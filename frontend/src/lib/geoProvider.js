@@ -12,24 +12,21 @@
  * into the caller's applyFix pipeline (Kalman, accuracy filter, throttle).
  */
 
-let isNative = false;
-let nativeDetected = false;
-
-function detectNative() {
-  if (nativeDetected) return;
-  nativeDetected = true;
+/**
+ * Returns true when running inside a Capacitor native shell.
+ * Evaluated fresh each call — Capacitor injects window.Capacitor into the
+ * WebView asynchronously, so a module-load-time snapshot can be wrong.
+ */
+function checkNative() {
   try {
-    // Capacitor global is injected by the native shell at load time
-    if (typeof window !== 'undefined' && window.Capacitor && window.Capacitor.isNativePlatform) {
-      isNative = window.Capacitor.isNativePlatform();
-    }
+    return typeof window !== 'undefined' &&
+      !!window.Capacitor &&
+      typeof window.Capacitor.isNativePlatform === 'function' &&
+      window.Capacitor.isNativePlatform();
   } catch (_) {
-    isNative = false;
+    return false;
   }
 }
-
-// Run detection immediately
-detectNative();
 
 // ── State shared across providers ───────────────────────────────────────────
 let primaryWatchId = null;
@@ -247,7 +244,7 @@ function normalise(pos) {
 export function startGeo(onFix, onError) {
   if (active) return;
   active = true;
-  if (isNative) {
+  if (checkNative()) {
     startNative(onFix, onError);
   } else {
     startWeb(onFix, onError);
@@ -260,7 +257,7 @@ export function startGeo(onFix, onError) {
 export function stopGeo() {
   if (!active) return;
   active = false;
-  if (isNative) {
+  if (checkNative()) {
     stopNative();
   } else {
     stopWeb();
@@ -271,7 +268,7 @@ export function stopGeo() {
  * Warm up GPS hardware (call early so the first real fix is faster).
  */
 export function warmUp() {
-  if (isNative) {
+  if (checkNative()) {
     // Only warm up GPS if permission is already granted — calling getCurrentPosition
     // without permission on some Android versions triggers the dialog at the wrong
     // moment (before any user interaction), which Android may auto-deny.
@@ -292,7 +289,7 @@ export function warmUp() {
  * @returns {Promise<string>} 'granted' | 'denied' | 'prompt' | 'unknown'
  */
 export async function checkPermission() {
-  if (isNative) {
+  if (checkNative()) {
     try {
       const { Geolocation } = await import('@capacitor/geolocation');
       const perm = await Geolocation.checkPermissions();
@@ -314,7 +311,7 @@ export async function checkPermission() {
  * @returns {boolean} Whether we're running inside a Capacitor native shell.
  */
 export function isNativePlatform() {
-  return isNative;
+  return checkNative();
 }
 
 /**
@@ -325,7 +322,7 @@ export function isNativePlatform() {
  * @param {function} onFix Called with (normalisedPos, forceEmit) for each background fix.
  */
 export async function startBackgroundGeo(onFix) {
-  if (!isNative || _bgGeoStarted) return;
+  if (!checkNative() || _bgGeoStarted) return;
   try {
     const { BackgroundGeolocation } = await import('@capacitor-community/background-geolocation');
     _bgGeoWatcher = await BackgroundGeolocation.addWatcher({
