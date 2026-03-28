@@ -59,10 +59,13 @@ async function startNative(onFix, onError) {
   const { Geolocation } = await import('@capacitor/geolocation');
   _CapGeolocation = Geolocation; // cache for stopNative()
 
-  // Request permission first (no-op if already granted)
+  // Request foreground location permission (no-op if already granted).
+  // Be explicit about which permissions to request so the plugin doesn't
+  // try to request background location — that would change the dialog on
+  // Android 10+ and break the flow on Android 11+.
   const perm = await Geolocation.checkPermissions();
   if (perm.location !== 'granted') {
-    const req = await Geolocation.requestPermissions();
+    const req = await Geolocation.requestPermissions({ permissions: ['location'] });
     if (req.location !== 'granted') {
       onError({ code: 1, message: 'Location permission denied' });
       return;
@@ -269,7 +272,12 @@ export function stopGeo() {
  */
 export function warmUp() {
   if (isNative) {
-    import('@capacitor/geolocation').then(({ Geolocation }) => {
+    // Only warm up GPS if permission is already granted — calling getCurrentPosition
+    // without permission on some Android versions triggers the dialog at the wrong
+    // moment (before any user interaction), which Android may auto-deny.
+    import('@capacitor/geolocation').then(async ({ Geolocation }) => {
+      const perm = await Geolocation.checkPermissions().catch(() => null);
+      if (perm?.location !== 'granted') return;
       Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 10000 }).catch(() => {});
     }).catch(() => {});
   } else if (navigator.geolocation) {
