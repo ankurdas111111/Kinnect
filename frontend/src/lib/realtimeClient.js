@@ -119,7 +119,9 @@ class WsCompatSocket {
   fireIo(event, ...args) {
     const cbs = this.ioListeners[event];
     if (cbs) cbs.forEach((cb) => cb(...args));
-    if (event === 'reconnect') this.fire('connect');
+    // Note: do NOT fire 'connect' here for 'reconnect' — ws.onopen already calls
+    // this.fire('connect') immediately before fireIo('reconnect'), so firing it
+    // again here would cause a double-connect and double handler execution.
   }
 }
 

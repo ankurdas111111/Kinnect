@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -356,4 +357,84 @@ func nullStr(p *string) interface{} {
 		return *p
 	}
 	return nil
+}
+
+// MovementEventRow is a single row for movement_events insert.
+type MovementEventRow struct {
+	UserID      string
+	EventType   string
+	Lat         *float64
+	Lng         *float64
+	SpeedMs     *float64
+	AccuracyM   *float64
+	PlaceID     *string
+	PlaceName   *string
+	MotionClass string
+	Metadata    map[string]interface{}
+}
+
+// InsertMovementEvent writes a single movement event to the DB.
+func InsertMovementEvent(ctx context.Context, db *sql.DB, row MovementEventRow) error {
+	meta := []byte("{}")
+	if row.Metadata != nil {
+		if b, err := json.Marshal(row.Metadata); err == nil {
+			meta = b
+		}
+	}
+	_, err := db.ExecContext(ctx,
+		`INSERT INTO movement_events
+		 (user_id, event_type, lat, lng, speed_ms, accuracy_m, place_id, place_name, motion_class, metadata)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+		row.UserID, row.EventType, row.Lat, row.Lng, row.SpeedMs, row.AccuracyM,
+		row.PlaceID, row.PlaceName, row.MotionClass, meta)
+	return err
+}
+
+// PurgeMovementEvents deletes movement_events older than the given number of days.
+func PurgeMovementEvents(ctx context.Context, db *sql.DB, days int) error {
+	_, err := db.ExecContext(ctx,
+		`DELETE FROM movement_events
+		 WHERE recorded_at < NOW() - MAKE_INTERVAL(days => $1)`,
+		days)
+	return err
+}
+
+// TrailPoint is a single point in a recent trail query result.
+type TrailPoint struct {
+	Lat float64
+	Lng float64
+	Ts  int64 // unix ms
+}
+
+// GetRecentTrail returns position history for a user within the last windowMinutes.
+// Results are ordered oldest-first, capped at 500 points.
+func GetRecentTrail(ctx context.Context, db *sql.DB, userID string, windowMinutes int) ([]TrailPoint, error) {
+	if windowMinutes <= 0 {
+		windowMinutes = 30
+	}
+	if windowMinutes > 60 {
+		windowMinutes = 60
+	}
+	rows, err := db.QueryContext(ctx,
+		`SELECT latitude, longitude,
+		        EXTRACT(EPOCH FROM recorded_at)::bigint * 1000 AS ts_ms
+		 FROM position_history
+		 WHERE user_id = $1
+		   AND recorded_at > NOW() - ($2 * INTERVAL '1 minute')
+		 ORDER BY recorded_at ASC
+		 LIMIT 500`,
+		userID, windowMinutes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var points []TrailPoint
+	for rows.Next() {
+		var p TrailPoint
+		if err := rows.Scan(&p.Lat, &p.Lng, &p.Ts); err != nil {
+			return nil, err
+		}
+		points = append(points, p)
+	}
+	return points, rows.Err()
 }

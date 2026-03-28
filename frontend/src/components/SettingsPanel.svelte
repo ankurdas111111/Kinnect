@@ -23,6 +23,8 @@
   let changingPw = false;
   let showDelete = false;
   let deleting = false;
+  let deleteCountdown = 0;
+  let deleteTimer = null;
 
   // Plain local state — driven only by clicks and acks, never by stores.
   // This prevents any external store write from overriding what the user just clicked.
@@ -31,6 +33,11 @@
   let privacyActive = false;
   let privacyTimeLeft = '';
   let _privacyTimer = null;
+
+  // Quiet Hours state
+  let quietHoursEnabled = false;
+  let quietHoursStart = '22:00';
+  let quietHoursEnd = '07:00';
 
   // Push notifications
   let pushSupported = false;
@@ -128,6 +135,7 @@
 
   onDestroy(() => {
     clearInterval(_privacyTimer);
+    if (deleteTimer) clearInterval(deleteTimer);
     socket.off('vapidKey', onVapidKey);
     socket.off('pushSubscribeAck', onPushSubscribeAck);
     socket.off('pushUnsubscribeAck', onPushUnsubscribeAck);
@@ -189,7 +197,7 @@
       pushEnabled = true;
       togglingPush = false;
       socket.emit('pushSubscribe', { endpoint: json.endpoint, keys: json.keys });
-      banner.set({ type: 'info', text: 'Push notifications enabled', actions: [] });
+      banner.set({ type: 'info', text: "Notifications on. We'll only bother you when it matters.", actions: [] });
       setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 2500);
     } catch (err) {
       togglingPush = false;
@@ -217,7 +225,7 @@
         pushEnabled = false;
         togglingPush = false;
         socket.emit('pushUnsubscribe', { endpoint });
-        banner.set({ type: 'info', text: 'Push notifications disabled', actions: [] });
+        banner.set({ type: 'info', text: 'Notifications off. Radio silence.', actions: [] });
         setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 2500);
       } else {
         pushEnabled = false;
@@ -235,7 +243,7 @@
     const res = await apiPost('/api/profile/update', { firstName, lastName, email, mobile });
     saving = false;
     if (res.ok) {
-      banner.set({ type: 'info', text: 'Profile updated', actions: [] });
+      banner.set({ type: 'info', text: 'Looking good. Profile saved.', actions: [] });
       setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 2000);
     } else {
       banner.set({ type: 'sos', text: res.error || 'Failed to update', actions: [] });
@@ -256,7 +264,7 @@
       currentPassword = '';
       newPassword = '';
       confirmPassword = '';
-      banner.set({ type: 'info', text: 'Password changed', actions: [] });
+      banner.set({ type: 'info', text: "New password locked in. Don't lose this one.", actions: [] });
       setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 2000);
     } else {
       banner.set({ type: 'sos', text: res.error || 'Failed', actions: [] });
@@ -286,6 +294,16 @@
     setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 2500);
   }
 
+  function startDeleteFlow() {
+    showDelete = true;
+    deleteCountdown = 3;
+    if (deleteTimer) clearInterval(deleteTimer);
+    deleteTimer = setInterval(() => {
+      deleteCountdown--;
+      if (deleteCountdown <= 0) clearInterval(deleteTimer);
+    }, 1000);
+  }
+
   function setPrivacyMode(duration) {
     // Optimistic — update local state immediately, backend confirms via privacyPauseAck.
     if (duration === 'resume') {
@@ -298,11 +316,23 @@
     _updatePrivacy();
     socket.emit('setPrivacyPause', { duration });
   }
+
+  function saveQuietHours() {
+    socket.emit('updateQuietHours', {
+      enabled: quietHoursEnabled,
+      startTime: quietHoursStart,
+      endTime: quietHoursEnd,
+    });
+    banner.set({ type: 'info', text: quietHoursEnabled
+      ? `Quiet hours set — contacts see a blurred location ${quietHoursStart}–${quietHoursEnd}`
+      : 'Quiet hours disabled', actions: [] });
+    setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 3000);
+  }
 </script>
 
 {#if embedded}
   <div class="panel-body settings-panel">
-    <h4>Profile</h4>
+    <h4 class="section-title-bold">Profile</h4>
     <div class="form-section">
       <label class="field-label">
         First Name
@@ -326,45 +356,80 @@
     </div>
 
     <hr class="divider" />
-    <h4>Privacy Mode</h4>
+    <h4 class="section-title-bold">Go Dark</h4>
     <div class="form-section">
-      <p class="hint">Temporarily hide your location from everyone.</p>
+      <p class="hint">Temporarily vanish from everyone's map. No trace. Full ghost.</p>
       {#if privacyActive}
-        <div class="privacy-active">
-          <span class="privacy-badge">Paused — {privacyTimeLeft} left</span>
-          <button class="btn btn-secondary btn-sm" on:click={() => setPrivacyMode('resume')}>Resume Sharing</button>
+        <div class="privacy-active animate-slide-up">
+          <span class="ghost-emoji animate-ghost-float" aria-hidden="true">👻</span>
+          <div class="ghost-info">
+            <p class="ghost-status">You're invisible</p>
+            <p class="ghost-time">{privacyTimeLeft} left</p>
+          </div>
+          <button class="btn btn-secondary btn-sm" on:click={() => setPrivacyMode('resume')}>Come Back</button>
         </div>
       {:else}
         <div class="privacy-btns">
-          <button class="btn btn-secondary btn-sm" on:click={() => setPrivacyMode('1h')}>Pause 1h</button>
-          <button class="btn btn-secondary btn-sm" on:click={() => setPrivacyMode('4h')}>Pause 4h</button>
-          <button class="btn btn-secondary btn-sm" on:click={() => setPrivacyMode('8h')}>Pause 8h</button>
+          <button class="btn btn-secondary btn-sm" on:click={() => setPrivacyMode('1h')}>Ghost: 1 Hour</button>
+          <button class="btn btn-secondary btn-sm" on:click={() => setPrivacyMode('4h')}>Ghost: 4 Hours</button>
+          <button class="btn btn-secondary btn-sm" on:click={() => setPrivacyMode('8h')}>Ghost: 8 Hours</button>
         </div>
       {/if}
     </div>
 
     <hr class="divider" />
-    <h4>Location Retention</h4>
+    <h4 class="section-title-bold">Quiet Hours</h4>
     <div class="form-section">
-      <p class="hint">How long your last known location stays visible to others after you go offline.</p>
-      <div class="retention-btns">
-        {#each [['default','24h'],['48h','2d'],['5d','5d'],['10d','10d'],['30d','30d']] as [mode, label]}
+      <p class="hint">During Quiet Hours, contacts see a blurred location (±500m). Guardians always get your exact position.</p>
+      <label class="toggle-row">
+        <span>Enable Quiet Hours</span>
+        <button
+          class="toggle-btn"
+          class:on={quietHoursEnabled}
+          on:click={() => { quietHoursEnabled = !quietHoursEnabled; }}
+          aria-label={quietHoursEnabled ? 'Disable quiet hours' : 'Enable quiet hours'}
+        >
+          <span class="toggle-knob"></span>
+        </button>
+      </label>
+      {#if quietHoursEnabled}
+        <div class="quiet-time-row">
+          <label class="field-label-inline">
+            From
+            <input type="time" bind:value={quietHoursStart} class="field-input field-time" />
+          </label>
+          <label class="field-label-inline">
+            To
+            <input type="time" bind:value={quietHoursEnd} class="field-input field-time" />
+          </label>
+        </div>
+      {/if}
+      <button class="btn btn-primary btn-sm" on:click={saveQuietHours}>Save Quiet Hours</button>
+    </div>
+
+    <hr class="divider" />
+    <h4 class="section-title-bold">Stay Visible For</h4>
+    <div class="form-section">
+      <p class="hint">How long your last known spot stays visible after you go offline. Longer = your people can still find you.</p>
+      <div class="retention-pills">
+        {#each [['default','1 Day'],['48h','2 Days'],['5d','5 Days'],['10d','10 Days'],['30d','30 Days']] as [mode, label]}
           <button
-            class="btn btn-sm"
-            class:btn-primary={retentionMode === mode}
-            class:btn-secondary={retentionMode !== mode}
+            class="retention-pill"
+            class:active={retentionMode === mode}
             on:click={() => setRetentionMode(mode)}
+            aria-pressed={retentionMode === mode}
           >{label}</button>
         {/each}
       </div>
     </div>
 
     <hr class="divider" />
-    <h4>Push Notifications</h4>
+    <h4 class="section-title-bold">Alerts & Pings</h4>
     <div class="form-section">
       {#if pushSupported}
+        <p class="hint">SOS alerts, check-in reminders, guardian updates. We only interrupt when it matters, promise.</p>
         <label class="toggle-row">
-          <span>Enable push notifications</span>
+          <span>{pushEnabled ? 'Notifications on' : 'Enable notifications'}</span>
           <button
             class="toggle-btn"
             class:on={pushEnabled}
@@ -382,7 +447,7 @@
     </div>
 
     <hr class="divider" />
-    <h4>Change Password</h4>
+    <h4 class="section-title-bold">Change Password</h4>
     <div class="form-section">
       <label class="field-label">
         Current Password
@@ -402,22 +467,32 @@
     </div>
 
     <hr class="divider" />
-    <h4>Danger Zone</h4>
+    <div class="danger-zone-header">
+      <h4 class="section-title-bold danger-title">Point of No Return</h4>
+    </div>
     <div class="form-section">
       {#if showDelete}
-        <p class="hint danger-text">This action is permanent and cannot be undone.</p>
+        <p class="hint danger-text">This permanently deletes your account, location history, and all connections. <strong>This cannot be undone.</strong></p>
         <label class="field-label">
           Enter your password to confirm
           <input type="password" bind:value={deletePassword} class="field-input" />
         </label>
         <div class="delete-actions">
-          <button class="btn btn-danger btn-sm" on:click={deleteAccount} disabled={deleting || !deletePassword}>
-            {deleting ? 'Deleting...' : 'Delete My Account'}
+          <button
+            class="btn btn-sm delete-countdown-btn"
+            class:counting={deleteCountdown > 0}
+            class:counting3={deleteCountdown === 3}
+            class:counting2={deleteCountdown === 2}
+            class:counting1={deleteCountdown === 1}
+            on:click={deleteAccount}
+            disabled={deleting || !deletePassword || deleteCountdown > 0}
+          >
+            {deleting ? 'Deleting...' : deleteCountdown > 0 ? `Wait ${deleteCountdown}…` : 'Delete Everything'}
           </button>
-          <button class="btn btn-secondary btn-sm" on:click={() => { showDelete = false; deletePassword = ''; }}>Cancel</button>
+          <button class="btn btn-secondary btn-sm" on:click={() => { showDelete = false; deletePassword = ''; deleteCountdown = 0; if (deleteTimer) clearInterval(deleteTimer); }}>Cancel</button>
         </div>
       {:else}
-        <button class="btn btn-danger-outline btn-sm" on:click={() => showDelete = true}>Delete Account</button>
+        <button class="btn btn-danger-outline btn-sm" on:click={startDeleteFlow}>Delete Everything</button>
       {/if}
     </div>
   </div>
@@ -436,14 +511,10 @@
 <style>
   .settings-panel { padding: 0; }
 
-  h4 {
-    font-size: 13px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--text-secondary, #666);
-    margin: 12px 0 8px;
-    padding: 0 16px;
+  /* Section title padding — font handled by global section-title-bold */
+  h4.section-title-bold {
+    margin: var(--space-4) 0 var(--space-2);
+    padding: 0 var(--space-4);
   }
 
   .form-section {
@@ -459,22 +530,22 @@
     gap: 4px;
     font-size: 12px;
     font-weight: 600;
-    color: var(--text-secondary, #666);
+    color: var(--text-secondary);
   }
 
   .field-input {
     padding: 8px 10px;
-    border: 1px solid var(--border-primary, #e0e0e0);
-    border-radius: 8px;
-    font-size: 13px;
-    background: var(--surface-primary, white);
-    color: var(--text-primary, #111);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+    background: var(--surface-3);
+    color: var(--text-primary);
   }
 
   .field-input:focus {
     outline: none;
-    border-color: var(--primary-500, #3b82f6);
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+    border-color: var(--primary-400);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
   }
 
   .hint {
@@ -512,10 +583,69 @@
     margin: 8px 0;
   }
 
-  .retention-btns {
+  /* MERIDIAN: Retention pills with glow on selection */
+  .retention-pills {
     display: flex;
-    gap: 8px;
+    gap: var(--space-1-5);
     flex-wrap: wrap;
+  }
+
+  .retention-pill {
+    padding: var(--space-1-5) var(--space-3);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-full);
+    background: var(--surface-1);
+    color: var(--text-secondary);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 200ms var(--ease-spring);
+  }
+
+  .retention-pill:hover {
+    background: var(--surface-2);
+    color: var(--text-primary);
+  }
+
+  .retention-pill.active {
+    background: var(--primary-600);
+    color: white;
+    border-color: var(--primary-500);
+    box-shadow: var(--glow-primary), var(--shadow-xs);
+    transform: scale(1.04);
+    animation: pill-select 300ms var(--ease-spring);
+  }
+
+  /* MERIDIAN: Danger zone */
+  .danger-zone-header {
+    border-top: 2px solid rgba(239, 68, 68, 0.28);
+    padding-top: var(--space-2);
+  }
+
+  .danger-title {
+    color: var(--danger-600) !important;
+  }
+
+  .delete-countdown-btn {
+    background: var(--danger-500);
+    color: white;
+    border: none;
+    transition: background 800ms, box-shadow 800ms;
+  }
+
+  /* 3-color progression: gray → amber → red as countdown ticks 3 → 2 → 1 */
+  .delete-countdown-btn.counting3 {
+    background: var(--gray-500);
+    box-shadow: none;
+  }
+  .delete-countdown-btn.counting2 {
+    background: var(--warning-500);
+    box-shadow: none;
+  }
+  .delete-countdown-btn.counting1 {
+    background: var(--danger-500);
+    box-shadow: 0 0 16px rgba(239, 68, 68, 0.40);
   }
 
   .privacy-btns {
@@ -577,4 +707,47 @@
     transition: transform 0.2s;
   }
   .toggle-btn.on .toggle-knob { transform: translateX(18px); }
+
+  /* ── Ghost mode card ─────────────────────────────────────────────── */
+  .privacy-active {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    background: rgba(245, 158, 11, 0.08);
+    border: 1px solid rgba(245, 158, 11, 0.20);
+    border-radius: var(--radius-md);
+    flex-wrap: wrap;
+  }
+  .ghost-emoji {
+    font-size: 24px;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+  .ghost-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .ghost-status {
+    font-size: var(--text-sm);
+    font-weight: 700;
+    color: var(--warning-700, #b45309);
+  }
+  .ghost-time {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+  }
+
+  .quiet-time-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin: 8px 0;
+  }
+  .field-time {
+    width: 110px;
+  }
 </style>

@@ -235,11 +235,18 @@ func (h *Hub) runAutoRules(user *cache.ActiveUser) {
 		}
 	}
 
-	// Geofence
+	// Geofence: only trigger SOS on inside→outside transition (requires confirmed prior inside state).
 	if user.AutoSOS.Geofence && user.Geofence.Enabled && user.Geofence.CenterLat != nil && user.Geofence.CenterLng != nil {
 		if user.Latitude != nil && user.Longitude != nil {
 			dist := shared.HaversineM(*user.Geofence.CenterLat, *user.Geofence.CenterLng, *user.Latitude, *user.Longitude)
-			if dist > user.Geofence.RadiusM && !user.SOS.Active {
+			isInside := dist <= user.Geofence.RadiusM
+			if isInside {
+				t := true
+				user.Geofence.WasInside = &t
+			} else if user.Geofence.WasInside != nil && *user.Geofence.WasInside && !user.SOS.Active {
+				// Confirmed transition: was inside, now outside.
+				f := false
+				user.Geofence.WasInside = &f
 				reason := "Left geofence area"
 				h.setSos(user, true, reason, "", "auto")
 			}
@@ -276,12 +283,25 @@ func (h *Hub) emitLiveCheckIn(user *cache.ActiveUser) {
 
 // publicSos builds public SOS payload.
 func (h *Hub) publicSos(user *cache.ActiveUser) map[string]interface{} {
+	sosMap := map[string]interface{}{
+		"active": user.SOS.Active, "at": user.SOS.At, "reason": user.SOS.Reason,
+		"type": user.SOS.Type, "acks": user.SOS.Acks,
+	}
+	if user.SOS.Token != nil {
+		sosMap["token"] = *user.SOS.Token
+	}
+	if user.SOS.Narrative != nil {
+		sosMap["narrative"] = map[string]interface{}{
+			"trackGeojson":  user.SOS.Narrative.TrackGeojson,
+			"motionSummary": user.SOS.Narrative.MotionSummary,
+			"batteryPct":    user.SOS.Narrative.BatteryPct,
+			"triggerRule":   user.SOS.Narrative.TriggerRule,
+			"lastSignalTs":  user.SOS.Narrative.LastSignalTs,
+		}
+	}
 	return map[string]interface{}{
 		"socketId": user.SocketID, "userId": user.UserID, "displayName": user.DisplayName,
-		"sos": map[string]interface{}{
-			"active": user.SOS.Active, "at": user.SOS.At, "reason": user.SOS.Reason,
-			"type": user.SOS.Type, "acks": user.SOS.Acks,
-		},
+		"sos": sosMap,
 	}
 }
 
@@ -296,7 +316,7 @@ func (h *Hub) setSos(user *cache.ActiveUser, active bool, reason, ackBy, sosType
 		t := sosType
 		user.SOS.Type = &t
 		if ackBy != "" {
-			user.SOS.Acks = append(user.SOS.Acks, ackBy)
+			user.SOS.Acks = append(user.SOS.Acks, cache.SosAckEntry{By: ackBy})
 		}
 	} else {
 		user.SOS.At = nil
@@ -305,6 +325,7 @@ func (h *Hub) setSos(user *cache.ActiveUser, active bool, reason, ackBy, sosType
 		user.SOS.Acks = nil
 		user.SOS.Token = nil
 		user.SOS.TokenExp = nil
+		user.SOS.Narrative = nil // free the GeoJSON blob assembled on trigger
 	}
 }
 
@@ -369,6 +390,7 @@ func (h *Hub) queuePositionBroadcast(user *cache.ActiveUser, data map[string]int
 }
 
 // flushPositionBroadcasts sends all queued position updates.
+// Applies quiet hours privacy jitter for non-guardian recipients when active.
 func (h *Hub) flushPositionBroadcasts() {
 	h.positionTimerMu.Lock()
 	batch := make(map[string]positionBroadcast)
@@ -381,9 +403,66 @@ func (h *Hub) flushPositionBroadcasts() {
 
 	serverTs := time.Now().UnixMilli()
 	for _, pb := range batch {
-		pb.data["serverTs"] = serverTs
-		h.emitToVisible(pb.user, "userUpdate", pb.data)
+		// Copy the shared sanitized map before mutating — prevents data race with
+		// the dispatch goroutine which may still hold a reference to the original.
+		data := make(map[string]interface{}, len(pb.data)+1)
+		for k, v := range pb.data {
+			data[k] = v
+		}
+		data["serverTs"] = serverTs
+		pb.data = data
+		user := pb.user
+
+		// Apply quiet hours jitter and schedule filtering per recipient
+		quietActive := user.QuietHoursEnabled && isQuietHoursNow(user.QuietHoursStart, user.QuietHoursEnd)
+		hasSchedule := h.Cache.HasSharingSchedules(user.UserID)
+		if quietActive || hasSchedule {
+			sids := h.Cache.GetVisibleSocketIDs(user)
+			for _, sid := range sids {
+				recipient := h.Cache.GetActiveUser(sid)
+				if recipient == nil {
+					h.SendToClient(sid, "userUpdate", pb.data)
+					continue
+				}
+				// Check adaptive schedule: if sender has rules, verify this recipient is in a window
+				if hasSchedule {
+					recipRooms := h.Cache.GetUserRooms(recipient.UserID)
+					if !h.Cache.IsScheduleVisible(user.UserID, recipient.UserID, recipRooms) {
+						continue // this recipient is outside the sharing window — skip
+					}
+				}
+				// Apply quiet hours jitter for non-guardian contacts
+				if quietActive {
+					isGuardian := h.Cache.IsGuardianOf(recipient.UserID, user.UserID)
+					if isGuardian {
+						h.SendToClient(sid, "userUpdate", pb.data)
+					} else {
+						h.SendToClient(sid, "userUpdate", copyMapWithJitter(pb.data))
+					}
+				} else {
+					h.SendToClient(sid, "userUpdate", pb.data)
+				}
+			}
+		} else {
+			h.emitToVisible(user, "userUpdate", pb.data)
+		}
 	}
+}
+
+// copyMapWithJitter creates a shallow copy of data with jittered lat/lng.
+func copyMapWithJitter(data map[string]interface{}) map[string]interface{} {
+	out := make(map[string]interface{}, len(data))
+	for k, v := range data {
+		out[k] = v
+	}
+	if lat, ok := data["lat"].(float64); ok {
+		if lng, ok := data["lng"].(float64); ok {
+			jLat, jLng := applyPrivacyJitter(lat, lng)
+			out["lat"] = jLat
+			out["lng"] = jLng
+		}
+	}
+	return out
 }
 
 // userInRooms returns room codes from roomCodes that userID is a member of.

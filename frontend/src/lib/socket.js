@@ -3,11 +3,15 @@ import { otherUsers, mySocketId, myLocation, mySafetyStatus } from './stores/map
 import { myRooms, myShareCode, myContactInfo } from './stores/rooms.js';
 import { myContacts } from './stores/contacts.js';
 import { myGuardianData, canManage, pendingIncomingRequests } from './stores/guardians.js';
-import { banner, alertState, myLiveLinks, mySosActive } from './stores/sos.js';
+import { banner, alertState, myLiveLinks, mySosActive, sosNarratives, activeSosUsers } from './stores/sos.js';
 import { adminOverview } from './stores/admin.js';
 import { privacyPause } from './stores/places.js';
 import { authUser } from './stores/auth.js';
 import { drainBuffer, hasBuffered } from './offlineBuffer.js';
+import { pulseMap } from './stores/pulses.js';
+import { arrivalProjections } from './stores/arrivals.js';
+import { networkGraph } from './stores/network.js';
+import { trailData } from './stores/trail.js';
 import { recordLatency } from './stores/latency.js';
 import { createRealtimeSocket } from './realtimeClient.js';
 
@@ -175,7 +179,8 @@ export function setupSocketHandlers() {
     _localMap = new Map();
     const sid = get(mySocketId);
     (users || []).forEach(u => {
-      if (u.socketId !== sid) _localMap.set(u.socketId, u);
+      if (u.socketId === sid) { extractSafety(u); return; }
+      _localMap.set(u.socketId, u);
     });
     otherUsers.set(_localMap); // full replacement — notify immediately
   });
@@ -266,14 +271,14 @@ export function setupSocketHandlers() {
 
   socket.on('guardianUpdated', (data) => {
     if (!data) return;
-    if (data.status === 'active' || data.status === 'denied' || data.status === 'revoked') {
+    if (data.status === 'active' || data.status === 'denied' || data.status === 'revoked' || data.status === 'expired') {
       pendingIncomingRequests.update(arr => arr.filter(r => {
         if (r.type === 'guardian' && r.from === data.guardianId) return false;
         if (r.type === 'guardianInvite' && r.from === data.wardId) return false;
         return true;
       }));
     }
-    const statusMsg = data.status === 'active' ? 'approved' : data.status === 'denied' ? 'denied' : data.status === 'revoked' ? 'revoked' : data.status;
+    const statusMsg = data.status === 'active' ? 'approved' : data.status === 'denied' ? 'denied' : data.status === 'revoked' ? 'revoked' : data.status === 'expired' ? 'expired' : data.status;
     setBanner({ type: 'info', text: 'Guardian relationship ' + statusMsg, actions: [] }, 2000);
   });
 
@@ -301,34 +306,73 @@ export function setupSocketHandlers() {
   });
   socket.on('liveLinkCreated', (data) => {
     const url = window.location.origin + '/#/live/' + data.token;
-    navigator.clipboard.writeText(url).catch(() => {});
+    navigator.clipboard.writeText(url).catch(() => {
+      // Clipboard write failed (e.g. permissions denied) — show the URL so user can copy manually.
+      setBanner({ type: 'info', text: 'Live link: ' + url, actions: [] }, 10000);
+      return;
+    });
     setBanner({ type: 'info', text: 'Live link created and copied!', actions: [] }, 2500);
   });
 
   // SOS events (persistent banners — no auto-clear)
+  // Pulse Check-In — ephemeral heartbeat from a contact
+  socket.on('pulseReceived', (data) => {
+    if (!data || !data.userId) return;
+    pulseMap.update(m => {
+      m.set(data.userId, data);
+      return m;
+    });
+    // Auto-expire after 30s
+    setTimeout(() => {
+      pulseMap.update(m => { m.delete(data.userId); return m; });
+    }, 30000);
+    if (data.type === 'ok') {
+      setBanner({ type: 'info', text: `${data.displayName || 'Someone'} sent an I'm OK pulse`, actions: [] }, 5000);
+    } else if (data.type === 'callme') {
+      setBanner({ type: 'sos', text: `${data.displayName || 'Someone'} needs you to call them`, actions: [
+        { label: 'Dismiss', kind: 'btn-secondary', onClick: () => setBanner({ type: null, text: null, actions: [] }) }
+      ] }, 8000);
+    }
+  });
+
+  // SOS Narrative — builds crisis card for AlertOverlay / WatchViewer
+  socket.on('sosNarrative', (data) => {
+    if (!data || !data.userId) return;
+    sosNarratives.update(m => { m.set(data.userId, data); return m; });
+  });
+
   socket.on('sosUpdate', (s) => {
     if (!s) return;
+    const sos = s.sos || {};
     const isMe = s.socketId === get(mySocketId);
-    if (isMe) mySosActive.set(!!s.active);
-    if (s.active) {
+    if (isMe) mySosActive.set(!!sos.active);
+    // Track active SOS users for AlertOverlay narrative display
+    if (s.userId) {
+      if (sos.active) {
+        activeSosUsers.update(m => { m.set(s.userId, s); return m; });
+      } else {
+        activeSosUsers.update(m => { m.delete(s.userId); return m; });
+      }
+    }
+    if (sos.active) {
       const from = isMe ? 'You' : ((_localMap.get(s.socketId) || {}).displayName || s.socketId);
-      const reason = s.reason || 'SOS';
-      const ackCount = typeof s.ackCount === 'number' ? s.ackCount : (s.acks ? s.acks.length : 0);
+      const reason = sos.reason || 'SOS';
+      const ackCount = typeof sos.ackCount === 'number' ? sos.ackCount : (sos.acks ? sos.acks.length : 0);
       const ackText = ackCount ? `Acknowledged (${ackCount})` : 'Not acknowledged';
 
       if (isMe) {
-        const ackNames = Array.isArray(s.acks) && s.acks.length > 0
-          ? s.acks.map(a => a.by || 'Someone').join(', ')
+        const ackNames = Array.isArray(sos.acks) && sos.acks.length > 0
+          ? sos.acks.map(a => a.by || 'Someone').join(', ')
           : null;
         const myText = ackNames
           ? `Your SOS is active: ${reason} — Acknowledged by: ${ackNames}`
           : `Your SOS is active: ${reason} — Not yet acknowledged`;
         // SOS banners persist — no auto-clear
         setBanner({ type: 'sos', text: myText, actions: [
-          { label: 'Copy watch link', kind: 'btn-secondary', onClick: () => { if (s.token) navigator.clipboard.writeText(window.location.origin + '/#/watch/' + s.token).catch(() => {}); } }
+          { label: 'Copy watch link', kind: 'btn-secondary', onClick: () => { if (sos.token) navigator.clipboard.writeText(window.location.origin + '/#/watch/' + sos.token).catch(() => {}); } }
         ] });
       } else {
-        const isGeofence = s.type === 'geofence';
+        const isGeofence = sos.type === 'geofence';
         const msg = `${isGeofence ? 'GEOFENCE BREACH' : 'SOS'} from ${from}: ${reason} - ${ackText}`;
         setBanner({ type: 'sos', text: msg, actions: [
           { label: 'Acknowledge', kind: 'btn-primary', onClick: () => { socket.emit('ackSOS', { socketId: s.socketId }); } },
@@ -347,6 +391,9 @@ export function setupSocketHandlers() {
         }
       }
     } else if (isMe) {
+      setBanner({ type: null, text: null, actions: [] });
+    } else {
+      // Non-self SOS resolved — clear any active SOS banner for this user.
       setBanner({ type: null, text: null, actions: [] });
     }
   });
@@ -378,7 +425,8 @@ export function setupSocketHandlers() {
     const sid = data.socketId;
     if (sid === get(mySocketId)) return;
     const u = _localMap.get(sid);
-    if (u && u.checkIn) {
+    if (u) {
+      if (!u.checkIn) u.checkIn = {};
       u.checkIn.lastCheckInAt = data.lastCheckInAt;
       _scheduleUsersFlush();
     }
@@ -402,9 +450,86 @@ export function setupSocketHandlers() {
     ] }, 8000);
   });
 
+  // Arrival Intelligence — ETA projections to named saved places
+  socket.on('arrivalProjection', (data) => {
+    if (!data || !data.userId) return;
+    arrivalProjections.update(m => { m.set(data.userId, data); return m; });
+  });
+
+  socket.on('arrivalDismiss', (data) => {
+    if (!data || !data.userId) return;
+    arrivalProjections.update(m => { m.delete(data.userId); return m; });
+  });
+
+  // Quiet Hours update
+  socket.on('quietHoursUpdated', (data) => {
+    if (!data) return;
+    // Update the user in _localMap so the quiet badge renders
+    for (const [sid, u] of _localMap) {
+      if (u.userId === data.userId) {
+        u.quietHoursActive = data.active;
+        _scheduleUsersFlush();
+        break;
+      }
+    }
+  });
+
   // Privacy pause
   socket.on('privacyPauseUpdate', (data) => {
     if (data) privacyPause.set(data.pausedUntil || null);
+  });
+
+  // ── Consumer feature events ──────────────────────────────────────────────────
+
+  // Attest update — refresh lastAttestAt on the user in otherUsers map
+  socket.on('attestUpdate', (data) => {
+    if (!data?.userId) return;
+    for (const [, u] of _localMap) {
+      if (u.userId === data.userId) { u.lastAttestAt = data.at; _scheduleUsersFlush(); break; }
+    }
+  });
+
+  // Trail data — store for Map.svelte to render polyline
+  socket.on('recentTrail', (data) => {
+    if (!data?.userId || !Array.isArray(data.points)) return;
+    trailData.update(m => { m.set(data.userId, data); return m; });
+  });
+  socket.on('trailError', (data) => {
+    setBanner({ type: 'info', text: data?.error || 'Trail unavailable', actions: [] }, 2000);
+  });
+
+  // Network graph
+  socket.on('networkGraph', (data) => { if (data) networkGraph.set(data); });
+
+  // On My Way
+  socket.on('onMyWayBroadcast', (data) => {
+    if (!data?.displayName) return;
+    const place = data.placeName ? ` → ${data.placeName}` : '';
+    setBanner({ type: 'info', text: `${data.displayName} is on their way${place}`, actions: [] }, 6000);
+  });
+  socket.on('onMyWayCancel', () => {});
+
+  // Co-location nudge
+  socket.on('colocationNudge', (data) => {
+    if (!data?.displayName) return;
+    setBanner({ type: 'info', text: `You're near ${data.displayName}!`, actions: [] }, 8000);
+  });
+
+  // Gentle "haven't moved" alert (received by guardian)
+  socket.on('gentleAlert', (data) => {
+    if (!data?.displayName) return;
+    const min = data.minutesStill ?? '?';
+    setBanner({ type: 'info', text: `${data.displayName} hasn't moved in ${min} min`, actions: [] }, 8000);
+  });
+
+  // Battery proxy alert
+  socket.on('batteryProxyAlert', (data) => {
+    if (!data?.displayName || data.batteryPct == null) return;
+    setBanner({
+      type: data.batteryPct <= 5 ? 'sos' : 'info',
+      text: `${data.displayName}'s battery is at ${data.batteryPct}%`,
+      actions: []
+    }, 10000);
   });
 
   // Network online/offline detection for immediate UX feedback

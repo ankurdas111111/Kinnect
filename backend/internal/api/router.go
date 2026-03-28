@@ -28,6 +28,7 @@ func NewRouter(cfg *config.Config, pool *db.Pool, c *cache.Cache, store *auth.Se
 	healthHandler := &HealthHandler{db: pool.DB, cache: c}
 	adminHandler := &AdminHandler{db: pool.DB, cache: c}
 	metricsHandler := NewMetricsHandler(hub)
+	placesHandler := &PlacesHandler{db: pool.DB}
 
 	// API routes
 	mux.Handle("POST /api/login", CsrfMiddleware(http.HandlerFunc(authHandler.Login)))
@@ -43,6 +44,12 @@ func NewRouter(cfg *config.Config, pool *db.Pool, c *cache.Cache, store *auth.Se
 	mux.Handle("GET /health", http.HandlerFunc(healthHandler.Health))
 	mux.Handle("GET /health/db", RequireAuth(RequireAdmin(http.HandlerFunc(healthHandler.HealthDb))))
 	mux.Handle("POST /api/admin/promote", RequireAuth(RequireAdmin(CsrfMiddleware(http.HandlerFunc(adminHandler.Promote)))))
+
+	// Saved places API
+	mux.Handle("GET /api/places", RequireAuth(http.HandlerFunc(placesHandler.ListPlaces)))
+	mux.Handle("POST /api/places", RequireAuth(CsrfMiddleware(http.HandlerFunc(placesHandler.CreatePlace))))
+	mux.Handle("DELETE /api/places/{placeId}", RequireAuth(CsrfMiddleware(http.HandlerFunc(placesHandler.DeletePlace))))
+	mux.Handle("GET /api/places/{placeId}/story", RequireAuth(http.HandlerFunc(placesHandler.GetZoneStory)))
 
 	// WebSocket upgrade endpoint with connection limiting
 	mux.HandleFunc("GET /ws", func(w http.ResponseWriter, r *http.Request) {

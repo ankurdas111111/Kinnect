@@ -113,6 +113,34 @@ func (h *Hub) StartCleanupRoutines(ctx context.Context) {
 		}
 	}()
 
+	// 8. Purge stale guardianship rows (expired/revoked, older than 30 days) — every 24h
+	go func() {
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				h.cleanupStaleGuardianships()
+			}
+		}
+	}()
+
+	// 9. Gentle "haven't moved" alerts for wards (every 5 min)
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				h.checkHaventMovedAlerts()
+			}
+		}
+	}()
+
 	slog.Info("Cleanup routines started")
 }
 
@@ -203,6 +231,16 @@ func (h *Hub) cleanupExpireGuardianships() {
 	}
 }
 
+func (h *Hub) cleanupStaleGuardianships() {
+	_, err := h.pool.DB.ExecContext(context.Background(),
+		`DELETE FROM guardianships
+		 WHERE status IN ('expired', 'revoked')
+		   AND created_at < extract(epoch from now() - interval '30 days')::bigint * 1000`)
+	if err != nil {
+		slog.Error("Failed to purge stale guardianships", "error", err)
+	}
+}
+
 func (h *Hub) cleanupCheckInOverdue() {
 	now := time.Now().UnixMilli()
 	h.Cache.ForEachActiveUser(func(socketID string, user *cache.ActiveUser) {
@@ -218,21 +256,62 @@ func (h *Hub) cleanupCheckInOverdue() {
 		overdueMs := int64(ch.OverdueMin) * 60 * 1000
 		since := now - lastAt
 
-		if since >= intervalMs {
+		// Only send checkInRequest once per interval period (debounce).
+		if since >= intervalMs && now-ch.RequestedAt > intervalMs {
+			ch.RequestedAt = now
 			h.SendToClient(socketID, "checkInRequest", map[string]interface{}{
-				"intervalMinutes":  ch.IntervalMin,
-				"overdueMinutes":   ch.OverdueMin,
+				"intervalMinutes": ch.IntervalMin,
+				"overdueMinutes":  ch.OverdueMin,
 			})
 		}
-		if since >= overdueMs {
+		// Only send checkInMissed once per overdue period (debounce).
+		if since >= overdueMs && now-ch.MissedNotifiedAt > overdueMs {
+			ch.MissedNotifiedAt = now
 			missedPayload := map[string]interface{}{
-				"socketId":        socketID,
-				"userId":          user.UserID,
-				"displayName":     user.DisplayName,
-				"lastCheckInAt":   lastAt,
-				"overdueMinutes":  ch.OverdueMin,
+				"socketId":       socketID,
+				"userId":         user.UserID,
+				"displayName":    user.DisplayName,
+				"lastCheckInAt":  lastAt,
+				"overdueMinutes": ch.OverdueMin,
 			}
 			h.emitToVisible(user, "checkInMissed", missedPayload)
+		}
+	})
+}
+
+// checkHaventMovedAlerts sends a gentle nudge to guardians when a ward has been
+// stationary for 45–240 minutes. Rate-limited to once per 60 min per ward.
+func (h *Hub) checkHaventMovedAlerts() {
+	now := time.Now().UnixMilli()
+	const minStillMs = 45 * 60 * 1000  // 45 min
+	const maxStillMs = 4 * 60 * 60 * 1000 // 4 hours (after this assume intentional)
+	const cooldownMs = 60 * 60 * 1000  // 1 hour between alerts
+
+	h.Cache.ForEachActiveUser(func(_ string, user *cache.ActiveUser) {
+		if user.MotionClass != "still" {
+			return
+		}
+		stillMs := now - user.LastMoveAt
+		if stillMs < minStillMs || stillMs > maxStillMs {
+			return
+		}
+		if now-user.GentleAlertSentAt < cooldownMs {
+			return
+		}
+		guardians := h.Cache.GetWardToGuardians(user.UserID)
+		if len(guardians) == 0 {
+			return
+		}
+		user.GentleAlertSentAt = now
+		payload := map[string]interface{}{
+			"userId":       user.UserID,
+			"displayName":  user.DisplayName,
+			"minutesStill": stillMs / 60000,
+		}
+		for guardianID := range guardians {
+			if sid := h.Cache.GetUserIdToSocketId(guardianID); sid != "" {
+				h.SendToClient(sid, "gentleAlert", payload)
+			}
 		}
 	})
 }

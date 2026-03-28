@@ -55,3 +55,18 @@ export async function apiGet(url) {
     return { ok: false, error: 'Network error' };
   }
 }
+
+export async function apiDelete(url) {
+  try {
+    if (!csrfToken) await fetchCsrf();
+    const res = await fetch(buildApiUrl(url), {
+      method: 'DELETE',
+      credentials: 'include',
+      headers: { 'x-csrf-token': csrfToken || '' }
+    });
+    if (res.status === 204) return { ok: true };
+    return safeJson(res);
+  } catch {
+    return { ok: false, error: 'Network error' };
+  }
+}

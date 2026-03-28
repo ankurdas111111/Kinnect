@@ -99,15 +99,22 @@
 
       <hr class="divider" />
 
-      <div class="section">
-        <label class="toggle"><input type="checkbox" bind:checked={autoSosEnabled}><span class="toggle-track"></span>Auto SOS</label>
-        <div class="field-row">
-          <span class="label mini">No-move minutes</span>
-          <input class="input w-input-sm" type="number" bind:value={noMoveMin} min="1" />
-        </div>
-        <div class="field-row">
-          <span class="label mini">Hard-stop minutes</span>
-          <input class="input w-input-sm" type="number" bind:value={hardStopMin} min="1" />
+      <!-- MERIDIAN: Amber card for auto-SOS config -->
+      <div class="auto-sos-card">
+        <span class="label-eyebrow auto-sos-eyebrow">
+          <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+          Auto-SOS Config
+        </span>
+        <div class="section" style="padding: 0;">
+          <label class="toggle"><input type="checkbox" bind:checked={autoSosEnabled}><span class="toggle-track"></span>Auto SOS</label>
+          <div class="field-row">
+            <span class="label mini">No-move minutes</span>
+            <input class="input w-input-sm" type="number" bind:value={noMoveMin} min="1" />
+          </div>
+          <div class="field-row">
+            <span class="label mini">Hard-stop minutes</span>
+            <input class="input w-input-sm" type="number" bind:value={hardStopMin} min="1" />
+          </div>
         </div>
       </div>
 
@@ -187,3 +194,26 @@
     </div>
   {/if}
 {/if}
+
+<style>
+  /* MERIDIAN: Amber card for auto-SOS section */
+  .auto-sos-card {
+    background: rgba(245, 158, 11, 0.07);
+    border: 1px solid rgba(245, 158, 11, 0.22);
+    border-radius: var(--radius-md);
+    padding: var(--space-3);
+    margin: var(--space-2) 0;
+  }
+
+  .auto-sos-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: var(--warning-600, #d97706);
+    margin-bottom: var(--space-2);
+  }
+</style>

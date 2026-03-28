@@ -3,166 +3,12 @@ package ws
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"log/slog"
 	"sync"
 	"time"
 
 	"kinnect-v3/internal/cache"
 )
-
-// PersistentSession stores active user state in database for recovery
-type PersistentSession struct {
-	UserID        string
-	SocketID      string
-	ConnectedAt   int64
-	LastUpdate    int64
-	LastLat       *float64
-	LastLng       *float64
-	LastSpeed     string
-	BatteryPct    *int
-	Online        bool
-	ExpiresAt     int64
-}
-
-// SessionPersister manages persistent session storage
-type SessionPersister struct {
-	db        *sql.DB
-	cache     sync.Map // userID -> PersistentSession
-	flushTick *time.Ticker
-	flushChan chan struct{}
-}
-
-// NewSessionPersister creates a new session persister
-func NewSessionPersister(database *sql.DB) *SessionPersister {
-	return &SessionPersister{
-		db:        database,
-		flushChan: make(chan struct{}, 10),
-	}
-}
-
-// StartPersistence begins the persistence loop
-func (sp *SessionPersister) StartPersistence(ctx context.Context) {
-	sp.flushTick = time.NewTicker(10 * time.Second)
-	defer sp.flushTick.Stop()
-
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-sp.flushTick.C:
-				sp.FlushSessions()
-			case <-sp.flushChan:
-				// Manual flush requested
-				sp.FlushSessions()
-			}
-		}
-	}()
-}
-
-// SaveSession saves or updates a session
-func (sp *SessionPersister) SaveSession(session *PersistentSession) {
-	session.ExpiresAt = time.Now().Add(24 * time.Hour).UnixMilli()
-	sp.cache.Store(session.UserID, session)
-}
-
-// GetSession retrieves a session
-func (sp *SessionPersister) GetSession(userID string) *PersistentSession {
-	val, ok := sp.cache.Load(userID)
-	if !ok {
-		return nil
-	}
-	return val.(*PersistentSession)
-}
-
-// DeleteSession removes a session
-func (sp *SessionPersister) DeleteSession(userID string) {
-	sp.cache.Delete(userID)
-}
-
-// FlushSessions writes all sessions to database
-func (sp *SessionPersister) FlushSessions() {
-	sessions := make([]*PersistentSession, 0, 100)
-
-	sp.cache.Range(func(key, value interface{}) bool {
-		session := value.(*PersistentSession)
-		sessions = append(sessions, session)
-		return true
-	})
-
-	if len(sessions) == 0 {
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	// Batch insert/update sessions
-	for _, session := range sessions {
-		err := sp.updateSessionDB(ctx, session)
-		if err != nil {
-			slog.Error("Failed to persist session", "userID", session.UserID, "error", err)
-		}
-	}
-
-	slog.Debug("Sessions persisted", "count", len(sessions))
-}
-
-// updateSessionDB updates a single session in database
-func (sp *SessionPersister) updateSessionDB(ctx context.Context, session *PersistentSession) error {
-	// SQL: Upsert (insert or update)
-	query := `
-		INSERT INTO active_sessions
-		(user_id, socket_id, connected_at, last_update, last_latitude, last_longitude, last_speed, battery_pct, online, expires_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-		ON CONFLICT (user_id) DO UPDATE SET
-		socket_id = $2, last_update = $4, last_latitude = $5, last_longitude = $6,
-		last_speed = $7, battery_pct = $8, online = $9, expires_at = $10
-	`
-
-	_, err := sp.db.ExecContext(ctx, query,
-		session.UserID, session.SocketID, session.ConnectedAt, session.LastUpdate,
-		session.LastLat, session.LastLng, session.LastSpeed, session.BatteryPct,
-		session.Online, session.ExpiresAt,
-	)
-	return err
-}
-
-// LoadActiveSessions loads active sessions from database at startup
-func (sp *SessionPersister) LoadActiveSessions(ctx context.Context) error {
-	query := `
-		SELECT user_id, socket_id, connected_at, last_update, last_latitude, last_longitude,
-		       last_speed, battery_pct, online, expires_at
-		FROM active_sessions
-		WHERE expires_at > EXTRACT(EPOCH FROM NOW())::bigint
-		ORDER BY last_update DESC
-		LIMIT 1000
-	`
-
-	rows, err := sp.db.QueryContext(ctx, query)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	count := 0
-	for rows.Next() {
-		session := &PersistentSession{}
-		err := rows.Scan(&session.UserID, &session.SocketID, &session.ConnectedAt, &session.LastUpdate,
-			&session.LastLat, &session.LastLng, &session.LastSpeed, &session.BatteryPct,
-			&session.Online, &session.ExpiresAt)
-		if err != nil {
-			return err
-		}
-
-		sp.cache.Store(session.UserID, session)
-		count++
-	}
-
-	slog.Info("Loaded active sessions", "count", count)
-	return nil
-}
 
 // HealthCheckService performs regular health checks
 type HealthCheckService struct {
@@ -371,6 +217,7 @@ func (gs *GracefulShutdown) Shutdown(ctx context.Context, hub *Hub) error {
 		defer cancel()
 
 		// Drain dispatch queue
+	drain:
 		for {
 			select {
 			case <-shutdownCtx.Done():
@@ -378,12 +225,11 @@ func (gs *GracefulShutdown) Shutdown(ctx context.Context, hub *Hub) error {
 				return
 			default:
 				hub.mu.RLock()
-				if len(hub.clients) == 0 {
-					hub.mu.RUnlock()
-					break
-				}
+				empty := len(hub.clients) == 0
 				hub.mu.RUnlock()
-
+				if empty {
+					break drain
+				}
 				time.Sleep(100 * time.Millisecond)
 			}
 		}
@@ -395,29 +241,3 @@ func (gs *GracefulShutdown) Shutdown(ctx context.Context, hub *Hub) error {
 	return err
 }
 
-// SerializeSession converts a session to JSON for storage
-func (ps *PersistentSession) MarshalJSON() ([]byte, error) {
-	m := map[string]interface{}{
-		"user_id":      ps.UserID,
-		"socket_id":    ps.SocketID,
-		"connected_at": ps.ConnectedAt,
-		"last_update":  ps.LastUpdate,
-		"online":       ps.Online,
-		"expires_at":   ps.ExpiresAt,
-	}
-
-	if ps.LastLat != nil {
-		m["last_lat"] = *ps.LastLat
-	}
-	if ps.LastLng != nil {
-		m["last_lng"] = *ps.LastLng
-	}
-	if ps.LastSpeed != "" {
-		m["last_speed"] = ps.LastSpeed
-	}
-	if ps.BatteryPct != nil {
-		m["battery_pct"] = *ps.BatteryPct
-	}
-
-	return json.Marshal(m)
-}

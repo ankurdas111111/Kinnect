@@ -25,12 +25,12 @@ func SanitizeString(val string, maxLen int) string {
 
 // ValidatedPosition holds validated position data.
 type ValidatedPosition struct {
-	Latitude     float64
-	Longitude    float64
-	Speed        float64
+	Latitude      float64
+	Longitude     float64
+	Speed         float64  // km/h — the frontend Kalman filter produces km/h (rawSpeed m/s × 3.6)
 	FormattedTime string
-	Accuracy     *float64
-	Timestamp    *int64
+	Accuracy      *float64
+	Timestamp     *int64
 }
 
 // ValidatePosition validates and extracts position data from a map.

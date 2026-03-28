@@ -26,6 +26,8 @@
   import MobileTopBar from '../components/primitives/MobileTopBar.svelte';
   import TrackingNowCard from '../components/primitives/TrackingNowCard.svelte';
   import OnboardingOverlay from '../components/OnboardingOverlay.svelte';
+  import NetworkPanel from '../components/NetworkPanel.svelte';
+  import PulseButton from '../components/primitives/PulseButton.svelte';
   import { calculateDistance } from '../lib/tracking.js';
   import { GPSKalmanFilter, VelocityKalmanFilter } from '../lib/kalman.js';
   import { startMotionSensor, stopMotionSensor, getMotionState } from '../lib/motionSensor.js';
@@ -318,6 +320,14 @@
       }
     );
 
+    // If no fix arrives within 12s (primary watchPosition timeout is 10s), replace the
+    // "Starting..." banner so the user knows we're still searching, not frozen.
+    setTimeout(() => {
+      if ($tracking && !lastAcceptedFix) {
+        banner.set({ type: 'info', text: 'Waiting for GPS signal...', actions: [] });
+      }
+    }, 12000);
+
     if (isNativePlatform()) {
       startBackgroundGeo((pos, forceEmit) => applyFix(pos, forceEmit));
     }
@@ -512,7 +522,7 @@
   <svelte:fragment slot="bottomSheet">
     <BottomSheet
       open={sheetOpen}
-      title={mobileTab === 'track' ? 'Track' : mobileTab === 'people' ? 'People' : mobileTab === 'share' ? 'Share' : mobileTab === 'safety' ? 'Safety' : 'Me'}
+      title={mobileTab === 'track' ? 'Track' : mobileTab === 'people' ? 'People' : mobileTab === 'share' ? 'Share' : mobileTab === 'safety' ? 'Safety' : mobileTab === 'network' ? 'Network' : 'Me'}
       on:close={() => {
         setSheetOpen(false);
       }}
@@ -528,10 +538,10 @@
           on:toggleFollow={() => (followMode = !followMode)}
         />
       {:else if mobileTab === 'me'}
-        <div class="me-subtabs">
-          <button class="subtab" class:active={meSubTab === 'info'} on:click={() => meSubTab = 'info'}>Info</button>
-          <button class="subtab" class:active={meSubTab === 'places'} on:click={() => meSubTab = 'places'}>Places</button>
-          <button class="subtab" class:active={meSubTab === 'settings'} on:click={() => meSubTab = 'settings'}>Settings</button>
+        <div class="spatial-subtabs">
+          <button class="spatial-subtab" class:active={meSubTab === 'info'} on:click={() => meSubTab = 'info'}>Info</button>
+          <button class="spatial-subtab" class:active={meSubTab === 'places'} on:click={() => meSubTab = 'places'}>Places</button>
+          <button class="spatial-subtab" class:active={meSubTab === 'settings'} on:click={() => meSubTab = 'settings'}>Settings</button>
         </div>
         {#if meSubTab === 'info'}
           <InfoPanel embedded={true} />
@@ -555,6 +565,8 @@
           <button class="btn btn-secondary" on:click={() => socket.emit('checkInAck')}>I'm OK</button>
         </div>
         <AdminPanel embedded={true} />
+      {:else if mobileTab === 'network'}
+        <NetworkPanel embedded={true} />
       {:else if mobileTab === 'people'}
         <UsersList embedded={true} />
       {/if}
@@ -591,6 +603,9 @@
       {/if}
     </button>
 
+    <!-- Pulse Check-In FAB -->
+    <PulseButton />
+
     <!-- FAB cluster — bottom-right: track + center + follow -->
     <div class="fab-wrapper" class:fab-wrapper--mobile={isMobile}>
       <MapFab
@@ -605,14 +620,14 @@
     <!-- SOS Confirmation Modal -->
     {#if sosConfirmOpen}
       <div class="sos-confirm-backdrop" on:click|self={() => sosConfirmOpen = false} on:keydown={(e) => { if (e.key === 'Escape') sosConfirmOpen = false; }} role="dialog" aria-modal="true" aria-label="Confirm SOS" tabindex="-1">
-        <div class="sos-confirm-card">
-          <div class="sos-confirm-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <div class="sos-confirm-card-spatial">
+          <div class="sos-icon-ring">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           </div>
           <h3 class="sos-confirm-title">Send SOS Alert?</h3>
-          <p class="sos-confirm-desc">This will immediately alert all your contacts that you need help. Your location will be shared with them.</p>
+          <p class="sos-confirm-desc">Everyone in your network will be alerted immediately. Your live location will be broadcast to all contacts.</p>
           <div class="sos-confirm-actions">
-            <button class="btn btn-ghost sos-cancel-btn" on:click={() => sosConfirmOpen = false}>Cancel</button>
+            <button class="btn btn-ghost sos-cancel-btn" on:click={() => sosConfirmOpen = false}>Not now</button>
             <button class="btn btn-danger sos-send-btn" on:click={() => { haptics.sos(); socket.emit('triggerSOS', { reason: 'SOS' }); sosConfirmOpen = false; }}>Send SOS</button>
           </div>
         </div>
@@ -633,38 +648,7 @@
 </AppLayout>
 
 <style>
-  .me-subtabs {
-    display: flex;
-    gap: 4px;
-    padding: 4px;
-    background: var(--surface-inset);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--border-subtle);
-    margin: 0 0 8px;
-  }
-
-  .subtab {
-    flex: 1;
-    padding: 6px 8px;
-    border: none;
-    background: transparent;
-    color: var(--text-secondary);
-    font-size: 12px;
-    font-weight: 600;
-    border-radius: calc(var(--radius-md) - 4px);
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-
-  .subtab.active {
-    background: var(--surface-2);
-    color: var(--primary-600);
-    box-shadow: var(--shadow-sm);
-  }
-
-  :global([data-theme="dark"]) .subtab.active {
-    color: var(--primary-400);
-  }
+  /* spatial-subtabs styles are in global.css */
 
   .safety-quick-actions {
     display: flex;
@@ -752,9 +736,9 @@
   .sos-confirm-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     z-index: calc(var(--z-panel, 100) + 10);
     display: flex;
     align-items: center;
@@ -762,31 +746,19 @@
     padding: var(--space-4);
     animation: fade-in 0.15s ease;
   }
-  .sos-confirm-card {
-    background: var(--surface-2);
-    border: 1px solid var(--border-default);
-    border-radius: 16px;
-    padding: 28px 24px 20px;
-    max-width: 340px;
-    width: 100%;
-    text-align: center;
-    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.25);
-    animation: scale-in 0.2s ease;
-  }
-  .sos-confirm-icon {
-    margin-bottom: 12px;
-  }
+  /* sos-confirm-card-spatial, .sos-icon-ring styles are in global.css */
   .sos-confirm-title {
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--text-primary);
+    font-size: 20px;
+    font-weight: 800;
+    color: white;
     margin: 0 0 8px;
+    letter-spacing: -0.02em;
   }
   .sos-confirm-desc {
     font-size: 13px;
-    color: var(--text-secondary);
-    line-height: 1.5;
-    margin: 0 0 20px;
+    color: rgba(255, 255, 255, 0.65);
+    line-height: 1.55;
+    margin: 0 0 24px;
   }
   .sos-confirm-actions {
     display: flex;
@@ -795,31 +767,32 @@
   }
   .sos-cancel-btn {
     flex: 1;
-    padding: 10px 16px;
-    border-radius: 10px;
+    padding: 11px 16px;
+    border-radius: var(--radius-lg);
     font-weight: 600;
     font-size: 14px;
-    background: var(--surface-inset);
-    color: var(--text-primary);
-    border: 1px solid var(--border-default);
+    background: rgba(255, 255, 255, 0.07);
+    color: rgba(255, 255, 255, 0.70);
+    border: 1px solid rgba(255, 255, 255, 0.10);
     cursor: pointer;
     transition: background var(--duration-fast) var(--ease-out);
   }
-  .sos-cancel-btn:hover { background: var(--surface-hover); }
+  .sos-cancel-btn:hover { background: rgba(255, 255, 255, 0.12); }
   .sos-send-btn {
     flex: 1;
-    padding: 10px 16px;
-    border-radius: 10px;
-    font-weight: 700;
+    padding: 11px 16px;
+    border-radius: var(--radius-lg);
+    font-weight: 800;
     font-size: 14px;
+    letter-spacing: 0.01em;
     background: #dc2626;
     color: white;
     border: none;
     cursor: pointer;
-    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.35);
+    box-shadow: 0 4px 16px rgba(220, 38, 38, 0.50);
+    transition: background var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
   }
-  .sos-send-btn:hover { background: #b91c1c; }
+  .sos-send-btn:hover { background: #ef4444; box-shadow: 0 6px 24px rgba(239, 68, 68, 0.55); }
   @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-  @keyframes scale-in { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
 
 </style>

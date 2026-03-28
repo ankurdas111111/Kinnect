@@ -7,11 +7,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"math"
+	mathrand "math/rand"
+	"strconv"
 	"strings"
 	"time"
 
 	"kinnect-v3/internal/cache"
 	"kinnect-v3/internal/db"
+	"kinnect-v3/internal/intelligence"
 	"kinnect-v3/internal/shared"
 )
 
@@ -24,6 +28,53 @@ const (
 	maxContactsPerUser   = 50
 	maxLiveLinksPerUser  = 10
 )
+
+// motionClass derives a motion class string from speed in km/h.
+// Frontend Kalman filter emits speed in km/h (browser raw m/s × 3.6).
+func motionClass(speedKmh float64) string {
+	switch {
+	case speedKmh < 1:
+		return "still"
+	case speedKmh < 7:
+		return "walk"
+	case speedKmh < 18:
+		return "run"
+	default:
+		return "vehicle"
+	}
+}
+
+// toMovementPhase maps speed in km/h to intelligence movement phase label.
+func toMovementPhase(speedKmh float64) string {
+	switch {
+	case speedKmh < 1:
+		return "stationary"
+	case speedKmh < 10:
+		return "walking"
+	case speedKmh < 50:
+		return "driving"
+	default:
+		return "transit"
+	}
+}
+
+// shouldWritePositionToDB returns true when a position update is meaningful enough to persist.
+func shouldWritePositionToDB(user *cache.ActiveUser, lat, lng, speedMs float64) bool {
+	if user.LastDBAt == 0 {
+		return true // first position ever
+	}
+	if shared.HaversineM(user.LastDBLat, user.LastDBLng, lat, lng) > 100 {
+		return true // moved 100m
+	}
+	if motionClass(speedMs) != user.MotionClass {
+		return true // class transition
+	}
+	if user.MotionClass != "still" &&
+		time.Now().UnixMilli()-user.LastDBAt > 5*60*1000 {
+		return true // 5-min heartbeat for moving users
+	}
+	return false
+}
 
 func toMap(data json.RawMessage) map[string]interface{} {
 	if len(data) == 0 {
@@ -81,19 +132,120 @@ func (h *Hub) handlePosition(c *Client, data json.RawMessage) {
 		user.HardStopAt = &t
 	}
 
-	// Record in position buffer
+	// ── Rolling buffer (always, every update — feeds SOS narrative) ──────────
+	h.pushRollingEntry(user.UserID, RollingEntry{
+		Lat:        pos.Latitude,
+		Lng:        pos.Longitude,
+		SpeedMs:    pos.Speed,
+		BatteryPct: user.BatteryPct,
+		Ts:         now,
+	})
+
+	// ── Motion class ─────────────────────────────────────────────────────────
+	newClass := motionClass(pos.Speed)
+	classChanged := newClass != user.MotionClass
+	prevClass := user.MotionClass
+	user.MotionClass = newClass
+
+	// ── Movement phase (intelligence label) ──────────────────────────────────
+	user.MovementPhase = toMovementPhase(pos.Speed)
+
+	// ── Safety score (recomputed on every position update) ───────────────────
+	{
+		checkInOverdueAt := int64(0)
+		if user.CheckIn.Enabled && user.CheckIn.IntervalMin > 0 && user.CheckIn.LastCheckInAt > 0 {
+			checkInOverdueAt = user.CheckIn.LastCheckInAt +
+				int64(user.CheckIn.IntervalMin+user.CheckIn.OverdueMin)*60*1000
+		}
+		geofenceBreached := user.Geofence.Enabled &&
+			user.Geofence.CenterLat != nil && user.Geofence.CenterLng != nil &&
+			user.Latitude != nil && user.Longitude != nil &&
+			shared.HaversineM(*user.Geofence.CenterLat, *user.Geofence.CenterLng,
+				*user.Latitude, *user.Longitude) > user.Geofence.RadiusM
+		sc := intelligence.ComputeSafetyScore(
+			user.Accuracy,
+			user.LastUpdate,
+			user.LastAttestAt,
+			user.CheckIn.Enabled,
+			checkInOverdueAt,
+			user.Geofence.Enabled,
+			geofenceBreached,
+			user.MotionClass,
+		)
+		user.SafetyScore = sc.Total
+	}
+
+	// ── Meaningful movement threshold ────────────────────────────────────────
 	var speedPtr *float64
 	if pos.Speed != 0 {
 		speedPtr = &pos.Speed
 	}
-	h.RecordPosition(user.UserID, pos.Latitude, pos.Longitude, speedPtr, pos.Accuracy)
-
-	// DB save throttle (30s)
-	if now-h.Cache.GetLastDbSaveAt(user.UserID) > dbSaveThrottleMs {
-		h.Cache.SetLastDbSaveAt(user.UserID, now)
-		speedStr := fmt.Sprintf("%.2f", pos.Speed)
-		_ = db.UpdateUserLocation(context.Background(), h.pool.DB, user.UserID, pos.Latitude, pos.Longitude, speedStr, now)
+	var accPtr *float64
+	if pos.Accuracy != nil {
+		a := *pos.Accuracy
+		accPtr = &a
 	}
+
+	if shouldWritePositionToDB(user, pos.Latitude, pos.Longitude, pos.Speed) {
+		user.LastDBLat = pos.Latitude
+		user.LastDBLng = pos.Longitude
+		user.LastDBAt = now
+
+		// Determine movement_events event type
+		evType := "waypoint"
+		if classChanged && prevClass == "still" && newClass != "still" {
+			evType = "trip_start"
+		} else if classChanged && prevClass != "still" && newClass == "still" {
+			evType = "trip_end"
+		} else if classChanged {
+			evType = "motion_class_change"
+		} else {
+			// Throttle plain waypoints: vehicle=60s, walk/run=120s
+			waypointInterval := int64(120_000)
+			if newClass == "vehicle" {
+				waypointInterval = 60_000
+			}
+			if now-user.LastWaypointAt < waypointInterval {
+				evType = "" // skip waypoint write this cycle
+			} else {
+				user.LastWaypointAt = now
+			}
+		}
+
+		lat, lng, spd := pos.Latitude, pos.Longitude, pos.Speed
+		uid := user.UserID
+		mc := newClass
+		pc := prevClass
+
+		go func() {
+			bCtx := context.Background()
+			// Dual-write: position_history (transition phase)
+			h.RecordPosition(uid, lat, lng, speedPtr, accPtr)
+			// movement_events (new semantic log)
+			if evType != "" {
+				spdF := spd
+				_ = db.InsertMovementEvent(bCtx, h.pool.DB, db.MovementEventRow{
+					UserID:      uid,
+					EventType:   evType,
+					Lat:         &lat,
+					Lng:         &lng,
+					SpeedMs:     &spdF,
+					AccuracyM:   accPtr,
+					MotionClass: mc,
+					Metadata:    map[string]interface{}{"prevClass": pc},
+				})
+			}
+			// users.last_* snapshot
+			speedStr := fmt.Sprintf("%.2f", spd)
+			_ = db.UpdateUserLocation(bCtx, h.pool.DB, uid, lat, lng, speedStr, now)
+		}()
+	}
+
+	// ── Activity context (derived from motion class + arrival state) ─────────
+	user.ActivityContext = computeActivityContext(user.UserID, user.MotionClass)
+
+	// ── Battery proxy alerts ──────────────────────────────────────────────────
+	checkBatteryAlerts(h, user)
 
 	sanitized := h.Cache.SanitizeUser(user)
 	sanitized["online"] = true
@@ -109,6 +261,7 @@ func (h *Hub) handlePosition(c *Client, data json.RawMessage) {
 }
 
 // handlePositionBatch handles batched position updates.
+// Applies the same motion/safety/auto-rules logic as handlePosition to each item.
 func (h *Hub) handlePositionBatch(c *Client, data json.RawMessage) {
 	if !c.CheckRateLimit("positionBatch", positionBatchRateMin) {
 		return
@@ -132,12 +285,74 @@ func (h *Hub) handlePositionBatch(c *Client, data json.RawMessage) {
 		if pos == nil {
 			continue
 		}
+		now := time.Now().UnixMilli()
 		user.Latitude = &pos.Latitude
 		user.Longitude = &pos.Longitude
 		user.Speed = pos.Speed
-		user.LastUpdate = time.Now().UnixMilli()
+		user.LastUpdate = now
 		user.FormattedTime = pos.FormattedTime
 		user.Accuracy = pos.Accuracy
+
+		// Rolling buffer feeds SOS narrative
+		h.pushRollingEntry(user.UserID, RollingEntry{
+			Lat:        pos.Latitude,
+			Lng:        pos.Longitude,
+			SpeedMs:    pos.Speed,
+			BatteryPct: user.BatteryPct,
+			Ts:         now,
+		})
+
+		// Motion tracking
+		user.MotionClass = motionClass(pos.Speed)
+		user.MovementPhase = toMovementPhase(pos.Speed)
+		if pos.Speed > 0.8 {
+			user.LastMoveAt = now
+		}
+		prevSpeed := user.LastSpeed
+		user.LastSpeed = pos.Speed
+		if prevSpeed > 25 && pos.Speed < 2 {
+			t := now
+			user.HardStopAt = &t
+		}
+
+		// Record position history
+		var speedPtr *float64
+		if pos.Speed != 0 {
+			speedPtr = &pos.Speed
+		}
+		var accPtr *float64
+		if pos.Accuracy != nil {
+			a := *pos.Accuracy
+			accPtr = &a
+		}
+		uid := user.UserID
+		lat, lng := pos.Latitude, pos.Longitude
+		go h.RecordPosition(uid, lat, lng, speedPtr, accPtr)
+	}
+
+	// Safety score on final position
+	{
+		checkInOverdueAt := int64(0)
+		if user.CheckIn.Enabled && user.CheckIn.IntervalMin > 0 && user.CheckIn.LastCheckInAt > 0 {
+			checkInOverdueAt = user.CheckIn.LastCheckInAt +
+				int64(user.CheckIn.IntervalMin+user.CheckIn.OverdueMin)*60*1000
+		}
+		geofenceBreached := user.Geofence.Enabled &&
+			user.Geofence.CenterLat != nil && user.Geofence.CenterLng != nil &&
+			user.Latitude != nil && user.Longitude != nil &&
+			shared.HaversineM(*user.Geofence.CenterLat, *user.Geofence.CenterLng,
+				*user.Latitude, *user.Longitude) > user.Geofence.RadiusM
+		sc := intelligence.ComputeSafetyScore(
+			user.Accuracy,
+			user.LastUpdate,
+			user.LastAttestAt,
+			user.CheckIn.Enabled,
+			checkInOverdueAt,
+			user.Geofence.Enabled,
+			geofenceBreached,
+			user.MotionClass,
+		)
+		user.SafetyScore = sc.Total
 	}
 
 	sanitized := h.Cache.SanitizeUser(user)
@@ -147,6 +362,7 @@ func (h *Hub) handlePositionBatch(c *Client, data json.RawMessage) {
 	for token := range tokens {
 		h.SendToGroup("live:"+token, "liveUpdate", map[string]interface{}{"user": sanitized})
 	}
+	h.runAutoRules(user)
 }
 
 // handleProfileUpdate updates battery, deviceType, connectionQuality.
@@ -237,9 +453,16 @@ func (h *Hub) handleSetPrivacyPause(c *Client, data json.RawMessage) {
 	default:
 		return
 	}
+	// Collect currently-visible sockets before invalidating, so we can tombstone them.
+	prevVisibleSids := h.Cache.GetVisibleSocketIDs(user)
 	user.PrivacyPausedUntil = pausedUntil
 	h.invalidateVisibility(user.UserID)
-	c.Send("privacyPauseAck", map[string]interface{}{"ok": true, "pausedUntil": pausedUntil})
+	c.Send("privacyPauseUpdate", map[string]interface{}{"ok": true, "pausedUntil": pausedUntil})
+	// Notify previously-visible users that this user is no longer sharing.
+	if pausedUntil != nil {
+		tombstone := map[string]interface{}{"socketId": user.SocketID, "privacyPaused": true}
+		h.SendToClients(prevVisibleSids, "userPrivacyPaused", tombstone)
+	}
 }
 
 // handleSetRetentionForever sets retention to forever (admin only).
@@ -324,7 +547,7 @@ func (h *Hub) handleCreateRoom(c *Client, data json.RawMessage) {
 		return
 	}
 	if h.Cache.GetUserRoomCount(user.UserID) >= maxRoomsPerUser {
-		c.Send("roomError", map[string]interface{}{"message": "Room limit reached (" + string(rune(maxRoomsPerUser)) + ")"})
+		c.Send("roomError", map[string]interface{}{"message": "Room limit reached (" + strconv.Itoa(maxRoomsPerUser) + ")"})
 		return
 	}
 	m := toMap(data)
@@ -643,6 +866,175 @@ func (h *Hub) handleRevokeLiveLink(c *Client, data json.RawMessage) {
 	h.SendToGroup("live:"+token, "liveExpired", map[string]interface{}{"message": "Link revoked"})
 	c.Send("liveLinkRevoked", map[string]interface{}{"token": token})
 	h.emitMyLiveLinks(c, user.UserID)
+}
+
+// handleSendPulse broadcasts a "I'm OK" or "Need help, call me" pulse to visible users.
+// Ephemeral — no DB write.
+func (h *Hub) handleSendPulse(c *Client, data json.RawMessage) {
+	if !c.CheckRateLimit("sendPulse", 10) {
+		return
+	}
+	user := h.Cache.GetActiveUser(c.ID())
+	if user == nil {
+		return
+	}
+	m := toMap(data)
+	pulseType := "ok"
+	if t, ok := m["type"].(string); ok && (t == "ok" || t == "callme") {
+		pulseType = t
+	}
+	expiresAt := time.Now().UnixMilli() + 30000 // 30s
+	payload := map[string]interface{}{
+		"userId":      user.UserID,
+		"displayName": user.DisplayName,
+		"type":        pulseType,
+		"lat":         user.Latitude,
+		"lng":         user.Longitude,
+		"expiresAt":   expiresAt,
+	}
+	h.emitToVisibleAndSelf(user, "pulseReceived", payload)
+}
+
+// handleQuietHoursUpdate sets or clears the user's quiet hours window.
+// During quiet hours, position broadcasts to non-guardian contacts are jittered ±500m.
+func (h *Hub) handleQuietHoursUpdate(c *Client, data json.RawMessage) {
+	if !c.CheckRateLimit("quietHoursUpdate", 10) {
+		return
+	}
+	user := h.Cache.GetActiveUser(c.ID())
+	if user == nil {
+		return
+	}
+	m := toMap(data)
+	if m == nil {
+		return
+	}
+	enabled, _ := m["enabled"].(bool)
+	start, _ := m["startTime"].(string) // "HH:MM"
+	end, _ := m["endTime"].(string)     // "HH:MM"
+
+	user.QuietHoursEnabled = enabled
+	user.QuietHoursStart = start
+	user.QuietHoursEnd = end
+
+	// Persist to DB (best-effort)
+	go func() {
+		var startVal, endVal interface{}
+		if enabled && start != "" {
+			startVal = start
+		}
+		if enabled && end != "" {
+			endVal = end
+		}
+		_, err := h.pool.DB.ExecContext(context.Background(),
+			`UPDATE users SET quiet_hours_enabled=$1, quiet_hours_start=$2::time, quiet_hours_end=$3::time WHERE id=$4`,
+			enabled, startVal, endVal, user.UserID)
+		if err != nil {
+			slog.Warn("Failed to persist quiet hours", "error", err)
+		}
+	}()
+
+	c.Send("quietHoursUpdated", map[string]interface{}{
+		"userId":  user.UserID,
+		"enabled": enabled,
+		"active":  enabled && isQuietHoursNow(start, end),
+	})
+}
+
+// isQuietHoursNow returns true if the current UTC time falls in [startHHMM, endHHMM).
+// Start and end are "HH:MM" strings in 24h format (user is expected to send UTC equivalents).
+func isQuietHoursNow(start, end string) bool {
+	if start == "" || end == "" {
+		return false
+	}
+	now := time.Now().UTC()
+	nowMin := now.Hour()*60 + now.Minute()
+	parse := func(s string) int {
+		var h, m int
+		fmt.Sscanf(s, "%d:%d", &h, &m)
+		return h*60 + m
+	}
+	s := parse(start)
+	e := parse(end)
+	if s <= e {
+		return nowMin >= s && nowMin < e
+	}
+	// Overnight window (e.g. 22:00 – 07:00)
+	return nowMin >= s || nowMin < e
+}
+
+// applyPrivacyJitter adds a random offset of up to ±444m to lat/lng.
+func applyPrivacyJitter(lat, lng float64) (float64, float64) {
+	// 0.004 deg ≈ 444m at equator
+	jitterDeg := 0.004
+	jLat := (mathrand.Float64()*2 - 1) * jitterDeg
+	cosLat := math.Cos(lat * math.Pi / 180)
+	if cosLat < 0.1 {
+		cosLat = 0.1 // avoid division by near-zero at poles
+	}
+	jLng := (mathrand.Float64()*2 - 1) * jitterDeg / cosLat
+	return lat + jLat, lng + jLng
+}
+
+// handleUpdateSchedule sets sharing schedule rules for the authenticated user.
+func (h *Hub) handleUpdateSchedule(c *Client, data json.RawMessage) {
+	if !c.CheckRateLimit("updateSchedule", 5) {
+		return
+	}
+	user := h.Cache.GetActiveUser(c.ID())
+	if user == nil {
+		return
+	}
+	type ruleIn struct {
+		TargetType string `json:"targetType"`
+		TargetID   string `json:"targetId"`
+		DayMask    int    `json:"dayMask"`
+		StartTime  string `json:"startTime"` // "HH:MM"
+		EndTime    string `json:"endTime"`   // "HH:MM"
+		Enabled    bool   `json:"enabled"`
+	}
+	var payload struct {
+		Rules []ruleIn `json:"rules"`
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return
+	}
+	parseMin := func(s string) int {
+		var hr, min int
+		fmt.Sscanf(s, "%d:%d", &hr, &min)
+		return hr*60 + min
+	}
+
+	rules := make([]cache.ScheduleRule, 0, len(payload.Rules))
+	for _, r := range payload.Rules {
+		rules = append(rules, cache.ScheduleRule{
+			TargetType: r.TargetType,
+			TargetID:   r.TargetID,
+			DayMask:    r.DayMask,
+			StartMin:   parseMin(r.StartTime),
+			EndMin:     parseMin(r.EndTime),
+			Enabled:    r.Enabled,
+		})
+	}
+
+	h.Cache.SetSharingSchedules(user.UserID, rules)
+
+	// Persist to DB in background
+	go func(uid string, ruleList []cache.ScheduleRule) {
+		ctx := context.Background()
+		_, _ = h.pool.DB.ExecContext(ctx, `DELETE FROM sharing_schedules WHERE user_id = $1`, uid)
+		for _, r := range ruleList {
+			_, _ = h.pool.DB.ExecContext(ctx,
+				`INSERT INTO sharing_schedules (user_id, target_type, target_id, day_mask, start_time, end_time, enabled, created_at)
+				 VALUES ($1, $2, NULLIF($3,'')::uuid, $4, $5::time, $6::time, $7, $8)`,
+				uid, r.TargetType, r.TargetID, r.DayMask,
+				fmt.Sprintf("%02d:%02d", r.StartMin/60, r.StartMin%60),
+				fmt.Sprintf("%02d:%02d", r.EndMin/60, r.EndMin%60),
+				r.Enabled, time.Now().UnixMilli())
+		}
+	}(user.UserID, rules)
+
+	c.Send("scheduleUpdated", map[string]interface{}{"ok": true, "count": len(rules)})
 }
 
 // handleWatchJoin joins watch:token group and sends watchInit.
@@ -1245,4 +1637,93 @@ func (h *Hub) handleRevokeGuardian(c *Client, data json.RawMessage) {
 		h.emitMyGuardians(otherCli, otherID)
 		h.emitPendingRequests(otherCli, otherID)
 	}
+}
+
+// ── Consumer product features ──────────────────────────────────────────────────
+
+// computeActivityContext derives a human-readable activity string from motion class
+// and arrival state (inside a saved place). No DB call — uses in-memory state.
+func computeActivityContext(userID, mClass string) string {
+	arrival.mu.Lock()
+	defer arrival.mu.Unlock()
+	for pid, inside := range arrival.insidePlaces[userID] {
+		if inside {
+			if name := arrival.placeNames[pid]; name != "" {
+				return "At " + name
+			}
+			return "At a saved place"
+		}
+	}
+	switch mClass {
+	case "walk":
+		return "Walking"
+	case "run":
+		return "Running"
+	case "vehicle":
+		return "Driving"
+	default:
+		return ""
+	}
+}
+
+// checkBatteryAlerts sends batteryProxyAlert to visible users when battery crosses
+// thresholds 20/10/5%. Rate-limited to once per threshold per hour.
+func checkBatteryAlerts(h *Hub, user *cache.ActiveUser) {
+	if user.BatteryPct == nil {
+		return
+	}
+	pct := *user.BatteryPct
+	thresholds := []int{20, 10, 5}
+	now := time.Now().UnixMilli()
+	for _, t := range thresholds {
+		if pct <= t {
+			if now-user.BatteryAlertSentAt[t] < 60*60*1000 {
+				continue
+			}
+			user.BatteryAlertSentAt[t] = now
+			payload := map[string]interface{}{
+				"userId":      user.UserID,
+				"displayName": user.DisplayName,
+				"batteryPct":  pct,
+				"threshold":   t,
+			}
+			h.emitToVisible(user, "batteryProxyAlert", payload)
+			break // only lowest threshold fires per position update
+		}
+	}
+}
+
+// handleOnMyWay broadcasts an "on my way" signal to all visible users.
+func (h *Hub) handleOnMyWay(c *Client, data json.RawMessage) {
+	if !c.CheckRateLimit("onMyWay", 20) {
+		return
+	}
+	user := h.Cache.GetActiveUser(c.ID())
+	if user == nil {
+		return
+	}
+	m := toMap(data)
+	placeName := ""
+	if v, ok := m["placeName"].(string); ok {
+		placeName = shared.SanitizeString(v, 50)
+	}
+	payload := map[string]interface{}{
+		"userId":      user.UserID,
+		"displayName": user.DisplayName,
+		"placeName":   placeName,
+		"at":          time.Now().UnixMilli(),
+	}
+	h.emitToVisible(user, "onMyWayBroadcast", payload)
+}
+
+// handleCancelOnMyWay cancels an "on my way" broadcast.
+func (h *Hub) handleCancelOnMyWay(c *Client, _ json.RawMessage) {
+	if !c.CheckRateLimit("cancelOnMyWay", 20) {
+		return
+	}
+	user := h.Cache.GetActiveUser(c.ID())
+	if user == nil {
+		return
+	}
+	h.emitToVisible(user, "onMyWayCancel", map[string]interface{}{"userId": user.UserID})
 }

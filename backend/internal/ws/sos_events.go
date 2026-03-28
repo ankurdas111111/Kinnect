@@ -4,8 +4,11 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
+	"strings"
 	"time"
 
+	"kinnect-v3/internal/cache"
 	"kinnect-v3/internal/shared"
 )
 
@@ -19,6 +22,65 @@ func generateSosToken() string {
 	b := make([]byte, sosTokenBytes)
 	_, _ = rand.Read(b)
 	return base64.URLEncoding.EncodeToString(b)[:22]
+}
+
+// assembleSosNarrative builds a narrative from the rolling in-memory buffer (no DB call).
+func (h *Hub) assembleSosNarrative(user *cache.ActiveUser, triggerRule string) *cache.SosNarrative {
+	entries := h.rollingSnapshot(user.UserID)
+
+	narrative := &cache.SosNarrative{
+		TriggerRule:  triggerRule,
+		LastSignalTs: user.LastUpdate,
+		BatteryPct:   user.BatteryPct,
+	}
+
+	if len(entries) == 0 {
+		narrative.MotionSummary = "No recent position data"
+		narrative.TrackGeojson = `{"type":"LineString","coordinates":[]}`
+		return narrative
+	}
+
+	// Build GeoJSON LineString
+	coords := make([]string, 0, len(entries))
+	var stationaryStart int64
+	longestStationary := int64(0)
+
+	for i, e := range entries {
+		coords = append(coords, fmt.Sprintf("[%f,%f]", e.Lng, e.Lat))
+		if e.SpeedMs <= 0.5 {
+			if stationaryStart == 0 {
+				stationaryStart = e.Ts
+			}
+		} else {
+			if stationaryStart > 0 && i > 0 {
+				dur := entries[i-1].Ts - stationaryStart
+				if dur > longestStationary {
+					longestStationary = dur
+				}
+				stationaryStart = 0
+			}
+		}
+	}
+	// Close any open stationary window
+	if stationaryStart > 0 {
+		dur := entries[len(entries)-1].Ts - stationaryStart
+		if dur > longestStationary {
+			longestStationary = dur
+		}
+	}
+
+	narrative.TrackGeojson = fmt.Sprintf(
+		`{"type":"LineString","coordinates":[%s]}`,
+		strings.Join(coords, ","))
+
+	if longestStationary > 0 {
+		narrative.MotionSummary = fmt.Sprintf(
+			"Stationary for %d min before SOS", longestStationary/60000)
+	} else {
+		narrative.MotionSummary = fmt.Sprintf("Active movement in last 30 min (%d fixes)", len(entries))
+	}
+
+	return narrative
 }
 
 // handleTriggerSOS sets SOS active, creates watch token, emits to contacts/visible/live.
@@ -49,6 +111,10 @@ func (h *Hub) handleTriggerSOS(c *Client, data json.RawMessage) {
 	user.SOS.Token = &token
 	user.SOS.TokenExp = &exp
 
+	// Assemble and store narrative
+	narrative := h.assembleSosNarrative(user, sosType)
+	user.SOS.Narrative = narrative
+
 	// Store watch token for public /watch/:token page
 	h.Cache.SetWatchToken(token, user.SocketID, user.UserID, exp)
 
@@ -56,6 +122,27 @@ func (h *Hub) handleTriggerSOS(c *Client, data json.RawMessage) {
 	// No separate DB table for watch tokens in schema; watch uses in-memory only
 	h.emitSosUpdate(user)
 	h.emitWatch(user)
+
+	// Emit narrative separately so receivers can render crisis card
+	if narrative != nil {
+		narrativePayload := map[string]interface{}{
+			"sosToken": token,
+			"userId":   user.UserID,
+			"narrative": map[string]interface{}{
+				"trackGeojson":  narrative.TrackGeojson,
+				"motionSummary": narrative.MotionSummary,
+				"batteryPct":    narrative.BatteryPct,
+				"triggerRule":   narrative.TriggerRule,
+				"lastSignalTs":  narrative.LastSignalTs,
+			},
+		}
+		h.emitToVisibleAndSelf(user, "sosNarrative", narrativePayload)
+		// Also send to live links
+		tokens := h.Cache.GetLiveTokensForUser(user.UserID)
+		for lt := range tokens {
+			h.SendToGroup("live:"+lt, "sosNarrative", narrativePayload)
+		}
+	}
 }
 
 // handleCancelSOS clears SOS, deletes watch token, emits watchUpdate and sosUpdate.
@@ -78,22 +165,37 @@ func (h *Hub) handleCancelSOS(c *Client, data json.RawMessage) {
 	h.emitLiveSos(user)
 }
 
-// handleAckSOS finds target by socketId, adds ack, emits sosUpdate.
+// handleAckSOS finds target by userId, adds ack (deduplicated by name), emits sosUpdate.
 func (h *Hub) handleAckSOS(c *Client, data json.RawMessage) {
 	if !c.CheckRateLimit("ackSOS", 10) {
 		return
 	}
 	m := toMap(data)
-	socketId, _ := m["socketId"].(string)
-	if socketId == "" {
-		return
+	// Accept userId (stable across reconnects) or fall back to socketId for compatibility.
+	targetUserID, _ := m["userId"].(string)
+	var target *cache.ActiveUser
+	if targetUserID != "" {
+		if sid := h.Cache.GetUserIdToSocketId(targetUserID); sid != "" {
+			target = h.Cache.GetActiveUser(sid)
+		}
+	} else {
+		socketId, _ := m["socketId"].(string)
+		if socketId == "" {
+			return
+		}
+		target = h.Cache.GetActiveUser(socketId)
 	}
-	target := h.Cache.GetActiveUser(socketId)
-	if target == nil {
+	if target == nil || !target.SOS.Active {
 		return
 	}
 	ackerName := h.Cache.GetDisplayName(c.UserID())
-	target.SOS.Acks = append(target.SOS.Acks, ackerName)
+	// Deduplicate: do not append if same name already present.
+	for _, a := range target.SOS.Acks {
+		if a.By == ackerName {
+			return
+		}
+	}
+	target.SOS.Acks = append(target.SOS.Acks, cache.SosAckEntry{By: ackerName})
 	h.emitSosUpdate(target)
 	h.emitWatch(target)
 }
@@ -108,6 +210,8 @@ func (h *Hub) handleCheckInAck(c *Client, data json.RawMessage) {
 		return
 	}
 	user.CheckIn.LastCheckInAt = time.Now().UnixMilli()
+	user.CheckIn.RequestedAt = 0
+	user.CheckIn.MissedNotifiedAt = 0
 	sanitized := h.Cache.SanitizeUser(user)
 	sanitized["online"] = true
 	ci := map[string]interface{}{
@@ -219,7 +323,12 @@ func (h *Hub) handleLiveAckSOS(c *Client, data json.RawMessage) {
 		viewerName = "Viewer"
 	}
 	ackLabel := viewerName + " (via link)"
-	target.SOS.Acks = append(target.SOS.Acks, ackLabel)
+	for _, a := range target.SOS.Acks {
+		if a.By == ackLabel {
+			return
+		}
+	}
+	target.SOS.Acks = append(target.SOS.Acks, cache.SosAckEntry{By: ackLabel})
 	h.emitSosUpdate(target)
 	h.emitWatch(target)
 }

@@ -35,6 +35,9 @@
   let lastOriginTs = null;
   let freshnessText = '';
   let freshnessInterval = null;
+  let linkJoinedAt = null;
+  let linkExpiresAt = null;
+  let expiryPercent = 100;
 
   $: token = params.token || '';
 
@@ -103,6 +106,8 @@
       hasInit = true;
       clearInitTimeout();
       connectionIssue = '';
+      linkJoinedAt = Date.now();
+      if (data.expiresAt) linkExpiresAt = data.expiresAt;
       if (data.user) { updateMarker(data.user); online = true; statusText = 'Tracking ' + (sharedBy || 'User'); }
       else { online = false; statusText = (sharedBy || 'User') + ' (offline)'; }
       if (data.sos?.active) showSos(data.sos);
@@ -191,9 +196,15 @@
     map = new maplibregl.Map({ container: mapContainer, style: MAP_STYLE, center: [78, 20], zoom: 5, attributionControl: true });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
     freshnessInterval = setInterval(() => {
+      const now = Date.now();
       if (lastOriginTs) {
-        const sec = Math.round((Date.now() - lastOriginTs) / 1000);
+        const sec = Math.round((now - lastOriginTs) / 1000);
         freshnessText = sec < 2 ? 'live' : sec < 60 ? sec + 's ago' : Math.round(sec / 60) + 'm ago';
+      }
+      if (linkExpiresAt && linkJoinedAt) {
+        const total = linkExpiresAt - linkJoinedAt;
+        const remaining = linkExpiresAt - now;
+        expiryPercent = total > 0 ? Math.max(0, Math.min(100, (remaining / total) * 100)) : 0;
       }
     }, 1000);
   });
@@ -227,7 +238,11 @@
         <div class="name-card-logo">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 1.892.402 3.13 1.5 4.5L12 22l6.5-7.5c1.098-1.37 1.5-2.608 1.5-4.5a8 8 0 0 0-8-8z"/></svg>
         </div>
-        <h2>Live Tracking</h2>
+        <div class="live-header">
+          <span class="rec-dot animate-rec-blink" aria-hidden="true"></span>
+          <h2>{sharedBy !== 'User' ? `${sharedBy}'s Live Location` : 'Live Location'}</h2>
+        </div>
+        <p class="text-sm text-muted" style="margin-bottom:var(--space-4);">You were invited to watch. Treat this with care.</p>
         <p class="text-sm text-muted" style="margin-bottom:var(--space-4);">Enter your name to start viewing</p>
         <input class="input input-lg" placeholder="Your name" bind:value={viewerName} on:keydown={e => e.key === 'Enter' && startViewing()} />
         <button class="btn btn-primary btn-lg" style="width:100%;margin-top:var(--space-3);" on:click={startViewing}>Start Viewing</button>
@@ -244,16 +259,32 @@
   {/if}
 
   {#if !showNameOverlay && !expired}
-    <div class="status-bar">
-      <span class="status-dot" class:online class:offline={!online}></span>
-      <span class="status-label">{statusText}</span>
-      {#if freshnessText}<span class="freshness" class:stale={freshnessText !== 'live'}>{freshnessText}</span>{/if}
-      {#if checkinText}<span class="checkin" class:overdue={checkinOverdue}>{checkinText}</span>{/if}
+    <!-- MERIDIAN: Floating glass bottom card replacing old status-bar -->
+    <div class="live-glass-card" class:sos-state={sosActive}>
+      <div class="glass-inner">
+        <div class="glass-row">
+          {#if online}
+            <span class="rec-dot-mini animate-rec-blink" aria-hidden="true"></span>
+          {:else}
+            <span class="glass-offline-dot" aria-hidden="true"></span>
+          {/if}
+          <span class="glass-status">{statusText}</span>
+          {#if freshnessText}
+            <span class="glass-fresh" class:stale={freshnessText !== 'live'}>{freshnessText}</span>
+          {/if}
+        </div>
+        {#if checkinText}
+          <div class="glass-checkin" class:overdue={checkinOverdue}>{checkinText}</div>
+        {/if}
+        {#if linkExpiresAt}
+          <div class="expiry-bar" aria-hidden="true">
+            <div class="expiry-fill" style="width:{expiryPercent}%"></div>
+          </div>
+        {/if}
+      </div>
+      <a href="/#/register" class="glass-signup">Get Kinnect</a>
     </div>
-  {/if}
-
-  {#if !showNameOverlay && !expired && !sosActive}
-    <a href="/#/register" class="live-cta">Get Kinnect — Sign up free</a>
+    <a href="/#/login" class="live-brand" aria-label="Powered by Kinnect">Powered by Kinnect</a>
   {/if}
 
   {#if sosActive}
@@ -336,50 +367,128 @@
     margin-top: var(--space-3);
   }
 
-  .status-bar {
+  /* MERIDIAN: Floating glass bottom card */
+  .live-glass-card {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
+    bottom: calc(var(--space-5) + env(safe-area-inset-bottom, 0px));
+    left: 50%;
+    transform: translateX(-50%);
     z-index: 50;
+    width: min(92vw, 400px);
+    background: rgba(8, 8, 16, 0.74);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: var(--radius-xl);
+    padding: var(--space-3) var(--space-4);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.40), 0 0 0 1px rgba(99, 102, 241, 0.06);
     display: flex;
     align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-2) var(--space-4);
-    background: var(--surface-2);
-    border-bottom: 1px solid var(--border-default);
-    backdrop-filter: blur(16px);
-    font-size: var(--text-sm);
-    height: 40px;
+    gap: var(--space-3);
+    color: white;
+    animation: slide-up-in 380ms var(--ease-spring) both;
+    transition: bottom 300ms var(--ease-spring);
   }
 
-  .status-dot {
-    width: 8px;
-    height: 8px;
+  .live-glass-card.sos-state {
+    bottom: calc(var(--space-3) + 80px + env(safe-area-inset-bottom, 0px));
+    border-color: rgba(239, 68, 68, 0.28);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 24px rgba(239,68,68,0.18);
+  }
+
+  .glass-inner {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .glass-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1-5);
+  }
+
+  .rec-dot-mini {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
+    background: var(--color-rec, #ef4444);
+    flex-shrink: 0;
+    animation: recording-blink 1.2s ease-in-out infinite;
+  }
+
+  .glass-offline-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.30);
     flex-shrink: 0;
   }
-  .status-dot.online { background: var(--success-500); }
-  .status-dot.offline { background: var(--gray-400); }
 
-  .freshness {
+  .glass-status {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .glass-fresh {
     margin-left: auto;
     font-size: var(--text-xs);
-    color: var(--success-500);
-    font-weight: 600;
+    color: var(--success-400, #34d399);
+    font-weight: 700;
+    flex-shrink: 0;
   }
-  .freshness.stale {
-    color: var(--text-tertiary);
+  .glass-fresh.stale {
+    color: rgba(255, 255, 255, 0.40);
     font-weight: 500;
   }
-  .checkin {
-    margin-left: 0;
+
+  .glass-checkin {
+    margin-top: 3px;
     font-size: var(--text-xs);
-    color: var(--text-tertiary);
+    opacity: 0.55;
   }
-  .checkin.overdue {
-    color: var(--danger-500);
+  .glass-checkin.overdue {
+    color: #fca5a5;
+    opacity: 1;
     font-weight: 600;
+  }
+
+  .expiry-bar {
+    margin-top: var(--space-2);
+    height: 3px;
+    background: rgba(255, 255, 255, 0.10);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .expiry-fill {
+    height: 100%;
+    background: var(--primary-400);
+    border-radius: 2px;
+    transition: width 1s linear;
+  }
+
+  .glass-signup {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 12px;
+    border-radius: var(--radius-full);
+    background: var(--primary-600);
+    color: white;
+    font-size: var(--text-xs);
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+    box-shadow: 0 0 16px rgba(99, 102, 241, 0.30);
+    transition: background 0.15s;
+  }
+  .glass-signup:hover {
+    background: var(--primary-500);
   }
 
   .sos-banner {
@@ -399,7 +508,7 @@
 
   .live-error {
     position: absolute;
-    top: 48px;
+    top: var(--space-4);
     left: 50%;
     transform: translateX(-50%);
     z-index: 60;
@@ -419,32 +528,51 @@
   .sos-text { font-weight: 700; }
   .sos-acks { font-size: var(--text-xs); opacity: 0.8; }
 
-  .live-cta {
+  .live-brand {
     position: absolute;
-    bottom: var(--space-4);
+    bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
     left: 50%;
     transform: translateX(-50%);
     z-index: 50;
-    background: var(--surface-2);
-    border: 1px solid var(--border-default);
-    border-radius: 999px;
-    padding: var(--space-1) var(--space-4);
-    font-size: var(--text-xs);
-    font-weight: 600;
-    color: var(--primary-600);
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.35);
     text-decoration: none;
-    box-shadow: var(--shadow-md);
-    backdrop-filter: blur(8px);
-    transition: background 0.15s, box-shadow 0.15s;
+    letter-spacing: 0.06em;
+    opacity: 1;
+    transition: color 0.15s;
+    white-space: nowrap;
   }
-  .live-cta:hover {
-    background: var(--primary-50, var(--surface-3));
-    box-shadow: var(--shadow-lg);
+  .live-brand:hover { color: rgba(255, 255, 255, 0.65); }
+
+  /* Name card recording header */
+  .live-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+  }
+  .live-header h2 { margin: 0; }
+
+  .rec-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--color-rec, #ef4444);
+    flex-shrink: 0;
+    animation: recording-blink 1.2s ease-in-out infinite;
+  }
+
+  @keyframes recording-blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.2; }
   }
 
   @media (max-width: 767px) {
-    .status-bar {
-      padding: var(--space-2) var(--space-3);
+    .live-glass-card {
+      width: min(96vw, 400px);
+      padding: var(--space-2-5) var(--space-3);
     }
     .sos-banner {
       padding: var(--space-3);

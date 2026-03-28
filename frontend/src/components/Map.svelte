@@ -3,7 +3,9 @@
   import maplibregl from 'maplibre-gl';
   import 'maplibre-gl/dist/maplibre-gl.css';
   import { otherUsers, myLocation, mySocketId, mySafetyStatus, focusUser } from '../lib/stores/map.js';
-  import { createMapIcon, escapeAttr, calculateDistance, formatDistance, circleGeoJSON } from '../lib/tracking.js';
+  import { arrivalProjections } from '../lib/stores/arrivals.js';
+  import { trailData } from '../lib/stores/trail.js';
+  import { createMapIcon, createPersonMarker, getPresenceState, escapeAttr, calculateDistance, formatDistance, circleGeoJSON } from '../lib/tracking.js';
   import { animateMarkerTo, cancelAnimation, cancelAllAnimations } from '../lib/markerInterpolator.js';
   import { getUserColor } from '../lib/getUserColor.js';
   import { MAP_STYLE, RASTER_STYLE } from '../lib/mapStyle.js';
@@ -171,7 +173,29 @@
       isMobile ? 'bottom-right' : 'top-right');
 
     map.on('dragstart', () => { followMode = false; });
-    map.on('load', addCircleSources);
+    map.on('load', () => {
+      addCircleSources();
+      // Subscribe to trail data — draw/update dashed polylines for requested users
+      trailData.subscribe($trailData => {
+        if (!map.isStyleLoaded()) return;
+        for (const [userId, data] of $trailData) {
+          if (!Array.isArray(data.points) || data.points.length < 2) continue;
+          const sourceId = `trail-src-${userId}`;
+          const layerId = `trail-line-${userId}`;
+          const coords = data.points.map(p => [p.lng, p.lat]);
+          const geojson = { type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} };
+          if (map.getSource(sourceId)) {
+            map.getSource(sourceId).setData(geojson);
+          } else {
+            map.addSource(sourceId, { type: 'geojson', data: geojson });
+            map.addLayer({
+              id: layerId, type: 'line', source: sourceId,
+              paint: { 'line-color': '#818cf8', 'line-width': 2, 'line-opacity': 0.65, 'line-dasharray': [2, 2] }
+            });
+          }
+        }
+      });
+    });
   });
 
   onDestroy(() => {
@@ -309,21 +333,52 @@
 
   // renderUserMarkers is replaced by updateSingleMarker + dirty tracking above.
 
+  function wrapWithRing(iconEl, user, color) {
+    const isLive = user.online !== false && !user.sos?.active;
+    const isOffline = user.online === false;
+    if (isOffline) {
+      iconEl.style.filter = 'grayscale(0.7)';
+      iconEl.style.opacity = '0.7';
+    }
+    if (!isLive) return iconEl;
+    const wrapper = document.createElement('div');
+    wrapper.className = 'marker-wrapper';
+    const ring = document.createElement('div');
+    ring.className = 'marker-ring animate-pulse-ring';
+    ring.style.setProperty('--user-color', color);
+    wrapper.appendChild(ring);
+    wrapper.appendChild(iconEl);
+    return wrapper;
+  }
+
   function updateSingleMarker(sid, user) {
     if (!map || user.latitude == null || user.longitude == null) return;
     const lngLat = [user.longitude, user.latitude];
-    let markerType = 'contact';
-    let color = getUserColor(user.userId);
-    if (user.sos?.active) { markerType = 'sos'; color = 'var(--danger-500)'; }
-    else if (user.online === false) { markerType = 'offline'; color = 'var(--gray-400)'; }
-    const iconKey = `${markerType}|${color}`;
+    const color = getUserColor(user.userId);
+    const isSos = !!user.sos?.active;
+    const presenceState = getPresenceState(user);
+    // Include presenceState + motionClass in key so rings/badges re-render when state changes
+    const mClass = user.motionClass || '';
+    const iconKey = `person|${color}|${presenceState}|${isSos}|${mClass}`;
     const popupContent = buildPopupCached(user);
+
+    function makePersonEl() {
+      return createPersonMarker({
+        displayName: user.displayName,
+        userId: user.userId,
+        color: isSos ? '#ef4444' : (user.online === false ? '#6b7280' : color),
+        isSelf: false,
+        isSos,
+        presenceState,
+        motionClass: mClass,
+      });
+    }
 
     if (markers.has(sid)) {
       const m = markers.get(sid);
       animateMarkerTo(sid, m, lngLat);
       if (markerState.get(sid) !== iconKey) {
-        const el = createMapIcon(color, '', { pulse: !!user.sos?.active, markerType });
+        const el = makePersonEl();
         const newMarker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
           .setLngLat(m.getLngLat())
           .addTo(map);
@@ -337,11 +392,8 @@
         if (popup) popup.setHTML(popupContent);
       }
     } else {
-      const el = createMapIcon(color, '', { pulse: !!user.sos?.active, markerType });
-      // Apply entrance animation via class (defined in Map.svelte :global CSS)
-      el.classList.add('map-pin-enter');
-      setTimeout(() => el.classList.remove('map-pin-enter'), 500);
-      const popup = new maplibregl.Popup({ offset: [0, -39], maxWidth: '280px', closeButton: true })
+      const el = makePersonEl();
+      const popup = new maplibregl.Popup({ offset: [0, -54], maxWidth: '280px', closeButton: true })
         .setHTML(popupContent);
       const m = new maplibregl.Marker({ element: el, anchor: 'bottom' })
         .setLngLat(lngLat)
@@ -456,6 +508,33 @@
 </script>
 
 <div class="map-container" bind:this={mapContainer}></div>
+<!-- MERIDIAN: Map vignette — connects UI chrome to map visually -->
+<div class="map-vignette-top" aria-hidden="true"></div>
+<div class="map-vignette-bottom" aria-hidden="true"></div>
+
+<!-- MERIDIAN SPATIAL: Contextual float chips — accuracy + speed -->
+{#if $myLocation}
+  {#if $myLocation.accuracy != null}
+    {@const acc = $myLocation.accuracy}
+    <div class="map-float-chip accuracy-float-chip"
+         class:chip-precise={acc <= 20}
+         class:chip-ok={acc > 20 && acc <= 80}
+         class:chip-rough={acc > 80}
+         aria-label="GPS accuracy {Math.round(acc)}m"
+         style="top: var(--space-3); right: var(--space-3);">
+      <span class="chip-dot" aria-hidden="true"></span>
+      {acc <= 20 ? `±${Math.round(acc)}m` : acc <= 80 ? `~${Math.round(acc)}m` : 'Rough GPS'}
+    </div>
+  {/if}
+  {#if $myLocation.speed != null && $myLocation.speed >= 4}
+    <div class="map-float-chip chip-speed"
+         aria-label="Speed {Math.round($myLocation.speed)} km/h"
+         style="top: calc(var(--space-3) + 32px); right: var(--space-3);">
+      <span class="chip-dot" aria-hidden="true"></span>
+      {Math.round($myLocation.speed)} km/h
+    </div>
+  {/if}
+{/if}
 
 {#if $mySafetyStatus?.geofence?.enabled || $mySafetyStatus?.autoSos?.enabled || $mySafetyStatus?.checkIn?.enabled}
   <div class="safety-overlay" role="status" aria-label="Active safety features">
@@ -489,11 +568,46 @@
   </div>
 {/if}
 
+<!-- Arrival Intelligence — ETA chips for contacts heading to saved places -->
+{#if $arrivalProjections.size > 0}
+  <div class="arrival-chips-container" role="status" aria-label="Arrival projections">
+    {#each [...$arrivalProjections.values()] as proj (proj.userId)}
+      <div class="arrival-chip">
+        <span class="arrival-chip-icon">📍</span>
+        <span class="arrival-chip-body">
+          <span class="arrival-name">{proj.displayName}</span>
+          <span class="arrival-eta">~{proj.etaSeconds < 60 ? 'arriving' : `${Math.round(proj.etaSeconds / 60)}min`} to {proj.placeName}</span>
+        </span>
+      </div>
+    {/each}
+  </div>
+{/if}
+
 <style>
   .map-container {
     position: absolute;
     inset: 0;
     z-index: 1;
+  }
+
+  /* MERIDIAN: Gradient vignettes blend the map into the UI chrome */
+  .map-vignette-top {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 80px;
+    z-index: 2;
+    pointer-events: none;
+    background: linear-gradient(to bottom, var(--surface-0) 0%, transparent 100%);
+    opacity: 0.32;
+  }
+  .map-vignette-bottom {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 100px;
+    z-index: 2;
+    pointer-events: none;
+    background: linear-gradient(to top, var(--surface-0) 0%, transparent 100%);
+    opacity: 0.28;
   }
 
   :global(.map-pin) {
@@ -510,6 +624,7 @@
     display: block;
   }
 
+  /* MERIDIAN: Self-marker — indigo ripple ring */
   :global(.map-pin.pin-self::after) {
     content: '';
     position: absolute;
@@ -518,7 +633,7 @@
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background: var(--primary-500, #3b82f6);
+    background: var(--primary-500);
     opacity: 0;
     transform: translate(-50%, 50%);
     animation: pin-ripple 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
@@ -526,18 +641,36 @@
     z-index: -1;
   }
 
+  /* MERIDIAN: SOS markers — double ring radar sweep */
   :global(.map-pin.pin-sos::after) {
     content: '';
     position: absolute;
     bottom: 0;
     left: 50%;
-    width: 12px;
-    height: 12px;
+    width: 14px;
+    height: 14px;
     border-radius: 50%;
     background: #ef4444;
     opacity: 0;
     transform: translate(-50%, 50%);
-    animation: pin-ripple-sos 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    animation: pin-ripple-sos 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  /* Second SOS ring — staggered for radar effect */
+  :global(.map-pin.pin-sos::before) {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #ef4444;
+    opacity: 0;
+    transform: translate(-50%, 50%);
+    animation: pin-ripple-sos 1.2s cubic-bezier(0.4, 0, 0.2, 1) 0.4s infinite;
     pointer-events: none;
     z-index: -1;
   }
@@ -559,22 +692,24 @@
   }
 
   :global(.maplibregl-popup-content) {
-    border-radius: 14px;
+    border-radius: var(--radius-xl, 20px);
     box-shadow:
-      0 8px 32px rgba(0, 0, 0, 0.18),
-      0 0 0 1px rgba(0, 0, 0, 0.06);
+      0 8px 32px rgba(0, 0, 0, 0.20),
+      0 0 0 1px rgba(0, 0, 0, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.60);
     padding: 12px 14px;
     line-height: 1.5;
     font-family: var(--font-sans, 'Inter', sans-serif);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(20px) saturate(1.8);
+    -webkit-backdrop-filter: blur(20px) saturate(1.8);
   }
   :global([data-theme="dark"] .maplibregl-popup-content) {
-    background: rgba(20, 25, 40, 0.92);
+    background: rgba(12, 12, 24, 0.94);
     color: rgba(255, 255, 255, 0.90);
     box-shadow:
-      0 8px 32px rgba(0, 0, 0, 0.45),
-      0 0 0 1px rgba(255, 255, 255, 0.06);
+      0 12px 40px rgba(0, 0, 0, 0.55),
+      0 0 0 1px rgba(255, 255, 255, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
   }
   :global(.maplibregl-popup-tip) {
     border-top-color: white;
@@ -697,5 +832,71 @@
     60%  { transform: scale(1.25) translateY(-6px); opacity: 1; }
     80%  { transform: scale(0.95) translateY(2px); }
     100% { transform: scale(1) translateY(0); }
+  }
+
+  /* Live user marker ring */
+  :global(.marker-wrapper) {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  :global(.marker-ring) {
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
+    border: 2px solid var(--user-color, #3b82f6);
+    pointer-events: none;
+    animation: marker-pulse-ring 2s ease-out infinite;
+  }
+
+  @keyframes marker-pulse-ring {
+    0%   { transform: scale(1);   opacity: 0.5; }
+    100% { transform: scale(1.8); opacity: 0; }
+  }
+
+  /* ── Arrival Intelligence chips ──────────────────────────────────────────── */
+  .arrival-chips-container {
+    position: absolute;
+    bottom: calc(var(--bottom-tab-height, 64px) + 16px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    pointer-events: none;
+    max-width: 280px;
+    width: max-content;
+  }
+  .arrival-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(17, 24, 39, 0.88);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(99, 102, 241, 0.4);
+    border-radius: 999px;
+    padding: 6px 14px 6px 10px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+    animation: chip-slide-up 0.25s ease;
+  }
+  @keyframes chip-slide-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .arrival-chip-icon { font-size: 15px; flex-shrink: 0; }
+  .arrival-chip-body { display: flex; flex-direction: column; gap: 1px; }
+  .arrival-name {
+    font-size: 12px;
+    font-weight: 700;
+    color: #f1f5f9;
+    line-height: 1.2;
+  }
+  .arrival-eta {
+    font-size: 11px;
+    color: #a5b4fc;
+    line-height: 1.2;
   }
 </style>

@@ -83,6 +83,7 @@ func (h *Hub) StartPositionFlusher(ctx context.Context) {
 }
 
 // StartPositionPurger runs a goroutine that purges old records every 24h (7 day retention).
+// Also purges zone_visits older than 7 days to respect 1GB DB constraint.
 func (h *Hub) StartPositionPurger(ctx context.Context) {
 	ticker := time.NewTicker(purgeInterval)
 	defer ticker.Stop()
@@ -91,9 +92,18 @@ func (h *Hub) StartPositionPurger(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			ctx := context.Background()
-			if err := db.PurgePositionHistory(ctx, h.pool.DB, positionRetentionDays); err != nil {
+			bCtx := context.Background()
+			if err := db.PurgePositionHistory(bCtx, h.pool.DB, positionRetentionDays); err != nil {
 				slog.Error("Failed to purge position history", "error", err)
+			}
+			// Purge old zone visits (7-day retention, matches position_history)
+			if _, err := h.pool.DB.ExecContext(bCtx,
+				`DELETE FROM zone_visits WHERE arrived_at < NOW() - INTERVAL '7 days'`); err != nil {
+				slog.Warn("Failed to purge zone_visits", "error", err)
+			}
+			// Purge movement_events (30-day retention)
+			if err := db.PurgeMovementEvents(bCtx, h.pool.DB, 30); err != nil {
+				slog.Warn("Failed to purge movement_events", "error", err)
 			}
 		}
 	}

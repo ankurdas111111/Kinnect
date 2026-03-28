@@ -7,6 +7,9 @@
   import { myGuardianData } from '../lib/stores/guardians.js';
   import { authUser } from '../lib/stores/auth.js';
   import { otherUsers, focusUser } from '../lib/stores/map.js';
+  import { getPresenceState, getPresenceText } from '../lib/tracking.js';
+  import { getUserColor } from '../lib/getUserColor.js';
+  import CopyButton from './primitives/CopyButton.svelte';
 
   function locateContact(userId) {
     // Find by userId in otherUsers map
@@ -99,13 +102,43 @@
     socket.emit('createLiveLink', { duration: dur === 'forever' ? null : dur });
   }
   function generateLiveLink() { createLiveLink(selectedLinkDuration); }
-  function copyLink(url) { navigator.clipboard.writeText(url).catch(() => {}); banner.set({ type: 'info', text: 'Link copied!', actions: [] }); setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 1500); }
+  function copyLink(url) { navigator.clipboard.writeText(url).catch(() => {}); banner.set({ type: 'info', text: 'Link copied. Let the watching begin.', actions: [] }); setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 2000); }
   function revokeLink(token) { socket.emit('revokeLiveLink', { token }); }
 
   function isGuardianOf(userId) { return $myGuardianData.asGuardian?.some(g => g.wardId === userId && g.status === 'active'); }
   function isWardOf(userId) { return $myGuardianData.asWard?.some(g => g.guardianId === userId && g.status === 'active'); }
 
   $: hasAny = ($myRooms.length > 0 || $myContacts.length > 0);
+
+  function getInitials(name) {
+    if (!name) return '?';
+    return name.split(' ').filter(Boolean).map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  }
+
+  // Cross-reference contacts with live otherUsers map for presence
+  function getContactUser(userId) {
+    for (const u of $otherUsers.values()) {
+      if (u.userId === userId) return u;
+    }
+    return null;
+  }
+
+  function contactPresenceState(userId) {
+    const u = getContactUser(userId);
+    if (!u) return 'gone';
+    return getPresenceState(u);
+  }
+
+  function contactPresenceText(userId) {
+    const u = getContactUser(userId);
+    if (!u) return 'Not on map';
+    return getPresenceText(u);
+  }
+
+  function contactBatteryLow(userId) {
+    const u = getContactUser(userId);
+    return u && u.batteryPct != null && u.batteryPct <= 20;
+  }
 
   onMount(() => {
     var onRoomCreated = () => clearRoomLoading();
@@ -131,40 +164,56 @@
 </script>
 
 {#if embedded}
-  <div class="panel-body">
-    <div class="section">
-      <h4>Rooms</h4>
-      <p class="hint">A room is a group where all members can see each other's live location. Create one and share the code, or join with someone else's code.</p>
-      <div class="input-group">
-        <input class="input" bind:value={roomName} placeholder="Room name" />
-        <button class="btn btn-primary btn-sm" on:click={createRoom} disabled={loading.createRoom}>{loading.createRoom ? '...' : 'Create'}</button>
+  <div class="panel-body sharing-root">
+
+    <!-- ── ROOMS ─────────────────────────────────────────────────── -->
+    <div class="sharing-section">
+      <div class="sharing-section-header">
+        <span class="card-eyebrow">Groups</span>
       </div>
-      <div class="input-group mt-2">
-        <input class="input" bind:value={joinCode} placeholder="Room code" on:keydown={e => e.key === 'Enter' && joinRoom()} />
-        <button class="btn btn-secondary btn-sm" on:click={joinRoom} disabled={loading.joinRoom}>{loading.joinRoom ? '...' : 'Join'}</button>
+      <div class="rooms-create-row">
+        <input class="input" bind:value={roomName} placeholder="New group name" />
+        <button class="btn btn-primary btn-sm" on:click={createRoom} disabled={loading.createRoom}>{loading.createRoom ? '…' : 'Create'}</button>
       </div>
-      <div class="list">
-        {#if $myRooms.length === 0}
-          <p class="mini list-empty">No rooms yet</p>
-        {:else}
+      <div class="rooms-join-row">
+        <input class="input" bind:value={joinCode} placeholder="Enter room code to join" on:keydown={e => e.key === 'Enter' && joinRoom()} />
+        <button class="btn btn-secondary btn-sm" on:click={joinRoom} disabled={loading.joinRoom}>{loading.joinRoom ? '…' : 'Join'}</button>
+      </div>
+
+      {#if $myRooms.length === 0}
+        <p class="empty-state">No groups yet. Create one and invite your people.</p>
+      {:else}
+        <div class="rooms-list">
           {#each $myRooms as room}
-            <div class="list-item">
-              <div class="list-item-main">
-                <strong>{room.name}</strong> <span class="mini">({room.code})</span>
-                {#if room.myRoomRole === 'admin'}<span class="badge badge-success badge-xs">Admin</span>{/if}
-                <div class="room-members">
+            <div class="room-card animate-slide-up" style="border-top: 3px solid {getUserColor(room.code)}; border-top-left-radius: var(--radius-xl); border-top-right-radius: var(--radius-xl);">
+              <div class="room-card-header">
+                <div class="room-card-icon">{(room.name || 'G')[0].toUpperCase()}</div>
+                <div class="room-card-meta">
+                  <span class="room-card-name">
+                    {room.name}
+                    {#if room.myRoomRole === 'admin'}<span class="badge badge-success badge-xs" style="margin-left:6px">Admin</span>{/if}
+                  </span>
+                  <span class="room-card-code">{room.code}</span>
+                </div>
+                <button class="btn btn-danger btn-sm" on:click={() => leaveRoom(room.code)}>Leave</button>
+              </div>
+
+              {#if (room.members || []).length > 0}
+                <div class="room-members-row">
                   {#each (room.members || []) as m}
-                    <span class="room-member">
-                      <button class="member-locate-btn" on:click={() => locateContact(m.userId)} title="Locate {m.displayName || 'user'} on map">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 1.892.402 3.13 1.5 4.5L12 22l6.5-7.5c1.098-1.37 1.5-2.608 1.5-4.5a8 8 0 0 0-8-8z"/></svg>
-                        {m.displayName || m}
-                      </button>
-                      {#if m.roomRole === 'admin'}<span class="badge badge-success badge-xs">Admin</span>{#if room.myRoomRole === 'admin' && m.userId !== $authUser?.userId} <button class="btn-inline-danger" on:click|stopPropagation={() => revokeAdmin(room.code, m.userId)}>Revoke</button>{/if}{/if}
-                    </span>
+                    <button class="room-member-chip" on:click={() => locateContact(m.userId)} title="Find {m.displayName || 'member'} on map">
+                      <span class="room-member-avatar">{(m.displayName || '?')[0].toUpperCase()}</span>
+                      {m.displayName || 'Member'}
+                      {#if m.roomRole === 'admin'}<span class="badge badge-success badge-xs">A</span>{/if}
+                      {#if room.myRoomRole === 'admin' && m.userId !== $authUser?.userId && m.roomRole === 'admin'}
+                        <button class="btn-revoke-inline" on:click|stopPropagation={() => revokeAdmin(room.code, m.userId)}>×</button>
+                      {/if}
+                    </button>
                   {/each}
                 </div>
-              </div>
-              <div class="list-item-actions">
+              {/if}
+
+              <div class="room-card-actions">
                 {#if room.myRoomRole !== 'admin' && !hasPendingAdminRequest(room)}
                   <select class="duration-select" bind:value={roomAdminDurations[room.code]}>
                     <option value={null}>Permanent</option>
@@ -178,8 +227,8 @@
                 {:else if hasPendingAdminRequest(room)}
                   <span class="badge badge-warning badge-xs">Admin Requested</span>
                 {/if}
-                <button class="btn btn-danger btn-sm" on:click={() => leaveRoom(room.code)}>Leave</button>
               </div>
+
               {#if (room.pendingAdminRequests || []).length > 0}
                 <div class="pending-admin-section">
                   {#each room.pendingAdminRequests as par}
@@ -207,95 +256,120 @@
               {/if}
             </div>
           {/each}
-        {/if}
-      </div>
+        </div>
+      {/if}
     </div>
 
-    <hr class="divider" />
-
-    <div class="section">
-      <h4>Contacts</h4>
-      <p class="hint">Add someone using their share code (found in their <strong>Info</strong> tab). Contacts see your live location when you're both tracking. <strong>Be Guardian</strong> = you watch them. <strong>Make Guardian</strong> = they watch you.</p>
-      <div class="input-group">
-        <input class="input" bind:value={contactCode} placeholder="Share code" on:keydown={e => e.key === 'Enter' && addContact()} />
-        <button class="btn btn-primary btn-sm" on:click={addContact} disabled={loading.addContact}>{loading.addContact ? '...' : 'Add'}</button>
+    <!-- ── YOUR PEOPLE ────────────────────────────────────────────── -->
+    <div class="sharing-section">
+      <div class="sharing-section-header">
+        <span class="card-eyebrow">Your People</span>
       </div>
-      <div class="list">
-        {#if $myContacts.length === 0}
-          <p class="mini list-empty">No contacts yet</p>
-        {:else}
-          {#each $myContacts as c}
-            <div class="list-item">
-              <div class="list-item-main">
-                <button class="locate-btn" on:click={() => locateContact(c.userId)} title="Locate on map">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 1.892.402 3.13 1.5 4.5L12 22l6.5-7.5c1.098-1.37 1.5-2.608 1.5-4.5a8 8 0 0 0-8-8z"/></svg>
-                </button>
-                <strong>{c.displayName}</strong>
-                {#if isGuardianOf(c.userId)}<span class="badge badge-primary badge-xs">Your Ward</span>{/if}
-                {#if isWardOf(c.userId)}<span class="badge badge-primary badge-xs">Your Guardian</span>{/if}
-                {#if isPendingGuardianOf(c.userId)}<span class="badge badge-warning badge-xs">Guardian Pending</span>{/if}
-                {#if isPendingWardOf(c.userId)}<span class="badge badge-warning badge-xs">Pending Approval</span>{/if}
-                <span class="mini">{c.maskedEmail || c.maskedMobile || c.shareCode || ''}</span>
+      <div class="rooms-create-row">
+        <input class="input" bind:value={contactCode} placeholder="Paste their signal code" on:keydown={e => e.key === 'Enter' && addContact()} />
+        <button class="btn btn-primary btn-sm" on:click={addContact} disabled={loading.addContact}>{loading.addContact ? '…' : 'Add'}</button>
+      </div>
+      {#if $myContacts.length === 0}
+        <p class="empty-state">No contacts yet. Share your signal code and connect.</p>
+      {:else}
+          {#each $myContacts as c, i}
+            {@const pState = contactPresenceState(c.userId)}
+            {@const pText  = contactPresenceText(c.userId)}
+            {@const batLow = contactBatteryLow(c.userId)}
+            {@const contactUser = getContactUser(c.userId)}
+            {@const actCtx = contactUser?.activityContext || ''}
+            <div class="person-card animate-slide-up stagger-item" style="animation-delay:{i*40}ms">
+              <!-- Presence avatar ring -->
+              <div class="person-ring-wrap">
+                <div
+                  class="person-avatar-circle state-{pState}"
+                  class:battery-low={batLow}
+                  style="--person-color:{getUserColor(c.userId)};"
+                  role="img"
+                  aria-label="{c.displayName}, {pText}"
+                >
+                  {getInitials(c.displayName)}
+                </div>
               </div>
-              <div class="list-item-actions">
+
+              <!-- Name + presence status -->
+              <div class="person-name-block">
+                <span class="person-name">
+                  {c.displayName}
+                  {#if isGuardianOf(c.userId)}<span class="badge badge-primary badge-xs" style="margin-left:4px">Ward</span>{/if}
+                  {#if isWardOf(c.userId)}<span class="badge badge-primary badge-xs" style="margin-left:4px">Guardian</span>{/if}
+                  {#if isPendingGuardianOf(c.userId) || isPendingWardOf(c.userId)}<span class="badge badge-warning badge-xs" style="margin-left:4px">Pending</span>{/if}
+                </span>
+                <span class="person-status" class:status-now={pState==='now'} class:status-sos={pState==='sos'}>{pText}</span>
+                {#if actCtx}<span class="activity-chip">{actCtx}</span>{/if}
+              </div>
+
+              <!-- Actions: locate + context menu -->
+              <div class="contact-actions-col">
+                <button class="locate-pill" on:click={() => locateContact(c.userId)} title="Find {c.displayName} on map" aria-label="Locate {c.displayName}">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 1.892.402 3.13 1.5 4.5L12 22l6.5-7.5c1.098-1.37 1.5-2.608 1.5-4.5a8 8 0 0 0-8-8z"/></svg>
+                </button>
+                <button class="btn btn-danger btn-sm" on:click={() => removeContact(c.userId)}>Remove</button>
                 {#if !isGuardianOf(c.userId) && !isWardOf(c.userId) && !isPendingGuardianOf(c.userId) && !isPendingWardOf(c.userId)}
                   <select class="duration-select" bind:value={guardianDurations[c.userId]}>
                     <option value={null}>Permanent</option>
-                    <option value="1h">1 Hour</option>
-                    <option value="24h">24 Hours</option>
-                    <option value="7d">7 Days</option>
-                    <option value="30d">30 Days</option>
+                    <option value="1h">1h</option>
+                    <option value="24h">24h</option>
+                    <option value="7d">7d</option>
+                    <option value="30d">30d</option>
                   </select>
-                  <button class="btn btn-secondary btn-sm" on:click={() => requestGuardian(c.userId)} title="You want to be their guardian">Be Guardian</button>
-                  <button class="btn btn-secondary btn-sm" on:click={() => inviteGuardian(c.userId)} title="You want them to be your guardian">Make Guardian</button>
+                  <button class="btn btn-secondary btn-sm" on:click={() => requestGuardian(c.userId)} title="You watch them">Watch</button>
+                  <button class="btn btn-secondary btn-sm" on:click={() => inviteGuardian(c.userId)} title="They watch you">Be Watched</button>
                 {/if}
-                <button class="btn btn-danger btn-sm" on:click={() => removeContact(c.userId)}>Remove</button>
               </div>
             </div>
           {/each}
-        {/if}
-      </div>
+      {/if}
     </div>
 
-    <hr class="divider" />
-
-    <div class="section">
-      <h4>Live Links</h4>
-      <p class="hint">Share a temporary link so anyone — even without an account — can see your live location. Set an expiry time or revoke it instantly.</p>
-      <div class="live-link-toolbar">
-        <select class="select live-duration-select" bind:value={selectedLinkDuration} aria-label="Live link duration">
-          <option value="1h">1 Hour</option>
-          <option value="6h">6 Hours</option>
-          <option value="24h">24 Hours</option>
-          <option value="48h">48 Hours</option>
-          <option value="forever">Until Revoked</option>
-        </select>
-        <button class="btn btn-primary btn-sm" on:click={generateLiveLink}>Generate Link</button>
+    <!-- ── LIVE BROADCASTS ───────────────────────────────────────── -->
+    <div class="sharing-section">
+      <div class="sharing-section-header">
+        <span class="card-eyebrow">Live Broadcasts</span>
       </div>
-      <div class="list">
-        {#if $myLiveLinks.length === 0}
-          <p class="mini list-empty">No active links</p>
-        {:else}
-          {#each $myLiveLinks as link}
+      <div class="live-link-toolbar">
+        <div class="duration-pills" role="group" aria-label="Broadcast duration">
+          {#each [['1h','1h'],['6h','6h'],['24h','24h'],['48h','48h'],['forever','∞']] as [val, label]}
+            <button
+              class="pill-btn"
+              class:pill-active={selectedLinkDuration === val}
+              on:click={() => selectedLinkDuration = val}
+              aria-pressed={selectedLinkDuration === val}
+            >{label}</button>
+          {/each}
+        </div>
+        <button class="btn btn-primary btn-sm" on:click={generateLiveLink}>Start Broadcast</button>
+      </div>
+      {#if $myLiveLinks.length === 0}
+        <p class="empty-state">No broadcasts running.</p>
+      {:else}
+        <div class="broadcasts-list">
+          {#each $myLiveLinks as link, i}
             {@const url = window.location.origin + '/#/live/' + link.token}
-            <div class="list-item live-link-item">
-              <div class="list-item-main live-link-main">
-                <div class="mini live-link-url" title={url}>{url}</div>
-                <div class="mini">Expires: {link.expiresAt ? new Date(link.expiresAt).toLocaleTimeString() : 'Until revoked'}</div>
+            <div class="broadcast-card card-glow-link animate-slide-up stagger-item" style="animation-delay:{i*40}ms">
+              <div class="broadcast-header">
+                <span class="rec-dot animate-rec-blink" aria-hidden="true"></span>
+                <span class="broadcast-label">Live</span>
+                <span class="broadcast-expiry">{link.expiresAt ? 'Expires ' + new Date(link.expiresAt).toLocaleTimeString() : 'Until I Say Stop'}</span>
               </div>
-              <div class="list-item-actions live-link-actions">
-                <button class="btn btn-secondary btn-sm" on:click={() => copyLink(url)}>Copy</button>
-                <button class="btn btn-danger btn-sm" on:click={() => revokeLink(link.token)}>Revoke</button>
+              <div class="live-link-actions">
+                <CopyButton text={url} label="Copy Link" />
+                <button class="btn btn-danger btn-sm" on:click={() => revokeLink(link.token)}>End Broadcast</button>
               </div>
             </div>
           {/each}
-        {/if}
-      </div>
+        </div>
+      {/if}
     </div>
 
     {#if !hasAny}
-      <div class="onboarding">
-        <p>Create a room or add contacts to start sharing your location in real time.</p>
+      <div class="empty-state-hero">
+        <p>Just you out here. Share your signal code to connect with someone.</p>
       </div>
     {/if}
   </div>
@@ -314,118 +388,162 @@
 {/if}
 
 <style>
-  .hint {
-    font-size: 12px;
-    color: var(--text-tertiary, #888);
-    line-height: 1.5;
-    margin: 0 0 8px;
-  }
-  .hint strong { color: var(--text-secondary, #aaa); font-weight: 600; }
-
-  .list { margin-top: var(--space-2); }
-  .list-empty { padding: var(--space-2) 0; }
-  .live-link-toolbar {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-2);
-    width: 100%;
-  }
-  .live-duration-select {
-    width: 100%;
-    min-width: 0;
-  }
-  .live-link-toolbar .btn {
-    width: 100%;
-  }
-  .live-link-item {
+  /* ── Sharing root container ──────────────────────────────────── */
+  .sharing-root {
     display: flex;
     flex-direction: column;
-    align-items: stretch;
-    gap: var(--space-1);
+    gap: var(--space-4);
   }
-  .live-link-main {
-    min-width: 0;
-    width: 100%;
-  }
-  .live-link-url {
-    display: block;
-    max-width: 100%;
-    white-space: normal;
-    overflow-wrap: anywhere;
-    word-break: break-word;
-  }
-  .live-link-actions {
+
+  /* ── Section structure — no dividers, just grouping ─────────── */
+  .sharing-section {
     display: flex;
-    justify-content: flex-start;
-    flex-wrap: wrap;
-    gap: var(--space-1);
-    width: 100%;
+    flex-direction: column;
+    gap: var(--space-2);
   }
-  .onboarding { padding: var(--space-4); text-align: center; color: var(--text-tertiary); font-size: var(--text-sm); }
-  .pending-admin-section {
-    width: 100%;
-    margin-top: var(--space-2, 8px);
-    padding: var(--space-2, 8px) 0 0;
-    border-top: 1px dashed var(--border-default, #e0e0e0);
-  }
-  .pending-admin-item {
+  .sharing-section-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--space-2, 8px);
-    padding: var(--space-1, 4px) 0;
-  }
-  .pending-admin-info {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-  }
-  .pending-admin-actions {
-    display: flex;
-    gap: var(--space-1, 4px);
-    flex-shrink: 0;
-  }
-  .vote-count {
-    color: var(--text-secondary, #888);
-  }
-  .badge-danger {
-    background: var(--danger-500, #ef4444);
-    color: #fff;
-  }
-  .btn-xs {
-    font-size: var(--text-2xs, 10px);
-    padding: 2px 8px;
-    border-radius: var(--radius-sm, 4px);
-  }
-  .duration-select {
-    font-size: var(--text-xs, 12px);
-    padding: 2px 6px;
-    border: 1px solid var(--border-default, #ddd);
-    border-radius: var(--radius-sm, 4px);
-    background: var(--surface-1, #fff);
-    color: var(--text-primary, #333);
-    cursor: pointer;
-    max-width: 90px;
+    margin-bottom: var(--space-1);
   }
 
-  /* ── Locate buttons ──────────────────────────────────────────────── */
-  .locate-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+  /* Create / join rows */
+  .rooms-create-row,
+  .rooms-join-row {
+    display: flex;
+    gap: var(--space-2);
+  }
+  .rooms-create-row .input,
+  .rooms-join-row .input {
+    flex: 1;
+  }
+
+  /* Rooms list */
+  .rooms-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  /* Broadcasts list */
+  .broadcasts-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  /* Empty state */
+  .empty-state {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    padding: var(--space-2) 0;
+    font-style: italic;
+  }
+  .empty-state-hero {
+    padding: var(--space-4);
+    text-align: center;
+    font-size: var(--text-sm);
+    color: var(--text-tertiary);
+    border: 1px dashed var(--border-subtle);
+    border-radius: var(--radius-xl);
+  }
+
+  /* Revoke inline button */
+  .btn-revoke-inline {
     background: none;
     border: none;
     cursor: pointer;
-    color: var(--text-tertiary, #999);
-    padding: 2px;
-    border-radius: var(--radius-sm, 4px);
-    transition: color 0.15s ease, background 0.15s ease;
-    flex-shrink: 0;
-    vertical-align: middle;
+    color: var(--danger-400);
+    font-size: 13px;
+    font-weight: 700;
+    padding: 0 2px;
+    line-height: 1;
+    border-radius: 2px;
+    transition: color 100ms;
   }
-  .locate-btn:hover {
-    color: var(--primary-500);
-    background: var(--surface-inset, rgba(0,0,0,0.04));
+  .btn-revoke-inline:hover { color: var(--danger-500); }
+
+  /* ── Contact cards — person-first ─────────────────────────────── */
+  .contact-card {
+    display: grid;
+    grid-template-columns: 38px 1fr auto;
+    gap: var(--space-3);
+    align-items: start;
+    padding: var(--space-3) var(--space-3);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-1);
+    transition: background 180ms var(--ease-out), border-color 180ms var(--ease-out), transform 150ms var(--ease-spring), box-shadow 180ms var(--ease-out);
+  }
+  .contact-card:hover {
+    background: var(--surface-2);
+    border-color: var(--border-default);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .contact-avatar-wrap { padding-top: 2px; }
+
+  .contact-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--primary-100);
+    color: var(--primary-700);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: var(--text-xs);
+    flex-shrink: 0;
+    text-transform: uppercase;
+    transition: box-shadow 300ms var(--ease-out);
+  }
+
+  .contact-avatar.avatar-guardian {
+    background: rgba(139, 92, 246, 0.12);
+    color: var(--accent-guardian);
+    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.20);
+  }
+
+  :global([data-theme="dark"]) .contact-avatar {
+    background: rgba(99, 102, 241, 0.18);
+    color: var(--primary-300);
+  }
+
+  .contact-name-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1-5);
+    flex-wrap: wrap;
+  }
+
+  /* ── Contact actions column ────────────────────────────────────────── */
+  .contact-actions-col {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--space-1);
+    flex-shrink: 0;
+  }
+
+  .locate-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(99, 102, 241, 0.10);
+    border: 1px solid rgba(99, 102, 241, 0.22);
+    color: var(--primary-400);
+    cursor: pointer;
+    transition: background 150ms var(--ease-out), transform 120ms var(--ease-spring);
+  }
+  .locate-pill:hover {
+    background: rgba(99, 102, 241, 0.20);
+    transform: scale(1.10);
   }
 
   /* ── Room members ────────────────────────────────────────────────── */
@@ -434,8 +552,8 @@
     flex-wrap: wrap;
     gap: 4px 8px;
     margin-top: 4px;
-    font-size: var(--text-xs, 12px);
-    color: var(--text-secondary, #666);
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
   }
   .room-member {
     display: inline-flex;
@@ -449,25 +567,150 @@
     background: none;
     border: 1px solid transparent;
     cursor: pointer;
-    color: var(--text-secondary, #666);
+    color: var(--text-secondary);
     padding: 2px 6px;
-    border-radius: var(--radius-sm, 4px);
+    border-radius: var(--radius-sm);
     font: inherit;
-    font-size: var(--text-xs, 12px);
-    transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+    font-size: var(--text-xs);
+    transition: color 150ms, background 150ms, border-color 150ms;
     line-height: 1.3;
   }
   .member-locate-btn:hover {
-    color: var(--primary-600, #2563eb);
-    background: var(--surface-inset, rgba(0,0,0,0.04));
-    border-color: var(--primary-200, #bfdbfe);
+    color: var(--primary-500);
+    background: var(--surface-inset);
+    border-color: var(--border-glow-primary);
   }
-  .member-locate-btn svg {
+  .member-locate-btn svg { flex-shrink: 0; opacity: 0.5; transition: opacity 150ms; }
+  .member-locate-btn:hover svg { opacity: 1; }
+
+  /* ── Locate button (inline) ──────────────────────────────────────── */
+  .locate-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-tertiary);
+    padding: 2px;
+    border-radius: var(--radius-sm);
+    transition: color 150ms, background 150ms;
     flex-shrink: 0;
-    opacity: 0.5;
-    transition: opacity 0.15s ease;
   }
-  .member-locate-btn:hover svg {
-    opacity: 1;
+  .locate-btn:hover { color: var(--primary-500); background: var(--surface-inset); }
+
+  /* ── Duration pills ─────────────────────────────────────────────── */
+  .live-link-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+    width: 100%;
+  }
+  .live-link-toolbar .btn { width: 100%; }
+  .duration-pills {
+    display: flex;
+    gap: var(--space-1);
+    flex-wrap: wrap;
+  }
+  .pill-btn {
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-full);
+    background: var(--surface-1);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background 120ms var(--ease-out), color 120ms var(--ease-out), transform 120ms var(--ease-spring), box-shadow 150ms var(--ease-out);
+  }
+  .pill-btn:hover { background: var(--surface-2); color: var(--text-primary); }
+  .pill-btn.pill-active {
+    background: var(--primary-600);
+    color: white;
+    border-color: var(--primary-500);
+    box-shadow: var(--glow-primary), var(--shadow-xs);
+    transform: scale(1.05);
+    animation: pill-select 300ms var(--ease-spring);
+  }
+
+  /* ── Broadcast card — cyan glow ─────────────────────────────────── */
+  .broadcast-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-lg);
+    background: rgba(6, 182, 212, 0.05);
+    border: 1px solid rgba(6, 182, 212, 0.20);
+    border-top-color: rgba(6, 182, 212, 0.38);
+    box-shadow: var(--glow-link);
+  }
+  .broadcast-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1-5);
+  }
+  .rec-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--color-rec);
+    flex-shrink: 0;
+  }
+  .broadcast-label {
+    font-weight: 700;
+    font-size: var(--text-sm);
+    color: var(--accent-link);
+  }
+  .broadcast-expiry {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    margin-left: auto;
+  }
+
+  .live-link-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1-5);
+  }
+  .live-link-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+  }
+
+  /* ── Admin controls ─────────────────────────────────────────────── */
+  .onboarding { padding: var(--space-4); text-align: center; color: var(--text-tertiary); font-size: var(--text-sm); }
+  .pending-admin-section {
+    width: 100%;
+    margin-top: var(--space-2);
+    padding: var(--space-2) 0 0;
+    border-top: 1px dashed var(--border-default);
+  }
+  .pending-admin-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    padding: var(--space-1) 0;
+  }
+  .pending-admin-info { display: flex; flex-direction: column; gap: 1px; }
+  .pending-admin-actions { display: flex; gap: var(--space-1); flex-shrink: 0; }
+  .vote-count { color: var(--text-secondary); }
+  .badge-danger { background: var(--danger-500); color: #fff; }
+  .btn-xs {
+    font-size: var(--text-2xs);
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+  }
+  .duration-select {
+    font-size: var(--text-xs);
+    padding: 2px 6px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    background: var(--surface-1);
+    color: var(--text-primary);
+    cursor: pointer;
+    max-width: 90px;
   }
 </style>

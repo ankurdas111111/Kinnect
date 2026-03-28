@@ -3,6 +3,7 @@ package ws
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -67,15 +68,15 @@ type Hub struct {
 	positionTimer    *time.Timer
 	positionTimerMu  sync.Mutex
 
+	// Rolling position buffers for SOS narrative (in-memory, per user)
+	rollingBufMu sync.RWMutex
+	rollingBufs  map[string]*rollingBuffer
+
 	// Free-tier optimizations
 	ConnLimiter     *ConnectionLimiter
 	MemoryMonitor   *MemoryMonitor
 	ShutdownOnce    sync.Once
 	IsShuttingDown  bool
-
-	// Redis (optional, for Render production)
-	RedisCache       *cache.RedisCache
-	RedisSessionStore *cache.RedisSessionStore
 
 	mu sync.RWMutex
 }
@@ -93,6 +94,7 @@ func NewHub(c *cache.Cache, p *db.Pool, cfg *config.Config) *Hub {
 		broadcast:        make(chan *broadcastMsg, chanBroadcastBuf),
 		groups:           make(map[string]map[string]bool),
 		pendingPositions: make(map[string]positionBroadcast),
+		rollingBufs:      make(map[string]*rollingBuffer),
 		ConnLimiter:      NewConnectionLimiter(config.MaxWebSocketConnections),
 		MemoryMonitor:    NewMemoryMonitor(10 * time.Second),
 		IsShuttingDown:   false,
@@ -132,6 +134,9 @@ func (h *Hub) buildEventHandlers() map[string]func(*Client, json.RawMessage) {
 		"approveGuardian":      h.handleApproveGuardian,
 		"denyGuardian":         h.handleDenyGuardian,
 		"revokeGuardian":       h.handleRevokeGuardian,
+		"sendPulse":            h.handleSendPulse,
+		"updateQuietHours":     h.handleQuietHoursUpdate,
+		"updateSchedule":       h.handleUpdateSchedule,
 		"triggerSOS":           h.handleTriggerSOS,
 		"cancelSOS":            h.handleCancelSOS,
 		"ackSOS":               h.handleAckSOS,
@@ -140,6 +145,11 @@ func (h *Hub) buildEventHandlers() map[string]func(*Client, json.RawMessage) {
 		"setGeofence":          h.handleSetGeofence,
 		"setAutoSos":           h.handleSetAutoSos,
 		"liveAckSOS":           h.handleLiveAckSOS,
+		"attest":               h.handleAttest,
+		"getRecentTrail":       h.handleGetRecentTrail,
+		"getNetworkGraph":      h.handleGetNetworkGraph,
+		"onMyWay":              h.handleOnMyWay,
+		"cancelOnMyWay":        h.handleCancelOnMyWay,
 	}
 }
 
@@ -209,6 +219,9 @@ func (h *Hub) handleRegister(c *Client) {
 		user.DisplayName = displayName
 		user.Online = true
 		user.Rooms = h.Cache.GetUserRooms(userID)
+		if user.BatteryAlertSentAt == nil {
+			user.BatteryAlertSentAt = make(map[int]int64)
+		}
 		h.Cache.SetActiveUser(clientID, user)
 		h.Cache.SetUserIdToSocketId(userID, clientID)
 		if role == "admin" {
@@ -218,14 +231,15 @@ func (h *Hub) handleRegister(c *Client) {
 	} else {
 		// 3. Create ActiveUser entry in cache
 		user := &cache.ActiveUser{
-			SocketID:    clientID,
-			UserID:      userID,
-			DisplayName: displayName,
-			Role:        role,
-			LastUpdate:  time.Now().UnixMilli(),
-			LastMoveAt:  time.Now().UnixMilli(),
-			Rooms:       h.Cache.GetUserRooms(userID),
-			Online:      true,
+			SocketID:           clientID,
+			UserID:             userID,
+			DisplayName:        displayName,
+			Role:               role,
+			LastUpdate:         time.Now().UnixMilli(),
+			LastMoveAt:         time.Now().UnixMilli(),
+			Rooms:              h.Cache.GetUserRooms(userID),
+			Online:             true,
+			BatteryAlertSentAt: make(map[int]int64),
 		}
 		user.Retention = &cache.Retention{Mode: "default", ClientID: clientID}
 		h.Cache.SetActiveUser(clientID, user)
@@ -306,6 +320,20 @@ func (h *Hub) handleUnregister(c *Client) {
 	h.Cache.DeleteLastDbSaveAt(user.UserID)
 	h.Cache.DeleteLastVisibleSet(clientID)
 	h.Cache.DeleteAdminClientId(clientID)
+	h.CloseZoneVisitsForUser(user.UserID)
+
+	// Guarantee last_* columns reflect the exact disconnect position (offline safety fix)
+	if user.Latitude != nil && user.Longitude != nil {
+		lat, lng, spd := *user.Latitude, *user.Longitude, user.Speed
+		uid := user.UserID
+		flushTs := time.Now().UnixMilli()
+		go func() {
+			speedStr := fmt.Sprintf("%.2f", spd)
+			_ = db.UpdateUserLocation(context.Background(), h.pool.DB, uid, lat, lng, speedStr, flushTs)
+		}()
+	}
+	// Release rolling buffer memory
+	h.deleteRollingBuf(user.UserID)
 
 	if user.ForceDelete {
 		h.Cache.DeleteActiveUser(clientID)
@@ -424,6 +452,7 @@ func (h *Hub) HandleUpgrade(w http.ResponseWriter, r *http.Request, sessionData 
 	conn, err := websocket.Accept(w, r, acceptOpts)
 	if err != nil {
 		slog.Warn("WebSocket upgrade failed", "error", err, "userID", userID)
+		h.ConnLimiter.ReleaseConnection() // slot was acquired in the HTTP handler before upgrade
 		return
 	}
 	slog.Info("WebSocket connected", "userID", userID, "role", role)

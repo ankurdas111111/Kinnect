@@ -5,6 +5,7 @@
   import { savedPlaces, placeAlerts, speedAlerts } from '../lib/stores/places.js';
   import { otherUsers, myLocation } from '../lib/stores/map.js';
   import { authUser } from '../lib/stores/auth.js';
+  import { apiGet, apiPost, apiDelete } from '../lib/api.js';
 
   export let embedded = false;
 
@@ -34,9 +35,13 @@
     { value: 'pin', label: 'Other' },
   ];
 
-  const STORAGE_KEY = 'kinnect_saved_places';
   const PALERT_KEY  = 'kinnect_place_alerts';
   const SALERT_KEY  = 'kinnect_speed_alerts';
+
+  // Zone Story state — per-place visit history
+  let storyPlaceId = null;     // which place's story is open
+  let storyVisits = [];        // fetched visits
+  let storyLoading = false;
 
   $: visibleUsers = buildUserList($otherUsers, $authUser);
 
@@ -49,11 +54,9 @@
     return list;
   }
 
-  // ── Persistence helpers (localStorage) ───────────────────────────────────────
-  function loadFromStorage() {
+  // ── Persistence helpers (localStorage — only for alerts, places now live in backend) ──
+  function loadAlertsFromStorage() {
     try {
-      const sp = localStorage.getItem(STORAGE_KEY);
-      if (sp) savedPlaces.set(JSON.parse(sp));
       const pa = localStorage.getItem(PALERT_KEY);
       if (pa) placeAlerts.set(JSON.parse(pa));
       const sa = localStorage.getItem(SALERT_KEY);
@@ -65,12 +68,25 @@
     try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) {}
   }
 
-  onMount(() => {
-    loadFromStorage();
+  onMount(async () => {
+    loadAlertsFromStorage();
+    // Load saved places from backend (canonical source)
+    const res = await apiGet('/api/places');
+    if (Array.isArray(res)) {
+      // Map backend field names to frontend convention
+      savedPlaces.set(res.map(p => ({
+        id: p.id,
+        name: p.name,
+        lat: p.latitude,
+        lng: p.longitude,
+        radiusM: p.radiusM,
+        icon: p.icon || 'pin',
+      })));
+    }
   });
 
   // ── Saved Places ─────────────────────────────────────────────────────────────
-  function addPlace() {
+  async function addPlace() {
     if (!newPlaceName.trim()) return;
     const loc = $myLocation;
     if (!loc) {
@@ -78,41 +94,79 @@
       setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 3000);
       return;
     }
-    const place = {
-      id: Date.now().toString(),
+    const res = await apiPost('/api/places', {
       name: newPlaceName.trim(),
-      lat: loc.latitude,
-      lng: loc.longitude,
+      latitude: loc.latitude,
+      longitude: loc.longitude,
       radiusM: newPlaceRadius,
       icon: newPlaceIcon,
-    };
-    savedPlaces.update(arr => {
-      const next = [...arr, place];
-      persist(STORAGE_KEY, next);
-      return next;
     });
-    // Notify server in background (fire-and-forget — no callback needed)
-    socket.emit('createSavedPlace', { name: place.name, lat: place.lat, lng: place.lng, radiusM: place.radiusM, icon: place.icon });
-    newPlaceName = '';
-    newPlaceRadius = 100;
-    newPlaceIcon = 'pin';
-    showAddPlace = false;
-    banner.set({ type: 'info', text: `"${place.name}" saved at your current location`, actions: [] });
-    setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 2500);
+    if (res && res.id) {
+      savedPlaces.update(arr => [...arr, {
+        id: res.id,
+        name: res.name,
+        lat: res.latitude,
+        lng: res.longitude,
+        radiusM: res.radiusM,
+        icon: res.icon || 'pin',
+      }]);
+      newPlaceName = '';
+      newPlaceRadius = 100;
+      newPlaceIcon = 'pin';
+      showAddPlace = false;
+      banner.set({ type: 'info', text: `"${res.name}" saved at your current location`, actions: [] });
+      setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 2500);
+    } else {
+      banner.set({ type: 'sos', text: res?.error || 'Failed to save place', actions: [] });
+      setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 3000);
+    }
   }
 
-  function removePlace(placeId) {
-    savedPlaces.update(arr => {
-      const next = arr.filter(p => p.id !== placeId);
-      persist(STORAGE_KEY, next);
-      return next;
-    });
+  async function removePlace(placeId) {
+    await apiDelete(`/api/places/${placeId}`);
+    savedPlaces.update(arr => arr.filter(p => p.id !== placeId));
     placeAlerts.update(arr => {
       const next = arr.filter(a => a.placeId !== placeId);
       persist(PALERT_KEY, next);
       return next;
     });
-    socket.emit('deleteSavedPlace', { id: placeId });
+    if (storyPlaceId === placeId) storyPlaceId = null;
+  }
+
+  // ── Zone Story ────────────────────────────────────────────────────────────────
+  async function viewStory(placeId) {
+    if (storyPlaceId === placeId) { storyPlaceId = null; return; }
+    storyPlaceId = placeId;
+    storyVisits = [];
+    storyLoading = true;
+    const res = await apiGet(`/api/places/${placeId}/story`);
+    storyLoading = false;
+    storyVisits = Array.isArray(res) ? res : [];
+  }
+
+  function formatDuration(seconds) {
+    if (!seconds) return '';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m`;
+  }
+
+  function formatTime(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function formatDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const today = new Date();
+    if (d.toDateString() === today.toDateString()) return 'Today';
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    return d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
   }
 
   // ── Arrival / Departure Alerts ───────────────────────────────────────────────
@@ -194,8 +248,8 @@
 {#if embedded}
   <div class="panel-body places-panel">
 
-    <!-- ── Saved Places ─────────────────────────────────────────────────── -->
-    <h4>Saved Places</h4>
+    <!-- ── Your Spots ─────────────────────────────────────────────────── -->
+    <h4 class="section-title-bold">Your Spots</h4>
     <div class="section-content">
       <p class="hint">Pin locations (home, work, etc.) at your current GPS position. These are used to trigger arrival and departure alerts below.</p>
 
@@ -206,8 +260,35 @@
             <span class="item-name">{place.name}</span>
             <span class="item-detail">{place.radiusM}m radius · {place.lat?.toFixed(4)}, {place.lng?.toFixed(4)}</span>
           </div>
+          <button class="btn-icon-sm story-btn" on:click={() => viewStory(place.id)} title="View visit history">
+            {storyPlaceId === place.id ? '▲' : '📋'}
+          </button>
           <button class="btn-icon-sm" on:click={() => removePlace(place.id)} title="Remove">✕</button>
         </div>
+        {#if storyPlaceId === place.id}
+          <div class="zone-story">
+            {#if storyLoading}
+              <p class="story-empty">Loading...</p>
+            {:else if storyVisits.length === 0}
+              <p class="story-empty">No visits recorded yet (last 7 days).</p>
+            {:else}
+              {#each storyVisits as v}
+                <div class="story-row">
+                  <div class="story-avatar">{v.displayName?.charAt(0) ?? '?'}</div>
+                  <div class="story-info">
+                    <span class="story-name">{v.displayName}</span>
+                    <span class="story-time">
+                      {formatDate(v.arrivedAt)} · {formatTime(v.arrivedAt)}
+                      {#if v.departedAt} – {formatTime(v.departedAt)}{/if}
+                      {#if v.durationSeconds} · {formatDuration(v.durationSeconds)}{/if}
+                    </span>
+                  </div>
+                  {#if !v.departedAt}<span class="story-badge-here">Here now</span>{/if}
+                </div>
+              {/each}
+            {/if}
+          </div>
+        {/if}
       {/each}
 
       {#if showAddPlace}
@@ -216,7 +297,7 @@
             type="text"
             bind:value={newPlaceName}
             class="field-input field-full"
-            placeholder="Place name (e.g. Home, Work…)"
+            placeholder="Give it a name (Home, Work, Mom's...)"
             maxlength="100"
             autocomplete="off"
           />
@@ -246,13 +327,13 @@
 
     <hr class="divider" />
 
-    <!-- ── Arrival / Departure Alerts ──────────────────────────────────── -->
-    <h4>Arrival / Departure Alerts</h4>
+    <!-- ── Arrival Pings ──────────────────────────────────────────────── -->
+    <h4 class="section-title-bold">Arrival Pings</h4>
     <div class="section-content">
-      <p class="hint">Get notified when a tracked person enters or leaves one of your saved places. Requires location sharing to be active.</p>
+      <p class="hint">Get notified when a tracked person enters or leaves one of your saved spots. Requires location sharing to be active.</p>
 
       {#if $placeAlerts.length === 0}
-        <p class="empty">No alerts configured.</p>
+        <p class="empty">No arrival alerts. Add one for home so your family knows you made it.</p>
       {/if}
       {#each $placeAlerts as alert}
         <div class="list-item">
@@ -296,13 +377,13 @@
 
     <hr class="divider" />
 
-    <!-- ── Speed Alerts ─────────────────────────────────────────────────── -->
-    <h4>Speed Alerts</h4>
+    <!-- ── Speed Checks ─────────────────────────────────────────────────── -->
+    <h4 class="section-title-bold">Speed Checks</h4>
     <div class="section-content">
       <p class="hint">Get notified when a tracked person exceeds a speed limit. Useful for monitoring young drivers or detecting unsafe driving.</p>
 
       {#if $speedAlerts.length === 0}
-        <p class="empty">No speed alerts configured.</p>
+        <p class="empty">No speed alerts. Add one if you'd like to be gently judged.</p>
       {/if}
       {#each $speedAlerts as sa}
         <div class="list-item">
@@ -349,23 +430,18 @@
 <style>
   .places-panel { padding: 0; }
 
-  h4 {
-    font-size: 13px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--text-secondary, #666);
-    margin: 12px 0 4px;
-    padding: 0 16px;
+  h4.section-title-bold {
+    margin: var(--space-4) 0 var(--space-1);
+    padding: 0 var(--space-4);
   }
 
-  .section-content { padding: 0 16px 8px; }
+  .section-content { padding: 0 var(--space-4) var(--space-2); }
 
   .hint {
-    font-size: 12px;
-    color: var(--text-tertiary, #999);
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
     line-height: 1.5;
-    margin: 0 0 8px;
+    margin: 0 0 var(--space-2);
   }
 
   /* ── List items ──────────────────────────────────────────────────────────── */
@@ -374,7 +450,7 @@
     align-items: center;
     gap: 10px;
     padding: 8px 0;
-    border-bottom: 1px solid var(--border-primary, rgba(255,255,255,0.08));
+    border-bottom: 1px solid var(--border-subtle);
   }
   .list-item:last-of-type { border-bottom: none; }
 
@@ -389,23 +465,23 @@
   }
 
   .item-name {
-    font-size: 13px;
+    font-size: var(--text-sm);
     font-weight: 600;
-    color: var(--text-primary, #e8e8e8);
+    color: var(--text-primary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
-  .item-detail { font-size: 11px; color: var(--text-tertiary, #888); }
+  .item-detail { font-size: var(--text-xs); color: var(--text-tertiary); }
 
   .btn-icon-sm {
     width: 26px;
     height: 26px;
     border-radius: 50%;
     border: none;
-    background: rgba(255,255,255,0.07);
-    color: var(--text-tertiary, #888);
+    background: var(--surface-3);
+    color: var(--text-tertiary);
     cursor: pointer;
     font-size: 12px;
     display: flex;
@@ -415,6 +491,51 @@
     transition: background 0.15s, color 0.15s;
   }
   .btn-icon-sm:hover { background: rgba(220, 38, 38, 0.18); color: #f87171; }
+  .story-btn:hover { background: var(--surface-3); color: var(--text-secondary); }
+
+  /* ── Zone Story Timeline ──────────────────────────────────────────────────── */
+  .zone-story {
+    margin: 4px 0 8px;
+    padding: 8px 10px;
+    background: var(--surface-inset);
+    border-left: 3px solid var(--color-primary, #6366f1);
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  }
+  .story-empty { font-size: var(--text-xs); color: var(--text-tertiary); margin: 0; }
+  .story-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .story-row:last-of-type { border-bottom: none; }
+  .story-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--color-primary, #6366f1);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    text-transform: uppercase;
+  }
+  .story-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .story-name { font-size: var(--text-xs); font-weight: 600; color: var(--text-primary); }
+  .story-time { font-size: 10px; color: var(--text-tertiary); }
+  .story-badge-here {
+    font-size: 10px;
+    font-weight: 600;
+    color: #22c55e;
+    background: rgba(34, 197, 94, 0.15);
+    padding: 2px 6px;
+    border-radius: 999px;
+    flex-shrink: 0;
+  }
 
   /* ── Add form ────────────────────────────────────────────────────────────── */
   .add-form {
@@ -423,9 +544,9 @@
     gap: 8px;
     margin-top: 8px;
     padding: 12px;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 10px;
+    background: var(--surface-inset);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
   }
 
   .form-row {
@@ -435,34 +556,32 @@
     flex-wrap: wrap;
   }
 
-  /* Force legible text inside inputs regardless of theme */
   .field-input {
     padding: 8px 10px;
-    border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 8px;
-    font-size: 13px;
-    background: rgba(255,255,255,0.10);
-    color: #e8e8e8;
-    -webkit-text-fill-color: #e8e8e8;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+    background: var(--surface-3);
+    color: var(--text-primary);
   }
-  .field-input::placeholder { color: rgba(232,232,232,0.45); }
-  .field-input option { background: #1e2433; color: #e8e8e8; }
+  .field-input::placeholder { color: var(--text-tertiary); }
+  .field-input option { background: var(--surface-2); color: var(--text-primary); }
   .field-full { width: 100%; box-sizing: border-box; }
-  .field-sm  { flex: 1; min-width: 90px; padding: 6px 8px; font-size: 12px; }
-  .field-num { width: 64px; flex: none; padding: 6px 8px; font-size: 12px; }
+  .field-sm  { flex: 1; min-width: 90px; padding: 6px 8px; font-size: var(--text-xs); }
+  .field-num { width: 64px; flex: none; padding: 6px 8px; font-size: var(--text-xs); }
 
   .field-input:focus {
     outline: none;
-    border-color: var(--primary-500, #3b82f6);
-    box-shadow: 0 0 0 2px rgba(59,130,246,0.25);
+    border-color: var(--primary-500);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
   }
 
   .field-label-inline {
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: 12px;
-    color: var(--text-secondary, #aaa);
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
     white-space: nowrap;
   }
 
@@ -470,23 +589,23 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: 12px;
-    color: var(--text-primary, #e8e8e8);
+    font-size: var(--text-xs);
+    color: var(--text-primary);
     cursor: pointer;
     user-select: none;
   }
 
   .form-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
-  .btn-sm { padding: 6px 14px; font-size: 12px; min-height: 32px; }
+  .btn-sm { padding: 6px 14px; font-size: var(--text-xs); min-height: 32px; }
 
   .add-btn { align-self: flex-start; margin-top: 4px; }
 
-  .empty { font-size: 12px; color: var(--text-tertiary, #888); margin: 4px 0 6px; }
+  .empty { font-size: var(--text-xs); color: var(--text-tertiary); margin: 4px 0 6px; }
 
   .divider {
     border: none;
-    border-top: 1px solid rgba(255,255,255,0.07);
-    margin: 8px 0;
+    border-top: 1px solid var(--border-subtle);
+    margin: var(--space-2) 0;
   }
 </style>

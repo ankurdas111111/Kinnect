@@ -181,6 +181,7 @@ function startWeb(onFix, onError) {
       }
       if (err.code === err.TIMEOUT) {
         startFallbackWatch(onFix);
+        onError({ code: 3, message: 'GPS timeout' });
         return;
       }
       onError({ code: err.code, message: err.message || 'Position error' });

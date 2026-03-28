@@ -4,19 +4,35 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"time"
 
 	"kinnect-v3/internal/db"
 )
 
+// SosNarrative holds the context assembled at SOS trigger time.
+type SosNarrative struct {
+	TrackGeojson  string  `json:"trackGeojson"`
+	MotionSummary string  `json:"motionSummary"`
+	BatteryPct    *int    `json:"batteryPct"`
+	TriggerRule   string  `json:"triggerRule"`
+	LastSignalTs  int64   `json:"lastSignalTs"`
+}
+
+// SosAckEntry records a single SOS acknowledgement.
+type SosAckEntry struct {
+	By string `json:"by"`
+}
+
 // SOS holds SOS alert state for an active user.
 type SOS struct {
-	Active   bool
-	At       *int64
-	Reason   *string
-	Type     *string
-	Acks     []string
-	Token    *string
-	TokenExp *int64
+	Active    bool
+	At        *int64
+	Reason    *string
+	Type      *string
+	Acks      []SosAckEntry
+	Token     *string
+	TokenExp  *int64
+	Narrative *SosNarrative
 }
 
 // Geofence holds geofence config for an active user.
@@ -38,10 +54,12 @@ type AutoSOS struct {
 
 // CheckIn holds check-in config for an active user.
 type CheckIn struct {
-	Enabled        bool
-	IntervalMin    int
-	OverdueMin     int
-	LastCheckInAt  int64
+	Enabled            bool
+	IntervalMin        int
+	OverdueMin         int
+	LastCheckInAt      int64
+	RequestedAt        int64 // unix ms — last time checkInRequest was sent; prevents duplicate sends
+	MissedNotifiedAt   int64 // unix ms — last time checkInMissed was sent; prevents duplicate sends
 }
 
 // Retention holds retention mode for an active user.
@@ -68,12 +86,36 @@ type ActiveUser struct {
 	LastMoveAt       int64
 	LastSpeed        float64
 	HardStopAt       *int64
+
+	// Meaningful-movement threshold tracking (not persisted)
+	LastDBLat      float64 // lat at last DB write; 0 = never written
+	LastDBLng      float64 // lng at last DB write
+	LastDBAt       int64   // UnixMilli of last DB write; 0 = never written
+
+	// Motion class (derived from speed, drives trip_start/trip_end events)
+	MotionClass    string // "still" | "walk" | "run" | "vehicle"
+
+	// Waypoint throttle: last time a waypoint event was written to movement_events
+	LastWaypointAt int64 // UnixMilli; 0 = never written
+
+	// Intelligence fields (computed on each position update)
+	LastAttestAt  int64   // unix ms — last manual attestation; 0 = never
+	MovementPhase string  // "stationary" | "walking" | "driving" | "transit"
+	SafetyScore   float64 // 0–100, recomputed on each position update
+
+	// Consumer context fields
+	ActivityContext    string        // "At Home" | "Walking" | "Driving" | "" (computed each position update)
+	BatteryAlertSentAt map[int]int64 // threshold (20/10/5) -> UnixMilli of last alert sent
+	GentleAlertSentAt  int64         // unix ms — last "haven't moved" gentle alert sent to guardians
 	SOS              SOS
 	Geofence         Geofence
 	AutoSOS          AutoSOS
 	CheckIn          CheckIn
 	Retention          *Retention
 	PrivacyPausedUntil *int64
+	QuietHoursEnabled  bool
+	QuietHoursStart    string // "HH:MM" in user's local time — evaluated server-side as UTC window
+	QuietHoursEnd      string
 	Rooms              []string
 	Online             bool
 	ForceDelete        bool
@@ -132,9 +174,21 @@ type Cache struct {
 	UserRooms        map[string]map[string]bool
 	AdminClientIds   map[string]bool
 	PushSubs         map[string][]PushSubscription // userID -> subscriptions
+	SharingSchedules map[string][]ScheduleRule      // userID -> rules
 
 	// Lazy loading
 	lazyLoader *LazyLoader
+}
+
+// ScheduleRule defines when a user shares their location with a specific target.
+type ScheduleRule struct {
+	ID         string
+	TargetType string // "all" | "contact" | "room"
+	TargetID   string // userID or roomID; empty for "all"
+	DayMask    int    // bitmask Mon=1,Tue=2,Wed=4,Thu=8,Fri=16,Sat=32,Sun=64
+	StartMin   int    // minutes from midnight
+	EndMin     int    // minutes from midnight
+	Enabled    bool
 }
 
 // New creates a new Cache.
@@ -164,6 +218,7 @@ func New() *Cache {
 		UserRooms:         make(map[string]map[string]bool),
 		AdminClientIds:    make(map[string]bool),
 		PushSubs:          make(map[string][]PushSubscription),
+		SharingSchedules:  make(map[string][]ScheduleRule),
 		lazyLoader:        nil, // Set via SetLazyLoader
 	}
 }
@@ -443,6 +498,92 @@ func (c *Cache) InvalidateVisibility(userID string) {
 	delete(c.VisibilityCache, userID)
 }
 
+// HasSharingSchedules returns true if the user has any schedule rules configured.
+func (c *Cache) HasSharingSchedules(userID string) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return len(c.SharingSchedules[userID]) > 0
+}
+
+// SetSharingSchedules replaces a user's sharing schedule rules in the cache.
+func (c *Cache) SetSharingSchedules(userID string, rules []ScheduleRule) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.SharingSchedules[userID] = rules
+}
+
+// IsScheduleVisible returns false if the sender has schedule rules that block the recipient now.
+// Returns true (share) by default when no applicable rules exist.
+func (c *Cache) IsScheduleVisible(senderID, recipientID string, recipientRooms []string) bool {
+	c.mu.RLock()
+	rules, ok := c.SharingSchedules[senderID]
+	c.mu.RUnlock()
+	if !ok || len(rules) == 0 {
+		return true // no rules → always share
+	}
+	now := time.Now().UTC()
+	// Go's Weekday: Sun=0, Mon=1...Sat=6. Plan bitmask: Mon=1,Tue=2,...,Sun=64
+	wd := int(now.Weekday())
+	var dayBit int
+	if wd == 0 {
+		dayBit = 64 // Sunday
+	} else {
+		dayBit = 1 << (wd - 1) // Mon=1, Tue=2, ...
+	}
+	nowMin := now.Hour()*60 + now.Minute()
+
+	for _, r := range rules {
+		if !r.Enabled {
+			continue
+		}
+		// Check if this rule applies to the recipient
+		switch r.TargetType {
+		case "contact":
+			if r.TargetID != recipientID {
+				continue
+			}
+		case "room":
+			found := false
+			for _, code := range recipientRooms {
+				if code == r.TargetID {
+					found = true
+					break
+				}
+			}
+			if !found {
+				continue
+			}
+		// "all" matches everyone
+		}
+		if r.DayMask != 0 && (r.DayMask&dayBit) == 0 {
+			continue
+		}
+		var inWindow bool
+		if r.StartMin <= r.EndMin {
+			inWindow = nowMin >= r.StartMin && nowMin < r.EndMin
+		} else {
+			inWindow = nowMin >= r.StartMin || nowMin < r.EndMin
+		}
+		if inWindow {
+			return true // an active sharing window covers this recipient
+		}
+	}
+	// Sender has rules but none match this recipient now → don't share
+	return false
+}
+
+// IsGuardianOf returns true if guardianID is an active guardian of wardID.
+func (c *Cache) IsGuardianOf(guardianID, wardID string) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if wards, ok := c.Guardianships[guardianID]; ok {
+		if e, ok := wards[wardID]; ok && e != nil && e.Status == "active" {
+			return true
+		}
+	}
+	return false
+}
+
 // GetVisibleSocketIDs returns socket IDs of users who can see targetUser (for emitToVisible).
 // Includes admins. Excludes targetUser's own socket.
 func (c *Cache) GetVisibleSocketIDs(targetUser *ActiveUser) []string {
@@ -527,6 +668,11 @@ func (c *Cache) SanitizeUser(user *ActiveUser) map[string]interface{} {
 		"connectionQuality": user.ConnectionQuality,
 		"online":          user.Online,
 		"rooms":           user.Rooms,
+		"safetyScore":     user.SafetyScore,
+		"movementPhase":   user.MovementPhase,
+		"motionClass":     user.MotionClass,
+		"lastAttestAt":    user.LastAttestAt,
+		"activityContext": user.ActivityContext,
 		"sos": map[string]interface{}{
 			"active": user.SOS.Active,
 			"at":     user.SOS.At,
@@ -847,7 +993,10 @@ func (c *Cache) sanitizeUserLocked(user *ActiveUser) map[string]interface{} {
 			}
 			return map[string]interface{}{"mode": "default"}
 		}(),
-		"rooms": user.Rooms,
+		"rooms":           user.Rooms,
+		"motionClass":     user.MotionClass,
+		"lastAttestAt":    user.LastAttestAt,
+		"activityContext": user.ActivityContext,
 	}
 }
 

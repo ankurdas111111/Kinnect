@@ -1,7 +1,18 @@
 <script>
-  import { alertState } from '../lib/stores/sos.js';
+  import { alertState, sosNarratives, activeSosUsers } from '../lib/stores/sos.js';
   import Modal from './primitives/Modal.svelte';
   import { haptics } from '../lib/haptics.js';
+
+  // Derive narrative from first active SOS user
+  $: activeNarrative = (() => {
+    for (const [userId, sos] of $activeSosUsers) {
+      const n = $sosNarratives.get(userId);
+      if (n) return n.narrative;
+      // Also check if narrative is embedded in sos.sos
+      if (sos.sos && sos.sos.narrative) return sos.sos.narrative;
+    }
+    return null;
+  })();
 
   let audioCtx = null;
   let oscillator = null;
@@ -64,6 +75,19 @@
         </svg>
       </div>
       <p class="alert-body">{$alertState.body}</p>
+      {#if activeNarrative}
+        <div class="narrative-chips">
+          {#if activeNarrative.motionSummary}
+            <span class="narrative-chip motion">{activeNarrative.motionSummary}</span>
+          {/if}
+          {#if activeNarrative.batteryPct != null}
+            <span class="narrative-chip battery">Battery {activeNarrative.batteryPct}%</span>
+          {/if}
+          {#if activeNarrative.triggerRule && activeNarrative.triggerRule !== 'manual'}
+            <span class="narrative-chip trigger">Auto: {activeNarrative.triggerRule}</span>
+          {/if}
+        </div>
+      {/if}
     </div>
 
     <svelte:fragment slot="footer">
@@ -113,5 +137,40 @@
     text-align: center;
     line-height: var(--leading-relaxed);
     margin: 0;
+  }
+
+  .narrative-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+    margin-top: 4px;
+  }
+
+  .narrative-chip {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: var(--radius-full);
+    letter-spacing: 0.02em;
+  }
+
+  .narrative-chip.motion {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.25);
+  }
+
+  .narrative-chip.battery {
+    background: rgba(16, 185, 129, 0.12);
+    color: var(--success-500);
+    border: 1px solid rgba(16, 185, 129, 0.20);
+  }
+
+  .narrative-chip.trigger {
+    background: rgba(239, 68, 68, 0.12);
+    color: var(--danger-500);
+    border: 1px solid rgba(239, 68, 68, 0.20);
   }
 </style>

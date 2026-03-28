@@ -62,12 +62,29 @@ func (c *Cache) AddRoomMember(code, userID, role string) {
 		c.UserRooms[userID] = make(map[string]bool)
 	}
 	c.UserRooms[userID][code] = true
+	// Invalidate visibility for the new member and all existing room members —
+	// they can now see each other, so cached visible sets are stale.
+	if room := c.Rooms[code]; room != nil {
+		affected := make([]string, 0, len(room.Members)+1)
+		for mid := range room.Members {
+			affected = append(affected, mid)
+		}
+		c.invalidateVisibilityLocked(affected...)
+	}
 }
 
 // RemoveRoomMember removes a member from a room.
 func (c *Cache) RemoveRoomMember(code, userID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	// Collect all affected users before the removal so departing member is included.
+	var affected []string
+	if room := c.Rooms[code]; room != nil {
+		affected = make([]string, 0, len(room.Members))
+		for mid := range room.Members {
+			affected = append(affected, mid)
+		}
+	}
 	if room := c.Rooms[code]; room != nil {
 		delete(room.Members, userID)
 	}
@@ -76,6 +93,10 @@ func (c *Cache) RemoveRoomMember(code, userID string) {
 	}
 	if ur := c.UserRooms[userID]; ur != nil {
 		delete(ur, code)
+	}
+	// Invalidate visibility for all affected users — they can no longer see the departing member.
+	if len(affected) > 0 {
+		c.invalidateVisibilityLocked(affected...)
 	}
 }
 
@@ -116,6 +137,8 @@ func (c *Cache) AddContactBidirectional(userA, userB string) {
 	}
 	c.Contacts[userA][userB] = true
 	c.Contacts[userB][userA] = true
+	// Both users can now see each other — stale cached sets must be cleared.
+	c.invalidateVisibilityLocked(userA, userB)
 }
 
 // RemoveContactBidirectional removes both directions.
@@ -128,6 +151,8 @@ func (c *Cache) RemoveContactBidirectional(userA, userB string) {
 	if c.Contacts[userB] != nil {
 		delete(c.Contacts[userB], userA)
 	}
+	// The contact link is gone — cached visible sets referencing either user are now stale.
+	c.invalidateVisibilityLocked(userA, userB)
 }
 
 // GetContactCount returns the number of contacts for a user.
@@ -200,6 +225,8 @@ func (c *Cache) SetGuardianship(guardianID, wardID string, entry *db.Guardianshi
 		c.WardToGuardians[wardID] = make(map[string]bool)
 	}
 	c.WardToGuardians[wardID][guardianID] = true
+	// Guardian can now see ward (and vice versa) — cached visible sets are stale.
+	c.invalidateVisibilityLocked(guardianID, wardID)
 }
 
 // DeleteGuardianship removes a guardianship.
@@ -219,6 +246,8 @@ func (c *Cache) DeleteGuardianship(guardianID, wardID string) {
 			delete(c.WardToGuardians, wardID)
 		}
 	}
+	// Guardianship removed — cached visible sets are stale.
+	c.invalidateVisibilityLocked(guardianID, wardID)
 }
 
 // AddPendingRequest appends a request to the keyed list.
@@ -416,6 +445,22 @@ func (c *Cache) GetGuardianshipsAsWard(userID string) []map[string]interface{} {
 	return out
 }
 
+// GetWardToGuardians returns a copy of the guardianIDs watching a given wardID.
+// Safe to call without holding the cache lock.
+func (c *Cache) GetWardToGuardians(wardID string) map[string]bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	src := c.WardToGuardians[wardID]
+	if len(src) == 0 {
+		return nil
+	}
+	out := make(map[string]bool, len(src))
+	for k, v := range src {
+		out[k] = v
+	}
+	return out
+}
+
 // GetManageableUsers returns ward user IDs for a guardian (active only).
 func (c *Cache) GetManageableUsers(userID string) []string {
 	c.mu.RLock()
@@ -561,15 +606,21 @@ func (c *Cache) SetLastVisibleSet(socketID string, vis map[string]bool) {
 func (c *Cache) InvalidateVisibilityForUsers(userIDs []string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.invalidateVisibilityLocked(userIDs...)
+}
+
+// invalidateVisibilityLocked clears visibility cache entries for the given userIDs and
+// any cached entries that transitively include them. Must be called with c.mu write-locked.
+func (c *Cache) invalidateVisibilityLocked(userIDs ...string) {
 	for _, uid := range userIDs {
 		delete(c.VisibilityCache, uid)
 	}
-	affectedSet := make(map[string]bool)
+	affected := make(map[string]bool, len(userIDs))
 	for _, uid := range userIDs {
-		affectedSet[uid] = true
+		affected[uid] = true
 	}
 	for uid, vis := range c.VisibilityCache {
-		for vid := range affectedSet {
+		for vid := range affected {
 			if vis[vid] {
 				delete(c.VisibilityCache, uid)
 				break
