@@ -76,9 +76,20 @@ func Load() (*Config, error) {
 		logLevel = defaultLogLevel
 	}
 
-	corsOrigins := parseCORSOrigins(os.Getenv("CORS_ALLOWED_ORIGINS"))
-	if len(corsOrigins) == 0 {
-		corsOrigins = defaultCORSOrigins
+	// Always start with the default origins (includes capacitor://localhost for
+	// native mobile apps). If CORS_ALLOWED_ORIGINS is set (e.g. on Render), merge
+	// those in rather than replacing — so the Capacitor app never gets locked out.
+	corsOrigins := defaultCORSOrigins
+	if extra := parseCORSOrigins(os.Getenv("CORS_ALLOWED_ORIGINS")); len(extra) > 0 {
+		seen := make(map[string]bool, len(corsOrigins))
+		for _, o := range corsOrigins {
+			seen[o] = true
+		}
+		for _, o := range extra {
+			if !seen[o] {
+				corsOrigins = append(corsOrigins, o)
+			}
+		}
 	}
 
 	return &Config{

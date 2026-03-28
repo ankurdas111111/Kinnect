@@ -53,13 +53,17 @@ func SessionMiddleware(store *SessionStore, secret string, secure bool) func(htt
 				if err := store.Create(sid, sessData, 7*24*time.Hour); err != nil {
 					slog.Warn("Session create failed", "error", err)
 				} else {
+					mwSameSite := http.SameSiteNoneMode
+					if !secure {
+						mwSameSite = http.SameSiteLaxMode
+					}
 					http.SetCookie(w, &http.Cookie{
 						Name:     "connect.sid",
 						Value:    url.QueryEscape(signed),
 						Path:     "/",
 						MaxAge:   sessionMaxAgeSec,
 						HttpOnly: true,
-						SameSite: http.SameSiteLaxMode,
+						SameSite: mwSameSite,
 						Secure:   secure,
 					})
 				}

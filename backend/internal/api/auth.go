@@ -314,13 +314,21 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func setSessionCookie(w http.ResponseWriter, signed string, maxAge int, secure bool) {
+	// SameSite=None is required for Capacitor/native apps which are cross-origin
+	// by definition. SameSite=Lax blocks cookies on cross-origin POST (Capacitor → server),
+	// breaking CSRF validation. SameSite=None requires Secure=true; fall back to Lax
+	// only for non-HTTPS local dev where cross-origin isn't a concern.
+	sameSite := http.SameSiteNoneMode
+	if !secure {
+		sameSite = http.SameSiteLaxMode
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     "connect.sid",
 		Value:    url.QueryEscape(signed),
 		Path:     "/",
 		MaxAge:   maxAge,
 		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: sameSite,
 		Secure:   secure,
 	})
 }
@@ -332,7 +340,8 @@ func clearSessionCookie(w http.ResponseWriter) {
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: http.SameSiteNoneMode,
+		Secure:   true,
 	})
 }
 
