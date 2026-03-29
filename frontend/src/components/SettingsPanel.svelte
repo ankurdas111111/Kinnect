@@ -285,6 +285,12 @@
     }
   }
 
+  async function logout() {
+    await apiPost('/api/logout');
+    window.location.hash = '#/login';
+    window.location.reload();
+  }
+
   const _retentionLabels = { default: '24 hours', '48h': '2 days', '5d': '5 days', '10d': '10 days', '30d': '30 days' };
   function setRetentionMode(mode) {
     retentionMode = mode; // immediate optimistic update — no callback, no deadlock
@@ -464,6 +470,12 @@
       <button class="btn btn-primary btn-sm" on:click={changePassword} disabled={changingPw || !currentPassword || !newPassword}>
         {changingPw ? 'Changing...' : 'Change Password'}
       </button>
+    </div>
+
+    <hr class="divider" />
+    <h4 class="section-title-bold">Account</h4>
+    <div class="form-section">
+      <button class="btn btn-secondary btn-sm logout-btn" on:click={logout}>Sign Out</button>
     </div>
 
     <hr class="divider" />
@@ -749,5 +761,9 @@
   }
   .field-time {
     width: 110px;
+  }
+
+  .logout-btn {
+    width: 100%;
   }
 </style>
