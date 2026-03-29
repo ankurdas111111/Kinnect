@@ -90,7 +90,13 @@ func (s *SessionStore) Get(sid string) (*SessionData, error) {
 }
 
 // Create inserts a session row and populates the in-memory cache.
+// The cache is always updated first so that subsequent requests on the same
+// server instance see a consistent CSRF token even if the DB write fails.
 func (s *SessionStore) Create(sid string, data *SessionData, maxAge time.Duration) error {
+	// Populate cache immediately — this ensures CSRF is consistent within the
+	// same process even on transient DB failures.
+	s.cache.Store(sid, &sessionCacheEntry{data: data, expiresAt: time.Now().Add(sessionCacheTTL)})
+
 	expire := time.Now().Add(maxAge)
 	payload := sessPayload{User: data.User, CsrfToken: data.CsrfToken}
 	raw, err := json.Marshal(payload)
@@ -101,11 +107,7 @@ func (s *SessionStore) Create(sid string, data *SessionData, maxAge time.Duratio
 		`INSERT INTO session (sid, sess, expire) VALUES ($1, $2, $3)
 		 ON CONFLICT (sid) DO UPDATE SET sess = $2, expire = $3`,
 		sid, raw, expire)
-	if err != nil {
-		return err
-	}
-	s.cache.Store(sid, &sessionCacheEntry{data: data, expiresAt: time.Now().Add(sessionCacheTTL)})
-	return nil
+	return err
 }
 
 // Destroy deletes the session by sid from DB and cache.

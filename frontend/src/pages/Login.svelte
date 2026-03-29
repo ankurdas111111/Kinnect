@@ -1,7 +1,7 @@
 <script>
   import { push } from 'svelte-spa-router';
   import { authUser, loadSession } from '../lib/stores/auth.js';
-  import { apiPost, fetchCsrf } from '../lib/api.js';
+  import { apiPost, fetchCsrf, clearCsrf } from '../lib/api.js';
   import { COUNTRY_CODES, COUNTRY_MAP, validateMobileLength } from '../lib/countryCodes.js';
   import { toasts } from '../lib/stores/toast.js';
   import { onMount } from 'svelte';
@@ -86,7 +86,13 @@
         body.login_id = c.dial + mobileDigits.replace(/\D/g, '');
         body.login_method = 'mobile';
       }
-      const res = await apiPost('/api/login', body);
+      let res = await apiPost('/api/login', body);
+      if (!res.ok && res.error === 'Invalid CSRF token') {
+        // Stale session — reset and retry once with a fresh token
+        clearCsrf();
+        await fetchCsrf();
+        res = await apiPost('/api/login', body);
+      }
       if (res.ok) {
         redirecting = true;
         toasts.success('Welcome back!');

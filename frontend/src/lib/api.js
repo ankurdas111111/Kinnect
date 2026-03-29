@@ -25,6 +25,10 @@ export function getCsrf() {
   return csrfToken;
 }
 
+export function clearCsrf() {
+  csrfToken = null;
+}
+
 function safeJson(res) {
   const ct = res.headers.get('content-type') || '';
   if (ct.includes('application/json')) return res.json();

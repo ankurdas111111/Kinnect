@@ -52,21 +52,25 @@ func SessionMiddleware(store *SessionStore, secret string, secure bool) func(htt
 				sessData := &SessionData{User: sess.User, CsrfToken: sess.CsrfToken}
 				if err := store.Create(sid, sessData, 7*24*time.Hour); err != nil {
 					slog.Warn("Session create failed", "error", err)
-				} else {
-					mwSameSite := http.SameSiteNoneMode
-					if !secure {
-						mwSameSite = http.SameSiteLaxMode
-					}
-					http.SetCookie(w, &http.Cookie{
-						Name:     "connect.sid",
-						Value:    url.QueryEscape(signed),
-						Path:     "/",
-						MaxAge:   sessionMaxAgeSec,
-						HttpOnly: true,
-						SameSite: mwSameSite,
-						Secure:   secure,
-					})
+					// Continue — the session is already in the in-memory cache so
+					// the CSRF token is consistent within this process.
 				}
+				// Always set the cookie even on DB failure.  The in-memory cache
+				// in SessionStore holds the session for up to sessionCacheTTL, so
+				// subsequent requests on the same instance will find a matching token.
+				mwSameSite := http.SameSiteNoneMode
+				if !secure {
+					mwSameSite = http.SameSiteLaxMode
+				}
+				http.SetCookie(w, &http.Cookie{
+					Name:     "connect.sid",
+					Value:    url.QueryEscape(signed),
+					Path:     "/",
+					MaxAge:   sessionMaxAgeSec,
+					HttpOnly: true,
+					SameSite: mwSameSite,
+					Secure:   secure,
+				})
 			}
 			ctx := r.Context()
 			ctx = withSession(ctx, sess)
