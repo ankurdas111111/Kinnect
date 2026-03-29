@@ -84,11 +84,13 @@ export function setupSocketHandlers() {
 
   socket.on('disconnect', (reason) => {
     connected = false;
-    // Only show banner after 4s — quick reconnects should be invisible
+    // Only show banner after 10s — brief drops on network/background should be invisible.
+    // Android WebView suspends WS when the app is backgrounded; the appStateChange
+    // listener reconnects in <1s on foreground, so 10s covers all normal cases.
     _reconnectBannerTimer = setTimeout(() => {
       _reconnectBannerTimer = null;
       if (!connected) setBanner({ type: 'info', text: 'Reconnecting...', actions: [] });
-    }, 4000);
+    }, 10000);
     // Auth errors need immediate feedback
     if (reason === 'io server disconnect') {
       clearTimeout(_reconnectBannerTimer);

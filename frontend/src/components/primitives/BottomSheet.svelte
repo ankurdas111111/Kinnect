@@ -275,11 +275,14 @@
     flex: 1;
     min-width: 0;
     min-height: 0;
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-y;
     padding: 0 var(--space-4) var(--space-4);
-    padding-bottom: calc(var(--space-4) + var(--safe-bottom));
+    /* Safe area + bottom tab bar height so content isn't hidden behind the tab bar */
+    padding-bottom: calc(var(--space-4) + var(--safe-bottom, 0px) + var(--bottom-tab-height, 56px));
   }
 
   @media (min-width: 768px) {
