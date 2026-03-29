@@ -33,7 +33,8 @@
   import { startMotionSensor, stopMotionSensor, getMotionState } from '../lib/motionSensor.js';
   import { recordFix, resetMetrics, trackingMetrics } from '../lib/stores/metrics.js';
   import { bufferPosition, clearBuffer, bufferSize } from '../lib/offlineBuffer.js';
-  import { startGeo, stopGeo, warmUp, checkPermission, isNativePlatform, startBackgroundGeo, stopBackgroundGeo } from '../lib/geoProvider.js';
+  import { startGeo, stopGeo, warmUp, checkPermission, isNativePlatform } from '../lib/geoProvider.js';
+  import { setupNotificationChannels, setAppActive } from '../lib/nativeNotifications.js';
   import { connectivityStore, setOnlineStatus, setSocketConnected, setBufferedCount } from '../lib/stores/connectivity.js';
   import { uiShellStore, setMobileTab, setSheetOpen } from '../lib/stores/uiShell.js';
   import { latencyMetrics } from '../lib/stores/latency.js';
@@ -57,6 +58,7 @@
   let lastRawLat = null;
   let lastRawLng = null;
   let geoPermission = 'unknown';
+  let _wakeLock = null;
   const gpsFilter = new GPSKalmanFilter({ Q: 3, R: 10 });
   const speedFilter = new VelocityKalmanFilter({ Q: 2, R: 25 });
 
@@ -134,26 +136,21 @@
     setSheetOpen(true);
   }
 
-  function pushProfile() {
-    let batteryPct = null;
-    const dt = /Mobi|Android/i.test(navigator.userAgent || '') ? 'Mobile' : 'Desktop';
+  async function pushProfile() {
+    const dt = isNativePlatform() ? 'Mobile' : (/Mobi|Android/i.test(navigator.userAgent || '') ? 'Mobile' : 'Desktop');
     let connectionQuality = 'Unknown';
-    try {
-      const ping = socket && socket.io && socket.io.engine ? socket.io.engine.ping : null;
-      if (typeof ping === 'number') {
-        connectionQuality = ping <= 80 ? 'Good' : ping <= 200 ? 'OK' : 'Poor';
-      }
-    } catch (_) {}
-    try {
-      if (navigator.getBattery) {
-        navigator.getBattery().then(b => {
-          batteryPct = Math.round((b.level || 0) * 100);
-          socket.emit('profileUpdate', { batteryPct, deviceType: dt, connectionQuality });
-        }).catch(() => socket.emit('profileUpdate', { batteryPct: null, deviceType: dt, connectionQuality }));
-        return;
-      }
-    } catch (_) {}
-    socket.emit('profileUpdate', { batteryPct: null, deviceType: dt, connectionQuality });
+    let batteryPct = null;
+
+    // Battery via @capacitor/device (reliable) — navigator.getBattery is deprecated/removed
+    if (isNativePlatform()) {
+      try {
+        const { Device } = await import('@capacitor/device');
+        const info = await Device.getBatteryInfo();
+        if (info.batteryLevel != null) batteryPct = Math.round(info.batteryLevel * 100);
+      } catch (_) {}
+    }
+
+    socket.emit('profileUpdate', { batteryPct, deviceType: dt, connectionQuality });
   }
 
   function toggleTrackingAction() {
@@ -328,8 +325,9 @@
       }
     }, 12000);
 
-    if (isNativePlatform()) {
-      startBackgroundGeo((pos, forceEmit) => applyFix(pos, forceEmit));
+    // Screen wake lock — keep display on while actively tracking so GPS stays alive
+    if ('wakeLock' in navigator) {
+      navigator.wakeLock.request('screen').then(lock => { _wakeLock = lock; }).catch(() => {});
     }
 
     // Start IMU sensor fusion for better speed accuracy on mobile
@@ -338,8 +336,9 @@
 
   function stopTracking() {
     stopGeo();
-    stopBackgroundGeo();
     stopMotionSensor();
+    // Release wake lock when tracking stops
+    if (_wakeLock) { _wakeLock.release().catch(() => {}); _wakeLock = null; }
     tracking.set(false);
     lastAcceptedFix = null;
     lastEmittedFix = null;
@@ -420,14 +419,36 @@
     let mounted = true;
     let appListenerCleanup = null;
     if (isNativePlatform()) {
+      // Set up local notification channels once at startup
+      setupNotificationChannels().catch(() => {});
+
+      // @capacitor/network — accurate WiFi/cellular detection replacing browser online/offline
+      import('@capacitor/network').then(({ Network }) => {
+        if (!mounted) return;
+        Network.getStatus().then(s => setOnlineStatus(s.connected)).catch(() => {});
+        Network.addListener('networkStatusChange', s => {
+          if (!mounted) return;
+          setOnlineStatus(s.connected);
+        });
+      }).catch(() => {});
+
       import('@capacitor/app').then(({ App }) => {
         if (!mounted) return; // component already destroyed — skip adding listeners
         const listeners = [];
         listeners.push(App.addListener('appStateChange', ({ isActive }) => {
+          setAppActive(isActive); // tells nativeNotifications whether to fire or skip
           if (isActive) {
-            // Resumed from background — reconnect socket and warm up GPS
+            // Resumed from background — reconnect socket, warm up GPS, re-acquire wake lock
             if (!socket.connected) socket.connect();
-            if ($tracking) warmUp();
+            if ($tracking) {
+              warmUp();
+              if ('wakeLock' in navigator && !_wakeLock) {
+                navigator.wakeLock.request('screen').then(lock => { _wakeLock = lock; }).catch(() => {});
+              }
+            }
+          } else {
+            // Going to background — release wake lock (OS reclaims it anyway)
+            if (_wakeLock) { _wakeLock.release().catch(() => {}); _wakeLock = null; }
           }
         }));
         listeners.push(App.addListener('backButton', ({ canGoBack }) => {

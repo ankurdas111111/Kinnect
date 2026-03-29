@@ -14,6 +14,7 @@ import { networkGraph } from './stores/network.js';
 import { trailData } from './stores/trail.js';
 import { recordLatency } from './stores/latency.js';
 import { createRealtimeSocket } from './realtimeClient.js';
+import { notifySOS, notifyGuardianRequest, notifyBatteryLow, notifyHaventMoved } from './nativeNotifications.js';
 
 const storedClientId = localStorage.getItem('clientId');
 const clientId = storedClientId || (crypto && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + '-' + Math.random().toString(16).slice(2));
@@ -251,6 +252,7 @@ export function setupSocketHandlers() {
       if (arr.some(r => r.type === 'guardian' && r.from === data.fromUserId)) return arr;
       return [...arr, { type: 'guardian', from: data.fromUserId, fromName: data.fromName, expiresIn: data.expiresIn }];
     });
+    notifyGuardianRequest(data.fromName).catch(() => {});
     setBanner({ type: 'info', text: data.fromName + ' wants to be your guardian', actions: [] }, 3000);
   });
 
@@ -376,6 +378,8 @@ export function setupSocketHandlers() {
       } else {
         const isGeofence = sos.type === 'geofence';
         const msg = `${isGeofence ? 'GEOFENCE BREACH' : 'SOS'} from ${from}: ${reason} - ${ackText}`;
+        // Fire local notification when app is backgrounded
+        notifySOS(from, reason).catch(() => {});
         setBanner({ type: 'sos', text: msg, actions: [
           { label: 'Acknowledge', kind: 'btn-primary', onClick: () => { socket.emit('ackSOS', { socketId: s.socketId }); } },
           { label: 'Dismiss', kind: 'btn-secondary', onClick: () => setBanner({ type: null, text: null, actions: [] }) }
@@ -521,12 +525,14 @@ export function setupSocketHandlers() {
   socket.on('gentleAlert', (data) => {
     if (!data?.displayName) return;
     const min = data.minutesStill ?? '?';
+    notifyHaventMoved(data.displayName, min).catch(() => {});
     setBanner({ type: 'info', text: `${data.displayName} hasn't moved in ${min} min`, actions: [] }, 8000);
   });
 
   // Battery proxy alert
   socket.on('batteryProxyAlert', (data) => {
     if (!data?.displayName || data.batteryPct == null) return;
+    notifyBatteryLow(data.displayName, data.batteryPct).catch(() => {});
     setBanner({
       type: data.batteryPct <= 5 ? 'sos' : 'info',
       text: `${data.displayName}'s battery is at ${data.batteryPct}%`,

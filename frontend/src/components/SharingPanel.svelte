@@ -102,7 +102,22 @@
     socket.emit('createLiveLink', { duration: dur === 'forever' ? null : dur });
   }
   function generateLiveLink() { createLiveLink(selectedLinkDuration); }
-  function copyLink(url) { navigator.clipboard.writeText(url).catch(() => {}); banner.set({ type: 'info', text: 'Link copied. Let the watching begin.', actions: [] }); setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 2000); }
+  async function copyLink(url) {
+    // On Android native: use system share sheet so users can send via WhatsApp, SMS, etc.
+    const isNative = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.();
+    if (isNative) {
+      try {
+        const { Share } = await import('@capacitor/share');
+        await Share.share({ title: 'Watch my live location', text: 'Follow my live location on Kinnect', url, dialogTitle: 'Share live link' });
+        return;
+      } catch (_) {
+        // User dismissed share sheet or plugin failed — fall through to clipboard
+      }
+    }
+    navigator.clipboard.writeText(url).catch(() => {});
+    banner.set({ type: 'info', text: 'Link copied. Let the watching begin.', actions: [] });
+    setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 2000);
+  }
   function revokeLink(token) { socket.emit('revokeLiveLink', { token }); }
 
   function isGuardianOf(userId) { return $myGuardianData.asGuardian?.some(g => g.wardId === userId && g.status === 'active'); }
