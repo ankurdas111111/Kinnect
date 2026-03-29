@@ -1,15 +1,39 @@
 <script>
+  import { onDestroy } from 'svelte';
+
   export let isOnline = true;
   export let socketConnected = false;
   export let bufferedCount = 0;
+
+  // Don't flash "Reconnecting" for brief drops (< 2.5s).
+  // The socket reconnects within 200–500ms during normal background/foreground
+  // cycles, so this prevents constant visual noise during those transitions.
+  let showReconnecting = false;
+  let _timer = null;
+
+  $: {
+    if (!socketConnected) {
+      if (!_timer) {
+        _timer = setTimeout(() => {
+          _timer = null;
+          if (!socketConnected) showReconnecting = true;
+        }, 2500);
+      }
+    } else {
+      if (_timer) { clearTimeout(_timer); _timer = null; }
+      showReconnecting = false;
+    }
+  }
+
+  onDestroy(() => { if (_timer) { clearTimeout(_timer); _timer = null; } });
 </script>
 
-<div class="network-chip" class:offline={!isOnline || !socketConnected}>
+<div class="network-chip" class:offline={!isOnline || showReconnecting}>
   <span class="dot" aria-hidden="true"></span>
   <span class="label">
     {#if !isOnline}
       Offline
-    {:else if !socketConnected}
+    {:else if showReconnecting}
       Reconnecting
     {:else}
       Live

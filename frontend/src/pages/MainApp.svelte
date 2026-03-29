@@ -40,11 +40,13 @@
   import { latencyMetrics } from '../lib/stores/latency.js';
   import { haptics } from '../lib/haptics.js';
   import { debounce } from '../lib/debounce.js';
+  import { isIgnoringBatteryOptimizations, requestIgnoreBatteryOptimizations } from '../lib/batteryOptimization.js';
 
   let activePanel = null;
   let sidebarTab = 'info';
   let sidebarCollapsed = false;
   let sosConfirmOpen = false;
+  let batteryPromptOpen = false;
   let isMobile = false;
   let mobileTab = 'track';
   let sheetOpen = false;
@@ -422,6 +424,13 @@
       // Set up local notification channels once at startup
       setupNotificationChannels().catch(() => {});
 
+      // Prompt the user to disable battery optimization if not already done
+      setTimeout(async () => {
+        if (!mounted) return;
+        const ignoring = await isIgnoringBatteryOptimizations();
+        if (!ignoring) batteryPromptOpen = true;
+      }, 2000);
+
       // @capacitor/network — accurate WiFi/cellular detection replacing browser online/offline
       import('@capacitor/network').then(({ Network }) => {
         if (!mounted) return;
@@ -655,6 +664,26 @@
       </div>
     {/if}
 
+    <!-- Battery Optimization Prompt -->
+    {#if batteryPromptOpen}
+      <div class="battery-prompt-backdrop" on:click|self={() => batteryPromptOpen = false} on:keydown={(e) => { if (e.key === 'Escape') batteryPromptOpen = false; }} role="dialog" aria-modal="true" aria-label="Allow background access" tabindex="-1">
+        <div class="battery-prompt-card">
+          <div class="battery-prompt-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><rect x="2" y="7" width="16" height="10" rx="2"/><path d="M22 11v2"/><path d="M6 11v2"/><path d="M10 11v2"/></svg>
+          </div>
+          <h3 class="battery-prompt-title">Allow Background Access</h3>
+          <p class="battery-prompt-desc">For Kinnect to share your location when the screen is off or the app is minimized, allow it to run unrestricted in the background.</p>
+          <div class="battery-prompt-actions">
+            <button class="btn battery-skip-btn" on:click={() => batteryPromptOpen = false}>Not now</button>
+            <button class="btn battery-allow-btn" on:click={async () => {
+              await requestIgnoreBatteryOptimizations();
+              batteryPromptOpen = false;
+            }}>Allow Background Access</button>
+          </div>
+        </div>
+      </div>
+    {/if}
+
     <!-- First-run onboarding -->
     <OnboardingOverlay
       visible={showOnboarding}
@@ -815,5 +844,82 @@
   }
   .sos-send-btn:hover { background: #ef4444; box-shadow: 0 6px 24px rgba(239, 68, 68, 0.55); }
   @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+  /* ── Battery Optimization Prompt ─────────────────────────────────────── */
+  .battery-prompt-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: calc(var(--z-panel, 100) + 10);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-4);
+    animation: fade-in 0.2s ease;
+  }
+  .battery-prompt-card {
+    background: #1a1a2e;
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    border-radius: var(--radius-xl, 20px);
+    padding: 28px 24px 24px;
+    max-width: 340px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  }
+  .battery-prompt-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px;
+  }
+  .battery-prompt-title {
+    font-size: 18px;
+    font-weight: 800;
+    color: white;
+    margin: 0 0 8px;
+    letter-spacing: -0.02em;
+  }
+  .battery-prompt-desc {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.60);
+    line-height: 1.55;
+    margin: 0 0 24px;
+  }
+  .battery-prompt-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .battery-allow-btn {
+    padding: 12px 16px;
+    border-radius: var(--radius-lg);
+    font-weight: 700;
+    font-size: 14px;
+    background: #f59e0b;
+    color: #0a0a15;
+    border: none;
+    cursor: pointer;
+    transition: background var(--duration-fast) var(--ease-out);
+  }
+  .battery-allow-btn:hover { background: #fbbf24; }
+  .battery-skip-btn {
+    padding: 10px 16px;
+    border-radius: var(--radius-lg);
+    font-weight: 500;
+    font-size: 13px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.45);
+    border: none;
+    cursor: pointer;
+  }
+  .battery-skip-btn:hover { color: rgba(255, 255, 255, 0.70); }
 
 </style>

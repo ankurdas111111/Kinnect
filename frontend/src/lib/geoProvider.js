@@ -36,6 +36,7 @@ let active = false;
 let _CapGeolocation = null; // cached after startNative() loads the module
 let _primaryGoodFixes = 0;  // counts consecutive accurate web fixes (used to retire fallback watcher)
 let _desktopRefreshTimer = null; // desktop only: polls for fresh position every 30s
+let _bgGeoWatcherId = null; // @capacitor-community/background-geolocation watcher id
 
 // True when running on a mobile browser (not native, not desktop)
 function isMobileBrowser() {
@@ -50,9 +51,77 @@ function safeFix(onFix, pos, force) {
 }
 
 // ── Native (Capacitor) provider ─────────────────────────────────────────────
+
+/**
+ * Uses @capacitor-community/background-geolocation for the ongoing native watch.
+ * This plugin runs a foreground service on Android, keeping GPS alive when the
+ * app is backgrounded or the screen is locked. It shows a persistent notification:
+ * "Kinnect — Live tracking active".
+ *
+ * Falls back to @capacitor/geolocation watchPosition if the plugin is unavailable.
+ */
+async function startBackgroundGeo(onFix, onError) {
+  try {
+    const { BackgroundGeolocation } = await import('@capacitor-community/background-geolocation');
+    _bgGeoWatcherId = await BackgroundGeolocation.addWatcher(
+      {
+        backgroundMessage: 'Kinnect is sharing your live location.',
+        backgroundTitle: 'Kinnect — Live tracking active',
+        requestPermissions: false, // foreground permission already granted in startNative()
+        stale: false,
+        distanceFilter: 0,
+      },
+      (location, error) => {
+        if (error) {
+          if (error.code === 'NOT_AUTHORIZED') {
+            onError({ code: 1, message: 'Location permission denied' });
+          }
+          return;
+        }
+        if (location) {
+          // Background-geo delivers { latitude, longitude, accuracy, speed, bearing, time }
+          onFix({
+            latitude: location.latitude,
+            longitude: location.longitude,
+            accuracy: location.accuracy,
+            speed: location.speed,
+            timestamp: location.time || Date.now(),
+          }, false);
+        }
+      }
+    );
+  } catch (_) {
+    // Plugin unavailable (should not happen post-sync, but guard anyway).
+    // Fall back to standard @capacitor/geolocation watchPosition — foreground only.
+    if (_CapGeolocation) {
+      nativeWatchId = await _CapGeolocation.watchPosition(
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 1000 },
+        (pos, err) => {
+          if (err) {
+            onError({ code: 2, message: err.message || 'Position unavailable' });
+            return;
+          }
+          if (pos) safeFix(onFix, pos, false);
+        }
+      );
+    }
+  }
+}
+
+async function stopBackgroundGeo() {
+  if (_bgGeoWatcherId != null) {
+    const id = _bgGeoWatcherId;
+    _bgGeoWatcherId = null;
+    try {
+      const { BackgroundGeolocation } = await import('@capacitor-community/background-geolocation');
+      await BackgroundGeolocation.removeWatcher({ id });
+    } catch (_) {}
+  }
+}
+
 async function startNative(onFix, onError) {
   const { Geolocation } = await import('@capacitor/geolocation');
-  _CapGeolocation = Geolocation; // cache for stopNative()
+  _CapGeolocation = Geolocation; // cache for fallback stopNative()
 
   // Request foreground location permission (no-op if already granted).
   // Be explicit about which permissions to request so the plugin doesn't
@@ -67,7 +136,7 @@ async function startNative(onFix, onError) {
     }
   }
 
-  // Quick first fix
+  // Quick first fix via @capacitor/geolocation (faster cold-start than background-geo)
   try {
     const pos = await Geolocation.getCurrentPosition({
       enableHighAccuracy: true,
@@ -87,24 +156,19 @@ async function startNative(onFix, onError) {
     } catch (_2) {}
   }
 
-  // Continuous watch using fused provider
-  nativeWatchId = await Geolocation.watchPosition(
-    { enableHighAccuracy: true, timeout: 10000, maximumAge: 1000 },
-    (pos, err) => {
-      if (err) {
-        onError({ code: 2, message: err.message || 'Position unavailable' });
-        return;
-      }
-      if (pos) safeFix(onFix, pos, false);
-    }
-  );
+  // Ongoing watch: background-geo handles both foreground AND background.
+  // When backgrounded, Android starts a foreground service with a persistent
+  // notification so GPS stays alive even with the screen locked.
+  await startBackgroundGeo(onFix, onError);
 }
 
 function stopNative() {
+  // Stop background-geo (async — fire and forget; cleanup happens in the background)
+  stopBackgroundGeo();
+  // Stop fallback native watcher if background-geo wasn't available
   if (nativeWatchId != null) {
     const id = nativeWatchId;
     nativeWatchId = null;
-    // Use the cached module reference — avoids a dangling dynamic import on teardown
     if (_CapGeolocation) {
       _CapGeolocation.clearWatch({ id }).catch(() => {});
     }

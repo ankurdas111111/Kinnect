@@ -28,6 +28,7 @@ class WsCompatSocket {
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = options.reconnectionAttempts ?? 50;
     this.reconnectDelay = options.reconnectionDelay ?? 200;
+    this._heartbeatTimer = null;
     this.reconnectDelayMax = options.reconnectionDelayMax ?? 3000;
     this.randomizationFactor = options.randomizationFactor ?? 0.3;
     this.reconnection = options.reconnection !== false;
@@ -65,6 +66,7 @@ class WsCompatSocket {
 
   disconnect() {
     this.manualDisconnect = true;
+    this._stopHeartbeat();
     if (this.ws) this.ws.close();
     this.connected = false;
   }
@@ -77,6 +79,7 @@ class WsCompatSocket {
       if (this.reconnectAttempts > 0) this.fireIo('reconnect', this.reconnectAttempts);
       this.reconnectAttempts = 0;
       this.fire('connect');
+      this._startHeartbeat();
     };
     this.ws.onmessage = (evt) => {
       try {
@@ -88,6 +91,7 @@ class WsCompatSocket {
       this.fire('connect_error', new Error('websocket error'));
     };
     this.ws.onclose = () => {
+      this._stopHeartbeat();
       this.connected = false;
       this.fire('disconnect', 'transport close');
       if (!this.manualDisconnect && this.reconnection && this.reconnectAttempts < this.maxReconnectAttempts) {
@@ -96,6 +100,26 @@ class WsCompatSocket {
         this.fireIo('reconnect_failed');
       }
     };
+  }
+
+  // Send a lightweight application-level heartbeat every 30s.
+  // The Go server's ReadPump has a 90s read deadline — without this,
+  // a silent connection (no tracking, app in background) gets closed
+  // server-side after 90s of no messages, causing constant reconnects.
+  _startHeartbeat() {
+    this._stopHeartbeat();
+    this._heartbeatTimer = setInterval(() => {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        try { this.ws.send(JSON.stringify({ e: 'ping' })); } catch (_) {}
+      }
+    }, 30000);
+  }
+
+  _stopHeartbeat() {
+    if (this._heartbeatTimer) {
+      clearInterval(this._heartbeatTimer);
+      this._heartbeatTimer = null;
+    }
   }
 
   scheduleReconnect() {

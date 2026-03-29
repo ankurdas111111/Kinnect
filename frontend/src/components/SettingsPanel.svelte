@@ -6,6 +6,8 @@
   import { banner } from '../lib/stores/sos.js';
   import { privacyPause } from '../lib/stores/places.js';
   import { apiPost, apiGet } from '../lib/api.js';
+  import { isIgnoringBatteryOptimizations, requestIgnoreBatteryOptimizations } from '../lib/batteryOptimization.js';
+  import { isNativePlatform } from '../lib/geoProvider.js';
 
   export let embedded = false;
 
@@ -44,6 +46,11 @@
   let pushEnabled = false;
   let togglingPush = false;
   let _pendingVapidResolve = null;
+
+  // Background tracking / battery optimization (Android native only)
+  const isNative = isNativePlatform();
+  let batteryOptIgnoring = true;  // true = already unrestricted (no action needed)
+  let checkingBattery = false;
 
   function formatTimeLeft(ms) {
     if (ms <= 0) return '';
@@ -131,7 +138,21 @@
         pushEnabled = false;
       }
     }
+
+    // Check battery optimization status (Android native only)
+    if (isNative) {
+      batteryOptIgnoring = await isIgnoringBatteryOptimizations();
+    }
   });
+
+  async function handleBatteryOptimization() {
+    checkingBattery = true;
+    await requestIgnoreBatteryOptimizations();
+    // Re-check after user returns from settings
+    await new Promise(r => setTimeout(r, 800));
+    batteryOptIgnoring = await isIgnoringBatteryOptimizations();
+    checkingBattery = false;
+  }
 
   onDestroy(() => {
     clearInterval(_privacyTimer);
@@ -452,6 +473,29 @@
       {/if}
     </div>
 
+    {#if isNative}
+      <hr class="divider" />
+      <h4 class="section-title-bold">Background Tracking</h4>
+      <div class="form-section">
+        {#if batteryOptIgnoring}
+          <div class="battery-status battery-status--ok">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Unrestricted — background tracking stays alive
+          </div>
+          <p class="hint">Android will not kill Kinnect while tracking is active. You're all set.</p>
+        {:else}
+          <div class="battery-status battery-status--warn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            Battery optimization is ON — may stop tracking
+          </div>
+          <p class="hint">Android may suspend Kinnect in the background on Samsung, Xiaomi, and other devices. Tap below to allow unrestricted background access.</p>
+          <button class="btn btn-primary btn-sm" on:click={handleBatteryOptimization} disabled={checkingBattery}>
+            {checkingBattery ? 'Checking...' : 'Allow Background Access'}
+          </button>
+        {/if}
+      </div>
+    {/if}
+
     <hr class="divider" />
     <h4 class="section-title-bold">Change Password</h4>
     <div class="form-section">
@@ -765,5 +809,36 @@
 
   .logout-btn {
     width: 100%;
+  }
+
+  .battery-status {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 12px;
+    border-radius: var(--radius-md, 8px);
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .battery-status--ok {
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.28);
+    color: var(--success-700, #047857);
+  }
+  .battery-status--warn {
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.30);
+    color: var(--warning-700, #b45309);
+  }
+  :global([data-theme="dark"]) .battery-status--ok {
+    background: rgba(16, 185, 129, 0.16);
+    border-color: rgba(52, 211, 153, 0.30);
+    color: var(--success-400, #34d399);
+  }
+  :global([data-theme="dark"]) .battery-status--warn {
+    background: rgba(245, 158, 11, 0.16);
+    border-color: rgba(251, 191, 36, 0.30);
+    color: var(--warning-400, #fbbf24);
   }
 </style>
