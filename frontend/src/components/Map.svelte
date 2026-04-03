@@ -693,7 +693,8 @@
   }
 
   :global(.maplibregl-popup-content) {
-    background: rgba(255, 255, 255, 0.94);
+    background: rgba(255, 255, 255, 0.96);
+    color: #1e293b;
     border-radius: var(--radius-xl, 20px);
     box-shadow:
       0 12px 40px rgba(0, 0, 0, 0.22),
@@ -734,14 +735,14 @@
   /* ── Popup content classes (light + dark mode aware) ─────────────────── */
   :global(.pu-wrap)  { min-width: 190px; font-size: 12px; line-height: 1.5; }
   :global(.pu-hdr)   { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
-  :global(.pu-name)  { font-family: var(--font-display); font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+  :global(.pu-name)  { font-family: var(--font-display); font-size: 15px; font-weight: 700; letter-spacing: -0.01em; color: #0f172a; }
   :global(.pu-status) { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 600; }
   :global(.pu-dot)   { width: 7px; height: 7px; border-radius: 50%; background: currentColor; display: inline-block; }
   :global(.pu-online)  { color: #22c55e; }
   :global(.pu-offline) { color: #9ca3af; }
   :global(.pu-grid)  { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 11px; }
-  :global(.pu-lbl)   { font-weight: 600; opacity: 0.55; }
-  :global(.pu-val)   { }
+  :global(.pu-lbl)   { font-weight: 600; color: #64748b; }
+  :global(.pu-val)   { color: #1e293b; }
   :global(.pu-good)  { color: #22c55e; font-weight: 600; }
   :global(.pu-warn)  { color: #eab308; font-weight: 600; }
   :global(.pu-danger){ color: #ef4444; font-weight: 600; }
@@ -757,9 +758,14 @@
   :global(.pu-feat-geo)    { color: #8b5cf6; }
   :global(.pu-feat-autoSos){ color: #f59e0b; }
   :global(.pu-feat-checkin){ color: #06b6d4; }
-  :global(.pu-rooms) { margin-top: 5px; font-size: 10px; opacity: 0.7; }
+  :global(.pu-rooms) { margin-top: 5px; font-size: 10px; color: #64748b; }
 
-  /* Dark mode: badge colours stay vivid, labels adapt via opacity */
+  /* Dark mode: text colours for popup */
+  :global([data-theme="dark"] .pu-lbl) { color: rgba(255, 255, 255, 0.50); }
+  :global([data-theme="dark"] .pu-val) { color: rgba(255, 255, 255, 0.90); }
+  :global([data-theme="dark"] .pu-name) { color: rgba(255, 255, 255, 0.95); }
+  :global([data-theme="dark"] .pu-rooms) { color: rgba(255, 255, 255, 0.55); }
+  /* Dark mode: badge colours stay vivid, labels adapt */
   :global([data-theme="dark"] .pu-badge-sos)    { background: rgba(220, 38, 38, 0.20); border-color: rgba(220, 38, 38, 0.40); color: #fca5a5; }
   :global([data-theme="dark"] .pu-badge-geo)    { background: rgba(167, 139, 250, 0.15); border-color: rgba(167, 139, 250, 0.30); color: #c4b5fd; }
   :global([data-theme="dark"] .pu-badge-autoSos){ background: rgba(252, 211, 77, 0.12); border-color: rgba(252, 211, 77, 0.25); color: #fcd34d; }

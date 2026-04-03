@@ -127,14 +127,14 @@
     role="tab"
     aria-selected={activeTab === 'me'}
     tabindex={activeTab === 'me' ? 0 : -1}
-    aria-label={isAdmin ? 'Me and admin options' : 'Me and settings'}
+    aria-label={isAdmin ? 'Profile and admin options' : 'Profile and settings'}
   >
     {#if activeTab === 'me'}
       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4" fill="currentColor" stroke="none"/></svg>
     {:else}
       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
     {/if}
-    <span class="tab-label">Me</span>
+    <span class="tab-label">Profile</span>
   </button>
 </div>
 

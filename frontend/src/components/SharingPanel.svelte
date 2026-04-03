@@ -11,6 +11,8 @@
   import { getShareOrigin } from '../lib/env.js';
   import { getUserColor } from '../lib/getUserColor.js';
   import CopyButton from './primitives/CopyButton.svelte';
+  import ShareMyRide from './ShareMyRide.svelte';
+  import { rideShare } from '../lib/stores/rideShare.js';
 
   function locateContact(userId) {
     // Find by userId in otherUsers map
@@ -177,10 +179,44 @@
       Object.keys(loadingTimers).forEach((k) => clearTimeout(loadingTimers[k]));
     };
   });
+
+  // ── Quick Actions (Share My Ride + On My Way) ──────────────────
+  let rideShareOpen = false;
+
+  function onMyWay() {
+    const links = $myLiveLinks;
+    let waText = "I'm on my way!";
+    if (links && links.length > 0) {
+      const liveUrl = getShareOrigin() + '/#/live/' + links[0].token;
+      waText += ` Track me live: ${liveUrl}`;
+    }
+    window.open('https://wa.me/?text=' + encodeURIComponent(waText), '_blank', 'noopener');
+    socket.emit('onMyWay', {});
+  }
 </script>
 
 {#if embedded}
   <div class="panel-body sharing-root">
+
+    <!-- ── QUICK ACTIONS ───────────────────────────────────────── -->
+    <div class="quick-actions-row">
+      <button class="quick-action-card" class:quick-action-active={$rideShare.active} on:click={() => rideShareOpen = true}>
+        <div class="qa-icon qa-icon-ride">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+        </div>
+        <span class="qa-label">{$rideShare.active ? 'Ride Active' : 'Share Ride'}</span>
+        {#if $rideShare.active}
+          <span class="qa-live-dot" aria-hidden="true"></span>
+        {/if}
+      </button>
+      <button class="quick-action-card" on:click={onMyWay}>
+        <div class="qa-icon qa-icon-omw">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </div>
+        <span class="qa-label">On My Way</span>
+      </button>
+    </div>
+    <ShareMyRide bind:open={rideShareOpen} />
 
     <!-- ── ROOMS ─────────────────────────────────────────────────── -->
     <div class="sharing-section">
@@ -1049,5 +1085,88 @@
     color: var(--text-primary);
     cursor: pointer;
     max-width: 90px;
+  }
+
+  /* ── Quick Actions (Share Ride / On My Way) ──────────────────── */
+  .quick-actions-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .quick-action-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 16px 12px;
+    background: var(--surface-inset);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg, 14px);
+    cursor: pointer;
+    position: relative;
+    transition: background 150ms, border-color 150ms, transform 120ms;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .quick-action-card:hover {
+    background: var(--surface-hover);
+    border-color: var(--border-default);
+  }
+  .quick-action-card:active {
+    transform: scale(0.96);
+  }
+
+  .quick-action-active {
+    background: rgba(16, 185, 129, 0.10);
+    border-color: rgba(16, 185, 129, 0.35);
+  }
+  .quick-action-active:hover {
+    background: rgba(16, 185, 129, 0.15);
+  }
+
+  .qa-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .qa-icon-ride {
+    background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.10));
+    border: 1px solid rgba(99,102,241,0.20);
+    color: var(--primary-400, #818cf8);
+  }
+
+  .qa-icon-omw {
+    background: linear-gradient(135deg, rgba(20,184,166,0.15), rgba(16,185,129,0.10));
+    border: 1px solid rgba(20,184,166,0.20);
+    color: var(--primary-500, #14b8a6);
+  }
+
+  .qa-label {
+    font-family: var(--font-display);
+    font-size: var(--text-xs, 11px);
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: 0.01em;
+  }
+
+  .qa-live-dot {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--success-500);
+    box-shadow: 0 0 6px rgba(16,185,129,0.50);
+    animation: qa-pulse 2s ease-in-out infinite;
+  }
+  @keyframes qa-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
   }
 </style>
