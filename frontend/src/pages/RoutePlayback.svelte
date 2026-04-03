@@ -233,7 +233,7 @@
   </style>
 </svelte:head>
 
-<div class="replay-page">
+<div class="replay-page page-enter aurora-ambient">
   <!-- Header -->
   <header class="rp-header">
     <button class="icon-btn" on:click={() => push('/')} aria-label="Back to map">

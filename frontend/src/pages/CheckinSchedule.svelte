@@ -142,7 +142,7 @@
     : countdownMs != null && countdownMs < 120000 ? 'countdown-soon' : 'countdown-ok';
 </script>
 
-<div class="page-shell" in:fly={{ y: 18, duration: 280, easing: cubicOut }}>
+<div class="page-shell page-enter aurora-ambient">
 
   <!-- ── Top bar ─────────────────────────────────────────────────────────── -->
   <header class="page-header">

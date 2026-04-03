@@ -2193,3 +2193,166 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
     inset 0 1px 0 rgba(255,255,255,0.18);
   transform: perspective(600px) translateZ(2px);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   2026 MAKEOVER — Scroll-reveal, spatial depth, micro-interactions
+   Applied globally — every page benefits automatically
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Scroll-Driven View Reveal ──────────────────────────────────────────
+   Any element with .reveal-on-scroll fades+slides in when entering viewport.
+   Pure CSS, zero JS. Uses animation-timeline: view() — 2026 Baseline.     */
+.reveal-on-scroll {
+  animation: css-reveal linear both;
+  animation-timeline: view();
+  animation-range: entry 0% entry 35%;
+}
+@keyframes css-reveal {
+  from { opacity: 0; transform: translateY(24px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Staggered children variant — add to parent, children auto-stagger */
+.reveal-stagger > * {
+  animation: css-reveal 400ms var(--ease-spring) both;
+  animation-timeline: view();
+  animation-range: entry 0% entry 35%;
+}
+.reveal-stagger > :nth-child(1) { animation-delay: 0ms; }
+.reveal-stagger > :nth-child(2) { animation-delay: 50ms; }
+.reveal-stagger > :nth-child(3) { animation-delay: 100ms; }
+.reveal-stagger > :nth-child(4) { animation-delay: 150ms; }
+.reveal-stagger > :nth-child(5) { animation-delay: 200ms; }
+.reveal-stagger > :nth-child(6) { animation-delay: 250ms; }
+
+/* ── Spatial Glass Surface ──────────────────────────────────────────────
+   Premium frosted-glass card with depth. Add .spatial-glass to any card. */
+.spatial-glass {
+  background: color-mix(in srgb, var(--surface-1) 72%, transparent);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  border: 1px solid color-mix(in srgb, var(--primary-500) 12%, transparent);
+  border-top-color: color-mix(in srgb, var(--primary-400) 22%, transparent);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.10),
+    inset 0 1px 0 color-mix(in srgb, white 8%, transparent);
+  transition: transform 350ms var(--ease-spring), box-shadow 350ms;
+}
+.spatial-glass:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 14px 40px rgba(0, 0, 0, 0.14),
+    inset 0 1px 0 color-mix(in srgb, white 10%, transparent);
+}
+
+/* ── Aurora Ambient Background ──────────────────────────────────────────
+   Subtle animated gradient mesh. Add .aurora-ambient to page backgrounds. */
+.aurora-ambient {
+  position: relative;
+}
+.aurora-ambient::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(ellipse 80% 60% at 15% 30%,
+      color-mix(in srgb, var(--primary-500) 10%, transparent) 0%, transparent 65%),
+    radial-gradient(ellipse 60% 50% at 85% 70%,
+      color-mix(in srgb, var(--primary-300) 8%, transparent) 0%, transparent 55%),
+    var(--surface-0);
+  animation: aurora-drift 16s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+@keyframes aurora-drift {
+  0%   { opacity: 0.7; }
+  50%  { opacity: 1; }
+  100% { opacity: 0.7; }
+}
+
+/* ── Enhanced Button Press ──────────────────────────────────────────────
+   Every .btn gets a satisfying press depth on active.                    */
+.btn:active,
+.btn-primary:active,
+.btn-secondary:active,
+.btn-ghost:active {
+  transform: perspective(600px) translateZ(-3px) scale(0.97) !important;
+  transition-duration: 80ms !important;
+}
+
+/* ── Card Depth Hover ───────────────────────────────────────────────────
+   Cards lift on hover with subtle shadow expansion.                     */
+.panel-body .sharing-section,
+.panel-body .network-section,
+.panel-body .status-msg-zone,
+.panel-body .metric-hero-card {
+  transition: transform 300ms var(--ease-spring), box-shadow 300ms;
+}
+.panel-body .sharing-section:hover,
+.panel-body .network-section:hover,
+.panel-body .metric-hero-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+/* ── Noise Grain Texture ────────────────────────────────────────────────
+   Add .grain-texture to any surface for subtle film grain.              */
+.grain-texture::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+  pointer-events: none;
+  border-radius: inherit;
+  mix-blend-mode: overlay;
+  opacity: 0.6;
+}
+
+/* ── Bento Grid ─────────────────────────────────────────────────────────
+   Responsive asymmetric grid. Add .bento to container.                  */
+.bento {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: minmax(100px, auto);
+  gap: var(--space-3);
+}
+.bento-hero { grid-column: span 2; grid-row: span 2; }
+.bento-wide { grid-column: span 2; }
+.bento-tall { grid-row: span 2; }
+@media (max-width: 767px) {
+  .bento {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .bento-hero { grid-column: span 2; grid-row: span 1; }
+  .bento-tall { grid-row: span 1; }
+}
+
+/* ── Page Entrance ──────────────────────────────────────────────────────
+   Wrap page content in .page-enter for a smooth fade+slide on mount.    */
+.page-enter {
+  animation: page-mount 450ms var(--ease-out) both;
+}
+@keyframes page-mount {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Reduced Motion ─────────────────────────────────────────────────────
+   Respect user preference — disable all cosmetic animations.            */
+@media (prefers-reduced-motion: reduce) {
+  .reveal-on-scroll,
+  .reveal-stagger > *,
+  .page-enter,
+  .aurora-ambient::before {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .spatial-glass:hover,
+  .panel-body .sharing-section:hover,
+  .panel-body .network-section:hover,
+  .panel-body .metric-hero-card:hover {
+    transform: none !important;
+  }
+}

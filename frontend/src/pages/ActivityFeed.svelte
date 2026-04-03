@@ -116,7 +116,7 @@
   function clearFeed() { events = []; }
 </script>
 
-<div class="activity-page">
+<div class="activity-page page-enter aurora-ambient">
   <!-- Header -->
   <header class="act-header">
     <button class="icon-btn" on:click={() => push('/')} aria-label="Back to map">

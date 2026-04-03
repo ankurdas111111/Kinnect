@@ -119,7 +119,7 @@
   }
 </script>
 
-<div class="auth-page">
+<div class="auth-page page-enter">
   <div class="auth-bg"><div class="auth-bg-blob"></div></div>
 
   <div class="auth-brand">

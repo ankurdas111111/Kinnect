@@ -94,16 +94,16 @@
   $: ringColor    = allSafe ? '#10b981' : '#ef4444';
 
   // ── Deterministic stars (3 size/colour classes) ───────────────────────────
-  const stars = Array.from({ length: 90 }, (_, i) => {
+  const stars = Array.from({ length: 60 }, (_, i) => {
     const a = (i * 2654435761) >>> 0;
     const b = (i * 1664525 + 1013904223) >>> 0;
     return {
       top:   (a % 1000) / 10,
       left:  (b % 1000) / 10,
-      size:  0.9 + (a % 28) / 14,
-      delay: (b % 60) / 10,
-      dur:   2 + (a % 50) / 10,
-      cls:   i % 7 === 0 ? 'fd-star-bright' : i % 4 === 0 ? 'fd-star-blue' : '',
+      size:  0.6 + (a % 20) / 16,
+      delay: (b % 80) / 10,
+      dur:   4 + (a % 60) / 10,
+      cls:   i % 9 === 0 ? 'fd-star-bright' : i % 5 === 0 ? 'fd-star-blue' : '',
     };
   });
 
@@ -167,15 +167,15 @@
       }, 650);
     }, 8000);
 
-    // Shooting star: fires 2s after mount, then every ~11s
+    // Shooting star: fires 4s after mount, then every ~25-40s (rare = special)
     function fireStar() {
       shootX = 5 + Math.random() * 35;
-      shootY = 5 + Math.random() * 40;
+      shootY = 5 + Math.random() * 30;
       shootingStarActive = true;
-      setTimeout(() => { shootingStarActive = false; }, 1300);
+      setTimeout(() => { shootingStarActive = false; }, 1500);
     }
-    setTimeout(fireStar, 2000);
-    shootInterval = setInterval(fireStar, 11000);
+    setTimeout(fireStar, 4000);
+    shootInterval = setInterval(fireStar, 25000 + Math.random() * 15000);
 
     // Gyroscope (mobile)
     if (!noMotion && typeof DeviceOrientationEvent !== 'undefined') {
@@ -331,7 +331,7 @@
         </div>
       </TiltCard>
     {:else}
-      <div class="fd-member-grid">
+      <div class="fd-member-grid reveal-stagger">
         {#each members as user (user.userId)}
           {@const color = getUserColor(user.userId)}
           {@const colorLight = getUserColorLight(user.userId)}
@@ -412,7 +412,7 @@
       <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
       <h2>Quick Actions</h2>
     </header>
-    <div class="fd-actions">
+    <div class="fd-actions reveal-stagger">
 
       <TiltCard intensity={10} shine={true}>
         <button class="fd-action fd-action-map" on:click={() => visitFeature(null, '/')}>
@@ -493,10 +493,10 @@
     overscroll-behavior-y: contain;
     padding: 0 0 var(--safe-bottom, 0px);
 
-    /* Mount animation */
+    /* Mount animation — gentle fade, no bounce */
     opacity: 0;
-    transform: translateY(12px);
-    transition: opacity 0.4s ease, transform 0.4s ease;
+    transform: translateY(8px);
+    transition: opacity 0.6s cubic-bezier(0.16,1,0.3,1), transform 0.6s cubic-bezier(0.16,1,0.3,1);
   }
   .fd.fd-mounted {
     opacity: 1;
@@ -515,32 +515,28 @@
   .fd-star {
     position: absolute;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.65);
-    animation: star-twinkle linear infinite;
+    background: rgba(255, 255, 255, 0.55);
+    animation: star-twinkle ease-in-out infinite;
   }
-  /* Bright star class — extra glow */
+  /* Bright star class — subtle glow, no aggressive scaling */
   .fd-star-bright {
-    background: rgba(255, 255, 255, 0.95) !important;
-    box-shadow: 0 0 3px rgba(255,255,255,0.6), 0 0 6px rgba(200,200,255,0.3);
-    animation: star-twinkle-bright linear infinite !important;
+    background: rgba(255, 255, 255, 0.9) !important;
+    box-shadow: 0 0 2px rgba(255,255,255,0.4);
+    animation: star-twinkle-bright ease-in-out infinite !important;
   }
   /* Blue-tinted star class */
   .fd-star-blue {
-    background: rgba(180, 200, 255, 0.75) !important;
-    animation: star-twinkle-blue linear infinite !important;
+    background: rgba(180, 200, 255, 0.6) !important;
+    animation: star-twinkle ease-in-out infinite !important;
   }
+  /* Stars: opacity-only twinkle, no scale — feels like real night sky */
   @keyframes star-twinkle {
-    0%, 100% { opacity: 0.12; transform: scale(1); }
-    50%       { opacity: 0.75; transform: scale(1.25); }
+    0%, 100% { opacity: 0.15; }
+    50%       { opacity: 0.6; }
   }
   @keyframes star-twinkle-bright {
-    0%, 100% { opacity: 0.3;  transform: scale(1); }
-    40%       { opacity: 1.0; transform: scale(1.5); box-shadow: 0 0 6px rgba(255,255,255,0.8); }
-    60%       { opacity: 0.9; transform: scale(1.3); }
-  }
-  @keyframes star-twinkle-blue {
-    0%, 100% { opacity: 0.1;  transform: scale(1); }
-    50%       { opacity: 0.6; transform: scale(1.2); }
+    0%, 100% { opacity: 0.35; }
+    50%       { opacity: 1.0; }
   }
 
   /* ══ Milky Way band — parallax layer ═════════════════════════════════════ */
@@ -562,25 +558,25 @@
     );
   }
 
-  /* ══ Shooting star ════════════════════════════════════════════════════════ */
+  /* ══ Shooting star — graceful arc with longer tail ═══════════════════════ */
   .fd-shooting-star {
     position: fixed;
-    width: 130px;
-    height: 1.5px;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.95) 40%, rgba(200,220,255,0.6), transparent);
+    width: 160px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.05) 20%, rgba(255,255,255,0.85) 70%, rgba(200,220,255,0.95) 90%, transparent 100%);
     border-radius: 2px;
-    transform: rotate(28deg);
-    transform-origin: left center;
-    animation: shoot-across 1.2s cubic-bezier(0.15, 0, 0.75, 1) forwards;
+    transform: rotate(32deg);
+    transform-origin: right center;
+    animation: shoot-across 1.4s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
     pointer-events: none;
     z-index: 0;
-    filter: drop-shadow(0 0 2px rgba(255,255,255,0.7)) drop-shadow(0 0 6px rgba(180,200,255,0.4));
+    filter: drop-shadow(0 0 1px rgba(255,255,255,0.5));
   }
   @keyframes shoot-across {
-    0%   { transform: translateX(0)    translateY(0)   rotate(28deg); opacity: 0; }
-    6%   { opacity: 1; }
-    82%  { opacity: 0.9; }
-    100% { transform: translateX(110vw) translateY(55px) rotate(28deg); opacity: 0; }
+    0%   { transform: translateX(0)    translateY(0)    rotate(32deg); opacity: 0; width: 40px; }
+    8%   { opacity: 0.9; width: 160px; }
+    70%  { opacity: 0.7; }
+    100% { transform: translateX(85vw) translateY(40px) rotate(32deg); opacity: 0; width: 160px; }
   }
 
   /* ══ Nebula — parallax layer (deepest shift) ═════════════════════════════ */
@@ -596,31 +592,38 @@
     position: absolute;
     border-radius: 50%;
     pointer-events: none;
-    filter: blur(80px);
+    filter: blur(90px);
   }
   .fd-nebula-a {
-    width: 600px; height: 500px;
+    width: 550px; height: 450px;
     top: -180px; left: -120px;
-    background: radial-gradient(ellipse, rgba(99,102,241,0.20) 0%, transparent 70%);
-    animation: nebula-drift 28s ease-in-out infinite;
+    background: radial-gradient(ellipse, rgba(99,102,241,0.14) 0%, transparent 70%);
+    animation: nebula-a 40s ease-in-out infinite;
   }
   .fd-nebula-b {
-    width: 500px; height: 500px;
+    width: 450px; height: 450px;
     bottom: -100px; right: -100px;
-    background: radial-gradient(ellipse, rgba(16,185,129,0.14) 0%, transparent 70%);
-    animation: nebula-drift 35s ease-in-out infinite reverse;
+    background: radial-gradient(ellipse, rgba(16,185,129,0.10) 0%, transparent 70%);
+    animation: nebula-b 50s ease-in-out infinite;
   }
   .fd-nebula-c {
-    width: 400px; height: 400px;
+    width: 350px; height: 350px;
     top: 40%; left: 55%;
-    background: radial-gradient(ellipse, rgba(139,92,246,0.12) 0%, transparent 70%);
-    animation: nebula-drift 22s ease-in-out infinite;
+    background: radial-gradient(ellipse, rgba(139,92,246,0.09) 0%, transparent 70%);
+    animation: nebula-c 35s ease-in-out infinite;
   }
-  /* Nebula now breathes (scale pulse) + drifts */
-  @keyframes nebula-drift {
-    0%, 100% { transform: translate(0,    0)    scale(1.00); opacity: 1.0; }
-    33%       { transform: translate(40px, 60px) scale(1.08); opacity: 0.82; }
-    66%       { transform: translate(-30px,30px) scale(0.94); opacity: 0.90; }
+  /* Each nebula gets its own gentle, unique drift — no scale, just position + opacity */
+  @keyframes nebula-a {
+    0%, 100% { transform: translate(0, 0);       opacity: 0.9; }
+    50%       { transform: translate(20px, 15px); opacity: 1.0; }
+  }
+  @keyframes nebula-b {
+    0%, 100% { transform: translate(0, 0);         opacity: 0.85; }
+    50%       { transform: translate(-15px, -10px); opacity: 1.0; }
+  }
+  @keyframes nebula-c {
+    0%, 100% { transform: translate(0, 0);       opacity: 0.8; }
+    50%       { transform: translate(12px, -8px); opacity: 0.95; }
   }
 
   /* ══ Header ═══════════════════════════════════════════════════════════════ */
@@ -669,14 +672,14 @@
     flex-direction: column;
     align-items: center;
     padding-top: 4px;
-    /* Depth entrance — fly in from scale(0.88) */
+    /* Smooth entrance — no bounce, just elegant deceleration */
     opacity: 0;
-    transform: scale(0.88) translateY(35px);
-    transition: opacity 0.9s ease 0.12s, transform 0.9s cubic-bezier(0.34,1.56,0.64,1) 0.12s;
+    transform: translateY(20px);
+    transition: opacity 0.7s cubic-bezier(0.16,1,0.3,1) 0.1s, transform 0.7s cubic-bezier(0.16,1,0.3,1) 0.1s;
   }
   .fd-mounted .fd-cosmos {
     opacity: 1;
-    transform: scale(1) translateY(0);
+    transform: translateY(0);
   }
 
   /* Top row: greeting left, compact safety ring right */
@@ -781,20 +784,10 @@
     position: relative;
     overflow: hidden;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
-    /* CSS 3D float — each chip gently bobs in zero gravity */
-    transform-style: preserve-3d;
-    animation: stat-3d-float 8s ease-in-out infinite;
-    transition: transform 0.25s ease;
+    transition: transform 0.3s cubic-bezier(0.16,1,0.3,1), box-shadow 0.3s ease, background 0.3s ease;
   }
-  .cosmos-stat:nth-child(1) { animation-delay: 0s; }
-  .cosmos-stat:nth-child(2) { animation-delay: 2s; }
-  .cosmos-stat:nth-child(3) { animation-delay: 4s; }
-  .cosmos-stat:nth-child(4) { animation-delay: 6s; }
-  @keyframes stat-3d-float {
-    0%, 100% { transform: perspective(300px) rotateX(3deg)  rotateY(0deg);  }
-    25%       { transform: perspective(300px) rotateX(-1deg) rotateY(5deg);  }
-    50%       { transform: perspective(300px) rotateX(-4deg) rotateY(0deg);  }
-    75%       { transform: perspective(300px) rotateX(-1deg) rotateY(-5deg); }
+  .cosmos-stat:active {
+    transform: scale(0.96);
   }
   .cosmos-stat-val {
     font-size: 18px;
@@ -829,26 +822,25 @@
     50%       { opacity: 0.3; }
   }
 
-  /* ══ Section — staggered depth entrance ═══════════════════════════════════ */
+  /* ══ Section — staggered slide-up entrance ═══════════════════════════════ */
   .fd-section {
     position: relative;
     z-index: 1;
     padding: 24px 20px 0;
-    /* Depth entrance */
     opacity: 0;
-    transform: scale(0.91) translateY(28px);
+    transform: translateY(16px);
   }
-  /* First section (Network) — stagger 0.35s */
+  /* First section (Network) — stagger 0.3s */
   .fd-mounted .fd-section:first-of-type {
     opacity: 1;
-    transform: scale(1) translateY(0);
-    transition: opacity 0.8s ease 0.35s, transform 0.8s cubic-bezier(0.34,1.56,0.64,1) 0.35s;
+    transform: translateY(0);
+    transition: opacity 0.6s cubic-bezier(0.16,1,0.3,1) 0.3s, transform 0.6s cubic-bezier(0.16,1,0.3,1) 0.3s;
   }
-  /* Second section (Quick Actions) — stagger 0.55s */
+  /* Second section (Quick Actions) — stagger 0.45s */
   .fd-mounted .fd-section:last-of-type {
     opacity: 1;
-    transform: scale(1) translateY(0);
-    transition: opacity 0.8s ease 0.55s, transform 0.8s cubic-bezier(0.34,1.56,0.64,1) 0.55s;
+    transform: translateY(0);
+    transition: opacity 0.6s cubic-bezier(0.16,1,0.3,1) 0.45s, transform 0.6s cubic-bezier(0.16,1,0.3,1) 0.45s;
   }
   .fd-section-header {
     display: flex;
@@ -905,14 +897,14 @@
   }
   .fd-member:active { transform: scale(0.97); }
 
-  /* SOS variant */
+  /* SOS variant — subtle border glow, no box-shadow explosion */
   .fd-member.member-sos {
     border-color: rgba(239,68,68,0.4);
-    animation: member-sos-pulse 1.5s ease-in-out infinite;
+    animation: member-sos-glow 2s ease-in-out infinite;
   }
-  @keyframes member-sos-pulse {
-    0%, 100% { box-shadow: 0 4px 20px rgba(0,0,0,0.35), 0 0 0 0 rgba(239,68,68,0.3); }
-    50%       { box-shadow: 0 4px 20px rgba(0,0,0,0.35), 0 0 0 6px rgba(239,68,68,0); }
+  @keyframes member-sos-glow {
+    0%, 100% { border-color: rgba(239,68,68,0.25); }
+    50%       { border-color: rgba(239,68,68,0.6); }
   }
   /* Offline variant */
   .fd-member.member-offline { opacity: 0.55; }
@@ -968,17 +960,17 @@
     border: 2px solid #050812;
   }
   .dot-online  { background: #10b981; }
-  .dot-moving  { background: #3b82f6; animation: moving-pulse 1s ease infinite; }
+  .dot-moving  { background: #3b82f6; animation: moving-pulse 2s ease-in-out infinite; }
   .dot-offline { background: #475569; }
-  .dot-sos     { background: #ef4444; animation: sos-pulse 0.8s ease infinite; }
+  .dot-sos     { background: #ef4444; animation: sos-dot-pulse 1.2s ease-in-out infinite; }
 
   @keyframes moving-pulse {
-    0%, 100% { transform: scale(1); }
-    50%       { transform: scale(1.4); }
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.5; }
   }
-  @keyframes sos-pulse {
-    0%, 100% { transform: scale(1); opacity: 1; }
-    50%       { transform: scale(1.6); opacity: 0.6; }
+  @keyframes sos-dot-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); }
+    50%       { box-shadow: 0 0 0 3px rgba(239,68,68,0); }
   }
 
   /* Battery */
@@ -1144,14 +1136,13 @@
   .fd-action-safety   .action-orb { background: rgba(6,182,212,0.15);   border: 1px solid rgba(6,182,212,0.3);   color: #22d3ee; }
   .fd-action-network  .action-orb { background: rgba(139,92,246,0.15);  border: 1px solid rgba(139,92,246,0.3);  color: #a78bfa; }
 
-  /* Active SOS action */
+  /* Active SOS action — breathing border glow */
   .fd-action-sos.sos-pulse {
-    border-color: rgba(239,68,68,0.4);
-    animation: action-sos 1.4s ease infinite;
+    animation: action-sos-breathe 2s ease-in-out infinite;
   }
-  @keyframes action-sos {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.25); }
-    50%       { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
+  @keyframes action-sos-breathe {
+    0%, 100% { border-color: rgba(239,68,68,0.2); }
+    50%       { border-color: rgba(239,68,68,0.55); }
   }
 
   /* ══ Dynamic quote ════════════════════════════════════════════════════════ */
@@ -1162,13 +1153,11 @@
     margin: -4px 0 4px;
     text-align: center;
     opacity: 0;
-    transform: translateY(8px);
-    transition: opacity 0.65s ease, transform 0.65s ease;
+    transition: opacity 0.8s ease;
     pointer-events: none;
   }
   .cosmos-quote.quote-visible {
     opacity: 1;
-    transform: translateY(0);
   }
   /* Decorative opening quote mark — centered above the text */
   .quote-glyph {
