@@ -518,6 +518,12 @@
     </div>
 
     <hr class="divider" />
+    <h4 class="section-title-bold">Help</h4>
+    <div class="form-section">
+      <button class="btn btn-secondary btn-sm" on:click={() => dispatch('openGuide')}>Feature Guide</button>
+    </div>
+
+    <hr class="divider" />
     <h4 class="section-title-bold">Account</h4>
     <div class="form-section">
       <button class="btn btn-secondary btn-sm logout-btn" on:click={logout}>Sign Out</button>

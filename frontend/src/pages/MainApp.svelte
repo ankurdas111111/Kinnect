@@ -29,6 +29,7 @@
   import PulseButton from '../components/primitives/PulseButton.svelte';
   import SosFloat from '../components/SosFloat.svelte';
   import HubSpotlight from '../components/HubSpotlight.svelte';
+  import FeatureGuide from '../components/FeatureGuide.svelte';
   import { calculateDistance } from '../lib/tracking.js';
   import { GPSKalmanFilter, VelocityKalmanFilter } from '../lib/kalman.js';
   import { startMotionSensor, stopMotionSensor, getMotionState } from '../lib/motionSensor.js';
@@ -42,6 +43,8 @@
   import { haptics } from '../lib/haptics.js';
   import { debounce } from '../lib/debounce.js';
   import { isIgnoringBatteryOptimizations, requestIgnoreBatteryOptimizations } from '../lib/batteryOptimization.js';
+  import { rideShare } from '../lib/stores/rideShare.js';
+  import * as trackingNotif from '../lib/trackingNotification.js';
 
   let activePanel = null;
   let sidebarTab = 'info';
@@ -110,6 +113,7 @@
   let followMode = false;
   let meSubTab = 'info';
   let showOnboarding = false;
+  let showFeatureGuide = false;
   let lastAcceptedFix = null;
   let lastEmittedFix = null;
   let lastEmitAt = 0;
@@ -136,6 +140,20 @@
 
   $: if (!$authUser) push('/login');
   $: isAdmin = $authUser && $authUser.role === 'admin';
+
+  // Force-update persistent notification when ride status changes
+  $: if ($tracking && $rideShare && trackingNotif.isActive()) {
+    const rs = $rideShare;
+    trackingNotif.showOrUpdate({
+      visibleCount: $otherUsers.size,
+      accuracy: $myLocation?.accuracy,
+      rideActive: rs.active,
+      rideDest: rs.dest,
+      rideVehicle: rs.vehicle,
+      rideEtaMins: rs.eta ? Math.max(0, Math.round((rs.eta - Date.now()) / 60000)) : null,
+      force: true,
+    });
+  }
   $: rightPanelOpen = activePanel === 'users' || activePanel === 'superAdmin';
   $: sidebarOpen = !sidebarCollapsed;
   $: hasNotification = $pendingIncomingRequests.length > 0;
@@ -354,6 +372,17 @@
         bufferPosition(payload);
         setBufferedCount(bufferSize());
       }
+
+      // Update persistent notification (throttled internally to every 30s)
+      const rs = $rideShare;
+      trackingNotif.showOrUpdate({
+        visibleCount: $otherUsers.size,
+        accuracy,
+        rideActive: rs.active,
+        rideDest: rs.dest,
+        rideVehicle: rs.vehicle,
+        rideEtaMins: rs.eta ? Math.max(0, Math.round((rs.eta - now) / 60000)) : null,
+      });
     }
   }
 
@@ -404,6 +433,9 @@
 
     // Start IMU sensor fusion for better speed accuracy on mobile
     startMotionSensor();
+
+    // Show persistent Android notification
+    trackingNotif.showOrUpdate({ visibleCount: $otherUsers.size, force: true });
   }
 
   function stopTracking() {
@@ -425,6 +457,9 @@
     resetMetrics();
     clearBuffer();
     setBufferedCount(0);
+
+    // Dismiss persistent notification
+    trackingNotif.dismiss();
   }
 
   function checkMobile() {
@@ -493,6 +528,26 @@
     if (isNativePlatform()) {
       // Set up local notification channels once at startup
       setupNotificationChannels().catch(() => {});
+      trackingNotif.setupTrackingChannel().then(() => trackingNotif.registerActions()).catch(() => {});
+
+      // Wire up notification action buttons
+      trackingNotif.onAction('share_ride', () => {
+        // Bring app to foreground — action tap does this automatically
+        setMobileTab('share');
+      });
+      trackingNotif.onAction('on_my_way', () => {
+        socket.emit('onMyWay', {});
+      });
+      trackingNotif.onAction('pause', () => {
+        stopTracking();
+      });
+      trackingNotif.onAction('reached_safely', () => {
+        socket.emit('endRide', {});
+        rideShare.set({ active: false, token: '', vehicle: '', vehicleType: '', dest: '', startedAt: 0, eta: 0 });
+      });
+      trackingNotif.onAction('sos', () => {
+        socket.emit('triggerSOS', { reason: 'Triggered from notification', type: 'manual' });
+      });
 
       // Prompt the user to disable battery optimization if not already done
       setTimeout(async () => {
@@ -600,7 +655,7 @@
       {:else if sidebarTab === 'places'}
         <SavedPlacesPanel embedded={true} />
       {:else if sidebarTab === 'settings'}
-        <SettingsPanel embedded={true} />
+        <SettingsPanel embedded={true} on:openGuide={() => showFeatureGuide = true} />
       {/if}
     </Sidebar>
   </svelte:fragment>
@@ -672,7 +727,7 @@
         {:else if meSubTab === 'places'}
           <SavedPlacesPanel embedded={true} />
         {:else if meSubTab === 'settings'}
-          <SettingsPanel embedded={true} />
+          <SettingsPanel embedded={true} on:openGuide={() => showFeatureGuide = true} />
         {/if}
       {:else if mobileTab === 'share'}
         <SharingPanel embedded={true} />
@@ -810,8 +865,15 @@
         showOnboarding = false;
         const key = 'kinnect_onboarded_' + ($authUser?.userId || '');
         localStorage.setItem(key, '1');
+        // Show feature guide for first-time users after onboarding
+        if (!localStorage.getItem('kinnect_guide_seen')) {
+          setTimeout(() => { showFeatureGuide = true; }, 600);
+        }
       }}
     />
+
+    <!-- Feature Guide overlay (first run + accessible from Settings) -->
+    <FeatureGuide bind:open={showFeatureGuide} />
   </svelte:fragment>
 </AppLayout>
 
