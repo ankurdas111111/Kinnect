@@ -14,6 +14,12 @@ export default defineConfig({
       : {
           '@capacitor/app': capacitorStubPath,
           '@capacitor/geolocation': capacitorStubPath,
+          '@capacitor/device': capacitorStubPath,
+          '@capacitor/network': capacitorStubPath,
+          '@capacitor/share': capacitorStubPath,
+          '@capacitor/haptics': capacitorStubPath,
+          '@capacitor/local-notifications': capacitorStubPath,
+          '@capacitor/core': capacitorStubPath,
           '@capacitor-community/background-geolocation': capacitorStubPath
         }
   },

@@ -190,7 +190,7 @@
 <div class="ep-root">
 
   <!-- ── Header ─────────────────────────────────────────────────────────── -->
-  <header class="ep-header" role="banner">
+  <header class="ep-header">
     <button
       class="ep-back-btn"
       aria-label="Back to map"

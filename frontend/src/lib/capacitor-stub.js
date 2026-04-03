@@ -1,6 +1,4 @@
-const listenerHandle = {
-  remove: () => {}
-};
+const listenerHandle = { remove: () => {} };
 
 export const App = {
   addListener: async () => listenerHandle,
@@ -16,3 +14,38 @@ export const Geolocation = {
   watchPosition: async () => "web-stub-watch",
   clearWatch: async () => {}
 };
+
+export const Device = {
+  getBatteryInfo: async () => ({ batteryLevel: null, isCharging: false }),
+  getInfo: async () => ({ platform: 'web', operatingSystem: 'unknown' })
+};
+
+export const Network = {
+  getStatus: async () => ({ connected: true, connectionType: 'unknown' }),
+  addListener: async () => listenerHandle
+};
+
+export const Share = {
+  canShare: async () => ({ value: false }),
+  share: async () => {}
+};
+
+export const Haptics = {
+  impact: async () => {},
+  notification: async () => {},
+  vibrate: async () => {}
+};
+
+export const ImpactStyle = { Heavy: 'HEAVY', Medium: 'MEDIUM', Light: 'LIGHT' };
+export const NotificationType = { Success: 'SUCCESS', Warning: 'WARNING', Error: 'ERROR' };
+
+export const LocalNotifications = {
+  checkPermissions: async () => ({ display: 'denied' }),
+  requestPermissions: async () => ({ display: 'denied' }),
+  schedule: async () => {},
+  addListener: async () => listenerHandle
+};
+
+export const registerPlugin = () => ({});
+
+export default {};
