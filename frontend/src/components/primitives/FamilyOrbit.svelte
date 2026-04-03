@@ -113,9 +113,11 @@
 <!-- ══════════════════════════════════════════════════════════════════════════
      Scene container — all layers are absolutely positioned inside this box
 ══════════════════════════════════════════════════════════════════════════════ -->
+{@const sceneSize = allMembers.length > 0 ? SCENE : 200}
 <div
   class="fo-scene"
-  style="width:min({SCENE}px,calc(100vw - 20px));height:min({SCENE}px,calc(100vw - 20px))"
+  class:fo-scene-empty={allMembers.length === 0}
+  style="width:min({sceneSize}px,calc(100vw - 20px));height:min({sceneSize}px,calc(100vw - 20px))"
   aria-label="Family orbital view"
 >
 
@@ -321,26 +323,21 @@
     position: relative;
     margin: 0 auto;
     flex-shrink: 0;
-    overflow: hidden;
-    /* Subtle inner vignette to ground the scene */
-    border-radius: 50%;
-    background: radial-gradient(
-      ellipse 88% 72% at 50% 56%,
-      rgba(8, 6, 28, 0.88) 0%,
-      rgba(4, 3, 16, 0.60) 55%,
-      transparent 100%
-    );
+    overflow: visible;
+    /* No border-radius, no background — seamlessly merges with the dashboard's
+       deep-space backdrop. The orbit floats in the existing cosmos. */
+    background: transparent;
   }
 
-  /* ── Deep space vignette overlay ────────────────────────────────────────── */
+  /* ── Subtle depth ring — faint radial gradient that doesn't look like a disk */
   .fo-space {
     position: absolute;
-    inset: 0;
+    inset: -10%;
     border-radius: 50%;
     background: radial-gradient(
-      ellipse 60% 55% at 50% 46%,
-      transparent 40%,
-      rgba(3, 2, 12, 0.55) 100%
+      ellipse 70% 60% at 50% 50%,
+      rgba(99, 102, 241, 0.04) 0%,
+      transparent 65%
     );
     pointer-events: none;
     z-index: 0;
@@ -572,12 +569,15 @@
   }
 
   /* ── Empty state ────────────────────────────────────────────────────────── */
+  .fo-scene-empty {
+    transition: width 0.5s ease, height 0.5s ease;
+  }
   .fo-empty {
     position: absolute;
-    bottom: 16px; left: 50%;
+    bottom: 6px; left: 50%;
     transform: translateX(-50%);
     font-size: 11px; font-weight: 500;
-    color: rgba(255, 255, 255, 0.20);
+    color: rgba(255, 255, 255, 0.28);
     white-space: nowrap;
     pointer-events: none;
     z-index: 100;

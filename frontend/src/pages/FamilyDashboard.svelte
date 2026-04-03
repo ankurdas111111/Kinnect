@@ -1156,34 +1156,31 @@
 
   /* ══ Dynamic quote ════════════════════════════════════════════════════════ */
   .cosmos-quote {
-    position: relative;
-    width: calc(100% - 40px);
-    padding: 10px 20px 12px;
-    margin: 0 0 6px;
+    width: calc(100% - 32px);
+    max-width: 360px;
+    padding: 6px 16px 10px;
+    margin: -4px 0 4px;
     text-align: center;
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(8px);
     transition: opacity 0.65s ease, transform 0.65s ease;
     pointer-events: none;
-    overflow: hidden;
   }
   .cosmos-quote.quote-visible {
     opacity: 1;
     transform: translateY(0);
   }
-  /* Giant decorative opening quote mark */
+  /* Decorative opening quote mark — centered above the text */
   .quote-glyph {
-    position: absolute;
-    top: -8px;
-    left: 12px;
-    font-size: 72px;
+    display: block;
+    font-size: 36px;
     line-height: 1;
     font-family: Georgia, 'Times New Roman', serif;
     font-style: italic;
-    color: rgba(139, 92, 246, 0.18);
+    color: rgba(139, 92, 246, 0.28);
     pointer-events: none;
     user-select: none;
-    letter-spacing: -0.05em;
+    margin-bottom: -4px;
   }
   .quote-text {
     position: relative;
