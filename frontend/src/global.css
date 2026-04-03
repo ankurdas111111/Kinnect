@@ -2154,6 +2154,7 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
 /* ── Me-tab subtabs — spatial style ─────────────────────────────────────── */
 .spatial-subtabs {
   display: flex;
+  flex-shrink: 0;
   gap: 2px;
   padding: 3px;
   background: rgba(0, 0, 0, 0.22);

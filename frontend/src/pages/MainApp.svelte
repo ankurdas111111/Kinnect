@@ -883,6 +883,7 @@
   /* ── Page navigation row ─────────────────────────────────────────────────── */
   .page-nav-row {
     display: flex;
+    flex-shrink: 0;
     gap: 8px;
     margin-bottom: 12px;
     overflow-x: auto;
