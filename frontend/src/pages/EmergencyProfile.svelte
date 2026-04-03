@@ -231,7 +231,7 @@
   </header>
 
   <!-- ── Scrollable body ────────────────────────────────────────────────── -->
-  <main class="ep-body" role="main">
+  <main class="ep-body">
 
     <!-- Status badge -->
     <div class="ep-badge-row" aria-live="polite">

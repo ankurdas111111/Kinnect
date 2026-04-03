@@ -234,7 +234,7 @@
     // Battery via @capacitor/device (reliable) — navigator.getBattery is deprecated/removed
     if (isNativePlatform()) {
       try {
-        const { Device } = await import('@capacitor/device');
+        const { Device } = await import(/* @vite-ignore */ '@capacitor/device');
         const info = await Device.getBatteryInfo();
         if (info.batteryLevel != null) batteryPct = Math.round(info.batteryLevel * 100);
       } catch (_) {}
