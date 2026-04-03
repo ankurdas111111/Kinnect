@@ -93,6 +93,22 @@ export async function setupNotificationChannels() {
 }
 
 /**
+ * Notify a nearby (non-contact) user that someone within 5km triggered SOS.
+ * Gentler than family SOS — no alarm, just an informational notification.
+ */
+export async function notifyProximitySOS(distanceKm) {
+  if (_appActive) return;
+  const dist = distanceKm < 1
+    ? `${Math.round(distanceKm * 1000)} m`
+    : `${distanceKm.toFixed(1)} km`;
+  await schedule(
+    'Nearby SOS Alert',
+    `Someone ${dist} away has triggered an SOS. Tap to see if you can help.`,
+    { type: 'proximity_sos' }
+  );
+}
+
+/**
  * Notify that a contact triggered SOS.
  * Only fires when the app is backgrounded — in-app banner handles foreground.
  */

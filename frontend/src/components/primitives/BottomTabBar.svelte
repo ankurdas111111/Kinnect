@@ -7,7 +7,7 @@
   export let hasNotification = false;
 
   const dispatch = createEventDispatcher();
-  const tabOrder = ['track', 'people', 'share', 'safety', 'network', 'me'];
+  const tabOrder = ['track', 'people', 'share', 'safety', 'me'];
 
   function selectTab(tab) {
     dispatch('tabChange', tab);
@@ -121,24 +121,6 @@
 
   <button
     class="tab-item"
-    class:active={activeTab === 'network'}
-    on:click={() => selectTab('network')}
-    on:keydown={(e) => onTabKeydown(e, 'network')}
-    role="tab"
-    aria-selected={activeTab === 'network'}
-    tabindex={activeTab === 'network' ? 0 : -1}
-    aria-label="Network graph"
-  >
-    {#if activeTab === 'network'}
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M12 7v4M8.5 16.5 12 11M15.5 16.5 12 11" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg>
-    {:else}
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><line x1="12" y1="7" x2="12" y2="11"/><line x1="8.5" y1="16.5" x2="12" y2="11"/><line x1="15.5" y1="16.5" x2="12" y2="11"/></svg>
-    {/if}
-    <span class="tab-label">Network</span>
-  </button>
-
-  <button
-    class="tab-item"
     class:active={activeTab === 'me'}
     on:click={() => selectTab('me')}
     on:keydown={(e) => onTabKeydown(e, 'me')}
@@ -161,11 +143,14 @@
     display: flex;
     align-items: stretch;
     justify-content: space-around;
-    background: rgba(5, 5, 15, 0.88);
-    backdrop-filter: blur(28px) saturate(1.6);
-    -webkit-backdrop-filter: blur(28px) saturate(1.6);
-    border-top: 1px solid rgba(255, 255, 255, 0.07);
-    box-shadow: 0 -4px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255,255,255,0.05);
+    /* Solid surface — no backdrop-filter to prevent GPU stacking with top bar + panels */
+    background: rgba(9, 9, 20, 0.97);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: none;
+    box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    /* Island effect */
+    margin: 0 10px;
+    border-radius: 22px 22px 0 0;
     padding-bottom: var(--safe-bottom);
     z-index: var(--z-navbar);
     position: relative;
@@ -173,63 +158,98 @@
   }
 
   :global([data-theme="light"]) .bottom-tabs {
-    background: rgba(255, 255, 255, 0.90);
-    border-top-color: var(--border-default);
-    box-shadow: var(--shadow-sheet);
+    background: rgba(252, 252, 255, 0.97);
+    border-color: rgba(0, 0, 0, 0.06);
+    box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.70);
   }
 
-  /* MERIDIAN: Sliding pill indicator — solid indigo with glow */
+  /* ── Sliding pill — spring motion ──────────────────────────────────── */
   .tab-pill {
     position: absolute;
-    top: 6px;
-    width: calc(16.667% - 8px); /* 100%/6 tabs minus padding */
-    bottom: calc(6px + var(--safe-bottom, 0px));
-    background: rgba(99, 102, 241, 0.16);
-    border: 1px solid rgba(99, 102, 241, 0.30);
+    top: 7px;
+    width: calc(20% - 10px);
+    bottom: calc(7px + var(--safe-bottom, 0px));
+    background: rgba(20, 184, 166, 0.22);
+    border: 1px solid rgba(20, 184, 166, 0.40);
+    border-top-color: rgba(20, 184, 166, 0.55);
     border-radius: var(--radius-lg);
     pointer-events: none;
-    transition: left 350ms cubic-bezier(0.34, 1.56, 0.64, 1); /* spring easing */
-    box-shadow: 0 0 16px rgba(99, 102, 241, 0.20);
+    transition: left 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow:
+      0 4px 16px rgba(20, 184, 166, 0.30),
+      inset 0 1px 0 rgba(255, 255, 255, 0.12);
     z-index: 0;
   }
 
+  :global([data-theme="light"]) .tab-pill {
+    background: rgba(20, 184, 166, 0.12);
+    border-color: rgba(20, 184, 166, 0.30);
+    box-shadow:
+      0 4px 12px rgba(20, 184, 166, 0.18),
+      inset 0 1px 0 rgba(255, 255, 255, 0.30);
+  }
+
+  /* ── Tab items ──────────────────────────────────────────────────────────── */
   .tab-item {
     flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2px;
-    padding: var(--space-1-5) 0;
+    gap: 3px;
+    padding: var(--space-2) 0;
     background: none;
     border: none;
     cursor: pointer;
     color: var(--text-tertiary);
     transition:
       color var(--duration-fast) var(--ease-out),
-      transform var(--duration-fast) var(--ease-spring);
+      transform 120ms var(--ease-spring);
     position: relative;
     z-index: 1;
     min-height: var(--bottom-tab-height);
-    min-width: 48px;
+    min-width: 44px;
     -webkit-tap-highlight-color: transparent;
+    /* Display font for tab labels */
+    font-family: var(--font-display);
+  }
+
+  .tab-item:hover {
+    color: rgba(255, 255, 255, 0.65);
+  }
+
+  :global([data-theme="light"]) .tab-item:hover {
+    color: var(--text-secondary);
   }
 
   .tab-item:active {
-    transform: scale(0.90);
-    transition-duration: 80ms;
+    transform: scale(0.86);
+    transition-duration: 70ms;
   }
 
+  /* Active tab — primary color + subtle icon scale */
   .tab-item.active {
     color: var(--primary-400);
   }
 
-  .tab-label {
-    font-size: var(--text-2xs);
-    font-weight: 600;
-    letter-spacing: 0.02em;
+  :global([data-theme="light"]) .tab-item.active {
+    color: var(--primary-600);
   }
 
+  /* Icon bounce on tab activation */
+  .tab-item.active .tab-icon-wrap {
+    animation: tab-bounce 340ms var(--ease-spring) both;
+  }
+
+  /* ── Label ─────────────────────────────────────────────────────────────── */
+  .tab-label {
+    font-size: var(--text-2xs); /* 11px — legible minimum */
+    font-weight: 700;
+    letter-spacing: 0.025em;
+    line-height: 1;
+  }
+
+  /* ── Icon wrapper ──────────────────────────────────────────────────────── */
   .tab-icon-wrap {
     position: relative;
     display: inline-flex;
@@ -237,34 +257,52 @@
     justify-content: center;
   }
 
+  /* ── Tracking active state ─────────────────────────────────────────────── */
+  /* Aurora green pulse — more cinematic than simple dot pulse */
   .tracking-dot {
     position: absolute;
-    top: -2px;
-    right: -2px;
-    width: 7px;
-    height: 7px;
-    background: var(--success-500);
+    top: -3px;
+    right: -3px;
+    width: 8px;
+    height: 8px;
+    background: var(--success-400);
     border-radius: 50%;
-    border: 1.5px solid transparent;
-    animation: tracking-pulse 2s ease infinite;
+    border: 2px solid rgba(5, 5, 18, 0.92);
+    animation: aurora-pulse 2s ease-in-out infinite;
   }
 
-  .tracking-active { color: var(--success-400); }
+  :global([data-theme="light"]) .tracking-dot {
+    border-color: rgba(252, 252, 255, 0.94);
+  }
 
+  /* Tracking tab: entire tab shifts to success green */
+  .tracking-active {
+    color: var(--success-400) !important;
+  }
+
+  /* ── Notification dot ──────────────────────────────────────────────────── */
   .tab-dot {
     position: absolute;
-    top: 6px;
-    right: calc(50% - 14px);
-    width: 6px;
-    height: 6px;
+    top: 4px;
+    right: calc(50% - 15px);
+    width: 7px;
+    height: 7px;
     background: var(--danger-500);
     border-radius: 50%;
-    border: 1.5px solid transparent;
+    border: 2px solid rgba(5, 5, 18, 0.92);
+    box-shadow: 0 0 6px rgba(239, 68, 68, 0.50);
   }
 
-  @keyframes tracking-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
-    50%       { box-shadow: 0 0 0 5px rgba(16, 185, 129, 0); }
+  :global([data-theme="light"]) .tab-dot {
+    border-color: rgba(252, 252, 255, 0.94);
+  }
+
+  /* ── Keyframe ──────────────────────────────────────────────────────────── */
+  @keyframes tab-bounce {
+    0%   { transform: scale(1) translateY(0); }
+    35%  { transform: scale(1.22) translateY(-3px); }
+    65%  { transform: scale(0.94) translateY(0); }
+    100% { transform: scale(1) translateY(0); }
   }
 
   @media (min-width: 768px) {

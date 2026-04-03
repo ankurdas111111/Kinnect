@@ -141,6 +141,20 @@ func (h *Hub) StartCleanupRoutines(ctx context.Context) {
 		}
 	}()
 
+	// 10. Expire ambient status messages (every 60s)
+	go func() {
+		ticker := time.NewTicker(60 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				h.cleanupExpiredStatusMessages()
+			}
+		}
+	}()
+
 	slog.Info("Cleanup routines started")
 }
 
@@ -276,6 +290,31 @@ func (h *Hub) cleanupCheckInOverdue() {
 			}
 			h.emitToVisible(user, "checkInMissed", missedPayload)
 		}
+	})
+}
+
+// cleanupExpiredStatusMessages clears status messages whose expiry time has passed
+// and broadcasts the cleared status to visible peers.
+func (h *Hub) cleanupExpiredStatusMessages() {
+	now := time.Now().UnixMilli()
+	h.Cache.ForEachActiveUser(func(_ string, user *cache.ActiveUser) {
+		if user.StatusMessage == "" || user.StatusExpiresAt == 0 {
+			return
+		}
+		if now < user.StatusExpiresAt {
+			return
+		}
+		user.StatusMessage = ""
+		user.StatusExpiresAt = 0
+		// Best-effort DB clear
+		go func(uid string) {
+			_, _ = h.pool.DB.ExecContext(context.Background(),
+				`UPDATE users SET status_message=NULL, status_expires_at=NULL WHERE id=$1`, uid)
+		}(user.UserID)
+		// Notify visible peers
+		sanitized := h.Cache.SanitizeUser(user)
+		sanitized["online"] = true
+		h.emitToVisibleAndSelf(user, "userUpdate", sanitized)
 	})
 }
 

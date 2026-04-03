@@ -150,6 +150,10 @@ func (h *Hub) buildEventHandlers() map[string]func(*Client, json.RawMessage) {
 		"getNetworkGraph":      h.handleGetNetworkGraph,
 		"onMyWay":              h.handleOnMyWay,
 		"cancelOnMyWay":        h.handleCancelOnMyWay,
+		"setStatusMessage":     h.handleSetStatusMessage,
+		"shareRide":            h.handleShareRide,
+		"endRide":              h.handleEndRide,
+		"toggleCrowdMode":      h.handleToggleCrowdMode,
 	}
 }
 

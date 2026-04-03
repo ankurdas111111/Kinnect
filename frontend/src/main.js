@@ -2,13 +2,11 @@ import { mount } from 'svelte';
 import App from './App.svelte';
 import './global.css';
 import './styles/components.css';
+import './styles/themes.css';
 
-const saved = localStorage.getItem('theme');
-if (saved) {
-  document.documentElement.setAttribute('data-theme', saved);
-} else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-  document.documentElement.setAttribute('data-theme', 'dark');
-}
+// Always use Vaporwave
+localStorage.setItem('theme', 'vapor');
+document.documentElement.setAttribute('data-theme', 'vapor');
 
 const app = mount(App, { target: document.getElementById('app') });
 

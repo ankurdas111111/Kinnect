@@ -31,6 +31,7 @@ export default defineConfig({
       external: ['@capacitor-community/background-geolocation'],
       output: {
         manualChunks(id) {
+          if (id.includes('tesseract.js')) return 'tesseract';
           if (id.includes('maplibre-gl')) return 'maplibre';
           if (id.includes('socket.io-client')) return 'socket';
           if (id.includes('node_modules/svelte')) return 'svelte-runtime';

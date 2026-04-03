@@ -29,6 +29,11 @@ const (
 	maxLiveLinksPerUser  = 10
 )
 
+// dbWriteSem bounds the number of concurrent goroutines performing DB writes
+// spawned by position update handlers. Without this limit, a spike of 200-item
+// batches from many clients could spawn thousands of goroutines simultaneously.
+var dbWriteSem = make(chan struct{}, 64)
+
 // motionClass derives a motion class string from speed in km/h.
 // Frontend Kalman filter emits speed in km/h (browser raw m/s × 3.6).
 func motionClass(speedKmh float64) string {
@@ -59,14 +64,15 @@ func toMovementPhase(speedKmh float64) string {
 }
 
 // shouldWritePositionToDB returns true when a position update is meaningful enough to persist.
-func shouldWritePositionToDB(user *cache.ActiveUser, lat, lng, speedMs float64) bool {
+// speedKmh is the filtered speed in km/h (same unit used by motionClass).
+func shouldWritePositionToDB(user *cache.ActiveUser, lat, lng, speedKmh float64) bool {
 	if user.LastDBAt == 0 {
 		return true // first position ever
 	}
 	if shared.HaversineM(user.LastDBLat, user.LastDBLng, lat, lng) > 100 {
 		return true // moved 100m
 	}
-	if motionClass(speedMs) != user.MotionClass {
+	if motionClass(speedKmh) != user.MotionClass {
 		return true // class transition
 	}
 	if user.MotionClass != "still" &&
@@ -118,10 +124,6 @@ func (h *Hub) handlePosition(c *Client, data json.RawMessage) {
 	user.LastUpdate = now
 	user.FormattedTime = pos.FormattedTime
 	user.Accuracy = pos.Accuracy
-	if pos.Timestamp != nil {
-		// Store clientTimestamp in a field if cache.ActiveUser has it - check struct
-		// ActiveUser doesn't have ClientTimestamp; skip or add - skip for now
-	}
 	prevSpeed := user.LastSpeed
 	user.LastSpeed = pos.Speed
 	if pos.Speed > 0.8 {
@@ -217,28 +219,36 @@ func (h *Hub) handlePosition(c *Client, data json.RawMessage) {
 		mc := newClass
 		pc := prevClass
 
-		go func() {
-			bCtx := context.Background()
-			// Dual-write: position_history (transition phase)
-			h.RecordPosition(uid, lat, lng, speedPtr, accPtr)
-			// movement_events (new semantic log)
-			if evType != "" {
-				spdF := spd
-				_ = db.InsertMovementEvent(bCtx, h.pool.DB, db.MovementEventRow{
-					UserID:      uid,
-					EventType:   evType,
-					Lat:         &lat,
-					Lng:         &lng,
-					SpeedMs:     &spdF,
-					AccuracyM:   accPtr,
-					MotionClass: mc,
-					Metadata:    map[string]interface{}{"prevClass": pc},
-				})
-			}
-			// users.last_* snapshot
-			speedStr := fmt.Sprintf("%.2f", spd)
-			_ = db.UpdateUserLocation(bCtx, h.pool.DB, uid, lat, lng, speedStr, now)
-		}()
+		// Non-blocking acquire: drop the write under extreme load rather than
+		// blocking the hub's dispatch goroutine or spawning unbounded goroutines.
+		select {
+		case dbWriteSem <- struct{}{}:
+			go func() {
+				defer func() { <-dbWriteSem }()
+				bCtx := context.Background()
+				// Dual-write: position_history (transition phase)
+				h.RecordPosition(uid, lat, lng, speedPtr, accPtr)
+				// movement_events (new semantic log)
+				if evType != "" {
+					spdF := spd
+					_ = db.InsertMovementEvent(bCtx, h.pool.DB, db.MovementEventRow{
+						UserID:      uid,
+						EventType:   evType,
+						Lat:         &lat,
+						Lng:         &lng,
+						SpeedMs:     &spdF,
+						AccuracyM:   accPtr,
+						MotionClass: mc,
+						Metadata:    map[string]interface{}{"prevClass": pc},
+					})
+				}
+				// users.last_* snapshot
+				speedStr := fmt.Sprintf("%.2f", spd)
+				_ = db.UpdateUserLocation(bCtx, h.pool.DB, uid, lat, lng, speedStr, now)
+			}()
+		default:
+			slog.Warn("dbWriteSem full, skipping position DB write", "userId", uid)
+		}
 	}
 
 	// ── Activity context (derived from motion class + arrival state) ─────────
@@ -258,6 +268,7 @@ func (h *Hub) handlePosition(c *Client, data json.RawMessage) {
 	}
 
 	h.runAutoRules(user)
+	h.checkCrowdMode(user)
 }
 
 // handlePositionBatch handles batched position updates.
@@ -327,7 +338,15 @@ func (h *Hub) handlePositionBatch(c *Client, data json.RawMessage) {
 		}
 		uid := user.UserID
 		lat, lng := pos.Latitude, pos.Longitude
-		go h.RecordPosition(uid, lat, lng, speedPtr, accPtr)
+		select {
+		case dbWriteSem <- struct{}{}:
+			go func(u string, la, ln float64, sp, ap *float64) {
+				defer func() { <-dbWriteSem }()
+				h.RecordPosition(u, la, ln, sp, ap)
+			}(uid, lat, lng, speedPtr, accPtr)
+		default:
+			// semaphore full — skip this historical position write
+		}
 	}
 
 	// Safety score on final position
@@ -567,6 +586,15 @@ func (h *Hub) handleCreateRoom(c *Client, data json.RawMessage) {
 	roomDbID, err := db.CreateRoom(context.Background(), h.pool.DB, code, roomName, user.UserID, createdAt)
 	if err != nil {
 		slog.Error("Failed to create room", "error", err)
+		c.Send("roomError", map[string]interface{}{"message": "Failed to create room"})
+		return
+	}
+
+	// Persist creator as admin member — must match cache.AddRoom which sets Members[createdBy]=admin.
+	// Without this, the room_members table has no rows and the room appears empty after a restart.
+	if err := db.AddRoomMember(context.Background(), h.pool.DB, roomDbID, user.UserID, "admin"); err != nil {
+		slog.Error("Failed to add room creator as member", "error", err)
+		_ = db.DeleteRoom(context.Background(), h.pool.DB, roomDbID)
 		c.Send("roomError", map[string]interface{}{"message": "Failed to create room"})
 		return
 	}
@@ -1660,7 +1688,7 @@ func computeActivityContext(userID, mClass string) string {
 	case "run":
 		return "Running"
 	case "vehicle":
-		return "Driving"
+		return "In Transit"
 	default:
 		return ""
 	}
@@ -1726,4 +1754,273 @@ func (h *Hub) handleCancelOnMyWay(c *Client, _ json.RawMessage) {
 		return
 	}
 	h.emitToVisible(user, "onMyWayCancel", map[string]interface{}{"userId": user.UserID})
+}
+
+// handleShareRide starts a ride-share session: creates a 4-hour live link and
+// marks the user as actively sharing a ride with optional vehicle/destination info.
+func (h *Hub) handleShareRide(c *Client, data json.RawMessage) {
+	if !c.CheckRateLimit("shareRide", 5) {
+		return
+	}
+	user := h.Cache.GetActiveUser(c.ID())
+	if user == nil {
+		return
+	}
+	// If already sharing a ride, silently revoke the old token first
+	if user.RideShareActive && user.RideShareToken != "" {
+		h.revokeLiveTokenByToken(user, user.RideShareToken)
+	}
+
+	m := toMap(data)
+	vehicle, dest := "", ""
+	if m != nil {
+		if v, ok := m["vehicle"].(string); ok {
+			vehicle = shared.SanitizeString(v, 15)
+		}
+		if v, ok := m["dest"].(string); ok {
+			dest = shared.SanitizeString(v, 30)
+		}
+	}
+
+	// Create a 4-hour live link
+	if h.Cache.GetLiveTokenCount(user.UserID) >= maxLiveLinksPerUser {
+		c.Send("rideShareError", map[string]interface{}{"message": "Live link limit reached"})
+		return
+	}
+	fourHoursMs := int64(4 * 60 * 60 * 1000)
+	expiresAt := time.Now().UnixMilli() + fourHoursMs
+	expiresAtPtr := &expiresAt
+	token := generateLiveToken()
+	createdAt := time.Now().UnixMilli()
+
+	if err := db.CreateLiveToken(context.Background(), h.pool.DB, token, user.UserID, expiresAtPtr, createdAt); err != nil {
+		slog.Error("handleShareRide: failed to create live token", "error", err)
+		c.Send("rideShareError", map[string]interface{}{"message": "Failed to create ride link"})
+		return
+	}
+
+	h.Cache.AddLiveToken(token, user.UserID, expiresAtPtr, createdAt)
+
+	user.RideShareActive = true
+	user.RideShareVehicle = vehicle
+	user.RideShareDest = dest
+	user.RideShareToken = token
+
+	// Tell the initiating client the token (for URL construction + WhatsApp share)
+	c.Send("rideShareStarted", map[string]interface{}{
+		"token":   token,
+		"vehicle": vehicle,
+		"dest":    dest,
+	})
+
+	// Broadcast updated state to visible peers via userUpdate
+	sanitized := h.Cache.SanitizeUser(user)
+	sanitized["online"] = true
+	h.emitToVisibleAndSelf(user, "userUpdate", sanitized)
+}
+
+// handleEndRide ends a ride-share session, revoking the live link.
+func (h *Hub) handleEndRide(c *Client, _ json.RawMessage) {
+	if !c.CheckRateLimit("endRide", 10) {
+		return
+	}
+	user := h.Cache.GetActiveUser(c.ID())
+	if user == nil || !user.RideShareActive {
+		return
+	}
+
+	token := user.RideShareToken
+	user.RideShareActive = false
+	user.RideShareVehicle = ""
+	user.RideShareDest = ""
+	user.RideShareToken = ""
+
+	if token != "" {
+		h.revokeLiveTokenByToken(user, token)
+	}
+
+	// Broadcast cleared state
+	sanitized := h.Cache.SanitizeUser(user)
+	sanitized["online"] = true
+	h.emitToVisibleAndSelf(user, "userUpdate", sanitized)
+}
+
+// revokeLiveTokenByToken is a shared helper for revoking a specific live token.
+// Callers are responsible for re-emitting myLiveLinks if needed.
+func (h *Hub) revokeLiveTokenByToken(user *cache.ActiveUser, token string) {
+	entry := h.Cache.GetLiveToken(token)
+	if entry == nil || entry.UserID != user.UserID {
+		return
+	}
+	h.SendToGroup("live:"+token, "liveExpired", map[string]interface{}{"message": "Ride ended"})
+	h.Cache.DeleteLiveToken(token)
+	go func() {
+		if _, err := h.pool.DB.ExecContext(context.Background(),
+			`DELETE FROM live_tokens WHERE token=$1`, token); err != nil {
+			slog.Warn("revokeLiveTokenByToken: failed to delete live token from DB", "error", err)
+		}
+	}()
+}
+
+// handleSetStatusMessage sets or clears the user's ambient status message.
+// Max 60 chars; empty string clears. Expiry in minutes: 0 = no expiry, else auto-clear.
+func (h *Hub) handleSetStatusMessage(c *Client, data json.RawMessage) {
+	if !c.CheckRateLimit("setStatusMessage", 10) {
+		return
+	}
+	user := h.Cache.GetActiveUser(c.ID())
+	if user == nil {
+		return
+	}
+	m := toMap(data)
+	if m == nil {
+		return
+	}
+
+	msg, _ := m["message"].(string)
+	msg = shared.SanitizeString(msg, 60)
+
+	var expiresAt int64
+	if expMin, ok := m["expiryMinutes"].(float64); ok && expMin > 0 {
+		expiresAt = time.Now().Add(time.Duration(expMin) * time.Minute).UnixMilli()
+	}
+
+	user.StatusMessage = msg
+	user.StatusExpiresAt = expiresAt
+
+	// Persist to DB (best-effort, consistent with quiet hours pattern)
+	go func() {
+		var expiresVal interface{}
+		if expiresAt > 0 {
+			expiresVal = expiresAt
+		}
+		var msgVal interface{}
+		if msg != "" {
+			msgVal = msg
+		}
+		_, err := h.pool.DB.ExecContext(context.Background(),
+			`UPDATE users SET status_message=$1, status_expires_at=$2 WHERE id=$3`,
+			msgVal, expiresVal, user.UserID)
+		if err != nil {
+			slog.Warn("Failed to persist status message", "error", err)
+		}
+	}()
+
+	// Broadcast the updated user to all visible peers
+	sanitized := h.Cache.SanitizeUser(user)
+	sanitized["online"] = true
+	h.emitToVisibleAndSelf(user, "userUpdate", sanitized)
+}
+
+// handleToggleCrowdMode enables or disables Festival / Crowd-Stay-Together mode for the caller.
+// When active the server checks on each position update if any crowd-mode peers have
+// drifted more than radiusM metres from the group centre and emits crowdAlert to them.
+func (h *Hub) handleToggleCrowdMode(c *Client, data json.RawMessage) {
+	if !c.CheckRateLimit("toggleCrowdMode", 10) {
+		return
+	}
+	user := h.Cache.GetActiveUser(c.ID())
+	if user == nil {
+		return
+	}
+	m := toMap(data)
+	if m == nil {
+		return
+	}
+	enabled, _ := m["enabled"].(bool)
+	radiusM := 200
+	if r, ok := m["radiusM"].(float64); ok && r > 0 {
+		if r > 5000 {
+			r = 5000 // max 5 km
+		}
+		radiusM = int(r)
+	}
+
+	user.CrowdModeActive = enabled
+	user.CrowdModeRadiusM = radiusM
+	if enabled && user.CrowdAlertSentAt == nil {
+		user.CrowdAlertSentAt = make(map[string]int64)
+	}
+
+	sanitized := h.Cache.SanitizeUser(user)
+	sanitized["online"] = true
+	h.emitToVisibleAndSelf(user, "userUpdate", sanitized)
+}
+
+// checkCrowdMode runs after each position update for a user who has CrowdModeActive.
+// Computes the centre of all crowd-mode-enabled visible users (including the mover),
+// then alerts any peer whose distance from that centre exceeds their radiusM threshold.
+// Alerts are rate-limited to once per 30 s per user pair.
+func (h *Hub) checkCrowdMode(mover *cache.ActiveUser) {
+	if !mover.CrowdModeActive || mover.Latitude == nil || mover.Longitude == nil {
+		return
+	}
+
+	// Collect crowd-mode peers visible to the mover who also have a known position.
+	visibleUIDs := h.Cache.GetVisibleSet(mover.UserID)
+	type crowdPeer struct {
+		user *cache.ActiveUser
+		lat  float64
+		lng  float64
+	}
+	peers := make([]crowdPeer, 0, 4)
+	// Always include self
+	peers = append(peers, crowdPeer{user: mover, lat: *mover.Latitude, lng: *mover.Longitude})
+	for uid := range visibleUIDs {
+		sid := h.Cache.GetUserIdToSocketId(uid)
+		if sid == "" {
+			continue
+		}
+		u := h.Cache.GetActiveUser(sid)
+		if u == nil || !u.CrowdModeActive || u.Latitude == nil || u.Longitude == nil {
+			continue
+		}
+		peers = append(peers, crowdPeer{user: u, lat: *u.Latitude, lng: *u.Longitude})
+	}
+	if len(peers) < 2 {
+		return // nothing to compare against
+	}
+
+	// Compute group centre (simple average lat/lng — fine for radii < 10 km)
+	var sumLat, sumLng float64
+	for _, p := range peers {
+		sumLat += p.lat
+		sumLng += p.lng
+	}
+	n := float64(len(peers))
+	cLat := sumLat / n
+	cLng := sumLng / n
+
+	now := time.Now().UnixMilli()
+	const alertCooldownMs = 30_000
+
+	// Alert any peer who is farther than their radiusM from the group centre.
+	for _, p := range peers {
+		if p.user.UserID == mover.UserID {
+			continue // don't alert ourselves
+		}
+		radius := float64(p.user.CrowdModeRadiusM)
+		if radius <= 0 {
+			radius = 200
+		}
+		dist := shared.HaversineM(cLat, cLng, p.lat, p.lng)
+		if dist <= radius {
+			continue
+		}
+		// Rate-limit: skip if we already alerted this peer recently
+		if mover.CrowdAlertSentAt == nil {
+			mover.CrowdAlertSentAt = make(map[string]int64)
+		}
+		if now-mover.CrowdAlertSentAt[p.user.UserID] < alertCooldownMs {
+			continue
+		}
+		mover.CrowdAlertSentAt[p.user.UserID] = now
+
+		distM := int(math.Round(dist))
+		h.SendToClient(p.user.SocketID, "crowdAlert", map[string]interface{}{
+			"fromName":    mover.DisplayName,
+			"distanceM":   distM,
+			"groupSizePeople": len(peers),
+		})
+	}
 }

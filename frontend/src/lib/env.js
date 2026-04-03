@@ -25,3 +25,12 @@ if (import.meta.env.DEV && rawApiBase && !API_BASE) {
 }
 
 export default API_BASE;
+
+/**
+ * Origin for shareable URLs (QR codes, live links, WhatsApp shares).
+ * On Capacitor builds, window.location.origin is "https://localhost"
+ * which is useless — use the configured VITE_API_URL instead.
+ */
+export function getShareOrigin() {
+  return API_BASE || window.location.origin;
+}

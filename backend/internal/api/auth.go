@@ -19,13 +19,15 @@ import (
 )
 
 var (
-	emailRegex  = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
-	mobileRegex = regexp.MustCompile(`^\+\d{7,15}$`)
+	emailRegex       = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
+	mobileRegex      = regexp.MustCompile(`^\+\d{7,15}$`)
+	mobileSanitizeRe = regexp.MustCompile(`[\s\-()]`) // compiled once, not per-request
 )
 
 const (
 	sessionMaxAge    = 7 * 24 * time.Hour
 	authRateLimit    = 10 // max attempts per IP per minute
+	minPasswordBytes = 6
 	maxPasswordBytes = 72 // bcrypt silently truncates at 72 bytes
 )
 
@@ -38,12 +40,53 @@ type ipRateEntry struct {
 
 var authIPLimiter sync.Map // map[string]*ipRateEntry
 
-// checkAuthRateLimit returns false if the IP has exceeded authRateLimit attempts per minute.
-func checkAuthRateLimit(r *http.Request) bool {
+func init() {
+	// Periodically purge expired entries from authIPLimiter to prevent unbounded
+	// memory growth under sustained attack traffic (IPs that attack once and disappear
+	// leave permanent allocations otherwise).
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			now := time.Now()
+			authIPLimiter.Range(func(k, v any) bool {
+				e := v.(*ipRateEntry)
+				e.mu.Lock()
+				expired := now.After(e.resetAt.Add(time.Minute))
+				e.mu.Unlock()
+				if expired {
+					authIPLimiter.Delete(k)
+				}
+				return true
+			})
+		}
+	}()
+}
+
+// clientIP extracts the real client IP, preferring X-Real-IP / X-Forwarded-For
+// (set by a reverse proxy) over r.RemoteAddr. Without this, all requests through
+// a proxy share the same rate-limit bucket.
+func clientIP(r *http.Request) string {
+	if ip := strings.TrimSpace(r.Header.Get("X-Real-IP")); ip != "" {
+		return ip
+	}
+	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
+		// X-Forwarded-For may be "client, proxy1, proxy2" — leftmost is the client.
+		if idx := strings.IndexByte(fwd, ','); idx >= 0 {
+			return strings.TrimSpace(fwd[:idx])
+		}
+		return strings.TrimSpace(fwd)
+	}
 	ip := r.RemoteAddr
 	if i := strings.LastIndex(ip, ":"); i >= 0 {
-		ip = ip[:i]
+		return ip[:i]
 	}
+	return ip
+}
+
+// checkAuthRateLimit returns false if the IP has exceeded authRateLimit attempts per minute.
+func checkAuthRateLimit(r *http.Request) bool {
+	ip := clientIP(r)
 	now := time.Now()
 	v, _ := authIPLimiter.LoadOrStore(ip, &ipRateEntry{resetAt: now.Add(time.Minute)})
 	entry := v.(*ipRateEntry)
@@ -100,7 +143,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	var userID string
 	if loginMethod == "mobile" {
-		cleaned := regexp.MustCompile(`[\s\-()]`).ReplaceAllString(loginID, "")
+		cleaned := mobileSanitizeRe.ReplaceAllString(loginID, "")
 		if !mobileRegex.MatchString(cleaned) {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "Invalid mobile number format"})
 			return
@@ -195,7 +238,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "Password is required"})
 		return
 	}
-	if len(password) < 6 {
+	if len(password) < minPasswordBytes {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "Password must be at least 6 characters"})
 		return
 	}
@@ -236,7 +279,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		}
 		email = &contactValue
 	} else {
-		contactValue = regexp.MustCompile(`[\s\-()]`).ReplaceAllString(contactValue, "")
+		contactValue = mobileSanitizeRe.ReplaceAllString(contactValue, "")
 		if !mobileRegex.MatchString(contactValue) {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "Invalid mobile number format (must include country code)"})
 			return
@@ -288,6 +331,8 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := h.store.Create(sid, sessData, sessionMaxAge); err != nil {
 		slog.Error("Session create failed", "error", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "Server error"})
+		return
 	}
 	signed := auth.SignCookie(sid, h.secret)
 	setSessionCookie(w, signed, int(sessionMaxAge.Seconds()), h.secure)

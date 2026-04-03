@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { push } from 'svelte-spa-router';
   import { authUser } from '../lib/stores/auth.js';
-  import { socket, setupSocketHandlers } from '../lib/socket.js';
+  import { socket, setupSocketHandlers, cancelReconnectBanner } from '../lib/socket.js';
   import { banner, mySosActive } from '../lib/stores/sos.js';
   import { pendingIncomingRequests } from '../lib/stores/guardians.js';
   import { otherUsers, mySocketId, myLocation, tracking, focusUser } from '../lib/stores/map.js';
@@ -26,8 +26,9 @@
   import MobileTopBar from '../components/primitives/MobileTopBar.svelte';
   import TrackingNowCard from '../components/primitives/TrackingNowCard.svelte';
   import OnboardingOverlay from '../components/OnboardingOverlay.svelte';
-  import NetworkPanel from '../components/NetworkPanel.svelte';
   import PulseButton from '../components/primitives/PulseButton.svelte';
+  import SosFloat from '../components/SosFloat.svelte';
+  import HubSpotlight from '../components/HubSpotlight.svelte';
   import { calculateDistance } from '../lib/tracking.js';
   import { GPSKalmanFilter, VelocityKalmanFilter } from '../lib/kalman.js';
   import { startMotionSensor, stopMotionSensor, getMotionState } from '../lib/motionSensor.js';
@@ -47,7 +48,63 @@
   let sidebarCollapsed = false;
   let sosConfirmOpen = false;
   let batteryPromptOpen = false;
-  let isMobile = false;
+
+  /**
+   * Detect Android device manufacturer from the WebView UA string.
+   * Returns one of: 'miui' | 'coloros' | 'funtouch' | 'samsung' | 'generic'
+   */
+  function detectAndroidManufacturer() {
+    const ua = (typeof navigator !== 'undefined' ? navigator.userAgent : '').toLowerCase();
+    if (ua.includes('xiaomi') || ua.includes('redmi') || ua.includes('miui')) return 'miui';
+    if (ua.includes('oppo') || ua.includes('realme')) return 'coloros';
+    if (ua.includes('vivo')) return 'funtouch';
+    if (ua.includes('samsung')) return 'samsung';
+    return 'generic';
+  }
+
+  const batteryManufacturer = detectAndroidManufacturer();
+
+  const BATTERY_INSTRUCTIONS = {
+    miui: {
+      brand: 'Xiaomi / Redmi',
+      steps: [
+        'Open Settings → Apps',
+        'Find and tap Kinnect',
+        'Tap Battery Saver',
+        'Select "No restrictions"',
+      ],
+    },
+    coloros: {
+      brand: 'Oppo / Realme',
+      steps: [
+        'Open Settings → App Management',
+        'Find and tap Kinnect',
+        'Tap Battery',
+        'Enable "Allow background activity"',
+      ],
+    },
+    funtouch: {
+      brand: 'Vivo',
+      steps: [
+        'Open Settings → Battery',
+        'Tap "Background power consumption"',
+        'Find Kinnect → set to "Unrestricted"',
+      ],
+    },
+    samsung: {
+      brand: 'Samsung',
+      steps: [
+        'Open Settings → Apps → Kinnect',
+        'Tap Battery → select "Unrestricted"',
+        'Then tap "Allow background activity"',
+      ],
+    },
+    generic: {
+      brand: null,
+      steps: null,
+    },
+  };
+  let isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
   let mobileTab = 'track';
   let sheetOpen = false;
   let followMode = false;
@@ -63,6 +120,19 @@
   let _wakeLock = null;
   const gpsFilter = new GPSKalmanFilter({ Q: 3, R: 10 });
   const speedFilter = new VelocityKalmanFilter({ Q: 2, R: 25 });
+
+  // Reads the emergency profile from localStorage and returns a sanitised snapshot.
+  // Called at SOS trigger time so the data is always fresh.
+  function getMedicalSnapshot() {
+    try {
+      const raw = localStorage.getItem('kinnect_emergency_profile');
+      if (!raw) return null;
+      const p = JSON.parse(raw);
+      const hasData = p.bloodType || p.allergies || p.medications || p.emergencyName ||
+                      p.emergencyContacts?.length || p.conditions;
+      return hasData ? p : null;
+    } catch { return null; }
+  }
 
   $: if (!$authUser) push('/login');
   $: isAdmin = $authUser && $authUser.role === 'admin';
@@ -447,7 +517,9 @@
         listeners.push(App.addListener('appStateChange', ({ isActive }) => {
           setAppActive(isActive); // tells nativeNotifications whether to fire or skip
           if (isActive) {
-            // Resumed from background — reconnect socket, warm up GPS, re-acquire wake lock
+            // Resumed from background — cancel any pending "Reconnecting…" banner before
+            // reconnecting so normal background/foreground cycles are always silent.
+            cancelReconnectBanner();
             if (!socket.connected) socket.connect();
             if ($tracking) {
               warmUp();
@@ -552,7 +624,7 @@
   <svelte:fragment slot="bottomSheet">
     <BottomSheet
       open={sheetOpen}
-      title={mobileTab === 'track' ? 'Track' : mobileTab === 'people' ? 'People' : mobileTab === 'share' ? 'Share' : mobileTab === 'safety' ? 'Safety' : mobileTab === 'network' ? 'Network' : 'Me'}
+      title={mobileTab === 'track' ? 'Track' : mobileTab === 'people' ? 'People' : mobileTab === 'share' ? 'Share' : mobileTab === 'safety' ? 'Safety' : 'Me'}
       on:close={() => {
         setSheetOpen(false);
       }}
@@ -568,6 +640,28 @@
           on:toggleFollow={() => (followMode = !followMode)}
         />
       {:else if mobileTab === 'me'}
+        <div class="page-nav-row" role="list">
+          <button class="page-nav-btn" role="listitem" on:click={() => push('/dashboard')}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            Dashboard
+          </button>
+          <button class="page-nav-btn" role="listitem" on:click={() => push('/activity')}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            Activity
+          </button>
+          <button class="page-nav-btn" role="listitem" on:click={() => push('/emergency')}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            Emergency
+          </button>
+          <button class="page-nav-btn" role="listitem" on:click={() => push('/checkins')}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            Check-ins
+          </button>
+          <button class="page-nav-btn" role="listitem" on:click={() => push('/replay')}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
+            Route History
+          </button>
+        </div>
         <div class="spatial-subtabs">
           <button class="spatial-subtab" class:active={meSubTab === 'info'} on:click={() => meSubTab = 'info'}>Info</button>
           <button class="spatial-subtab" class:active={meSubTab === 'places'} on:click={() => meSubTab = 'places'}>Places</button>
@@ -594,9 +688,17 @@
           </button>
           <button class="btn btn-secondary" on:click={() => socket.emit('checkInAck')}>I'm OK</button>
         </div>
+        <div class="page-nav-row" role="list">
+          <button class="page-nav-btn" role="listitem" on:click={() => push('/emergency')}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            Emergency Profile
+          </button>
+          <button class="page-nav-btn" role="listitem" on:click={() => push('/checkins')}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            Check-in Schedule
+          </button>
+        </div>
         <AdminPanel embedded={true} />
-      {:else if mobileTab === 'network'}
-        <NetworkPanel embedded={true} />
       {:else if mobileTab === 'people'}
         <UsersList embedded={true} />
       {/if}
@@ -615,6 +717,12 @@
 
   <svelte:fragment slot="overlay">
     <AlertOverlay />
+
+    <!-- Persistent emergency float card — appears above SOS FAB when a network member has active SOS + medical data -->
+    <SosFloat />
+
+    <!-- First-run Hub discovery coach mark (desktop only, shows once) -->
+    <HubSpotlight />
 
     <!-- SOS FAB — always visible bottom-left -->
     <button
@@ -658,7 +766,7 @@
           <p class="sos-confirm-desc">Everyone in your network will be alerted immediately. Your live location will be broadcast to all contacts.</p>
           <div class="sos-confirm-actions">
             <button class="btn btn-ghost sos-cancel-btn" on:click={() => sosConfirmOpen = false}>Not now</button>
-            <button class="btn btn-danger sos-send-btn" on:click={() => { haptics.sos(); socket.emit('triggerSOS', { reason: 'SOS' }); sosConfirmOpen = false; }}>Send SOS</button>
+            <button class="btn btn-danger sos-send-btn" on:click={() => { haptics.sos(); socket.emit('triggerSOS', { reason: 'SOS', medicalCard: getMedicalSnapshot() }); sosConfirmOpen = false; }}>Send SOS</button>
           </div>
         </div>
       </div>
@@ -672,13 +780,23 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><rect x="2" y="7" width="16" height="10" rx="2"/><path d="M22 11v2"/><path d="M6 11v2"/><path d="M10 11v2"/></svg>
           </div>
           <h3 class="battery-prompt-title">Allow Background Access</h3>
-          <p class="battery-prompt-desc">For Kinnect to share your location when the screen is off or the app is minimized, allow it to run unrestricted in the background.</p>
+          {#if BATTERY_INSTRUCTIONS[batteryManufacturer].steps}
+            {@const info = BATTERY_INSTRUCTIONS[batteryManufacturer]}
+            <p class="battery-prompt-brand">{info.brand} detected</p>
+            <ol class="battery-steps-list">
+              {#each info.steps as step}
+                <li>{step}</li>
+              {/each}
+            </ol>
+          {:else}
+            <p class="battery-prompt-desc">For Kinnect to share your location when the screen is off or the app is minimized, allow it to run unrestricted in the background.</p>
+          {/if}
           <div class="battery-prompt-actions">
             <button class="btn battery-skip-btn" on:click={() => batteryPromptOpen = false}>Not now</button>
             <button class="btn battery-allow-btn" on:click={async () => {
               await requestIgnoreBatteryOptimizations();
               batteryPromptOpen = false;
-            }}>Allow Background Access</button>
+            }}>Open Battery Settings</button>
           </div>
         </div>
       </div>
@@ -700,6 +818,47 @@
 <style>
   /* spatial-subtabs styles are in global.css */
 
+  /* ── Page navigation row ─────────────────────────────────────────────────── */
+  .page-nav-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
+  .page-nav-row::-webkit-scrollbar { display: none; }
+
+  .page-nav-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border-radius: var(--radius-lg);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    color: var(--text-secondary);
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), transform 120ms var(--ease-spring);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .page-nav-btn:hover {
+    background: rgba(99, 102, 241, 0.14);
+    border-color: rgba(99, 102, 241, 0.30);
+    color: var(--primary-300);
+  }
+  .page-nav-btn:active {
+    transform: scale(0.93);
+    transition-duration: 70ms;
+  }
+
   .safety-quick-actions {
     display: flex;
     gap: 8px;
@@ -711,7 +870,7 @@
     min-height: 44px;
   }
 
-  /* ── SOS FAB ──────────────────────────────────────────────────────────── */
+  /* ── SOS FAB — 3D physical button ─────────────────────────────────────── */
   .sos-fab {
     position: fixed;
     bottom: var(--space-4);
@@ -719,23 +878,41 @@
     width: 52px;
     height: 52px;
     border-radius: 50%;
-    background: #dc2626;
+    background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
     color: white;
-    border: 3px solid rgba(255,255,255,0.9);
+    border: 3px solid rgba(255,255,255,0.85);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 12px rgba(220, 38, 38, 0.45), 0 0 0 0 rgba(220, 38, 38, 0);
+    /* 3D raised emergency button */
+    box-shadow:
+      0 6px 20px rgba(220, 38, 38, 0.50),
+      0 2px 6px rgba(220, 38, 38, 0.35),
+      inset 0 2px 4px rgba(255, 255, 255, 0.20),
+      inset 0 -3px 6px rgba(0, 0, 0, 0.20);
     z-index: calc(var(--z-panel, 100) + 2);
-    transition: transform 0.15s ease, box-shadow 0.3s ease, background 0.2s ease;
+    transform-style: preserve-3d;
+    transition:
+      transform var(--duration-3d) var(--ease-3d-spring),
+      box-shadow var(--duration-3d) var(--ease-3d-out),
+      background 0.2s ease;
+    isolation: isolate;
   }
   .sos-fab:hover {
-    transform: scale(1.06);
-    box-shadow: 0 4px 20px rgba(220, 38, 38, 0.55), 0 0 0 4px rgba(220, 38, 38, 0.15);
+    transform: perspective(600px) translateY(-3px) translateZ(6px) scale(1.08);
+    box-shadow:
+      0 10px 32px rgba(220, 38, 38, 0.60),
+      0 4px 10px rgba(220, 38, 38, 0.40),
+      0 0 0 4px rgba(220, 38, 38, 0.15),
+      inset 0 2px 4px rgba(255, 255, 255, 0.22),
+      inset 0 -3px 6px rgba(0, 0, 0, 0.18);
   }
   .sos-fab:active {
-    transform: scale(0.94);
+    transform: perspective(600px) translateZ(-6px) scale(0.92);
+    box-shadow:
+      0 1px 6px rgba(220, 38, 38, 0.40),
+      inset 0 3px 8px rgba(0, 0, 0, 0.25);
   }
   .sos-fab .sos-text {
     font-size: 14px;
@@ -745,12 +922,25 @@
   }
   .sos-fab.active {
     background: #991b1b;
-    animation: sos-ring 1.2s ease infinite;
+  }
+  /* Ripple ring via pseudo-element — uses transform+opacity (composited, no paint) */
+  .sos-fab::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: rgba(239, 68, 68, 0.5);
+    transform: scale(1);
+    opacity: 0;
+    pointer-events: none;
+    will-change: transform, opacity;
+  }
+  .sos-fab.active::after {
+    animation: sos-ring 1.2s ease-out infinite;
   }
   @keyframes sos-ring {
-    0% { box-shadow: 0 2px 12px rgba(220, 38, 38, 0.45), 0 0 0 0 rgba(239, 68, 68, 0.5); }
-    70% { box-shadow: 0 2px 12px rgba(220, 38, 38, 0.45), 0 0 0 14px rgba(239, 68, 68, 0); }
-    100% { box-shadow: 0 2px 12px rgba(220, 38, 38, 0.45), 0 0 0 0 rgba(239, 68, 68, 0); }
+    0%   { transform: scale(1);   opacity: 0.6; }
+    100% { transform: scale(1.9); opacity: 0; }
   }
 
   @media (max-width: 767px) {
@@ -892,6 +1082,25 @@
     color: rgba(255, 255, 255, 0.60);
     line-height: 1.55;
     margin: 0 0 24px;
+  }
+  .battery-prompt-brand {
+    font-size: 11px;
+    font-weight: 700;
+    color: #f59e0b;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 0 0 10px;
+  }
+  .battery-steps-list {
+    text-align: left;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.75);
+    line-height: 1.6;
+    margin: 0 0 24px;
+    padding-left: 20px;
+  }
+  .battery-steps-list li {
+    margin-bottom: 4px;
   }
   .battery-prompt-actions {
     display: flex;

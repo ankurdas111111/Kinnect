@@ -359,6 +359,7 @@
 
 {#if embedded}
   <div class="panel-body settings-panel">
+    <hr class="divider" />
     <h4 class="section-title-bold">Profile</h4>
     <div class="form-section">
       <label class="field-label">
@@ -631,6 +632,57 @@
   .delete-actions {
     display: flex;
     gap: 8px;
+  }
+
+  /* ── Appearance / theme selector ──────────────────────────────────── */
+  .theme-current-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
+    background: var(--surface-1);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    transition: background var(--duration-fast) var(--ease-out),
+                border-color var(--duration-fast) var(--ease-out),
+                transform 120ms var(--ease-spring);
+    color: var(--text-primary);
+    text-align: left;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .theme-current-btn:hover {
+    background: var(--surface-2);
+    border-color: var(--border-strong);
+  }
+  .theme-current-btn:active { transform: scale(0.98); }
+
+  .theme-swatch-dot {
+    width: 20px;
+    height: 20px;
+    border-radius: var(--radius-full);
+    background: var(--th-accent, var(--primary-500));
+    box-shadow: 0 0 10px color-mix(in srgb, var(--th-accent, var(--primary-500)) 60%, transparent);
+    flex-shrink: 0;
+    transition: background 300ms var(--ease-out), box-shadow 300ms var(--ease-out);
+  }
+
+  .theme-btn-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .theme-btn-name {
+    font-family: var(--font-display);
+    font-size: var(--text-sm);
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+  .theme-btn-desc {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
   }
 
   .divider {

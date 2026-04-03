@@ -4,18 +4,40 @@
   import { authUser } from '../lib/stores/auth.js';
   import { myShareCode, myContactInfo } from '../lib/stores/rooms.js';
   import { socket } from '../lib/socket.js';
-  import { banner, mySosActive } from '../lib/stores/sos.js';
+  import { banner, mySosActive, myLiveLinks } from '../lib/stores/sos.js';
   import { myGuardianData, pendingIncomingRequests } from '../lib/stores/guardians.js';
   import { formatCoordinate } from '../lib/tracking.js';
+  import { getShareOrigin } from '../lib/env.js';
   import { trackingMetrics } from '../lib/stores/metrics.js';
   import { latencyMetrics } from '../lib/stores/latency.js';
   import CopyButton from './primitives/CopyButton.svelte';
+  import ShareMyRide from './ShareMyRide.svelte';
+  import { rideShare } from '../lib/stores/rideShare.js';
+  import { crowdMode } from '../lib/stores/crowdMode.js';
 
   export let embedded = false;
   let statsOpen = false;
   let debugTaps = 0;
+  let showQr = false;
+  let rideShareOpen = false;
+
+  function toggleCrowdMode() {
+    const next = !$crowdMode.active;
+    crowdMode.update(s => ({ ...s, active: next }));
+    socket.emit('toggleCrowdMode', { enabled: next, radiusM: $crowdMode.radiusM });
+  }
 
   const dispatch = createEventDispatcher();
+
+  function getMedicalSnapshot() {
+    try {
+      const raw = localStorage.getItem('kinnect_emergency_profile');
+      if (!raw) return null;
+      const p = JSON.parse(raw);
+      const hasData = p.bloodType || p.allergies || p.medications || p.emergencyName;
+      return hasData ? p : null;
+    } catch { return null; }
+  }
 
   function toggleSOS() {
     if (!socket.connected) {
@@ -23,7 +45,7 @@
       setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 3000);
       return;
     }
-    if (!$mySosActive) socket.emit('triggerSOS', { reason: 'SOS' });
+    if (!$mySosActive) socket.emit('triggerSOS', { reason: 'SOS', medicalCard: getMedicalSnapshot() });
     else socket.emit('cancelSOS');
   }
 
@@ -33,10 +55,46 @@
     setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 2000);
   }
 
+  let onMyWayActive = false;
+
+  // Ambient status message
+  let statusDraft = '';
+  let statusExpiry = '60'; // minutes; '0' = no expiry
+
+  function saveStatusMessage() {
+    socket.emit('setStatusMessage', {
+      message: statusDraft.trim(),
+      expiryMinutes: statusExpiry === '0' ? 0 : parseInt(statusExpiry, 10),
+    });
+    banner.set({ type: 'info', text: statusDraft.trim() ? 'Status set.' : 'Status cleared.', actions: [] });
+    setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 1500);
+  }
+
+  function clearStatusMessage() {
+    statusDraft = '';
+    socket.emit('setStatusMessage', { message: '', expiryMinutes: 0 });
+  }
+
   function onMyWay() {
     socket.emit('onMyWay', {});
+    onMyWayActive = true;
+
+    // Build WhatsApp share message — include live link URL if one exists
+    const links = $myLiveLinks;
+    let waText = "I'm on my way! 🚀";
+    if (links && links.length > 0) {
+      const liveUrl = getShareOrigin() + '/#/live/' + links[0].token;
+      waText += ` Track me live: ${liveUrl}`;
+    }
+    window.open('https://wa.me/?text=' + encodeURIComponent(waText), '_blank', 'noopener');
+
     banner.set({ type: 'info', text: 'On My Way broadcast sent.', actions: [] });
     setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 2000);
+  }
+
+  function cancelOnMyWay() {
+    socket.emit('cancelOnMyWay');
+    onMyWayActive = false;
   }
 
   function attest() {
@@ -111,30 +169,25 @@
     <!-- ── GPS LIVE STATUS ──────────────────────────────────────────── -->
     {#if $myLocation}
       <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <div class:is-tracking={$tracking} on:click={tapGps} role="presentation" aria-hidden="true">
-        <div class="metrics-grid">
-          <div class="metric-hero-card">
-            <span class="metric-eyebrow">Latitude</span>
-            <span class="metric-hero-value">{formatCoordinate($myLocation.latitude)}<span class="metric-unit">° N</span></span>
-          </div>
-          <div class="metric-hero-card">
-            <span class="metric-eyebrow">Longitude</span>
-            <span class="metric-hero-value">{formatCoordinate($myLocation.longitude)}<span class="metric-unit">° E</span></span>
-          </div>
-          {#if ($myLocation.speed || 0) >= 1}
-            <div class="metric-hero-card metric-wide">
-              <span class="metric-eyebrow">Speed</span>
-              <span class="metric-hero-value">{$myLocation.speed}<span class="metric-unit">km/h</span></span>
-            </div>
-          {/if}
-        </div>
-        <div class="signal-row">
+      <div class="gps-live-card" class:is-tracking={$tracking} on:click={tapGps} role="presentation" aria-hidden="true">
+        <div class="gps-signal-left">
           <span class="gps-ping" class:active={$tracking && $trackingMetrics.lastAccuracy != null}></span>
-          {#if $trackingMetrics.lastAccuracy != null}
-            <span class="accuracy-dot {accClass}"></span>
-          {/if}
-          <span>{accLabel}{$myLocation.formattedTime ? ' · ' + $myLocation.formattedTime : ''}</span>
+          <div class="gps-coord-block">
+            <span class="gps-accuracy-label">{accLabel}</span>
+            <div class="gps-sub">
+              {#if $trackingMetrics.lastAccuracy != null}
+                <span class="accuracy-dot {accClass}"></span>
+              {/if}
+              <span>{$myLocation.formattedTime || 'Live'}</span>
+            </div>
+          </div>
         </div>
+        {#if ($myLocation.speed || 0) >= 1}
+          <div class="speed-pill">
+            <span class="speed-num">{Math.round($myLocation.speed)}</span>
+            <span class="speed-unit">km/h</span>
+          </div>
+        {/if}
       </div>
     {:else}
       <div class="gps-acquire-card animate-breathe">
@@ -168,7 +221,14 @@
       <span class="card-eyebrow">Signal Code</span>
       <div class="identity-body">
         <code class="signal-code">{$myShareCode || '—'}</code>
-        <CopyButton text={$myShareCode || ''} label="Copy" />
+        <div class="signal-btns">
+          <CopyButton text={$myShareCode || ''} label="Copy" />
+          {#if $myShareCode}
+            <button class="qr-icon-btn" on:click={() => showQr = true} aria-label="Show QR code for signal code" title="QR code">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="3" height="3"/><rect x="18" y="14" width="3" height="3"/><rect x="14" y="18" width="3" height="3"/><rect x="18" y="18" width="3" height="3"/></svg>
+            </button>
+          {/if}
+        </div>
       </div>
       {#if $myContactInfo?.email || $myContactInfo?.mobile}
         <span class="identity-meta">{[$myContactInfo.email, $myContactInfo.mobile].filter(Boolean).join(' · ')}</span>
@@ -194,20 +254,63 @@
           </span>
           {$mySosActive ? 'Cancel SOS' : 'Emergency SOS'}
         </button>
-        <button class="ok-action-btn" on:click={checkIn} aria-label="Send check-in — I'm OK">
+        <button class="ok-action-btn" on:click={checkIn} aria-label="Send scheduled check-in">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
-          I'm OK
+          Check-in ✓
         </button>
       </div>
       <div class="safety-actions" style="margin-top:6px;">
-        <button class="ok-action-btn" on:click={onMyWay} aria-label="Broadcast On My Way">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-          On My Way
-        </button>
+        {#if onMyWayActive}
+          <button class="ok-action-btn ok-action-btn--active" on:click={cancelOnMyWay} aria-label="Cancel On My Way broadcast">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Cancel
+          </button>
+        {:else}
+          <button class="ok-action-btn" on:click={onMyWay} aria-label="Broadcast On My Way and share via WhatsApp">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            On My Way
+          </button>
+        {/if}
         <button class="ok-action-btn" on:click={attest} aria-label="Confirm your location is genuine" title="Confirm your location is real">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           I'm Safe
         </button>
+      </div>
+      <div class="safety-actions" style="margin-top:6px;">
+        <button class="ok-action-btn" class:ok-action-btn--active={$rideShare.active} on:click={() => rideShareOpen = true} aria-label="Share My Ride with family">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+          {$rideShare.active ? 'Ride Active' : 'Share Ride'}
+        </button>
+        <button class="ok-action-btn" class:ok-action-btn--crowd={$crowdMode.active} on:click={toggleCrowdMode} aria-label="Toggle Festival / Crowd mode">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          {$crowdMode.active ? 'Group On' : 'Group Mode'}
+        </button>
+      </div>
+    </div>
+
+    <!-- ── AMBIENT STATUS MESSAGE ─────────────────────────────────── -->
+    <div class="status-msg-zone">
+      <span class="card-eyebrow">My Status</span>
+      <div class="status-msg-row">
+        <input
+          class="status-msg-input"
+          type="text"
+          maxlength="60"
+          placeholder='e.g. "At school until 3pm"'
+          bind:value={statusDraft}
+          aria-label="Set a status message visible to your family"
+        />
+        <select class="status-expiry-select" bind:value={statusExpiry} aria-label="Status expires after">
+          <option value="60">1h</option>
+          <option value="240">4h</option>
+          <option value="480">8h</option>
+          <option value="1440">Today</option>
+          <option value="0">Always</option>
+        </select>
+      </div>
+      <div class="status-msg-actions">
+        <button class="btn btn-primary btn-sm" on:click={saveStatusMessage} disabled={statusDraft.trim() === ''}>Set</button>
+        <button class="btn btn-ghost btn-sm" on:click={clearStatusMessage}>Clear</button>
       </div>
     </div>
 
@@ -288,6 +391,7 @@
     {/if}
 
   </div>
+  <ShareMyRide bind:open={rideShareOpen} />
 
 <!-- ═══════════════════════════════════════════════════════════════════════
      PANEL SHELL MODE (desktop standalone panel)
@@ -306,30 +410,25 @@
       <!-- GPS LIVE STATUS -->
       {#if $myLocation}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <div class:is-tracking={$tracking} on:click={tapGps} role="presentation" aria-hidden="true">
-          <div class="metrics-grid">
-            <div class="metric-hero-card">
-              <span class="metric-eyebrow">Latitude</span>
-              <span class="metric-hero-value">{formatCoordinate($myLocation.latitude)}<span class="metric-unit">° N</span></span>
-            </div>
-            <div class="metric-hero-card">
-              <span class="metric-eyebrow">Longitude</span>
-              <span class="metric-hero-value">{formatCoordinate($myLocation.longitude)}<span class="metric-unit">° E</span></span>
-            </div>
-            {#if ($myLocation.speed || 0) >= 1}
-              <div class="metric-hero-card metric-wide">
-                <span class="metric-eyebrow">Speed</span>
-                <span class="metric-hero-value">{$myLocation.speed}<span class="metric-unit">km/h</span></span>
-              </div>
-            {/if}
-          </div>
-          <div class="signal-row">
+        <div class="gps-live-card" class:is-tracking={$tracking} on:click={tapGps} role="presentation" aria-hidden="true">
+          <div class="gps-signal-left">
             <span class="gps-ping" class:active={$tracking && $trackingMetrics.lastAccuracy != null}></span>
-            {#if $trackingMetrics.lastAccuracy != null}
-              <span class="accuracy-dot {accClass}"></span>
-            {/if}
-            <span>{accLabel}{$myLocation.formattedTime ? ' · ' + $myLocation.formattedTime : ''}</span>
+            <div class="gps-coord-block">
+              <span class="gps-accuracy-label">{accLabel}</span>
+              <div class="gps-sub">
+                {#if $trackingMetrics.lastAccuracy != null}
+                  <span class="accuracy-dot {accClass}"></span>
+                {/if}
+                <span>{$myLocation.formattedTime || 'Live'}</span>
+              </div>
+            </div>
           </div>
+          {#if ($myLocation.speed || 0) >= 1}
+            <div class="speed-pill">
+              <span class="speed-num">{Math.round($myLocation.speed)}</span>
+              <span class="speed-unit">km/h</span>
+            </div>
+          {/if}
         </div>
       {:else}
         <div class="gps-acquire-card animate-breathe">
@@ -362,7 +461,14 @@
         <span class="card-eyebrow">Signal Code</span>
         <div class="identity-body">
           <code class="signal-code">{$myShareCode || '—'}</code>
-          <CopyButton text={$myShareCode || ''} label="Copy" />
+          <div class="signal-btns">
+            <CopyButton text={$myShareCode || ''} label="Copy" />
+            {#if $myShareCode}
+              <button class="qr-icon-btn" on:click={() => showQr = true} aria-label="Show QR code for signal code" title="QR code">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="3" height="3"/><rect x="18" y="14" width="3" height="3"/><rect x="14" y="18" width="3" height="3"/><rect x="18" y="18" width="3" height="3"/></svg>
+              </button>
+            {/if}
+          </div>
         </div>
         {#if $myContactInfo?.email || $myContactInfo?.mobile}
           <span class="identity-meta">{[$myContactInfo.email, $myContactInfo.mobile].filter(Boolean).join(' · ')}</span>
@@ -383,10 +489,63 @@
             </span>
             {$mySosActive ? 'Cancel SOS' : 'Emergency SOS'}
           </button>
-          <button class="ok-action-btn" on:click={checkIn} aria-label="Send check-in — I'm OK">
+          <button class="ok-action-btn" on:click={checkIn} aria-label="Send scheduled check-in">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
-            I'm OK
+            Check-in ✓
           </button>
+        </div>
+        <div class="safety-actions" style="margin-top:6px;">
+          {#if onMyWayActive}
+            <button class="ok-action-btn ok-action-btn--active" on:click={cancelOnMyWay} aria-label="Cancel On My Way broadcast">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              Cancel
+            </button>
+          {:else}
+            <button class="ok-action-btn" on:click={onMyWay} aria-label="Broadcast On My Way and share via WhatsApp">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+              On My Way
+            </button>
+          {/if}
+          <button class="ok-action-btn" on:click={attest} aria-label="Confirm your location is genuine" title="Confirm your location is real">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            I'm Safe
+          </button>
+        </div>
+        <div class="safety-actions" style="margin-top:6px;">
+          <button class="ok-action-btn" class:ok-action-btn--active={$rideShare.active} on:click={() => rideShareOpen = true} aria-label="Share My Ride with family">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+            {$rideShare.active ? 'Ride Active' : 'Share Ride'}
+          </button>
+          <button class="ok-action-btn" class:ok-action-btn--crowd={$crowdMode.active} on:click={toggleCrowdMode} aria-label="Toggle Festival / Crowd mode">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            {$crowdMode.active ? 'Group On' : 'Group Mode'}
+          </button>
+        </div>
+      </div>
+
+      <!-- AMBIENT STATUS MESSAGE -->
+      <div class="status-msg-zone">
+        <span class="card-eyebrow">My Status</span>
+        <div class="status-msg-row">
+          <input
+            class="status-msg-input"
+            type="text"
+            maxlength="60"
+            placeholder='e.g. "At school until 3pm"'
+            bind:value={statusDraft}
+            aria-label="Set a status message visible to your family"
+          />
+          <select class="status-expiry-select" bind:value={statusExpiry} aria-label="Status expires after">
+            <option value="60">1h</option>
+            <option value="240">4h</option>
+            <option value="480">8h</option>
+            <option value="1440">Today</option>
+            <option value="0">Always</option>
+          </select>
+        </div>
+        <div class="status-msg-actions">
+          <button class="btn btn-primary btn-sm" on:click={saveStatusMessage} disabled={statusDraft.trim() === ''}>Set</button>
+          <button class="btn btn-ghost btn-sm" on:click={clearStatusMessage}>Clear</button>
         </div>
       </div>
 
@@ -466,6 +625,32 @@
 
     </div>
   </div>
+  <ShareMyRide bind:open={rideShareOpen} />
+{/if}
+
+<!-- ── QR code modal (fixed overlay, always in DOM) ──────────────────────── -->
+{#if showQr}
+  <!-- svelte-ignore a11y-click-events-have-key-events -->
+  <div class="qr-backdrop" on:click={() => showQr = false} role="dialog" aria-modal="true" aria-label="Signal code QR">
+    <div class="qr-modal" on:click|stopPropagation>
+      <button class="qr-close-btn" on:click={() => showQr = false} aria-label="Close QR code">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+      <span class="qr-title">Your Signal Code</span>
+      <div class="qr-image-wrap">
+        <img
+          src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={encodeURIComponent(getShareOrigin() + '/#/add-contact/' + $myShareCode)}&margin=6&bgcolor=ffffff&color=0f0f23"
+          alt="QR code for signal code {$myShareCode}"
+          width="180"
+          height="180"
+          class="qr-image"
+          loading="lazy"
+        />
+      </div>
+      <code class="qr-code-display">{$myShareCode}</code>
+      <p class="qr-hint">Have someone scan this to add you as a contact</p>
+    </div>
+  </div>
 {/if}
 
 <style>
@@ -529,18 +714,31 @@
   .gps-live-card {
     background: var(--surface-inset);
     border: 1px solid var(--border-subtle);
+    border-top-color: var(--border-highlight);
     border-radius: var(--radius-xl);
     padding: var(--space-4);
     display: flex;
     align-items: center;
     gap: var(--space-3);
     cursor: default;
-    transition: border-color 500ms var(--ease-out), background 500ms var(--ease-out);
+    transition:
+      border-color 500ms var(--ease-out),
+      background 500ms var(--ease-out),
+      box-shadow 500ms var(--ease-out);
     user-select: none;
   }
   .gps-live-card.is-tracking {
-    border-color: rgba(16, 185, 129, 0.22);
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, transparent 60%);
+    border-color: rgba(16, 185, 129, 0.30);
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.07) 0%, transparent 60%);
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.08);
+  }
+  .gps-accuracy-label {
+    font-family: var(--font-display);
+    font-size: var(--text-base);
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.01em;
+    line-height: 1.2;
   }
   .gps-signal-left {
     display: flex;
@@ -659,12 +857,14 @@
     padding: var(--space-4);
     background: var(--surface-inset);
     border: 1px solid var(--border-subtle);
+    border-top-color: var(--border-highlight);
     border-radius: var(--radius-xl);
   }
-  .acquire-icon { color: var(--text-tertiary); flex-shrink: 0; }
+  .acquire-icon { color: var(--primary-400); flex-shrink: 0; }
   .acquire-title {
+    font-family: var(--font-display);
     font-size: var(--text-sm);
-    font-weight: 600;
+    font-weight: 700;
     color: var(--text-secondary);
     margin: 0;
   }
@@ -756,7 +956,7 @@
     border-top-color: rgba(255, 100, 100, 0.48);
     border-radius: var(--radius-lg);
     color: white;
-    font-family: var(--font-sans);
+    font-family: var(--font-display);
     font-weight: 800;
     font-size: var(--text-base);
     letter-spacing: -0.01em;
@@ -803,7 +1003,7 @@
     border: 1px solid rgba(16, 185, 129, 0.18);
     border-radius: var(--radius-lg);
     color: var(--success-500);
-    font-family: var(--font-sans);
+    font-family: var(--font-display);
     font-size: var(--text-xs);
     font-weight: 700;
     cursor: pointer;
@@ -814,6 +1014,61 @@
   .ok-action-btn:hover {
     background: rgba(16, 185, 129, 0.14);
     box-shadow: 0 0 16px rgba(16, 185, 129, 0.18);
+  }
+  .ok-action-btn--active {
+    background: rgba(239, 68, 68, 0.10);
+    border-color: rgba(239, 68, 68, 0.25);
+    color: var(--danger-500);
+  }
+  .ok-action-btn--active:hover {
+    background: rgba(239, 68, 68, 0.16);
+  }
+  .ok-action-btn--crowd {
+    background: rgba(245, 158, 11, 0.12);
+    border-color: rgba(245, 158, 11, 0.28);
+    color: var(--warning-500, #f59e0b);
+  }
+  .ok-action-btn--crowd:hover {
+    background: rgba(245, 158, 11, 0.18);
+  }
+
+  /* ── Ambient Status Message ──────────────────────────────────────── */
+  .status-msg-zone {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    background: var(--surface-1);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-xl);
+    padding: var(--space-3) var(--space-4);
+  }
+  .status-msg-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .status-msg-input {
+    flex: 1;
+    font-size: var(--text-sm);
+    padding: 7px 10px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-3);
+    color: var(--text-primary);
+    min-width: 0;
+  }
+  .status-expiry-select {
+    font-size: var(--text-xs);
+    padding: 7px 6px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-3);
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+  .status-msg-actions {
+    display: flex;
+    gap: 6px;
   }
 
   /* ── Network / Guardian section ──────────────────────────────────── */
@@ -867,5 +1122,130 @@
     font-weight: 800;
     padding: 0 4px;
     margin-left: 4px;
+  }
+
+  /* ── Signal code actions group ──────────────────────────────────── */
+  .signal-btns {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1-5, 6px);
+    flex-shrink: 0;
+  }
+
+  /* ── QR icon button ──────────────────────────────────────────────── */
+  .qr-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-md);
+    background: var(--surface-inset);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-tertiary);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 150ms var(--ease-out), color 150ms, transform 120ms var(--ease-spring);
+  }
+  .qr-icon-btn:hover {
+    background: var(--surface-2);
+    color: var(--primary-400);
+    transform: scale(1.08);
+  }
+  .qr-icon-btn:active { transform: scale(0.93); }
+
+  /* ── QR modal ────────────────────────────────────────────────────── */
+  .qr-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 6000;
+    background: rgba(5, 5, 18, 0.72);
+    backdrop-filter: blur(8px) saturate(1.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-4);
+    animation: qr-fade-in 180ms var(--ease-out) both;
+  }
+  @keyframes qr-fade-in { from { opacity: 0; } to { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .qr-backdrop { animation: none; } }
+
+  .qr-modal {
+    position: relative;
+    background: var(--surface-1);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-2xl, 20px);
+    padding: var(--space-6, 24px) var(--space-5, 20px) var(--space-4);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3);
+    max-width: 260px;
+    width: 100%;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+    animation: qr-slide-up 220ms var(--ease-spring, cubic-bezier(0.34,1.56,0.64,1)) both;
+  }
+  @keyframes qr-slide-up { from { transform: translateY(16px) scale(0.95); opacity: 0; } to { transform: none; opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .qr-modal { animation: none; } }
+
+  .qr-close-btn {
+    position: absolute;
+    top: var(--space-3);
+    right: var(--space-3);
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background 120ms, color 120ms;
+  }
+  .qr-close-btn:hover { background: var(--surface-3, var(--surface-2)); color: var(--text-primary); }
+
+  .qr-title {
+    font-family: var(--font-display);
+    font-size: var(--text-sm);
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .qr-image-wrap {
+    background: white;
+    border-radius: var(--radius-lg);
+    padding: 8px;
+    line-height: 0;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  }
+
+  .qr-image {
+    display: block;
+    width: 180px;
+    height: 180px;
+    border-radius: 4px;
+  }
+
+  .qr-code-display {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    font-weight: 700;
+    color: var(--primary-400);
+    letter-spacing: 0.08em;
+    background: var(--surface-inset);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 4px 10px;
+  }
+
+  .qr-hint {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    text-align: center;
+    line-height: 1.45;
+    margin: 0;
+    max-width: 200px;
   }
 </style>

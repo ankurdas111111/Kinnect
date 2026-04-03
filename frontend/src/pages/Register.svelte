@@ -1,7 +1,7 @@
 <script>
   import { push } from 'svelte-spa-router';
   import { authUser, loadSession } from '../lib/stores/auth.js';
-  import { apiPost, fetchCsrf } from '../lib/api.js';
+  import { apiPost, fetchCsrf, clearCsrf } from '../lib/api.js';
   import { COUNTRY_CODES, COUNTRY_MAP, validateMobileLength } from '../lib/countryCodes.js';
   import { toasts } from '../lib/stores/toast.js';
   import { onMount } from 'svelte';
@@ -127,8 +127,19 @@
       if (res.ok) {
         redirecting = true;
         toasts.success('Account created successfully!');
+        // Register creates a new server session with a new CSRF token.
+        // Refresh it so subsequent POSTs from the main app use the correct token.
+        clearCsrf();
+        await fetchCsrf();
         await loadSession();
-        push('/');
+        // If user arrived via QR add-contact link, redirect back to complete it
+        const pendingContact = sessionStorage.getItem('kinnect_pending_contact');
+        if (pendingContact) {
+          sessionStorage.removeItem('kinnect_pending_contact');
+          push('/add-contact/' + encodeURIComponent(pendingContact));
+        } else {
+          push('/');
+        }
       } else {
         error = res.error || 'Registration failed';
       }
@@ -144,6 +155,33 @@
 
   <div class="auth-brand">
     <div class="auth-brand-inner">
+      <!-- Decorative floating location pins -->
+      <div class="auth-brand-deco" aria-hidden="true">
+        <svg class="deco-map" viewBox="0 0 340 280" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="90" y1="80" x2="180" y2="130" stroke="rgba(99,102,241,0.22)" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <line x1="180" y1="130" x2="260" y2="90" stroke="rgba(16,185,129,0.20)" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <line x1="180" y1="130" x2="140" y2="200" stroke="rgba(139,92,246,0.18)" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <line x1="260" y1="90" x2="290" y2="170" stroke="rgba(6,182,212,0.16)" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <circle cx="180" cy="130" r="22" fill="rgba(99,102,241,0.06)" stroke="rgba(99,102,241,0.18)" stroke-width="1"/>
+          <circle cx="180" cy="130" r="34" fill="none" stroke="rgba(99,102,241,0.08)" stroke-width="1"/>
+          <circle cx="180" cy="130" r="10" fill="rgba(99,102,241,0.90)"/>
+          <circle cx="180" cy="130" r="4" fill="white"/>
+          <circle cx="90" cy="80" r="8" fill="rgba(16,185,129,0.85)"/>
+          <circle cx="90" cy="80" r="3" fill="white"/>
+          <circle cx="90" cy="80" r="14" fill="none" stroke="rgba(16,185,129,0.22)" stroke-width="1"/>
+          <circle cx="260" cy="90" r="7" fill="rgba(139,92,246,0.80)"/>
+          <circle cx="260" cy="90" r="3" fill="white"/>
+          <circle cx="140" cy="200" r="7" fill="rgba(6,182,212,0.75)"/>
+          <circle cx="140" cy="200" r="3" fill="white"/>
+          <circle cx="290" cy="170" r="6" fill="rgba(245,158,11,0.75)"/>
+          <circle cx="290" cy="170" r="2.5" fill="white"/>
+          <circle cx="50" cy="160" r="2" fill="rgba(255,255,255,0.06)"/>
+          <circle cx="120" cy="240" r="2" fill="rgba(255,255,255,0.06)"/>
+          <circle cx="220" cy="220" r="2" fill="rgba(255,255,255,0.06)"/>
+          <circle cx="310" cy="50" r="2" fill="rgba(255,255,255,0.06)"/>
+        </svg>
+      </div>
+
       <div class="auth-brand-logo">
         <svg width="24" height="29" viewBox="0 0 20 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M10 1C5.029 1 1 5.029 1 10c0 6.938 8.25 13.1 9 14.1.75-1 9-7.162 9-14.1C19 5.029 14.971 1 10 1z" fill="white" fill-opacity="0.95"/>
@@ -163,9 +201,21 @@
   </div>
 
   <div class="auth-form-area">
+    <!-- Mobile-only brand header: shown when desktop brand panel is hidden -->
+    <div class="mobile-brand-header" aria-hidden="true">
+      <div class="mobile-brand-logo">
+        <svg width="18" height="22" viewBox="0 0 20 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M10 1C5.029 1 1 5.029 1 10c0 6.938 8.25 13.1 9 14.1.75-1 9-7.162 9-14.1C19 5.029 14.971 1 10 1z" fill="white" fill-opacity="0.95"/>
+          <path d="M7 7v6M7 10l3.5-3M7 10l3.5 3" stroke="rgba(255,255,255,0.90)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <span class="mobile-brand-name">Kinnect</span>
+      <span class="mobile-brand-tagline">Keep your family close</span>
+    </div>
+
     <div class="auth-card">
       <h2>Create account</h2>
-      <p class="subtitle">Sign up to start tracking and sharing</p>
+      <p class="subtitle">Join your family in minutes</p>
 
       {#if error}
         <div class="auth-error" role="alert">
@@ -328,6 +378,23 @@
 <style>
   @import '../styles/auth.css';
 
+  /* Decorative location-pin cluster */
+  .auth-brand-deco {
+    position: absolute;
+    top: -40px;
+    right: -80px;
+    width: 340px;
+    height: 280px;
+    pointer-events: none;
+    opacity: 0.65;
+  }
+
+  .deco-map {
+    width: 100%;
+    height: 100%;
+    filter: drop-shadow(0 4px 12px rgba(20, 184, 166, 0.12));
+  }
+
   .input-wrapper {
     position: relative;
   }
@@ -407,4 +474,47 @@
     vertical-align: middle;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Mobile brand header ─────────────────────────────────────────────── */
+  .mobile-brand-header {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 20px;
+    animation: fadeIn 400ms var(--ease-out, ease) both;
+  }
+
+  .mobile-brand-logo {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--primary-400, #2dd4bf) 0%, var(--primary-700, #0f766e) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 20px rgba(20, 184, 166, 0.40);
+    margin-bottom: 4px;
+  }
+
+  .mobile-brand-name {
+    font-family: var(--font-display, 'Sora', sans-serif);
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #ffffff;
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+
+  .mobile-brand-tagline {
+    font-size: 0.8125rem;
+    color: rgba(255, 255, 255, 0.45);
+    letter-spacing: 0.01em;
+  }
+
+  @media (max-width: 767px) {
+    .mobile-brand-header {
+      display: flex;
+    }
+  }
 </style>

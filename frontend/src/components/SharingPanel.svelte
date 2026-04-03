@@ -8,6 +8,7 @@
   import { authUser } from '../lib/stores/auth.js';
   import { otherUsers, focusUser } from '../lib/stores/map.js';
   import { getPresenceState, getPresenceText } from '../lib/tracking.js';
+  import { getShareOrigin } from '../lib/env.js';
   import { getUserColor } from '../lib/getUserColor.js';
   import CopyButton from './primitives/CopyButton.svelte';
 
@@ -184,7 +185,10 @@
     <!-- ── ROOMS ─────────────────────────────────────────────────── -->
     <div class="sharing-section">
       <div class="sharing-section-header">
-        <span class="card-eyebrow">Groups</span>
+        <span class="section-header-label">Groups</span>
+        {#if $myRooms.length > 0}
+          <span class="section-badge">{$myRooms.length}</span>
+        {/if}
       </div>
       <div class="rooms-create-row">
         <input class="input" bind:value={roomName} placeholder="New group name" />
@@ -196,7 +200,12 @@
       </div>
 
       {#if $myRooms.length === 0}
-        <p class="empty-state">No groups yet. Create one and invite your people.</p>
+        <div class="section-empty">
+          <div class="section-empty-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <span class="section-empty-text">No groups yet — create one and invite your people</span>
+        </div>
       {:else}
         <div class="rooms-list">
           {#each $myRooms as room}
@@ -278,14 +287,22 @@
     <!-- ── YOUR PEOPLE ────────────────────────────────────────────── -->
     <div class="sharing-section">
       <div class="sharing-section-header">
-        <span class="card-eyebrow">Your People</span>
+        <span class="section-header-label">Your People</span>
+        {#if $myContacts.length > 0}
+          <span class="section-badge">{$myContacts.length}</span>
+        {/if}
       </div>
       <div class="rooms-create-row">
         <input class="input" bind:value={contactCode} placeholder="Paste their signal code" on:keydown={e => e.key === 'Enter' && addContact()} />
         <button class="btn btn-primary btn-sm" on:click={addContact} disabled={loading.addContact}>{loading.addContact ? '…' : 'Add'}</button>
       </div>
       {#if $myContacts.length === 0}
-        <p class="empty-state">No contacts yet. Share your signal code and connect.</p>
+        <div class="section-empty">
+          <div class="section-empty-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <span class="section-empty-text">No contacts yet — share your signal code and connect</span>
+        </div>
       {:else}
           {#each $myContacts as c, i}
             {@const pState = contactPresenceState(c.userId)}
@@ -345,7 +362,10 @@
     <!-- ── LIVE BROADCASTS ───────────────────────────────────────── -->
     <div class="sharing-section">
       <div class="sharing-section-header">
-        <span class="card-eyebrow">Live Broadcasts</span>
+        <span class="section-header-label">Live Broadcasts</span>
+        {#if $myLiveLinks.length > 0}
+          <span class="section-badge section-badge-live">{$myLiveLinks.length}</span>
+        {/if}
       </div>
       <div class="live-link-toolbar">
         <div class="duration-pills" role="group" aria-label="Broadcast duration">
@@ -361,11 +381,17 @@
         <button class="btn btn-primary btn-sm" on:click={generateLiveLink}>Start Broadcast</button>
       </div>
       {#if $myLiveLinks.length === 0}
-        <p class="empty-state">No broadcasts running.</p>
+        <div class="section-empty">
+          <div class="section-empty-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 6l10.5 6L22 6"/><rect x="1" y="4" width="21" height="16" rx="2"/></svg>
+          </div>
+          <span class="section-empty-text">No broadcasts running</span>
+        </div>
       {:else}
         <div class="broadcasts-list">
           {#each $myLiveLinks as link, i}
-            {@const url = window.location.origin + '/#/live/' + link.token}
+            {@const url = getShareOrigin() + '/#/live/' + link.token}
+            {@const waText = encodeURIComponent('Watch my live location on Kinnect: ' + url)}
             <div class="broadcast-card card-glow-link animate-slide-up stagger-item" style="animation-delay:{i*40}ms">
               <div class="broadcast-header">
                 <span class="rec-dot animate-rec-blink" aria-hidden="true"></span>
@@ -374,6 +400,18 @@
               </div>
               <div class="live-link-actions">
                 <CopyButton text={url} label="Copy Link" />
+                <a
+                  class="btn-wa"
+                  href="https://wa.me/?text={waText}"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Share via WhatsApp"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/>
+                  </svg>
+                  WhatsApp
+                </a>
                 <button class="btn btn-danger btn-sm" on:click={() => revokeLink(link.token)}>End Broadcast</button>
               </div>
             </div>
@@ -419,8 +457,262 @@
   .sharing-section-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: var(--space-2);
     margin-bottom: var(--space-1);
+  }
+
+  /* Section label */
+  .section-header-label {
+    font-family: var(--font-display);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    flex: 1;
+  }
+
+  /* Section badge */
+  .section-badge {
+    font-family: var(--font-display);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    color: var(--text-tertiary);
+    background: var(--surface-inset);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-full);
+    padding: 1px 8px;
+    min-width: 22px;
+    text-align: center;
+  }
+  .section-badge-live {
+    color: var(--accent-link);
+    background: rgba(6, 182, 212, 0.08);
+    border-color: rgba(6, 182, 212, 0.20);
+  }
+
+  /* Section empty state */
+  .section-empty {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    background: var(--surface-inset);
+    border: 1px dashed var(--border-subtle);
+    border-radius: var(--radius-xl);
+  }
+  .section-empty-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-lg);
+    background: linear-gradient(135deg, rgba(99,102,241,0.12) 0%, rgba(139,92,246,0.07) 100%);
+    border: 1px solid rgba(99, 102, 241, 0.16);
+    color: var(--primary-400);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .section-empty-text {
+    font-size: var(--text-sm);
+    color: var(--text-tertiary);
+    line-height: var(--leading-normal);
+  }
+
+  /* ── Person cards (Your People) ──────────────────────────────── */
+  .person-card {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2-5) var(--space-1);
+    border-radius: var(--radius-lg);
+    transition: background 180ms var(--ease-out);
+  }
+  .person-card:hover {
+    background: var(--surface-hover);
+  }
+  .person-ring-wrap {
+    flex-shrink: 0;
+    position: relative;
+  }
+  .person-avatar-circle {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-display);
+    font-size: var(--text-sm);
+    font-weight: 700;
+    color: white;
+    background: var(--person-color, var(--primary-500));
+    position: relative;
+    transition: box-shadow 300ms var(--ease-out);
+  }
+  .person-avatar-circle.state-now {
+    box-shadow:
+      0 0 0 2.5px var(--surface-0),
+      0 0 0 4.5px var(--person-color, var(--primary-500)),
+      0 0 14px var(--person-color, var(--primary-500));
+  }
+  .person-avatar-circle.state-recent {
+    box-shadow:
+      0 0 0 2.5px var(--surface-0),
+      0 0 0 4px rgba(99,102,241,0.45);
+  }
+  .person-avatar-circle.state-sos {
+    box-shadow:
+      0 0 0 2.5px var(--surface-0),
+      0 0 0 4.5px #ef4444,
+      0 0 18px rgba(239,68,68,0.55);
+    animation: sos-urgent-pulse 0.9s ease-in-out infinite;
+  }
+  .person-avatar-circle.state-gone {
+    box-shadow: none;
+    filter: grayscale(0.5);
+    opacity: 0.7;
+  }
+  .person-name-block {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .person-name {
+    font-family: var(--font-display);
+    font-size: var(--text-sm);
+    font-weight: 700;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .person-status {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .person-status.status-now { color: var(--success-500); font-weight: 600; }
+  .person-status.status-sos { color: var(--danger-500); font-weight: 700; }
+  .activity-chip {
+    font-size: var(--text-2xs);
+    color: var(--text-tertiary);
+    background: var(--surface-inset);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-full);
+    padding: 1px 7px;
+    width: fit-content;
+    margin-top: 2px;
+  }
+
+  /* ── Room cards ───────────────────────────────────────────────── */
+  .room-card {
+    background: var(--surface-1);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-xl);
+    padding: var(--space-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    transition: background 150ms var(--ease-out), box-shadow 150ms var(--ease-out);
+  }
+  .room-card:hover {
+    background: var(--surface-2);
+    box-shadow: var(--shadow-sm);
+  }
+  .room-card-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2-5);
+  }
+  .room-card-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-md);
+    background: rgba(99,102,241,0.12);
+    color: var(--primary-400);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-display);
+    font-size: var(--text-base);
+    font-weight: 800;
+    flex-shrink: 0;
+  }
+  .room-card-meta {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .room-card-name {
+    font-family: var(--font-display);
+    font-size: var(--text-sm);
+    font-weight: 700;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .room-card-code {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    letter-spacing: 0.05em;
+  }
+  .room-card-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    flex-wrap: wrap;
+    padding-top: var(--space-1);
+  }
+  .room-members-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--border-subtle);
+  }
+  .room-member-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--surface-inset);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-full);
+    padding: 3px 10px;
+    font-family: var(--font-display);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background 120ms, color 120ms;
+  }
+  .room-member-chip:hover {
+    background: var(--surface-hover);
+    color: var(--text-primary);
+  }
+  .room-member-avatar {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: rgba(99,102,241,0.15);
+    color: var(--primary-400);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-display);
+    font-size: 9px;
+    font-weight: 700;
   }
 
   /* Create / join rows */
@@ -629,6 +921,7 @@
   }
   .pill-btn {
     padding: var(--space-1) var(--space-3);
+    font-family: var(--font-display);
     font-size: var(--text-xs);
     font-weight: 600;
     border: 1px solid var(--border-default);
@@ -673,6 +966,7 @@
     flex-shrink: 0;
   }
   .broadcast-label {
+    font-family: var(--font-display);
     font-weight: 700;
     font-size: var(--text-sm);
     color: var(--accent-link);
@@ -692,6 +986,34 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-1);
+    align-items: center;
+  }
+
+  /* WhatsApp share button */
+  .btn-wa {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px var(--space-3);
+    background: #25D366;
+    color: #fff;
+    border-radius: var(--radius-full);
+    font-family: var(--font-display);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 150ms var(--ease-out), transform 120ms var(--ease-spring), box-shadow 150ms var(--ease-out);
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .btn-wa:hover {
+    background: #128C7E;
+    transform: scale(1.04);
+    box-shadow: 0 2px 12px rgba(37, 211, 102, 0.35);
+  }
+  .btn-wa:active {
+    transform: scale(0.97);
   }
 
   /* ── Admin controls ─────────────────────────────────────────────── */

@@ -150,6 +150,10 @@ func InitDB(db *sql.DB) error {
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS quiet_hours_start TIME`,
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS quiet_hours_end TIME`,
 
+		// Ambient Status Messages — user-set short status visible to family
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS status_message VARCHAR(80)`,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS status_expires_at BIGINT`,
+
 		// Sharing Schedules — granular per-recipient / per-time-window visibility control
 		`CREATE TABLE IF NOT EXISTS sharing_schedules (
 			id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),

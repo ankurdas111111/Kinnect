@@ -1,5 +1,6 @@
 <script>
   import { createEventDispatcher } from 'svelte';
+  import TiltCard from './TiltCard.svelte';
 
   export let location = null;
   export let trackingActive = false;
@@ -9,6 +10,7 @@
   const dispatch = createEventDispatcher();
 </script>
 
+<TiltCard intensity={8} shine={true}>
 <section class="now-card">
   <div class="head">
     <div>
@@ -61,15 +63,24 @@
     </span>
   </div>
 </section>
+</TiltCard>
 
 <style>
   .now-card {
-    background: var(--surface-2, #fff);
-    border: 1px solid var(--border-default, #e2e8f0);
-    border-radius: 18px;
+    background: var(--glass-3d, rgba(255,255,255,0.65));
+    border: 1px solid var(--glass-3d-border, #e2e8f0);
+    border-top-color: rgba(255, 255, 255, 0.25);
+    border-radius: 20px;
     padding: 14px;
-    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+    /* 3D floating card with depth */
+    box-shadow:
+      var(--elevation-3, 0 10px 28px rgba(15, 23, 42, 0.08)),
+      inset 0 1px 0 rgba(255, 255, 255, 0.18),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.05);
+    backdrop-filter: var(--glass-3d-blur, blur(24px) saturate(2.0));
+    -webkit-backdrop-filter: var(--glass-3d-blur, blur(24px) saturate(2.0));
     margin-bottom: 12px;
+    transform-style: preserve-3d;
   }
 
   .head {
@@ -113,6 +124,11 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
+    /* 3D inset stat cell */
+    border: 1px solid var(--border-subtle, rgba(0,0,0,0.04));
+    box-shadow:
+      inset 0 2px 4px rgba(0, 0, 0, 0.04),
+      0 1px 0 rgba(255, 255, 255, 0.08);
   }
 
   .stat.wide {

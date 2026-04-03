@@ -1,5 +1,6 @@
 <script>
   import { createEventDispatcher } from 'svelte';
+  import { push } from 'svelte-spa-router';
   import StatusPills from './StatusPills.svelte';
   import ThemeToggle from '../ThemeToggle.svelte';
 
@@ -32,6 +33,9 @@
       <p>{trackingActive ? 'Live location active' : 'Tracking paused'}</p>
     </div>
     <div class="top-actions">
+      <button class="icon-btn dashboard-btn" aria-label="Family Dashboard" on:click={() => push('/dashboard')}>
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      </button>
       <ThemeToggle />
       <button class="icon-btn" aria-label="Open profile tab" on:click={() => dispatch('openMe')}>
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -62,11 +66,16 @@
     top: 0;
     z-index: calc(var(--z-navbar) + 1);
     padding: calc(var(--safe-top, 0px) + 8px) 12px 8px;
-    background: var(--glass-bg, rgba(255, 255, 255, 0.85));
-    backdrop-filter: var(--glass-blur, blur(20px) saturate(1.8));
-    -webkit-backdrop-filter: var(--glass-blur, blur(20px) saturate(1.8));
-    border-bottom: 1px solid var(--glass-border, rgba(15, 23, 42, 0.08));
-    box-shadow: 0 1px 12px rgba(0, 0, 0, 0.06);
+    /* Solid surface — avoids GPU stacking with panels + bottom bar */
+    background: rgba(252, 252, 255, 0.97);
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.05), 0 2px 10px rgba(0, 0, 0, 0.06);
+  }
+
+  :global([data-theme="dark"]) .mobile-top-bar {
+    background: rgba(9, 9, 20, 0.97);
+    border-bottom-color: rgba(255, 255, 255, 0.07);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05), 0 2px 12px rgba(0, 0, 0, 0.40);
   }
 
   .bar-main {
@@ -110,11 +119,23 @@
     position: relative;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
-    transition: background var(--duration-fast) var(--ease-out);
+    box-shadow: var(--elevation-1, 0 2px 8px rgba(0,0,0,0.08));
+    transition: background var(--duration-fast) var(--ease-out), transform 100ms ease;
   }
 
   .icon-btn:active {
     background: var(--surface-active);
+    transform: scale(0.93);
+  }
+
+  /* Dashboard shortcut — teal tint to stand out */
+  .dashboard-btn {
+    background: rgba(20, 184, 166, 0.10);
+    border-color: rgba(20, 184, 166, 0.20);
+    color: var(--primary-500);
+  }
+  .dashboard-btn:active {
+    background: rgba(20, 184, 166, 0.18);
   }
 
   .dot {

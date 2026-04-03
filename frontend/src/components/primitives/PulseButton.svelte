@@ -63,8 +63,8 @@
       <path d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.01-.24 11.36 11.36 0 0 0 3.56.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.56a1 1 0 0 1-.25 1.02z"/>
     </svg>
   {:else}
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.38 2 2 0 0 1 3.6 1.2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.09 6.09l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
     </svg>
   {/if}
   {#if feedback}
@@ -75,29 +75,48 @@
 <style>
   .pulse-fab {
     position: fixed;
-    right: var(--space-4);
-    bottom: calc(64px + var(--space-4) + env(safe-area-inset-bottom, 0px));
-    z-index: 400;
+    left: var(--space-4);
+    bottom: calc(var(--space-4) + 52px + 10px);
+    z-index: calc(var(--z-panel, 1000) + 2);
     width: 48px;
     height: 48px;
     border-radius: var(--radius-full);
-    background: rgba(16, 185, 129, 0.90);
-    border: 1.5px solid rgba(16, 185, 129, 0.50);
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.95) 0%, rgba(5, 150, 105, 0.95) 100%);
+    border: 1.5px solid rgba(16, 185, 129, 0.55);
     color: white;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     touch-action: none;
-    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.35);
-    transition: transform 150ms var(--ease-out), background 150ms, box-shadow 150ms;
+    /* 3D raised button */
+    box-shadow:
+      0 6px 20px rgba(16, 185, 129, 0.40),
+      0 2px 6px rgba(16, 185, 129, 0.25),
+      inset 0 2px 4px rgba(255, 255, 255, 0.18),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.15);
+    transform-style: preserve-3d;
+    transition:
+      transform var(--duration-3d, 250ms) cubic-bezier(0.34, 1.56, 0.64, 1),
+      background 150ms,
+      box-shadow var(--duration-3d, 250ms) ease;
     -webkit-user-select: none;
     user-select: none;
     overflow: visible;
   }
 
+  /* Mobile: SOS FAB is raised above tabs, match that offset */
+  @media (max-width: 767px) {
+    .pulse-fab {
+      bottom: calc(var(--bottom-tab-height, 56px) + var(--safe-bottom, 0px) + var(--space-4) + 52px + 10px);
+    }
+  }
+
   .pulse-fab:active {
-    transform: scale(0.90);
+    transform: perspective(600px) translateZ(-6px) scale(0.88);
+    box-shadow:
+      0 1px 6px rgba(16, 185, 129, 0.30),
+      inset 0 3px 6px rgba(0, 0, 0, 0.20);
   }
 
   .pulse-fab.feedback-ok {
@@ -113,7 +132,7 @@
 
   .pulse-label {
     position: absolute;
-    right: calc(100% + 8px);
+    left: calc(100% + 8px);
     top: 50%;
     transform: translateY(-50%);
     white-space: nowrap;
@@ -130,5 +149,16 @@
   @keyframes pulse-label-pop {
     from { opacity: 0; transform: translateY(-50%) scale(0.85); }
     to   { opacity: 1; transform: translateY(-50%) scale(1); }
+  }
+
+  /* Desktop: slide with sidebar, matching SOS FAB offsets */
+  :global(.app-layout.sidebar-open:not(.mobile)) .pulse-fab {
+    left: calc(var(--sidebar-width, 400px) + var(--space-4));
+  }
+  :global(.app-layout.tablet.sidebar-open) .pulse-fab {
+    left: calc(var(--sidebar-tablet, 320px) + var(--space-4));
+  }
+  :global(.app-layout.sidebar-closed:not(.mobile)) .pulse-fab {
+    left: calc(var(--sidebar-collapsed, 56px) + var(--space-4));
   }
 </style>

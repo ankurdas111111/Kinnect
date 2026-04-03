@@ -14,7 +14,11 @@ import { networkGraph } from './stores/network.js';
 import { trailData } from './stores/trail.js';
 import { recordLatency } from './stores/latency.js';
 import { createRealtimeSocket } from './realtimeClient.js';
-import { notifySOS, notifyGuardianRequest, notifyBatteryLow, notifyHaventMoved } from './nativeNotifications.js';
+import { notifySOS, notifyProximitySOS, notifyGuardianRequest, notifyBatteryLow, notifyHaventMoved } from './nativeNotifications.js';
+import { rideShare } from './stores/rideShare.js';
+import { crowdMode } from './stores/crowdMode.js';
+import { bumpHubBadge } from './stores/hubBadge.js';
+import { getShareOrigin } from './env.js';
 
 const storedClientId = localStorage.getItem('clientId');
 const clientId = storedClientId || (crypto && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + '-' + Math.random().toString(16).slice(2));
@@ -47,6 +51,32 @@ function setBanner(b, autoClearMs) {
   }
 }
 
+// ── Module-scope reconnect banner timer — must be accessible from appStateChange ─
+let _reconnectBannerTimer = null;
+
+/**
+ * Cancel the pending "Reconnecting…" banner timer and clear the banner if it
+ * is currently showing the reconnecting message. Called from:
+ *  - appStateChange (isActive=true) so foreground resumes are always silent
+ *  - window.online handler so network-back events don't race with reconnect
+ */
+export function cancelReconnectBanner() {
+  if (_reconnectBannerTimer) { clearTimeout(_reconnectBannerTimer); _reconnectBannerTimer = null; }
+  // Use type field (not text string) to identify the reconnect banner so this
+  // check survives any future copy/i18n changes to the displayed message.
+  banner.update(b => (b && b.type === 'reconnecting') ? { type: null, text: null, actions: [] } : b);
+}
+
+/**
+ * Reset client-side user state. Call this on explicit logout so that a
+ * re-login as a different user doesn't briefly display the previous user's
+ * contacts before the server sends a fresh existingUsers event.
+ */
+export function resetSocketState() {
+  _localMap = new Map();
+  otherUsers.set(_localMap);
+}
+
 // ── Fix J: module-level Map + microtask batching for otherUsers store ─────────
 // Batches all same-tick socket events into a single Svelte store notification,
 // preventing O(n) store updates when many users report positions simultaneously.
@@ -68,13 +98,10 @@ export function setupSocketHandlers() {
     return;
   }
   handlersRegistered = true;
-  // Only show reconnecting banner if disconnected for more than 4 seconds.
-  // Brief drops (network hiccups, Render cold starts) should be invisible.
-  let _reconnectBannerTimer = null;
 
   socket.on('connect', () => {
     connected = true;
-    if (_reconnectBannerTimer) { clearTimeout(_reconnectBannerTimer); _reconnectBannerTimer = null; }
+    cancelReconnectBanner();
     setBanner({ type: null, text: null, actions: [] });
   });
 
@@ -85,28 +112,36 @@ export function setupSocketHandlers() {
 
   socket.on('disconnect', (reason) => {
     connected = false;
-    // Only show banner after 10s — brief drops on network/background should be invisible.
-    // Android WebView suspends WS when the app is backgrounded; the appStateChange
-    // listener reconnects in <1s on foreground, so 10s covers all normal cases.
+    // Explicit client-initiated disconnect (e.g. logout) — clear stale user data
+    // immediately so a re-login as a different user doesn't briefly see the previous
+    // user's contacts before the server sends a fresh existingUsers event.
+    if (reason === 'io client disconnect') {
+      _localMap = new Map();
+      otherUsers.set(_localMap);
+    }
+    // Start the 10s countdown. Each reconnect_attempt resets it so the banner only
+    // appears if a full 10s elapses without a new attempt — i.e. we're genuinely stuck.
+    // appStateChange (foreground) and window.online both call cancelReconnectBanner()
+    // before calling socket.connect(), so normal background/resume cycles are silent.
+    if (_reconnectBannerTimer) { clearTimeout(_reconnectBannerTimer); _reconnectBannerTimer = null; }
     _reconnectBannerTimer = setTimeout(() => {
       _reconnectBannerTimer = null;
-      if (!connected) setBanner({ type: 'info', text: 'Reconnecting...', actions: [] });
+      if (!connected) setBanner({ type: 'reconnecting', text: 'Reconnecting...', actions: [] });
     }, 10000);
-    // Auth errors need immediate feedback
+    // Auth errors need immediate feedback — skip the timer
     if (reason === 'io server disconnect') {
-      clearTimeout(_reconnectBannerTimer);
-      _reconnectBannerTimer = null;
+      cancelReconnectBanner();
     }
   });
 
   socket.on('connect_error', (err) => {
     const msg = err && err.message ? err.message : '';
     if (msg.includes('Authentication') || msg.includes('session') || msg.includes('401') || msg.includes('403')) {
-      if (_reconnectBannerTimer) { clearTimeout(_reconnectBannerTimer); _reconnectBannerTimer = null; }
+      cancelReconnectBanner();
       setBanner({ type: 'sos', text: 'Session expired. Redirecting to login...', actions: [] });
       setTimeout(() => { window.location.hash = '#/login'; }, 2000);
     }
-    // Other errors: silently retry, banner already scheduled from disconnect
+    // Other errors: silently retry — banner is already scheduled from disconnect
   });
 
   socket.io.on('reconnect', () => {
@@ -119,11 +154,18 @@ export function setupSocketHandlers() {
     }
   });
 
-  // No per-attempt banner — too noisy
-  socket.io.on('reconnect_attempt', () => {});
+  // Reset the 10s banner timer on each reconnect attempt so "Reconnecting…" only
+  // appears when we've been genuinely stuck without any new attempt for 10 seconds.
+  socket.io.on('reconnect_attempt', () => {
+    if (_reconnectBannerTimer) { clearTimeout(_reconnectBannerTimer); _reconnectBannerTimer = null; }
+    _reconnectBannerTimer = setTimeout(() => {
+      _reconnectBannerTimer = null;
+      if (!connected) setBanner({ type: 'reconnecting', text: 'Reconnecting...', actions: [] });
+    }, 10000);
+  });
 
   socket.io.on('reconnect_failed', () => {
-    if (_reconnectBannerTimer) { clearTimeout(_reconnectBannerTimer); _reconnectBannerTimer = null; }
+    cancelReconnectBanner();
     setBanner({ type: 'sos', text: 'Unable to reconnect. Please refresh the page.', actions: [
       { label: 'Refresh', kind: 'btn-primary', onClick: () => window.location.reload() }
     ] });
@@ -298,18 +340,20 @@ export function setupSocketHandlers() {
   });
   socket.on('roomJoined', (data) => {
     setBanner({ type: 'info', text: `Joined room "${data.name}"`, actions: [] }, 2000);
+    bumpHubBadge(false);
   });
   socket.on('roomLeft', (data) => {
     setBanner({ type: 'info', text: `Left room "${data?.name || ''}"`, actions: [] }, 2000);
   });
   socket.on('contactAdded', (data) => {
     setBanner({ type: 'info', text: `Added ${data?.displayName || 'contact'} to contacts`, actions: [] }, 2000);
+    bumpHubBadge(false);
   });
   socket.on('contactRemoved', () => {
     setBanner({ type: 'info', text: 'Contact removed', actions: [] }, 2000);
   });
   socket.on('liveLinkCreated', (data) => {
-    const url = window.location.origin + '/#/live/' + data.token;
+    const url = getShareOrigin() + '/#/live/' + data.token;
     navigator.clipboard.writeText(url).catch(() => {
       // Clipboard write failed (e.g. permissions denied) — show the URL so user can copy manually.
       setBanner({ type: 'info', text: 'Live link: ' + url, actions: [] }, 10000);
@@ -345,6 +389,28 @@ export function setupSocketHandlers() {
     sosNarratives.update(m => { m.set(data.userId, data); return m; });
   });
 
+  // Proximity SOS — someone within 5 km (not a contact) triggered SOS
+  socket.on('proximitySosAlert', (data) => {
+    if (!data) return;
+    const dist = data.distanceKm != null
+      ? (data.distanceKm < 1
+          ? `${Math.round(data.distanceKm * 1000)} m`
+          : `${Number(data.distanceKm).toFixed(1)} km`)
+      : 'nearby';
+    const watchUrl = data.watchToken
+      ? getShareOrigin() + '/#/watch/' + data.watchToken
+      : null;
+    setBanner({
+      type: 'info',
+      text: `Someone ${dist} away has triggered an SOS — can you help?`,
+      actions: [
+        ...(watchUrl ? [{ label: 'View', kind: 'btn-primary', onClick: () => window.open(watchUrl, '_blank') }] : []),
+        { label: 'Dismiss', kind: 'btn-secondary', onClick: () => setBanner({ type: null, text: null, actions: [] }) }
+      ]
+    }, 30000);
+    notifyProximitySOS(data.distanceKm ?? 5).catch(() => {});
+  });
+
   socket.on('sosUpdate', (s) => {
     if (!s) return;
     const sos = s.sos || {};
@@ -353,6 +419,8 @@ export function setupSocketHandlers() {
     // Track active SOS users for AlertOverlay narrative display
     if (s.userId) {
       if (sos.active) {
+        // Bump badge only when this is a new SOS from someone else
+        if (!isMe && !get(activeSosUsers).has(s.userId)) bumpHubBadge(true);
         activeSosUsers.update(m => { m.set(s.userId, s); return m; });
       } else {
         activeSosUsers.update(m => { m.delete(s.userId); return m; });
@@ -373,7 +441,7 @@ export function setupSocketHandlers() {
           : `Your SOS is active: ${reason} — Not yet acknowledged`;
         // SOS banners persist — no auto-clear
         setBanner({ type: 'sos', text: myText, actions: [
-          { label: 'Copy watch link', kind: 'btn-secondary', onClick: () => { if (sos.token) navigator.clipboard.writeText(window.location.origin + '/#/watch/' + sos.token).catch(() => {}); } }
+          { label: 'Copy watch link', kind: 'btn-secondary', onClick: () => { if (sos.token) navigator.clipboard.writeText(getShareOrigin() + '/#/watch/' + sos.token).catch(() => {}); } }
         ] });
       } else {
         const isGeofence = sos.type === 'geofence';
@@ -540,13 +608,48 @@ export function setupSocketHandlers() {
     }, 10000);
   });
 
+  // Share My Ride — server confirms ride link was created
+  socket.on('rideShareStarted', (data) => {
+    if (!data?.token) return;
+    // Use update() to preserve locally-set vehicleType and eta from the component
+    rideShare.update(current => ({
+      ...current,
+      active: true,
+      token: data.token,
+      vehicle: data.vehicle || '',
+      dest: data.dest || '',
+      startedAt: Date.now(),
+    }));
+  });
+
+  // Ride ended by server (token expired or endRide called from another device)
+  socket.on('rideShareError', (data) => {
+    setBanner({ type: 'info', text: data?.message || 'Could not start ride share', actions: [] }, 3000);
+  });
+
+  // Crowd Mode — someone in your festival group has drifted too far
+  socket.on('crowdAlert', (data) => {
+    if (!data?.fromName) return;
+    const dist = data.distanceM != null ? `${data.distanceM}m` : 'far';
+    setBanner({
+      type: 'info',
+      text: `${data.fromName} is ${dist} from the group — check in!`,
+      actions: [
+        { label: 'Dismiss', kind: 'btn-secondary', onClick: () => setBanner({ type: null, text: null, actions: [] }) }
+      ]
+    }, 12000);
+  });
+
   // Network online/offline detection for immediate UX feedback
   if (typeof window !== 'undefined') {
     window.addEventListener('offline', () => {
       setBanner({ type: 'info', text: "You're offline. Positions will be buffered.", actions: [] });
     });
     window.addEventListener('online', () => {
-      setBanner({ type: 'info', text: 'Back online!', actions: [] }, 2000);
+      // Cancel the pending "Reconnecting…" timer — the upcoming socket.connect() will
+      // reconnect quickly and the 'connect' handler will clear the banner naturally.
+      // We do NOT show "Back online!" here because the socket may not be connected yet.
+      cancelReconnectBanner();
       if (!socket.connected) socket.connect();
     });
   }

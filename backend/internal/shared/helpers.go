@@ -4,23 +4,32 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
 )
 
-// SanitizeString removes < > " ' & and truncates to maxLen.
+// htmlEscaper HTML-encodes the five characters that are special in HTML/XML contexts.
+// Using encoding rather than stripping preserves data (e.g. O'Brien, AT&T) while
+// preventing injection in any context that interprets the output as HTML.
+var htmlEscaper = strings.NewReplacer(
+	"&", "&amp;",
+	"<", "&lt;",
+	">", "&gt;",
+	`"`, "&#34;",
+	"'", "&#39;",
+)
+
+// SanitizeString HTML-encodes < > " ' & and truncates the input to maxLen bytes
+// before encoding (preserving the byte-length contract of the original).
 func SanitizeString(val string, maxLen int) string {
 	if maxLen <= 0 {
 		maxLen = 200
 	}
-	re := regexp.MustCompile(`[<>"'&]`)
-	s := re.ReplaceAllString(val, "")
-	if len(s) > maxLen {
-		return s[:maxLen]
+	if len(val) > maxLen {
+		val = val[:maxLen]
 	}
-	return s
+	return htmlEscaper.Replace(val)
 }
 
 // ValidatedPosition holds validated position data.

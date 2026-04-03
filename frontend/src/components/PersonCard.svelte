@@ -1,19 +1,40 @@
 <script>
   import { getUserColor, getUserColorLight } from '../lib/getUserColor.js';
   import FreshnessChip from './primitives/FreshnessChip.svelte';
+  import TiltCard from './primitives/TiltCard.svelte';
   import { focusUser, myLocation } from '../lib/stores/map.js';
+  import { savedPlaces } from '../lib/stores/places.js';
+  import { sosNarratives } from '../lib/stores/sos.js';
   import { calculateDistance, formatDistance } from '../lib/tracking.js';
+  import { computeActivityStatus, formatActivityAge } from '../lib/activityStatus.js';
 
   export let user = null;
   export let onClose = null;
 
-  $: color = user ? getUserColor(user.userId) : '#6366f1';
+  $: color      = user ? getUserColor(user.userId) : '#6366f1';
   $: colorLight = user ? getUserColorLight(user.userId) : 'rgba(99,102,241,0.15)';
 
   $: initials = user
     ? (user.displayName || '').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?'
     : '?';
 
+  // ── Activity status (Feature 6) ──────────────────────────────────────────
+  $: activityStatus = computeActivityStatus(user);
+  $: activityAge    = formatActivityAge(user?.lastSeen);
+
+  // ── Named place detection (Feature 5) ───────────────────────────────────
+  // Check if user is within the radius of any family saved place
+  $: atPlace = (() => {
+    if (!user?.lat || !user?.lng || !$savedPlaces?.length) return null;
+    for (const place of $savedPlaces) {
+      if (place.lat == null || place.lng == null || !place.radiusM) continue;
+      const distM = calculateDistance(user.lat, user.lng, place.lat, place.lng);
+      if (distM <= place.radiusM) return place;
+    }
+    return null;
+  })();
+
+  // ── Distance from me ─────────────────────────────────────────────────────
   $: distanceText = (user?.lat != null && user?.lng != null && $myLocation)
     ? formatDistance(calculateDistance($myLocation.latitude, $myLocation.longitude, user.lat, user.lng))
     : null;
@@ -23,20 +44,103 @@
     if (onClose) onClose();
   }
 
+  // Emergency card — shown when this user has an active SOS with medical data
+  $: emergencyCard = user?.sos?.active ? $sosNarratives.get(user.userId)?.medicalCard || null : null;
+  $: emergencyContacts = emergencyCard?.emergencyContacts?.filter(c => c.name || c.phone) ||
+    ((emergencyCard?.emergencyName || emergencyCard?.emergencyPhone)
+      ? [{ name: emergencyCard.emergencyName, phone: emergencyCard.emergencyPhone, relation: '' }]
+      : []);
+
   function copyCoords() {
     if (!user?.lat || !user?.lng) return;
-    const text = `${user.lat.toFixed(6)}, ${user.lng.toFixed(6)}`;
+    const text = atPlace
+      ? `${user.displayName} is at ${atPlace.name} (${user.lat.toFixed(6)}, ${user.lng.toFixed(6)})`
+      : `${user.lat.toFixed(6)}, ${user.lng.toFixed(6)}`;
     navigator.clipboard?.writeText(text).catch(() => {});
   }
+
+  // Place icon map (matches the icon field from saved places)
+  const PLACE_ICONS = {
+    home:     'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
+    school:   null, // uses book icon
+    work:     null, // uses briefcase
+    gym:      null,
+    hospital: null,
+    default:  null,
+  };
 </script>
 
 {#if user}
-  <div class="person-card" style="--user-color:{color};--user-color-light:{colorLight}">
+<TiltCard intensity={10} shine={true}>
+  <div
+    class="person-card"
+    style:--user-color={color}
+    style:--user-color-light={colorLight}
+  >
     <!-- SOS banner -->
     {#if user.sos?.active}
       <div class="sos-banner" role="alert">
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
         SOS Active — {user.sos.reason || 'Emergency'}
+      </div>
+    {/if}
+
+    <!-- Emergency medical card — shown inline when this user has active SOS + medical data -->
+    {#if emergencyCard}
+      <div class="ec-card" role="region" aria-label="Emergency medical info for {user.displayName || 'this user'}">
+
+        <!-- Blood type + key pills row -->
+        <div class="ec-top">
+          {#if emergencyCard.bloodType}
+            <div class="ec-blood">
+              <span class="ec-blood-label">Blood</span>
+              <span class="ec-blood-val">{emergencyCard.bloodType}</span>
+            </div>
+          {/if}
+          {#if emergencyCard.allergies?.trim()}
+            <span class="ec-pill ec-pill-alert" title="Allergies: {emergencyCard.allergies}">
+              ⚠ {emergencyCard.allergies.length > 28 ? emergencyCard.allergies.slice(0, 28) + '…' : emergencyCard.allergies}
+            </span>
+          {/if}
+          {#if emergencyCard.conditions?.trim()}
+            <span class="ec-pill" title="Conditions: {emergencyCard.conditions}">
+              {emergencyCard.conditions.length > 28 ? emergencyCard.conditions.slice(0, 28) + '…' : emergencyCard.conditions}
+            </span>
+          {/if}
+        </div>
+
+        <!-- Emergency contacts with call buttons -->
+        {#if emergencyContacts.length}
+          <div class="ec-contacts">
+            {#each emergencyContacts as c, i}
+              <div class="ec-contact">
+                <div class="ec-contact-info">
+                  <span class="ec-contact-name">{c.name || 'Contact ' + (i + 1)}</span>
+                  {#if c.relation}<span class="ec-contact-rel">{c.relation}</span>{/if}
+                </div>
+                {#if c.phone}
+                  <a class="ec-call" href="tel:{c.phone}" aria-label="Call {c.name || 'emergency contact'}" on:click|stopPropagation>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 3.07 9.81a19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 2 .92h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L6.09 8.91A16 16 0 0 0 15.1 17.9l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+                    </svg>
+                    {c.phone}
+                  </a>
+                {/if}
+              </div>
+            {/each}
+          </div>
+        {/if}
+
+      </div>
+    {/if}
+
+    <!-- Named place banner (Feature 5) -->
+    {#if atPlace}
+      <div class="place-banner" aria-label="Current location: {atPlace.name}">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+        </svg>
+        at {atPlace.name}
       </div>
     {/if}
 
@@ -51,8 +155,22 @@
       >
         <span class="avatar-initials" style="color:{color}">{initials}</span>
       </div>
+
       <div class="name-block">
         <span class="display-name">{user.displayName || 'Unknown'}</span>
+
+        <!-- Activity status line (Feature 6) -->
+        {#if activityStatus}
+          <span
+            class="activity-status"
+            style:color={activityStatus.color}
+            aria-label="Activity: {activityStatus.label}{activityAge ? ', ' + activityAge : ''}"
+          >
+            <span class="activity-dot" style:background={activityStatus.dotColor} aria-hidden="true"></span>
+            {activityStatus.label}{activityAge ? ' · ' + activityAge : ''}
+          </span>
+        {/if}
+
         <FreshnessChip
           lastSeenMs={user.lastSeen}
           accuracy={user.accuracy}
@@ -60,9 +178,10 @@
           sos={!!user.sos?.active}
         />
       </div>
+
       {#if onClose}
         <button class="close-btn btn btn-icon btn-ghost" on:click={onClose} aria-label="Close">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       {/if}
     </div>
@@ -70,26 +189,43 @@
     <!-- Stat grid -->
     {#if user.lat && user.lng}
       <div class="stat-grid">
-        <div class="stat">
-          <span class="stat-label">Latitude</span>
-          <span class="stat-value">{user.lat.toFixed(5)}°</span>
-        </div>
-        <div class="stat">
-          <span class="stat-label">Longitude</span>
-          <span class="stat-value">{user.lng.toFixed(5)}°</span>
-        </div>
+        {#if atPlace}
+          <!-- When at a named place, show the place prominently instead of raw coords -->
+          <div class="stat stat-place" style:--place-color={color}>
+            <span class="stat-label">Location</span>
+            <span class="stat-value stat-value-place">{atPlace.name}</span>
+          </div>
+          {#if distanceText}
+            <div class="stat">
+              <span class="stat-label">Distance</span>
+              <span class="stat-value">{distanceText}</span>
+            </div>
+          {/if}
+        {:else}
+          <div class="stat">
+            <span class="stat-label">Latitude</span>
+            <span class="stat-value">{user.lat.toFixed(5)}°</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Longitude</span>
+            <span class="stat-value">{user.lng.toFixed(5)}°</span>
+          </div>
+        {/if}
+
         {#if user.accuracy != null}
           <div class="stat">
             <span class="stat-label">Accuracy</span>
             <span class="stat-value">±{Math.round(user.accuracy)}m</span>
           </div>
         {/if}
-        {#if distanceText}
+
+        {#if !atPlace && distanceText}
           <div class="stat">
             <span class="stat-label">Distance</span>
             <span class="stat-value">{distanceText}</span>
           </div>
         {/if}
+
         {#if user.speed != null && user.speed > 0.5}
           <div class="stat">
             <span class="stat-label">Speed</span>
@@ -102,28 +238,153 @@
     <!-- Actions -->
     <div class="card-actions">
       <button class="btn btn-primary btn-sm action-btn" on:click={locateOnMap} disabled={!user.lat}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
         Locate
       </button>
       <button class="btn btn-secondary btn-sm action-btn" on:click={copyCoords} disabled={!user.lat}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
         Copy
       </button>
     </div>
   </div>
+</TiltCard>
 {/if}
 
 <style>
   .person-card {
-    background: var(--glass-1, rgba(255,255,255,0.85));
-    backdrop-filter: var(--blur-md, blur(24px));
-    -webkit-backdrop-filter: var(--blur-md, blur(24px));
-    border: 1px solid var(--glass-border, rgba(255,255,255,0.6));
-    box-shadow: var(--shadow-glass-md, 0 4px 24px rgba(0,0,0,0.12));
-    border-radius: var(--radius-xl, 16px);
+    background: var(--glass-3d, rgba(255,255,255,0.65));
+    backdrop-filter: var(--glass-3d-blur, blur(24px) saturate(2.0));
+    -webkit-backdrop-filter: var(--glass-3d-blur, blur(24px) saturate(2.0));
+    border: 1px solid var(--user-color-light, var(--glass-3d-border));
+    border-top-color: rgba(255, 255, 255, 0.25);
+    /* 3D layered depth with user color glow */
+    box-shadow:
+      0 8px 32px rgba(0,0,0,0.14),
+      0 2px 8px rgba(0,0,0,0.08),
+      0 12px 40px var(--user-color-light, transparent),
+      inset 0 1px 0 rgba(255,255,255,0.20),
+      inset 0 -1px 0 rgba(0,0,0,0.05);
+    border-radius: var(--radius-xl, 20px);
     overflow: hidden;
+    isolation: isolate;
+    transform-style: preserve-3d;
+    transition:
+      box-shadow var(--duration-3d, 250ms) ease,
+      border-color 0.3s ease,
+      transform var(--duration-3d, 250ms) cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
+  /* ── Inline emergency card ─────────────────────────────────────────────── */
+  .ec-card {
+    background: rgba(239, 68, 68, 0.06);
+    border-bottom: 1px solid rgba(239, 68, 68, 0.14);
+  }
+  .ec-top {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 12px;
+  }
+  .ec-blood {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: rgba(239, 68, 68, 0.14);
+    border: 1px solid rgba(239, 68, 68, 0.30);
+    border-radius: 8px;
+    padding: 3px 8px;
+    flex-shrink: 0;
+  }
+  .ec-blood-label {
+    font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--danger-500, #ef4444);
+    line-height: 1;
+  }
+  .ec-blood-val {
+    font-size: 16px;
+    font-weight: 900;
+    color: var(--danger-600, #dc2626);
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .ec-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    color: var(--text-secondary);
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ec-pill-alert {
+    background: rgba(239, 68, 68, 0.10);
+    border-color: rgba(239, 68, 68, 0.25);
+    color: var(--danger-600, #dc2626);
+  }
+  .ec-contacts {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    border-top: 1px solid rgba(239, 68, 68, 0.10);
+  }
+  .ec-contact {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .ec-contact-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+  }
+  .ec-contact-name {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ec-contact-rel {
+    font-size: 9px;
+    font-weight: 500;
+    color: var(--text-tertiary);
+  }
+  .ec-call {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 7px;
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.28);
+    color: var(--success-600, #059669);
+    font-size: 10px;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 120ms ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .ec-call:hover { background: rgba(16, 185, 129, 0.22); }
+
+  /* ── SOS banner ─────────────────────────────────────────────────────────── */
   .sos-banner {
     display: flex;
     align-items: center;
@@ -138,6 +399,21 @@
     text-transform: uppercase;
   }
 
+  /* ── Named place banner (Feature 5) ─────────────────────────────────────── */
+  .place-banner {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    background: rgba(99, 102, 241, 0.08);
+    border-bottom: 1px solid rgba(99, 102, 241, 0.15);
+    color: var(--primary-600, #4f46e5);
+    font-size: var(--text-xs, 11px);
+    font-weight: 700;
+    letter-spacing: 0.03em;
+  }
+
+  /* ── Card header ─────────────────────────────────────────────────────────── */
   .card-header {
     display: flex;
     align-items: center;
@@ -155,11 +431,19 @@
     justify-content: center;
     flex-shrink: 0;
     position: relative;
-    transition: box-shadow 0.3s;
+    /* 3D sphere avatar */
+    box-shadow:
+      0 4px 12px rgba(0, 0, 0, 0.15),
+      inset 0 2px 4px rgba(255, 255, 255, 0.15),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.10);
+    transition: box-shadow 0.3s, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .avatar:hover {
+    transform: perspective(400px) translateZ(4px) scale(1.05);
   }
 
-  .avatar-sos {
-    animation: sos-ring 1.2s ease-in-out infinite;
+  .avatar-sos::after {
+    animation: sos-ring 1.2s ease-out infinite;
   }
 
   .avatar-offline {
@@ -167,9 +451,20 @@
     filter: grayscale(0.6);
   }
 
+  .avatar::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: rgba(239, 68, 68, 0.45);
+    transform: scale(1);
+    opacity: 0;
+    pointer-events: none;
+    will-change: transform, opacity;
+  }
   @keyframes sos-ring {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); }
-    50% { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
+    0%   { transform: scale(1);   opacity: 0.6; }
+    100% { transform: scale(1.9); opacity: 0; }
   }
 
   .avatar-initials {
@@ -183,7 +478,7 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 3px;
     min-width: 0;
   }
 
@@ -194,6 +489,26 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    line-height: 1.2;
+  }
+
+  /* ── Activity status line (Feature 6) ──────────────────────────────────── */
+  .activity-status {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    line-height: 1;
+    opacity: 0.9;
+  }
+
+  .activity-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
   }
 
   .close-btn {
@@ -204,6 +519,7 @@
     min-height: 28px;
   }
 
+  /* ── Stat grid ───────────────────────────────────────────────────────────── */
   .stat-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -219,6 +535,16 @@
     gap: 2px;
     padding: 10px 14px;
     background: var(--glass-1, rgba(255,255,255,0.85));
+    /* 3D inset stat cells */
+    box-shadow:
+      inset 0 1px 3px rgba(0, 0, 0, 0.04),
+      0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  /* Named place stat spans both columns */
+  .stat-place {
+    grid-column: 1 / -1;
+    background: rgba(99, 102, 241, 0.04);
   }
 
   .stat-label {
@@ -236,6 +562,13 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* Place name value is slightly larger and colored */
+  .stat-value-place {
+    font-size: 15px;
+    color: var(--primary-600, #4f46e5);
+  }
+
+  /* ── Actions ─────────────────────────────────────────────────────────────── */
   .card-actions {
     display: flex;
     gap: 8px;

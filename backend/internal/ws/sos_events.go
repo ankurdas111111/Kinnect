@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -105,6 +106,13 @@ func (h *Hub) handleTriggerSOS(c *Client, data json.RawMessage) {
 		reason = "SOS triggered"
 	}
 
+	// Optional medical card snapshot — user-consented, device-local data
+	// sent only when the triggering user has filled out their emergency profile.
+	var medicalCard map[string]interface{}
+	if mc, ok := m["medicalCard"].(map[string]interface{}); ok && len(mc) > 0 {
+		medicalCard = sanitizeMedicalCard(mc)
+	}
+
 	token := generateSosToken()
 	exp := time.Now().UnixMilli() + sosWatchExpiryMs
 	h.setSos(user, true, reason, "", sosType)
@@ -136,6 +144,10 @@ func (h *Hub) handleTriggerSOS(c *Client, data json.RawMessage) {
 				"lastSignalTs":  narrative.LastSignalTs,
 			},
 		}
+		// Include medical card when provided — shown in family AlertOverlay
+		if len(medicalCard) > 0 {
+			narrativePayload["medicalCard"] = medicalCard
+		}
 		h.emitToVisibleAndSelf(user, "sosNarrative", narrativePayload)
 		// Also send to live links
 		tokens := h.Cache.GetLiveTokensForUser(user.UserID)
@@ -143,6 +155,96 @@ func (h *Hub) handleTriggerSOS(c *Client, data json.RawMessage) {
 			h.SendToGroup("live:"+lt, "sosNarrative", narrativePayload)
 		}
 	}
+
+	// ── Proximity SOS broadcast (5 km radius) ──────────────────────────────
+	// Notify nearby active users who are NOT already in the SOS user's visible
+	// set (family/contacts already receive the full sosUpdate above).
+	if user.Latitude != nil && user.Longitude != nil {
+		sosLat, sosLng := *user.Latitude, *user.Longitude
+		watchToken := token // always non-empty at this point
+
+		// Collect socket IDs that already received the full SOS alert.
+		alreadyNotified := make(map[string]bool)
+		for _, sid := range h.Cache.GetVisibleSocketIDs(user) {
+			alreadyNotified[sid] = true
+		}
+		alreadyNotified[user.SocketID] = true
+
+		h.Cache.ForEachActiveUser(func(sid string, u *cache.ActiveUser) {
+			if alreadyNotified[sid] {
+				return
+			}
+			if u.Latitude == nil || u.Longitude == nil {
+				return
+			}
+			distKm := haversineKm(sosLat, sosLng, *u.Latitude, *u.Longitude)
+			if distKm > 5.0 {
+				return
+			}
+			distRounded := math.Round(distKm*10) / 10
+			h.SendToClient(sid, "proximitySosAlert", map[string]interface{}{
+				"distanceKm": distRounded,
+				"watchToken": watchToken,
+			})
+		})
+	}
+}
+
+// sanitizeMedicalCard keeps only known string fields and truncates each to 500 chars.
+// Also sanitizes the emergencyContacts array (max 5 entries, 4 fields each).
+// This prevents injection of unexpected keys and limits payload size.
+func sanitizeMedicalCard(mc map[string]interface{}) map[string]interface{} {
+	allowed := []string{
+		"fullName", "dob", "bloodType",
+		"emergencyName", "emergencyPhone",
+		"conditions", "allergies", "medications",
+		"doctorName", "doctorPhone",
+		"language", "responderNotes",
+	}
+	out := make(map[string]interface{}, len(allowed)+1)
+	for _, k := range allowed {
+		if v, ok := mc[k].(string); ok && v != "" {
+			out[k] = shared.SanitizeString(v, 500)
+		}
+	}
+	// Sanitize emergencyContacts array — up to 5 contacts, 4 string fields each.
+	if contacts, ok := mc["emergencyContacts"].([]interface{}); ok {
+		allowedContactFields := []string{"name", "relation", "phone", "address"}
+		var sanitized []map[string]interface{}
+		for _, raw := range contacts {
+			cm, ok := raw.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			sc := make(map[string]interface{}, 4)
+			for _, f := range allowedContactFields {
+				if v, ok := cm[f].(string); ok && v != "" {
+					sc[f] = shared.SanitizeString(v, 200)
+				}
+			}
+			if len(sc) > 0 {
+				sanitized = append(sanitized, sc)
+			}
+			if len(sanitized) >= 5 {
+				break
+			}
+		}
+		if len(sanitized) > 0 {
+			out["emergencyContacts"] = sanitized
+		}
+	}
+	return out
+}
+
+// haversineKm returns the great-circle distance in kilometres between two lat/lng points.
+func haversineKm(lat1, lon1, lat2, lon2 float64) float64 {
+	const R = 6371.0
+	dLat := (lat2 - lat1) * math.Pi / 180
+	dLon := (lon2 - lon1) * math.Pi / 180
+	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
+		math.Cos(lat1*math.Pi/180)*math.Cos(lat2*math.Pi/180)*
+			math.Sin(dLon/2)*math.Sin(dLon/2)
+	return R * 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
 }
 
 // handleCancelSOS clears SOS, deletes watch token, emits watchUpdate and sosUpdate.

@@ -104,8 +104,24 @@ type ActiveUser struct {
 	SafetyScore   float64 // 0–100, recomputed on each position update
 
 	// Consumer context fields
-	ActivityContext    string        // "At Home" | "Walking" | "Driving" | "" (computed each position update)
+	ActivityContext    string        // "At Home" | "Walking" | "In Transit" | "" (computed each position update)
 	BatteryAlertSentAt map[int]int64 // threshold (20/10/5) -> UnixMilli of last alert sent
+
+	// Ambient status message (user-set, max 60 chars)
+	StatusMessage   string // "" means no active status
+	StatusExpiresAt int64  // Unix ms; 0 = no expiry; auto-cleared by cleanup goroutine
+
+	// Share My Ride — ephemeral ride-share state (cleared on endRide or disconnect)
+	RideShareActive  bool
+	RideShareVehicle string // optional vehicle number, max 15 chars
+	RideShareDest    string // optional destination hint, max 30 chars
+	RideShareToken   string // live link token used for this ride
+
+	// Crowd Stay Together / Festival Mode
+	CrowdModeActive   bool
+	CrowdModeRadiusM  int              // alert radius in metres, default 200
+	CrowdAlertSentAt  map[string]int64 // peerUserID -> UnixMilli of last crowdAlert sent
+
 	GentleAlertSentAt  int64         // unix ms — last "haven't moved" gentle alert sent to guardians
 	SOS              SOS
 	Geofence         Geofence
@@ -673,6 +689,16 @@ func (c *Cache) SanitizeUser(user *ActiveUser) map[string]interface{} {
 		"motionClass":     user.MotionClass,
 		"lastAttestAt":    user.LastAttestAt,
 		"activityContext": user.ActivityContext,
+		"statusMessage":   user.StatusMessage,
+		"rideShare": map[string]interface{}{
+			"active":  user.RideShareActive,
+			"vehicle": user.RideShareVehicle,
+			"dest":    user.RideShareDest,
+		},
+		"crowdMode": map[string]interface{}{
+			"active":  user.CrowdModeActive,
+			"radiusM": user.CrowdModeRadiusM,
+		},
 		"sos": map[string]interface{}{
 			"active": user.SOS.Active,
 			"at":     user.SOS.At,

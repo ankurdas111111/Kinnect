@@ -22,7 +22,7 @@
   let myMarker = null;
   let myPopup = null;
   let hasSetView = false;
-  let isMobile = false;
+  let isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
   let renderUsersRaf = null;
   let pendingUsers = new Map();
   const popupCache = new Map();
@@ -521,7 +521,7 @@
          class:chip-ok={acc > 20 && acc <= 80}
          class:chip-rough={acc > 80}
          aria-label="GPS accuracy {Math.round(acc)}m"
-         style="top: var(--space-3); right: var(--space-3);">
+         style="top: {isMobile ? 'calc(var(--safe-top, 0px) + 116px)' : 'var(--space-3)'}; right: var(--space-3);">
       <span class="chip-dot" aria-hidden="true"></span>
       {acc <= 20 ? `±${Math.round(acc)}m` : acc <= 80 ? `~${Math.round(acc)}m` : 'Rough GPS'}
     </div>
@@ -529,7 +529,7 @@
   {#if $myLocation.speed != null && $myLocation.speed >= 4}
     <div class="map-float-chip chip-speed"
          aria-label="Speed {Math.round($myLocation.speed)} km/h"
-         style="top: calc(var(--space-3) + 32px); right: var(--space-3);">
+         style="top: {isMobile ? 'calc(var(--safe-top, 0px) + 152px)' : 'calc(var(--space-3) + 32px)'}; right: var(--space-3);">
       <span class="chip-dot" aria-hidden="true"></span>
       {Math.round($myLocation.speed)} km/h
     </div>
@@ -612,13 +612,14 @@
 
   :global(.map-pin) {
     cursor: pointer;
-    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.28));
-    transition: opacity 0.2s ease, filter 0.2s ease;
+    filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.32));
+    transition: opacity 0.2s ease, filter 0.2s ease, transform 150ms cubic-bezier(0.34, 1.56, 0.64, 1);
     pointer-events: auto;
     overflow: visible;
   }
   :global(.map-pin:hover) {
-    filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.35));
+    filter: drop-shadow(0 5px 12px rgba(0, 0, 0, 0.40));
+    transform: scale(1.08);
   }
   :global(.map-pin svg) {
     display: block;
@@ -692,16 +693,17 @@
   }
 
   :global(.maplibregl-popup-content) {
+    background: rgba(255, 255, 255, 0.94);
     border-radius: var(--radius-xl, 20px);
     box-shadow:
-      0 8px 32px rgba(0, 0, 0, 0.20),
+      0 12px 40px rgba(0, 0, 0, 0.22),
       0 0 0 1px rgba(0, 0, 0, 0.06),
-      inset 0 1px 0 rgba(255, 255, 255, 0.60);
-    padding: 12px 14px;
+      inset 0 1px 0 rgba(255, 255, 255, 0.70);
+    padding: 14px 16px;
     line-height: 1.5;
     font-family: var(--font-sans, 'Inter', sans-serif);
-    backdrop-filter: blur(20px) saturate(1.8);
-    -webkit-backdrop-filter: blur(20px) saturate(1.8);
+    backdrop-filter: blur(28px) saturate(1.8);
+    -webkit-backdrop-filter: blur(28px) saturate(1.8);
   }
   :global([data-theme="dark"] .maplibregl-popup-content) {
     background: rgba(12, 12, 24, 0.94);
@@ -730,9 +732,9 @@
   }
 
   /* ── Popup content classes (light + dark mode aware) ─────────────────── */
-  :global(.pu-wrap)  { min-width: 180px; font-size: 12px; line-height: 1.5; }
-  :global(.pu-hdr)   { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
-  :global(.pu-name)  { font-size: 14px; font-weight: 700; }
+  :global(.pu-wrap)  { min-width: 190px; font-size: 12px; line-height: 1.5; }
+  :global(.pu-hdr)   { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+  :global(.pu-name)  { font-family: var(--font-display); font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
   :global(.pu-status) { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 600; }
   :global(.pu-dot)   { width: 7px; height: 7px; border-radius: 50%; background: currentColor; display: inline-block; }
   :global(.pu-online)  { color: #22c55e; }
@@ -799,6 +801,9 @@
   :global([data-theme="dark"]) .safety-chip.checkin  { background: rgba(6, 182, 212, 0.22); color: #22d3ee; }
   .safety-icon { font-size: 13px; }
   .safety-detail { opacity: 0.7; font-weight: 500; font-size: 10px; }
+  @media (max-width: 767px) {
+    .safety-overlay { top: calc(var(--safe-top, 0px) + 116px); }
+  }
   @keyframes chip-in {
     from { opacity: 0; transform: translateY(-6px); }
     to { opacity: 1; transform: translateY(0); }
@@ -859,7 +864,7 @@
   /* ── Arrival Intelligence chips ──────────────────────────────────────────── */
   .arrival-chips-container {
     position: absolute;
-    bottom: calc(var(--bottom-tab-height, 64px) + 16px);
+    bottom: calc(var(--bottom-tab-height, 56px) + 16px);
     left: 50%;
     transform: translateX(-50%);
     z-index: 10;

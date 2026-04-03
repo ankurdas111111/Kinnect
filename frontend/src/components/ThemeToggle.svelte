@@ -1,29 +1,56 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
+  import { themeStore, THEMES } from '../lib/stores/theme.js';
+  import ThemePicker from './primitives/ThemePicker.svelte';
 
-  let dark = document.documentElement.getAttribute('data-theme') === 'dark';
-  let observer = null;
+  let pickerOpen = false;
+  let currentTheme = 'dark';
+  let unsubscribe;
 
   onMount(() => {
-    observer = new MutationObserver(() => {
-      dark = document.documentElement.getAttribute('data-theme') === 'dark';
-    });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    unsubscribe = themeStore.subscribe(v => { currentTheme = v; });
   });
+  onDestroy(() => { if (unsubscribe) unsubscribe(); });
 
-  onDestroy(() => { if (observer) observer.disconnect(); });
-
-  function toggle() {
-    dark = !dark;
-    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-    localStorage.setItem('theme', dark ? 'dark' : 'light');
-  }
+  $: themeData = THEMES.find(t => t.id === currentTheme) || THEMES[0];
 </script>
 
-<button class="btn btn-icon btn-ghost" on:click={toggle} title={dark ? 'Light mode' : 'Dark mode'}>
-  {#if dark}
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-  {:else}
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-  {/if}
+<button
+  class="btn btn-icon btn-ghost theme-btn"
+  on:click={() => pickerOpen = true}
+  title="Change theme — currently {themeData.name}"
+  aria-label="Change theme"
+  style="--th-accent: {themeData.colors.accent}"
+>
+  <!-- Palette icon with a dot tinted to the current accent -->
+  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/>
+    <circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/>
+    <circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/>
+    <circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/>
+    <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>
+  </svg>
+  <span class="theme-accent-dot" aria-hidden="true"></span>
 </button>
+
+<ThemePicker bind:open={pickerOpen} />
+
+<style>
+  .theme-btn {
+    position: relative;
+  }
+
+  .theme-accent-dot {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--th-accent, var(--primary-500));
+    border: 1.5px solid var(--surface-0, #080810);
+    box-shadow: 0 0 4px var(--th-accent, var(--primary-500));
+    pointer-events: none;
+    transition: background 300ms var(--ease-out), box-shadow 300ms var(--ease-out);
+  }
+</style>

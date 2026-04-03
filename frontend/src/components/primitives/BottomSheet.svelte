@@ -200,7 +200,7 @@
     position: fixed;
     inset: 0;
     z-index: calc(var(--z-panel) - 1);
-    background: rgba(0, 0, 0, 0.3);
+    background: rgba(0, 0, 0, 0.48);
     opacity: 0;
     transition: opacity var(--duration-normal) var(--ease-out);
     touch-action: none;
@@ -217,17 +217,25 @@
     bottom: 0;
     height: 90vh;
     z-index: var(--z-panel);
-    background: var(--surface-2);
+    /* 3D glass sheet with depth */
+    background: var(--glass-3d);
     border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
-    box-shadow: var(--shadow-sheet);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-3d-border);
+    border-bottom: none;
+    border-top-color: rgba(255, 255, 255, 0.20);
+    box-shadow:
+      var(--elevation-5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.05);
+    backdrop-filter: var(--glass-3d-blur);
+    -webkit-backdrop-filter: var(--glass-3d-blur);
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+    transition: transform 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
     will-change: transform;
     touch-action: none;
+    transform-style: preserve-3d;
   }
 
   .sheet-handle-area {
@@ -245,14 +253,21 @@
   }
 
   .sheet-handle {
-    width: 44px;
-    height: 5px;
+    width: 48px;
+    height: 6px;
     background: var(--gray-300);
     border-radius: 999px;
+    /* 3D raised handle */
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.25);
   }
 
   :global([data-theme="dark"]) .sheet-handle {
-    background: var(--gray-600);
+    background: rgba(255, 255, 255, 0.25);
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.30),
+      inset 0 1px 0 rgba(255, 255, 255, 0.10);
   }
 
   .sheet-header {
@@ -264,9 +279,11 @@
   }
 
   .sheet-header h3 {
+    font-family: var(--font-display);
     font-size: var(--text-lg);
     font-weight: 700;
     margin: 0;
+    letter-spacing: -0.015em;
   }
 
   .sheet-body {

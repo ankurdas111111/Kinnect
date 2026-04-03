@@ -7,13 +7,21 @@
   import Register from './pages/Register.svelte';
   import MainApp from './pages/MainApp.svelte';
   import Monitoring from './pages/Monitoring.svelte';
+  import FamilyDashboard from './pages/FamilyDashboard.svelte';
+  import EmergencyProfile from './pages/EmergencyProfile.svelte';
   import Toast from './components/primitives/Toast.svelte';
 
   const routes = {
     '/': MainApp,
+    '/dashboard': FamilyDashboard,
     '/login': Login,
     '/register': Register,
     '/monitoring': Monitoring,
+    '/emergency': EmergencyProfile,
+    '/activity': wrap({ asyncComponent: () => import('./pages/ActivityFeed.svelte') }),
+    '/replay': wrap({ asyncComponent: () => import('./pages/RoutePlayback.svelte') }),
+    '/checkins': wrap({ asyncComponent: () => import('./pages/CheckinSchedule.svelte') }),
+    '/add-contact/:code': wrap({ asyncComponent: () => import('./pages/AddContact.svelte') }),
     '/live/:token': wrap({ asyncComponent: () => import('./pages/LiveViewer.svelte') }),
     '/watch/:token': wrap({ asyncComponent: () => import('./pages/WatchViewer.svelte') })
   };
@@ -56,12 +64,17 @@
     font-family: var(--font-sans);
   }
   .app-loading-spinner {
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     border: 3px solid var(--border-default);
     border-top-color: var(--primary-500);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
+    /* 3D depth spinner */
+    box-shadow:
+      0 4px 16px rgba(99, 102, 241, 0.20),
+      inset 0 1px 2px rgba(255, 255, 255, 0.10);
+    transform-style: preserve-3d;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 </style>

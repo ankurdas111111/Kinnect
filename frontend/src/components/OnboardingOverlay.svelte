@@ -1,5 +1,5 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onMount } from 'svelte';
   import { authUser } from '../lib/stores/auth.js';
   import { socket } from '../lib/socket.js';
 
@@ -15,20 +15,31 @@
 
   $: shareCode = $authUser?.shareCode || '';
 
-  async function handleAddContact() {
-    if (!contactCode.trim()) return;
+  function handleAddContact() {
+    if (!contactCode.trim() || adding || addSuccess) return;
     adding = true;
     addError = '';
-    socket.emit('addContact', { code: contactCode.trim().toUpperCase() }, (res) => {
-      adding = false;
-      if (res?.ok) {
-        addSuccess = true;
-        setTimeout(() => dispatch('dismiss'), 1200);
-      } else {
-        addError = res?.error || 'Could not find user with that code.';
-      }
-    });
+    // WsCompatSocket does not support ack callbacks — use socket event listeners instead.
+    socket.emit('addContact', { shareCode: contactCode.trim().toUpperCase() });
   }
+
+  onMount(() => {
+    const onContactAdded = () => {
+      adding = false;
+      addSuccess = true;
+      setTimeout(() => dispatch('dismiss'), 1200);
+    };
+    const onContactError = (data) => {
+      adding = false;
+      addError = data?.message || 'Could not find user with that code.';
+    };
+    socket.on('contactAdded', onContactAdded);
+    socket.on('contactError', onContactError);
+    return () => {
+      socket.off('contactAdded', onContactAdded);
+      socket.off('contactError', onContactError);
+    };
+  });
 
   function copyCode() {
     navigator.clipboard?.writeText(shareCode).catch(() => {});
@@ -144,20 +155,29 @@
   }
 
   .onboarding-card {
-    background: var(--glass-2, rgba(255,255,255,0.96));
-    backdrop-filter: var(--blur-md, blur(24px));
-    -webkit-backdrop-filter: var(--blur-md, blur(24px));
-    border: 1px solid var(--glass-border, rgba(255,255,255,0.6));
-    box-shadow: var(--shadow-glass-lg, 0 8px 40px rgba(0,0,0,0.18));
+    background: var(--glass-3d, rgba(255,255,255,0.65));
+    backdrop-filter: var(--glass-3d-blur, blur(24px) saturate(2.0));
+    -webkit-backdrop-filter: var(--glass-3d-blur, blur(24px) saturate(2.0));
+    border: 1px solid var(--glass-3d-border, rgba(255,255,255,0.30));
+    border-top-color: rgba(255, 255, 255, 0.35);
+    /* 3D floating card with deep depth */
+    box-shadow:
+      0 32px 80px rgba(0,0,0,0.25),
+      0 12px 24px rgba(0,0,0,0.15),
+      0 4px 8px rgba(0,0,0,0.10),
+      inset 0 1px 0 rgba(255, 255, 255, 0.20),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.05);
     border-radius: 24px;
     padding: 28px 24px;
     max-width: 360px;
     width: 100%;
-    animation: card-in 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+    /* 3D flip entrance */
+    animation: card-3d-flip-in 500ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: var(--space-4);
+    transform-style: preserve-3d;
   }
 
   :global([data-theme="dark"]) .onboarding-card {
@@ -180,7 +200,8 @@
   .step-dot.active {
     width: 20px;
     border-radius: 3px;
-    background: var(--primary-500);
+    background: linear-gradient(135deg, var(--primary-500), var(--primary-700));
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.30);
   }
 
   .onboarding-step {
@@ -193,22 +214,32 @@
   }
 
   .brand-icon {
-    width: 72px;
-    height: 72px;
-    background: linear-gradient(135deg, rgba(59,130,246,0.12) 0%, rgba(29,78,216,0.08) 100%);
-    border-radius: 20px;
+    width: 76px;
+    height: 76px;
+    background: linear-gradient(135deg, rgba(99,102,241,0.18) 0%, rgba(139,92,246,0.12) 100%);
+    border-radius: 22px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid rgba(59,130,246,0.15);
+    border: 1px solid rgba(99, 102, 241, 0.28);
+    border-top-color: rgba(99, 102, 241, 0.40);
+    /* 3D floating icon */
+    box-shadow:
+      0 8px 28px rgba(99, 102, 241, 0.22),
+      0 2px 8px rgba(99, 102, 241, 0.15),
+      inset 0 2px 4px rgba(255, 255, 255, 0.15),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.08);
+    transform-style: preserve-3d;
+    animation: float-3d 6s ease-in-out infinite;
   }
 
   .onboarding-title {
-    font-size: 20px;
+    font-family: var(--font-display);
+    font-size: 22px;
     font-weight: 800;
     color: var(--text-primary);
     margin: 0;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
   }
 
   .onboarding-desc {
@@ -223,12 +254,14 @@
     display: flex;
     align-items: center;
     gap: 6px;
+    font-family: var(--font-display);
     font-size: 12px;
+    font-weight: 500;
     color: var(--text-tertiary);
-    background: rgba(59,130,246,0.06);
-    border: 1px solid rgba(59,130,246,0.12);
-    border-radius: 8px;
-    padding: 6px 12px;
+    background: rgba(99, 102, 241, 0.06);
+    border: 1px solid rgba(99, 102, 241, 0.14);
+    border-radius: 10px;
+    padding: 7px 14px;
   }
 
   .onboarding-actions {
@@ -241,20 +274,30 @@
 
   .btn-primary-full {
     width: 100%;
-    padding: 14px;
-    border-radius: 12px;
+    padding: 15px;
+    border-radius: 14px;
     background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-700) 100%);
     color: white;
-    font-size: 15px;
-    font-weight: 700;
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 800;
     border: none;
     cursor: pointer;
-    box-shadow: 0 4px 16px rgba(37,99,235,0.40);
-    transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow:
+      0 4px 20px rgba(99, 102, 241, 0.45),
+      inset 0 1px 0 rgba(255, 255, 255, 0.20);
+    transition: transform 140ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 150ms var(--ease-out);
+    letter-spacing: -0.01em;
+  }
+
+  .btn-primary-full:hover {
+    box-shadow:
+      0 6px 28px rgba(99, 102, 241, 0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.20);
   }
 
   .btn-primary-full:active {
-    transform: scale(0.97);
+    transform: scale(0.95);
   }
 
   .btn-ghost-sm {
@@ -262,15 +305,17 @@
     border: none;
     cursor: pointer;
     color: var(--text-tertiary);
-    font-size: 13px;
-    font-weight: 500;
-    padding: 4px 8px;
-    border-radius: 6px;
-    transition: color 0.15s;
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 8px;
+    transition: color 0.15s, background 0.15s;
   }
 
   .btn-ghost-sm:hover {
     color: var(--text-secondary);
+    background: var(--surface-hover);
   }
 
   /* Code block */
@@ -407,7 +452,7 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
   @keyframes card-in {
-    from { opacity: 0; transform: scale(0.88) translateY(20px); }
+    from { opacity: 0; transform: scale(0.90) translateY(24px); }
     to { opacity: 1; transform: scale(1) translateY(0); }
   }
 </style>

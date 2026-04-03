@@ -5,8 +5,8 @@
   export let sidebarOpen = true;
   export let rightPanelOpen = false;
 
-  let isMobile = false;
-  let isTablet = false;
+  let isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
+  let isTablet = typeof window !== 'undefined' ? (window.innerWidth >= 768 && window.innerWidth < 1024) : false;
 
   function checkBreakpoint() {
     const w = window.innerWidth;

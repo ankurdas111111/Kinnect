@@ -193,6 +193,19 @@
   onMount(() => {
     checkMobile();
     window.addEventListener('resize', checkMobile);
+
+    // Silently attempt to open the native Kinnect app if installed.
+    // Uses a hidden iframe so the page URL doesn't change and no error is shown
+    // to the user. If the app intercepts kinnect://, it opens. If not, nothing happens.
+    const isNative = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.();
+    if (!isNative && isMobile && token) {
+      const appFrame = document.createElement('iframe');
+      appFrame.style.cssText = 'display:none;width:0;height:0;border:0;position:absolute;';
+      appFrame.src = `kinnect://live/${token}`;
+      document.body.appendChild(appFrame);
+      setTimeout(() => { try { document.body.removeChild(appFrame); } catch (_) {} }, 2000);
+    }
+
     map = new maplibregl.Map({ container: mapContainer, style: MAP_STYLE, center: [78, 20], zoom: 5, attributionControl: true });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
     freshnessInterval = setInterval(() => {
