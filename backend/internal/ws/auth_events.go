@@ -1050,15 +1050,19 @@ func (h *Hub) handleUpdateSchedule(c *Client, data json.RawMessage) {
 	// Persist to DB in background
 	go func(uid string, ruleList []cache.ScheduleRule) {
 		ctx := context.Background()
-		_, _ = h.pool.DB.ExecContext(ctx, `DELETE FROM sharing_schedules WHERE user_id = $1`, uid)
+		if _, err := h.pool.DB.ExecContext(ctx, `DELETE FROM sharing_schedules WHERE user_id = $1`, uid); err != nil {
+			slog.Error("Failed to delete sharing schedules", "error", err, "userId", uid)
+		}
 		for _, r := range ruleList {
-			_, _ = h.pool.DB.ExecContext(ctx,
+			if _, err := h.pool.DB.ExecContext(ctx,
 				`INSERT INTO sharing_schedules (user_id, target_type, target_id, day_mask, start_time, end_time, enabled, created_at)
 				 VALUES ($1, $2, NULLIF($3,'')::uuid, $4, $5::time, $6::time, $7, $8)`,
 				uid, r.TargetType, r.TargetID, r.DayMask,
 				fmt.Sprintf("%02d:%02d", r.StartMin/60, r.StartMin%60),
 				fmt.Sprintf("%02d:%02d", r.EndMin/60, r.EndMin%60),
-				r.Enabled, time.Now().UnixMilli())
+				r.Enabled, time.Now().UnixMilli()); err != nil {
+				slog.Error("Failed to persist sharing schedule", "error", err, "userId", uid)
+			}
 		}
 	}(user.UserID, rules)
 

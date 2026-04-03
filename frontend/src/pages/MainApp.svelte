@@ -399,6 +399,8 @@
     lastEmittedFix = null;
     lastEmitAt = 0;
     lastCoarseNoticeAt = 0;
+    gpsFilter.reset();
+    speedFilter.reset();
 
     startGeo(
       (pos, forceEmit) => applyFix(pos, forceEmit || !lastAcceptedFix),

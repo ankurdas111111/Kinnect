@@ -264,6 +264,9 @@ func (h *Hub) cleanupCheckInOverdue() {
 		}
 		lastAt := ch.LastCheckInAt
 		if lastAt == 0 {
+			// First evaluation: set baseline to now so the first interval starts counting.
+			// Persist it so the user doesn't reset every cleanup cycle.
+			ch.LastCheckInAt = now
 			lastAt = now
 		}
 		intervalMs := int64(ch.IntervalMin) * 60 * 1000

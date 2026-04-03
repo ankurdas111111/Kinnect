@@ -113,11 +113,10 @@
 <!-- ══════════════════════════════════════════════════════════════════════════
      Scene container — all layers are absolutely positioned inside this box
 ══════════════════════════════════════════════════════════════════════════════ -->
-{@const sceneSize = allMembers.length > 0 ? SCENE : 200}
 <div
   class="fo-scene"
   class:fo-scene-empty={allMembers.length === 0}
-  style="width:min({sceneSize}px,calc(100vw - 20px));height:min({sceneSize}px,calc(100vw - 20px))"
+  style="width:min({allMembers.length > 0 ? SCENE : 200}px,calc(100vw - 20px));height:min({allMembers.length > 0 ? SCENE : 200}px,calc(100vw - 20px))"
   aria-label="Family orbital view"
 >
 

@@ -75,6 +75,18 @@ export function cancelReconnectBanner() {
 export function resetSocketState() {
   _localMap = new Map();
   otherUsers.set(_localMap);
+  pulseMap.set(new Map());
+  sosNarratives.set(new Map());
+  activeSosUsers.set(new Map());
+  arrivalProjections.set(new Map());
+  networkGraph.set(new Map());
+  trailData.set(new Map());
+  myRooms.set([]);
+  myContacts.set([]);
+  myLiveLinks.set([]);
+  mySosActive.set(false);
+  banner.set({ type: null, text: null, actions: [] });
+  drainBuffer(); // flush stale buffered positions
 }
 
 // ── Fix J: module-level Map + microtask batching for otherUsers store ─────────
@@ -145,12 +157,10 @@ export function setupSocketHandlers() {
   });
 
   socket.io.on('reconnect', () => {
-    // Drain offline buffer after a short delay
+    // Drain offline buffer IMMEDIATELY before any new position emits
     if (hasBuffered()) {
-      setTimeout(() => {
-        const batch = drainBuffer();
-        if (batch.length > 0 && socket.connected) socket.emit('positionBatch', batch);
-      }, 500);
+      const batch = drainBuffer();
+      if (batch.length > 0 && socket.connected) socket.emit('positionBatch', batch);
     }
   });
 
@@ -367,12 +377,13 @@ export function setupSocketHandlers() {
   socket.on('pulseReceived', (data) => {
     if (!data || !data.userId) return;
     pulseMap.update(m => {
-      m.set(data.userId, data);
-      return m;
+      const nm = new Map(m);
+      nm.set(data.userId, data);
+      return nm;
     });
     // Auto-expire after 30s
     setTimeout(() => {
-      pulseMap.update(m => { m.delete(data.userId); return m; });
+      pulseMap.update(m => { const nm = new Map(m); nm.delete(data.userId); return nm; });
     }, 30000);
     if (data.type === 'ok') {
       setBanner({ type: 'info', text: `${data.displayName || 'Someone'} sent an I'm OK pulse`, actions: [] }, 5000);
@@ -386,7 +397,7 @@ export function setupSocketHandlers() {
   // SOS Narrative — builds crisis card for AlertOverlay / WatchViewer
   socket.on('sosNarrative', (data) => {
     if (!data || !data.userId) return;
-    sosNarratives.update(m => { m.set(data.userId, data); return m; });
+    sosNarratives.update(m => { const nm = new Map(m); nm.set(data.userId, data); return nm; });
   });
 
   // Proximity SOS — someone within 5 km (not a contact) triggered SOS
@@ -421,9 +432,10 @@ export function setupSocketHandlers() {
       if (sos.active) {
         // Bump badge only when this is a new SOS from someone else
         if (!isMe && !get(activeSosUsers).has(s.userId)) bumpHubBadge(true);
-        activeSosUsers.update(m => { m.set(s.userId, s); return m; });
+        activeSosUsers.update(m => { const nm = new Map(m); nm.set(s.userId, s); return nm; });
       } else {
-        activeSosUsers.update(m => { m.delete(s.userId); return m; });
+        activeSosUsers.update(m => { const nm = new Map(m); nm.delete(s.userId); return nm; });
+        sosNarratives.update(m => { const nm = new Map(m); nm.delete(s.userId); return nm; });
       }
     }
     if (sos.active) {
