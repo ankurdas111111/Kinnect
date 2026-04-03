@@ -128,6 +128,31 @@
   let quoteVisible = true;
   let quoteInterval, shootInterval;
 
+  // ── Gyroscope + scroll parallax ─────────────────────────────────────────────
+  let gx = 0, gy = 0;       // normalised tilt −1…1
+  let scrollY = 0;
+  let scrollRef;
+  let gyroActive = false;
+  const noMotion = typeof window !== 'undefined'
+    && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+  function handleOrientation(e) {
+    if (noMotion) return;
+    const gamma = Math.max(-30, Math.min(30, e.gamma || 0));
+    const beta  = Math.max(-30, Math.min(30, (e.beta || 0) - 55));
+    gx = gamma / 30;
+    gy = beta  / 30;
+    gyroActive = true;
+  }
+  function handleMouseParallax(e) {
+    if (gyroActive || noMotion) return;
+    gx = (e.clientX / window.innerWidth  - 0.5) * 2;
+    gy = (e.clientY / window.innerHeight - 0.5) * 2;
+  }
+  function handleScroll() {
+    scrollY = scrollRef?.scrollTop || 0;
+  }
+
   // ── Entrance animation ─────────────────────────────────────────────────────
   let mounted = false;
   onMount(() => {
@@ -151,18 +176,25 @@
     }
     setTimeout(fireStar, 2000);
     shootInterval = setInterval(fireStar, 11000);
+
+    // Gyroscope (mobile)
+    if (!noMotion && typeof DeviceOrientationEvent !== 'undefined') {
+      window.addEventListener('deviceorientation', handleOrientation, { passive: true });
+    }
   });
   onDestroy(() => {
     clearInterval(clockInterval);
     clearInterval(quoteInterval);
     clearInterval(shootInterval);
+    window.removeEventListener('deviceorientation', handleOrientation);
   });
 </script>
 
-<div class="fd" class:fd-mounted={mounted}>
+<!-- svelte-ignore a11y-no-static-element-interactions -->
+<div class="fd" class:fd-mounted={mounted} bind:this={scrollRef} on:scroll={handleScroll} on:mousemove={handleMouseParallax}>
 
-  <!-- ══ Starfield ══════════════════════════════════════════════════════════ -->
-  <div class="fd-stars" aria-hidden="true">
+  <!-- ══ Starfield — parallax layer 1 (slowest) ═══════════════════════════ -->
+  <div class="fd-stars" style="transform:translate3d({gx*-16}px,{gy*-11 + scrollY*-0.08}px,0)" aria-hidden="true">
     {#each stars as s}
       <span
         class="fd-star {s.cls}"
@@ -171,13 +203,15 @@
     {/each}
   </div>
 
-  <!-- Milky Way band — diagonal gradient strip for cosmic depth -->
-  <div class="fd-milkyway" aria-hidden="true"></div>
+  <!-- Milky Way — parallax layer 2 -->
+  <div class="fd-milkyway" style="transform:translate3d({gx*-22}px,{gy*-15 + scrollY*-0.12}px,0)" aria-hidden="true"></div>
 
-  <!-- Nebula glow layers -->
-  <div class="fd-nebula fd-nebula-a" aria-hidden="true"></div>
-  <div class="fd-nebula fd-nebula-b" aria-hidden="true"></div>
-  <div class="fd-nebula fd-nebula-c" aria-hidden="true"></div>
+  <!-- Nebula — parallax layer 3 (deepest shift, moves most) -->
+  <div class="fd-nebula-layer" style="transform:translate3d({gx*-30}px,{gy*-22 + scrollY*-0.18}px,0)" aria-hidden="true">
+    <div class="fd-nebula fd-nebula-a"></div>
+    <div class="fd-nebula fd-nebula-b"></div>
+    <div class="fd-nebula fd-nebula-c"></div>
+  </div>
 
   <!-- Shooting star -->
   {#if shootingStarActive}
@@ -469,12 +503,14 @@
     transform: translateY(0);
   }
 
-  /* ══ Starfield ════════════════════════════════════════════════════════════ */
+  /* ══ Starfield — parallax layer ═══════════════════════════════════════════ */
   .fd-stars {
     position: fixed;
     inset: 0;
     pointer-events: none;
     z-index: 0;
+    will-change: transform;
+    transition: transform 0.12s ease-out;
   }
   .fd-star {
     position: absolute;
@@ -507,12 +543,14 @@
     50%       { opacity: 0.6; transform: scale(1.2); }
   }
 
-  /* ══ Milky Way band ═══════════════════════════════════════════════════════ */
+  /* ══ Milky Way band — parallax layer ═════════════════════════════════════ */
   .fd-milkyway {
     position: fixed;
     inset: 0;
     pointer-events: none;
     z-index: 0;
+    will-change: transform;
+    transition: transform 0.12s ease-out;
     background: linear-gradient(
       128deg,
       transparent 10%,
@@ -545,9 +583,17 @@
     100% { transform: translateX(110vw) translateY(55px) rotate(28deg); opacity: 0; }
   }
 
-  /* ══ Nebula layers ════════════════════════════════════════════════════════ */
-  .fd-nebula {
+  /* ══ Nebula — parallax layer (deepest shift) ═════════════════════════════ */
+  .fd-nebula-layer {
     position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    will-change: transform;
+    transition: transform 0.14s ease-out;
+  }
+  .fd-nebula {
+    position: absolute;
     border-radius: 50%;
     pointer-events: none;
     filter: blur(80px);
@@ -623,6 +669,14 @@
     flex-direction: column;
     align-items: center;
     padding-top: 4px;
+    /* Depth entrance — fly in from scale(0.88) */
+    opacity: 0;
+    transform: scale(0.88) translateY(35px);
+    transition: opacity 0.9s ease 0.12s, transform 0.9s cubic-bezier(0.34,1.56,0.64,1) 0.12s;
+  }
+  .fd-mounted .fd-cosmos {
+    opacity: 1;
+    transform: scale(1) translateY(0);
   }
 
   /* Top row: greeting left, compact safety ring right */
@@ -727,6 +781,20 @@
     position: relative;
     overflow: hidden;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+    /* CSS 3D float — each chip gently bobs in zero gravity */
+    transform-style: preserve-3d;
+    animation: stat-3d-float 8s ease-in-out infinite;
+    transition: transform 0.25s ease;
+  }
+  .cosmos-stat:nth-child(1) { animation-delay: 0s; }
+  .cosmos-stat:nth-child(2) { animation-delay: 2s; }
+  .cosmos-stat:nth-child(3) { animation-delay: 4s; }
+  .cosmos-stat:nth-child(4) { animation-delay: 6s; }
+  @keyframes stat-3d-float {
+    0%, 100% { transform: perspective(300px) rotateX(3deg)  rotateY(0deg);  }
+    25%       { transform: perspective(300px) rotateX(-1deg) rotateY(5deg);  }
+    50%       { transform: perspective(300px) rotateX(-4deg) rotateY(0deg);  }
+    75%       { transform: perspective(300px) rotateX(-1deg) rotateY(-5deg); }
   }
   .cosmos-stat-val {
     font-size: 18px;
@@ -761,11 +829,26 @@
     50%       { opacity: 0.3; }
   }
 
-  /* ══ Section ══════════════════════════════════════════════════════════════ */
+  /* ══ Section — staggered depth entrance ═══════════════════════════════════ */
   .fd-section {
     position: relative;
     z-index: 1;
     padding: 24px 20px 0;
+    /* Depth entrance */
+    opacity: 0;
+    transform: scale(0.91) translateY(28px);
+  }
+  /* First section (Network) — stagger 0.35s */
+  .fd-mounted .fd-section:first-of-type {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    transition: opacity 0.8s ease 0.35s, transform 0.8s cubic-bezier(0.34,1.56,0.64,1) 0.35s;
+  }
+  /* Second section (Quick Actions) — stagger 0.55s */
+  .fd-mounted .fd-section:last-of-type {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    transition: opacity 0.8s ease 0.55s, transform 0.8s cubic-bezier(0.34,1.56,0.64,1) 0.55s;
   }
   .fd-section-header {
     display: flex;
@@ -1128,7 +1211,9 @@
   @media (prefers-reduced-motion: reduce) {
     .fd-star, .fd-star-bright, .fd-star-blue,
     .fd-nebula, .fd-nebula-a, .fd-nebula-b, .fd-nebula-c,
-    .fd-shooting-star,
+    .fd-shooting-star, .cosmos-stat,
     .cosmos-quote { animation: none !important; transition: none !important; opacity: 1 !important; transform: none !important; }
+    .fd-stars, .fd-milkyway, .fd-nebula-layer { transition: none !important; }
+    .fd-cosmos, .fd-section { opacity: 1 !important; transform: none !important; transition: none !important; }
   }
 </style>
