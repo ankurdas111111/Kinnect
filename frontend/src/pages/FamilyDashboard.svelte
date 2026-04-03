@@ -93,22 +93,70 @@
   $: ringOffset   = CIRC * (1 - safetyScore / 100);
   $: ringColor    = allSafe ? '#10b981' : '#ef4444';
 
-  // ── Deterministic stars ────────────────────────────────────────────────────
-  const stars = Array.from({ length: 55 }, (_, i) => {
+  // ── Deterministic stars (3 size/colour classes) ───────────────────────────
+  const stars = Array.from({ length: 90 }, (_, i) => {
     const a = (i * 2654435761) >>> 0;
     const b = (i * 1664525 + 1013904223) >>> 0;
     return {
-      top:  (a % 1000) / 10,
-      left: (b % 1000) / 10,
-      size: 1 + (a % 25) / 12,
-      delay: (b % 50) / 10,
-      dur:   3 + (a % 45) / 10,
+      top:   (a % 1000) / 10,
+      left:  (b % 1000) / 10,
+      size:  0.9 + (a % 28) / 14,
+      delay: (b % 60) / 10,
+      dur:   2 + (a % 50) / 10,
+      cls:   i % 7 === 0 ? 'fd-star-bright' : i % 4 === 0 ? 'fd-star-blue' : '',
     };
   });
 
+  // ── Shooting star ──────────────────────────────────────────────────────────
+  let shootingStarActive = false;
+  let shootX = 10, shootY = 10;
+
+  // ── Dynamic quotes ─────────────────────────────────────────────────────────
+  const QUOTES = [
+    { text: "Family is not an important thing. It's everything.", author: "Michael J. Fox" },
+    { text: "The bond that links your true family is not blood, but respect and joy in each other's life.", author: "Richard Bach" },
+    { text: "Friends are the family we choose for ourselves.", author: "Edna Buchanan" },
+    { text: "A real friend walks in when the rest of the world walks out.", author: "Walter Winchell" },
+    { text: "In family life, love is the oil that eases friction.", author: "Friedrich Nietzsche" },
+    { text: "Where there is family, there is love that will never fade.", author: "" },
+    { text: "The memories we make with our family are everything.", author: "Candace Cameron Bure" },
+    { text: "Home is wherever I'm with my people.", author: "" },
+    { text: "A friend is one who knows you and loves you just the same.", author: "Elbert Hubbard" },
+    { text: "Family means no one gets left behind or forgotten.", author: "Lilo & Stitch" },
+  ];
+  let quoteIdx = Math.floor(Math.random() * QUOTES.length);
+  let quoteVisible = true;
+  let quoteInterval, shootInterval;
+
   // ── Entrance animation ─────────────────────────────────────────────────────
   let mounted = false;
-  onMount(() => { requestAnimationFrame(() => { mounted = true; }); });
+  onMount(() => {
+    requestAnimationFrame(() => { mounted = true; });
+
+    // Quote rotation — fade out, swap, fade in
+    quoteInterval = setInterval(() => {
+      quoteVisible = false;
+      setTimeout(() => {
+        quoteIdx = (quoteIdx + 1) % QUOTES.length;
+        quoteVisible = true;
+      }, 650);
+    }, 8000);
+
+    // Shooting star: fires 2s after mount, then every ~11s
+    function fireStar() {
+      shootX = 5 + Math.random() * 35;
+      shootY = 5 + Math.random() * 40;
+      shootingStarActive = true;
+      setTimeout(() => { shootingStarActive = false; }, 1300);
+    }
+    setTimeout(fireStar, 2000);
+    shootInterval = setInterval(fireStar, 11000);
+  });
+  onDestroy(() => {
+    clearInterval(clockInterval);
+    clearInterval(quoteInterval);
+    clearInterval(shootInterval);
+  });
 </script>
 
 <div class="fd" class:fd-mounted={mounted}>
@@ -117,16 +165,28 @@
   <div class="fd-stars" aria-hidden="true">
     {#each stars as s}
       <span
-        class="fd-star"
+        class="fd-star {s.cls}"
         style="top:{s.top}%;left:{s.left}%;width:{s.size}px;height:{s.size}px;animation-delay:{s.delay}s;animation-duration:{s.dur}s"
       ></span>
     {/each}
   </div>
 
+  <!-- Milky Way band — diagonal gradient strip for cosmic depth -->
+  <div class="fd-milkyway" aria-hidden="true"></div>
+
   <!-- Nebula glow layers -->
   <div class="fd-nebula fd-nebula-a" aria-hidden="true"></div>
   <div class="fd-nebula fd-nebula-b" aria-hidden="true"></div>
   <div class="fd-nebula fd-nebula-c" aria-hidden="true"></div>
+
+  <!-- Shooting star -->
+  {#if shootingStarActive}
+    <span
+      class="fd-shooting-star"
+      style="top:{shootY}%;left:{shootX}%"
+      aria-hidden="true"
+    ></span>
+  {/if}
 
   <!-- ══ Header ═════════════════════════════════════════════════════════════ -->
   <header class="fd-header">
@@ -184,6 +244,15 @@
 
     <!-- Full-width orbit visualization -->
     <FamilyOrbit />
+
+    <!-- Dynamic family/friendship quote -->
+    <div class="cosmos-quote" class:quote-visible={quoteVisible} aria-live="polite" aria-atomic="true">
+      <span class="quote-glyph" aria-hidden="true">"</span>
+      <p class="quote-text">{QUOTES[quoteIdx].text}</p>
+      {#if QUOTES[quoteIdx].author}
+        <span class="quote-author">— {QUOTES[quoteIdx].author}</span>
+      {/if}
+    </div>
 
     <!-- Stats strip — 4 inline chips -->
     <div class="cosmos-stats">
@@ -410,12 +479,70 @@
   .fd-star {
     position: absolute;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.7);
+    background: rgba(255, 255, 255, 0.65);
     animation: star-twinkle linear infinite;
   }
+  /* Bright star class — extra glow */
+  .fd-star-bright {
+    background: rgba(255, 255, 255, 0.95) !important;
+    box-shadow: 0 0 3px rgba(255,255,255,0.6), 0 0 6px rgba(200,200,255,0.3);
+    animation: star-twinkle-bright linear infinite !important;
+  }
+  /* Blue-tinted star class */
+  .fd-star-blue {
+    background: rgba(180, 200, 255, 0.75) !important;
+    animation: star-twinkle-blue linear infinite !important;
+  }
   @keyframes star-twinkle {
-    0%, 100% { opacity: 0.15; transform: scale(1); }
-    50%       { opacity: 0.8;  transform: scale(1.3); }
+    0%, 100% { opacity: 0.12; transform: scale(1); }
+    50%       { opacity: 0.75; transform: scale(1.25); }
+  }
+  @keyframes star-twinkle-bright {
+    0%, 100% { opacity: 0.3;  transform: scale(1); }
+    40%       { opacity: 1.0; transform: scale(1.5); box-shadow: 0 0 6px rgba(255,255,255,0.8); }
+    60%       { opacity: 0.9; transform: scale(1.3); }
+  }
+  @keyframes star-twinkle-blue {
+    0%, 100% { opacity: 0.1;  transform: scale(1); }
+    50%       { opacity: 0.6; transform: scale(1.2); }
+  }
+
+  /* ══ Milky Way band ═══════════════════════════════════════════════════════ */
+  .fd-milkyway {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background: linear-gradient(
+      128deg,
+      transparent 10%,
+      rgba(160, 120, 255, 0.018) 28%,
+      rgba(120, 160, 255, 0.028) 38%,
+      rgba(180, 140, 255, 0.022) 48%,
+      rgba(100, 180, 255, 0.016) 58%,
+      transparent 72%
+    );
+  }
+
+  /* ══ Shooting star ════════════════════════════════════════════════════════ */
+  .fd-shooting-star {
+    position: fixed;
+    width: 130px;
+    height: 1.5px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.95) 40%, rgba(200,220,255,0.6), transparent);
+    border-radius: 2px;
+    transform: rotate(28deg);
+    transform-origin: left center;
+    animation: shoot-across 1.2s cubic-bezier(0.15, 0, 0.75, 1) forwards;
+    pointer-events: none;
+    z-index: 0;
+    filter: drop-shadow(0 0 2px rgba(255,255,255,0.7)) drop-shadow(0 0 6px rgba(180,200,255,0.4));
+  }
+  @keyframes shoot-across {
+    0%   { transform: translateX(0)    translateY(0)   rotate(28deg); opacity: 0; }
+    6%   { opacity: 1; }
+    82%  { opacity: 0.9; }
+    100% { transform: translateX(110vw) translateY(55px) rotate(28deg); opacity: 0; }
   }
 
   /* ══ Nebula layers ════════════════════════════════════════════════════════ */
@@ -428,25 +555,26 @@
   .fd-nebula-a {
     width: 600px; height: 500px;
     top: -180px; left: -120px;
-    background: radial-gradient(ellipse, rgba(99,102,241,0.18) 0%, transparent 70%);
+    background: radial-gradient(ellipse, rgba(99,102,241,0.20) 0%, transparent 70%);
     animation: nebula-drift 28s ease-in-out infinite;
   }
   .fd-nebula-b {
     width: 500px; height: 500px;
     bottom: -100px; right: -100px;
-    background: radial-gradient(ellipse, rgba(16,185,129,0.12) 0%, transparent 70%);
+    background: radial-gradient(ellipse, rgba(16,185,129,0.14) 0%, transparent 70%);
     animation: nebula-drift 35s ease-in-out infinite reverse;
   }
   .fd-nebula-c {
     width: 400px; height: 400px;
     top: 40%; left: 55%;
-    background: radial-gradient(ellipse, rgba(139,92,246,0.10) 0%, transparent 70%);
+    background: radial-gradient(ellipse, rgba(139,92,246,0.12) 0%, transparent 70%);
     animation: nebula-drift 22s ease-in-out infinite;
   }
+  /* Nebula now breathes (scale pulse) + drifts */
   @keyframes nebula-drift {
-    0%, 100% { transform: translate(0, 0) scale(1); }
-    33%       { transform: translate(40px, 60px) scale(1.06); }
-    66%       { transform: translate(-30px, 30px) scale(0.96); }
+    0%, 100% { transform: translate(0,    0)    scale(1.00); opacity: 1.0; }
+    33%       { transform: translate(40px, 60px) scale(1.08); opacity: 0.82; }
+    66%       { transform: translate(-30px,30px) scale(0.94); opacity: 0.90; }
   }
 
   /* ══ Header ═══════════════════════════════════════════════════════════════ */
@@ -941,5 +1069,66 @@
   @keyframes action-sos {
     0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.25); }
     50%       { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
+  }
+
+  /* ══ Dynamic quote ════════════════════════════════════════════════════════ */
+  .cosmos-quote {
+    position: relative;
+    width: calc(100% - 40px);
+    padding: 10px 20px 12px;
+    margin: 0 0 6px;
+    text-align: center;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.65s ease, transform 0.65s ease;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .cosmos-quote.quote-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  /* Giant decorative opening quote mark */
+  .quote-glyph {
+    position: absolute;
+    top: -8px;
+    left: 12px;
+    font-size: 72px;
+    line-height: 1;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-style: italic;
+    color: rgba(139, 92, 246, 0.18);
+    pointer-events: none;
+    user-select: none;
+    letter-spacing: -0.05em;
+  }
+  .quote-text {
+    position: relative;
+    font-size: 12.5px;
+    font-style: italic;
+    font-family: Georgia, 'Times New Roman', serif;
+    color: rgba(255, 255, 255, 0.48);
+    line-height: 1.7;
+    letter-spacing: 0.015em;
+    margin: 0 0 5px;
+    padding: 0 8px;
+  }
+  .quote-author {
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    font-style: normal;
+    font-family: var(--font-sans, system-ui, sans-serif);
+    color: rgba(139, 92, 246, 0.6);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* ══ Reduced motion ═══════════════════════════════════════════════════════ */
+  @media (prefers-reduced-motion: reduce) {
+    .fd-star, .fd-star-bright, .fd-star-blue,
+    .fd-nebula, .fd-nebula-a, .fd-nebula-b, .fd-nebula-c,
+    .fd-shooting-star,
+    .cosmos-quote { animation: none !important; transition: none !important; opacity: 1 !important; transform: none !important; }
   }
 </style>
