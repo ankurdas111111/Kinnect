@@ -140,6 +140,7 @@ export function createPersonMarker(options = {}) {
     isSos = false,
     presenceState = 'gone',
     motionClass = '',
+    quietHoursActive = false,
   } = options;
 
   const initials = (displayName || '?')
@@ -209,11 +210,17 @@ export function createPersonMarker(options = {}) {
     ? `<div style="width:9px;height:9px;border-radius:50%;background:${badgeColor};border:1.5px solid rgba(8,8,20,0.9);position:absolute;bottom:-2px;right:-2px;pointer-events:none;"></div>`
     : '';
 
+  // Moon badge for quiet hours (top-left corner)
+  const moonBadge = quietHoursActive && !isSelf && !isSos
+    ? `<div style="position:absolute;top:-4px;left:-4px;width:14px;height:14px;border-radius:50%;background:rgba(99,102,241,0.85);border:1.5px solid rgba(8,8,20,0.9);display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:8px;" title="Quiet Hours active">🌙</div>`
+    : '';
+
   el.innerHTML =
     `<div style="width:42px;height:42px;border-radius:50%;background:rgba(8,8,20,0.92);border:${ringBorder};box-shadow:${ringGlow};display:flex;align-items:center;justify-content:center;position:relative;opacity:${opacity};${animation}">`
     + `<span style="font-family:Inter,sans-serif;font-size:13px;font-weight:800;color:${textColor};text-transform:uppercase;letter-spacing:-0.02em;user-select:none;">${escapeAttr(initials)}</span>`
     + sosSvg
     + motionBadge
+    + moonBadge
     + `</div>`
     + `<div style="width:2px;height:7px;background:${tailColor};border-radius:0 0 2px 2px;margin:0 auto;opacity:0.6;"></div>`;
 

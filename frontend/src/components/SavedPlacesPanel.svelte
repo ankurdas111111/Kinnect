@@ -188,7 +188,6 @@
       persist(PALERT_KEY, next);
       return next;
     });
-    socket.emit('createPlaceAlert', { targetId: alertTargetId, placeId: alertPlaceId, onArrive: alertOnArrive, onDepart: alertOnDepart });
     alertTargetId = '';
     alertPlaceId = '';
     banner.set({ type: 'info', text: 'Arrival/departure alert added', actions: [] });
@@ -201,7 +200,6 @@
       persist(PALERT_KEY, next);
       return next;
     });
-    socket.emit('deletePlaceAlert', { id: alertId });
   }
 
   // ── Speed Alerts ─────────────────────────────────────────────────────────────
@@ -219,7 +217,6 @@
       persist(SALERT_KEY, next);
       return next;
     });
-    socket.emit('createSpeedAlert', { targetId: speedTargetId, thresholdKmh: speedThreshold });
     speedTargetId = '';
     banner.set({ type: 'info', text: `Speed alert set — you'll be notified above ${speedThreshold} km/h`, actions: [] });
     setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 2500);
@@ -231,7 +228,6 @@
       persist(SALERT_KEY, next);
       return next;
     });
-    socket.emit('deleteSpeedAlert', { id: alertId });
   }
 
   function getUserName(userId) {
@@ -249,9 +245,9 @@
   <div class="panel-body places-panel">
 
     <!-- ── Your Spots ─────────────────────────────────────────────────── -->
-    <h4 class="section-title-bold">Your Spots</h4>
+    <h4 class="section-title-bold">Saved Places</h4>
     <div class="section-content">
-      <p class="hint">Pin locations (home, work, etc.) at your current GPS position. These are used to trigger arrival and departure alerts below.</p>
+      <p class="hint">Save places like home or work. You'll get notified when family members arrive or leave.</p>
 
       {#each $savedPlaces as place}
         <div class="list-item">
@@ -270,7 +266,7 @@
             {#if storyLoading}
               <p class="story-empty">Loading...</p>
             {:else if storyVisits.length === 0}
-              <p class="story-empty">No visits recorded yet (last 7 days).</p>
+              <p class="story-empty">No visits in the last 7 days.</p>
             {:else}
               {#each storyVisits as v}
                 <div class="story-row">
@@ -297,7 +293,7 @@
             type="text"
             bind:value={newPlaceName}
             class="field-input field-full"
-            placeholder="Give it a name (Home, Work, Mom's...)"
+            placeholder="Name this place (Home, Work, School...)"
             maxlength="100"
             autocomplete="off"
           />
@@ -315,25 +311,25 @@
           </div>
           <div class="form-actions">
             <button class="btn btn-primary btn-sm" on:click={addPlace} disabled={!newPlaceName.trim()}>
-              Save at My Location
+              Save This Place
             </button>
             <button class="btn btn-secondary btn-sm" on:click={() => { showAddPlace = false; newPlaceName = ''; }}>Cancel</button>
           </div>
         </div>
       {:else}
-        <button class="btn btn-secondary btn-sm add-btn" on:click={() => showAddPlace = true}>+ Add Place</button>
+        <button class="btn btn-secondary btn-sm add-btn" on:click={() => showAddPlace = true}>Add a Place</button>
       {/if}
     </div>
 
     <hr class="divider" />
 
     <!-- ── Arrival Pings ──────────────────────────────────────────────── -->
-    <h4 class="section-title-bold">Arrival Pings</h4>
+    <h4 class="section-title-bold">Arrival Alerts</h4>
     <div class="section-content">
-      <p class="hint">Get notified when a tracked person enters or leaves one of your saved spots. Requires location sharing to be active.</p>
+      <p class="hint">Get notified when someone arrives at or leaves one of your saved places.</p>
 
       {#if $placeAlerts.length === 0}
-        <p class="empty">No arrival alerts. Add one for home so your family knows you made it.</p>
+        <p class="empty">No alerts yet. Add one for home so your family knows when you arrive.</p>
       {/if}
       {#each $placeAlerts as alert}
         <div class="list-item">
@@ -352,38 +348,38 @@
         <div class="add-form">
           <div class="form-row">
             <select bind:value={alertTargetId} class="field-input field-sm">
-              <option value="">Who to watch?</option>
+              <option value="">Choose a person</option>
               {#each visibleUsers as u}
                 <option value={u.id}>{u.name}</option>
               {/each}
             </select>
             <select bind:value={alertPlaceId} class="field-input field-sm">
-              <option value="">Which place?</option>
+              <option value="">Choose a place</option>
               {#each $savedPlaces as p}
                 <option value={p.id}>{iconEmoji[p.icon] ?? '📍'} {p.name}</option>
               {/each}
             </select>
           </div>
           <div class="form-row">
-            <label class="check-label"><input type="checkbox" bind:checked={alertOnArrive} /> On arrival</label>
-            <label class="check-label"><input type="checkbox" bind:checked={alertOnDepart} /> On departure</label>
+            <label class="check-label"><input type="checkbox" bind:checked={alertOnArrive} /> When they arrive</label>
+            <label class="check-label"><input type="checkbox" bind:checked={alertOnDepart} /> When they leave</label>
             <button class="btn btn-primary btn-sm" on:click={addPlaceAlert} disabled={!alertTargetId || !alertPlaceId || (!alertOnArrive && !alertOnDepart)}>Add</button>
           </div>
         </div>
       {:else}
-        <p class="empty">Add a saved place above first.</p>
+        <p class="empty">Save a place first to set up alerts.</p>
       {/if}
     </div>
 
     <hr class="divider" />
 
     <!-- ── Speed Checks ─────────────────────────────────────────────────── -->
-    <h4 class="section-title-bold">Speed Checks</h4>
+    <h4 class="section-title-bold">Speed Alerts</h4>
     <div class="section-content">
-      <p class="hint">Get notified when a tracked person exceeds a speed limit. Useful for monitoring young drivers or detecting unsafe driving.</p>
+      <p class="hint">Get a heads-up when someone drives faster than a set limit.</p>
 
       {#if $speedAlerts.length === 0}
-        <p class="empty">No speed alerts. Add one if you'd like to be gently judged.</p>
+        <p class="empty">No speed alerts yet.</p>
       {/if}
       {#each $speedAlerts as sa}
         <div class="list-item">
@@ -399,7 +395,7 @@
       <div class="add-form">
         <div class="form-row">
           <select bind:value={speedTargetId} class="field-input field-sm">
-            <option value="">Who to watch?</option>
+            <option value="">Choose a person</option>
             {#each visibleUsers as u}
               <option value={u.id}>{u.name}</option>
             {/each}
@@ -418,11 +414,11 @@
 {:else}
   <div class="panel-shell panel-left panel-base">
     <div class="panel-header">
-      <h3>Places & Alerts</h3>
+      <h3>Places</h3>
       <button class="panel-close" on:click={() => dispatch('close')} aria-label="Close">&times;</button>
     </div>
     <div class="panel-body">
-      <p>Use the sidebar Places tab.</p>
+      <p>Open Places from the sidebar.</p>
     </div>
   </div>
 {/if}

@@ -74,27 +74,27 @@
             </svg>
           </div>
           <h2 class="onboarding-title">Welcome to Kinnect</h2>
-          <p class="onboarding-desc">To share your location with family, Kinnect needs access to your device's GPS. Your location is only shared with people you choose.</p>
+          <p class="onboarding-desc">Kinnect lets your family see where you are in real time. To get started, we need your location — it's only shared with people you invite.</p>
           <div class="privacy-note">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            Private &amp; end-to-end secure. Never sold.
+            Your location is private. Only your family can see it.
           </div>
           <div class="onboarding-actions">
             <button class="btn-primary-full" on:click={() => { dispatch('requestPermission'); step = 2; }}>
-              Allow location access
+              Turn on location
             </button>
-            <button class="btn-ghost-sm" on:click={() => step = 2}>Skip for now</button>
+            <button class="btn-ghost-sm" on:click={() => step = 2}>Maybe later</button>
           </div>
         </div>
       {:else}
         <!-- Step 2: Add first person -->
         <div class="onboarding-step" role="tabpanel" aria-label="Step 2: Add a contact">
-          <h2 class="onboarding-title">Add someone</h2>
-          <p class="onboarding-desc">Share your code with a family member, or enter their code to connect.</p>
+          <h2 class="onboarding-title">Connect with family</h2>
+          <p class="onboarding-desc">Send your code to a family member, or type in theirs to start sharing locations.</p>
 
           <!-- Your share code -->
           <div class="code-block">
-            <span class="code-label">Your share code</span>
+            <span class="code-label">Your family code</span>
             <div class="code-display">
               <span class="code-value">{shareCode || '—'}</span>
               <button class="copy-btn" on:click={copyCode} aria-label="Copy or share code" disabled={!shareCode}>
@@ -107,7 +107,7 @@
           <div class="input-row">
             <input
               class="code-input"
-              placeholder="Enter their code"
+              placeholder="Their family code"
               bind:value={contactCode}
               maxlength="10"
               style="text-transform:uppercase"
@@ -127,11 +127,11 @@
             <span class="add-error">{addError}</span>
           {/if}
           {#if addSuccess}
-            <span class="add-success">Connected!</span>
+            <span class="add-success">You're connected!</span>
           {/if}
 
           <button class="btn-ghost-sm" style="margin-top: var(--space-4)" on:click={() => dispatch('dismiss')}>
-            Done
+            I'm all set
           </button>
         </div>
       {/if}
@@ -425,7 +425,7 @@
 
   .add-btn:hover:not(:disabled) { background: var(--primary-600); }
   .add-btn:active:not(:disabled) { transform: scale(0.95); }
-  .add-btn:disabled { opacity: 0.6; cursor: default; }
+  .add-btn:disabled { opacity: 0.35; cursor: default; pointer-events: none; }
 
   .add-error {
     font-size: 12px;

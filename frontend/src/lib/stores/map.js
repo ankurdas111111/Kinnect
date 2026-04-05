@@ -17,3 +17,28 @@ export const mySafetyStatus = writable({
  * Automatically resets to null after the map consumes it.
  */
 export const focusUser = writable(null);
+
+/**
+ * Set to { lng, lat, zoom? } to fly the map to that location.
+ * Automatically resets to null after the map consumes it.
+ */
+export const mapFlyTo = writable(null);
+
+/**
+ * Set to a GeoJSON LineString geometry to draw a route polyline on the map.
+ * Set to null to clear the route.
+ */
+export const routeGeometry = writable(null);
+
+/**
+ * Set to { lat, lng, name } to pre-fill Walk With Me destination and open the modal.
+ * Components that render WalkWithMe should subscribe and open their modal when set.
+ */
+export const walkDestination = writable(null);
+
+/**
+ * Navigation state for turn-by-turn directions.
+ * Set to { active: true, destLat, destLng, destName, routeCoords: [[lng,lat],...] }
+ * to enter navigation mode. Set to { active: false } to exit.
+ */
+export const navigationState = writable({ active: false });

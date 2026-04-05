@@ -55,26 +55,34 @@
   }
 
   // ── Socket trail request ────────────────────────────────────────────────────
+  let trailTimeout;
   function requestTrail() {
-    if (!targetUserId) { loading = false; error = 'No user specified'; return; }
+    if (!targetUserId) { loading = false; error = 'Choose someone to see their route'; return; }
+    if (loading) return;
     loading = true;
     error = null;
     playing = false;
     playProgress = 0;
     playIndex = 0;
     socket.emit('getRecentTrail', { targetUserId, windowMinutes });
+    clearTimeout(trailTimeout);
+    trailTimeout = setTimeout(() => {
+      if (loading) { loading = false; error = 'Took too long — try again'; }
+    }, 15000);
   }
 
   function onTrailData(data) {
+    clearTimeout(trailTimeout);
     loading = false;
     points = (data.points || data || []).slice().sort((a, b) => a.ts - b.ts);
-    if (points.length === 0) { error = 'No position data in this window'; return; }
+    if (points.length === 0) { error = 'No location data for this time'; return; }
     renderTrail();
   }
 
   function onTrailError(data) {
+    clearTimeout(trailTimeout);
     loading = false;
-    error = data?.error || 'Could not load trail';
+    error = data?.error || 'Could not load the route';
   }
 
   // ── MapLibre GL ─────────────────────────────────────────────────────────────
@@ -211,6 +219,7 @@
 
   onDestroy(() => {
     clearTimeout(playTimer);
+    clearTimeout(trailTimeout);
     socket.off('recentTrail', onTrailData);
     socket.off('trailError', onTrailError);
     if (map) map.remove();
@@ -263,7 +272,7 @@
         <div class="spinner" aria-label="Loading trail data"></div>
         <p>Loading route…</p>
       </div>
-    {:else if error === 'No user specified'}
+    {:else if error === 'Choose someone to see their route'}
       <div class="map-overlay" transition:fade={{ duration: 200 }}>
         <div class="empty-icon" aria-hidden="true">
           <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M3 12h18M12 3l9 9-9 9-9-9 9-9z"/></svg>

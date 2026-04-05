@@ -140,7 +140,7 @@ export function setupSocketHandlers() {
     if (_reconnectBannerTimer) { clearTimeout(_reconnectBannerTimer); _reconnectBannerTimer = null; }
     _reconnectBannerTimer = setTimeout(() => {
       _reconnectBannerTimer = null;
-      if (!connected) setBanner({ type: 'reconnecting', text: 'Reconnecting...', actions: [] });
+      if (!connected) setBanner({ type: 'reconnecting', text: 'Trying to reconnect...', actions: [] });
     }, 10000);
     // Auth errors need immediate feedback — skip the timer
     if (reason === 'io server disconnect') {
@@ -152,7 +152,7 @@ export function setupSocketHandlers() {
     const msg = err && err.message ? err.message : '';
     if (msg.includes('Authentication') || msg.includes('session') || msg.includes('401') || msg.includes('403')) {
       cancelReconnectBanner();
-      setBanner({ type: 'sos', text: 'Session expired. Redirecting to login...', actions: [] });
+      setBanner({ type: 'sos', text: 'Your session has ended. Signing you in again...', actions: [] });
       setTimeout(() => { window.location.hash = '#/login'; }, 2000);
     }
     // Other errors: silently retry — banner is already scheduled from disconnect
@@ -172,13 +172,13 @@ export function setupSocketHandlers() {
     if (_reconnectBannerTimer) { clearTimeout(_reconnectBannerTimer); _reconnectBannerTimer = null; }
     _reconnectBannerTimer = setTimeout(() => {
       _reconnectBannerTimer = null;
-      if (!connected) setBanner({ type: 'reconnecting', text: 'Reconnecting...', actions: [] });
+      if (!connected) setBanner({ type: 'reconnecting', text: 'Trying to reconnect...', actions: [] });
     }, 10000);
   });
 
   socket.io.on('reconnect_failed', () => {
     cancelReconnectBanner();
-    setBanner({ type: 'sos', text: 'Unable to reconnect. Please refresh the page.', actions: [
+    setBanner({ type: 'sos', text: "Can't reach Kinnect right now. Try refreshing.", actions: [
       { label: 'Refresh', kind: 'btn-primary', onClick: () => window.location.reload() }
     ] });
   });
@@ -343,42 +343,41 @@ export function setupSocketHandlers() {
         return true;
       }));
     }
-    const statusMsg = data.status === 'active' ? 'approved' : data.status === 'denied' ? 'denied' : data.status === 'revoked' ? 'revoked' : data.status === 'expired' ? 'expired' : data.status;
-    setBanner({ type: 'info', text: 'Guardian relationship ' + statusMsg, actions: [] }, 2000);
+    const statusMsg = data.status === 'active' ? 'accepted' : data.status === 'denied' ? 'declined' : data.status === 'revoked' ? 'ended' : data.status === 'expired' ? 'expired' : data.status;
+    setBanner({ type: 'info', text: 'Guardian request ' + statusMsg, actions: [] }, 2000);
   });
 
   // Room/contact action results
   socket.on('roomError', (data) => {
-    setBanner({ type: 'info', text: data?.message || 'Room error', actions: [] }, 2500);
+    setBanner({ type: 'info', text: data?.message || 'Something went wrong with this room', actions: [] }, 2500);
   });
   socket.on('contactError', (data) => {
-    setBanner({ type: 'info', text: data?.message || 'Contact error', actions: [] }, 2500);
+    setBanner({ type: 'info', text: data?.message || 'Could not update this contact', actions: [] }, 2500);
   });
   socket.on('roomCreated', (data) => {
-    setBanner({ type: 'info', text: `Room "${data.name}" created! Code: ${data.code}`, actions: [] }, 3000);
+    setBanner({ type: 'info', text: `"${data.name}" created — share code ${data.code} with family`, actions: [] }, 4000);
   });
   socket.on('roomJoined', (data) => {
-    setBanner({ type: 'info', text: `Joined room "${data.name}"`, actions: [] }, 2000);
+    setBanner({ type: 'info', text: `You joined "${data.name}"`, actions: [] }, 2000);
     bumpHubBadge(false);
   });
   socket.on('roomLeft', (data) => {
-    setBanner({ type: 'info', text: `Left room "${data?.name || ''}"`, actions: [] }, 2000);
+    setBanner({ type: 'info', text: `You left "${data?.name || 'the room'}"`, actions: [] }, 2000);
   });
   socket.on('contactAdded', (data) => {
-    setBanner({ type: 'info', text: `Added ${data?.displayName || 'contact'} to contacts`, actions: [] }, 2000);
+    setBanner({ type: 'info', text: `${data?.displayName || 'Contact'} added to your family`, actions: [] }, 2000);
     bumpHubBadge(false);
   });
   socket.on('contactRemoved', () => {
-    setBanner({ type: 'info', text: 'Contact removed', actions: [] }, 2000);
+    setBanner({ type: 'info', text: 'Contact removed from your list', actions: [] }, 2000);
   });
   socket.on('liveLinkCreated', (data) => {
     const url = getShareOrigin() + '/#/live/' + data.token;
     navigator.clipboard.writeText(url).catch(() => {
-      // Clipboard write failed (e.g. permissions denied) — show the URL so user can copy manually.
-      setBanner({ type: 'info', text: 'Live link: ' + url, actions: [] }, 10000);
+      setBanner({ type: 'info', text: 'Share this link: ' + url, actions: [] }, 10000);
       return;
     });
-    setBanner({ type: 'info', text: 'Live link created and copied!', actions: [] }, 2500);
+    setBanner({ type: 'info', text: 'Live link copied — share it with anyone', actions: [] }, 2500);
   });
 
   // SOS events (persistent banners — no auto-clear)
@@ -395,10 +394,10 @@ export function setupSocketHandlers() {
       pulseMap.update(m => { const nm = new Map(m); nm.delete(data.userId); return nm; });
     }, 30000);
     if (data.type === 'ok') {
-      setBanner({ type: 'info', text: `${data.displayName || 'Someone'} sent an I'm OK pulse`, actions: [] }, 5000);
+      setBanner({ type: 'info', text: `${data.displayName || 'Someone'} says they're okay`, actions: [] }, 5000);
     } else if (data.type === 'callme') {
-      setBanner({ type: 'sos', text: `${data.displayName || 'Someone'} needs you to call them`, actions: [
-        { label: 'Dismiss', kind: 'btn-secondary', onClick: () => setBanner({ type: null, text: null, actions: [] }) }
+      setBanner({ type: 'sos', text: `${data.displayName || 'Someone'} is asking you to call them`, actions: [
+        { label: 'Got it', kind: 'btn-secondary', onClick: () => setBanner({ type: null, text: null, actions: [] }) }
       ] }, 8000);
     }
   });
@@ -425,7 +424,7 @@ export function setupSocketHandlers() {
       text: `Someone ${dist} away has triggered an SOS — can you help?`,
       actions: [
         ...(watchUrl ? [{ label: 'View', kind: 'btn-primary', onClick: () => window.open(watchUrl, '_blank') }] : []),
-        { label: 'Dismiss', kind: 'btn-secondary', onClick: () => setBanner({ type: null, text: null, actions: [] }) }
+        { label: 'OK', kind: 'btn-secondary', onClick: () => setBanner({ type: null, text: null, actions: [] }) }
       ]
     }, 30000);
     notifyProximitySOS(data.distanceKm ?? 5).catch(() => {});
@@ -453,35 +452,36 @@ export function setupSocketHandlers() {
       const from = isMe ? 'You' : (s.displayName || (_localMap.get(s.socketId) || {}).displayName || 'Unknown');
       const reason = sos.reason || 'SOS';
       const ackCount = typeof sos.ackCount === 'number' ? sos.ackCount : (sos.acks ? sos.acks.length : 0);
-      const ackText = ackCount ? `Acknowledged (${ackCount})` : 'Not acknowledged';
+      const ackText = ackCount ? `${ackCount} responded` : 'No one has responded yet';
 
       if (isMe) {
         const ackNames = Array.isArray(sos.acks) && sos.acks.length > 0
           ? sos.acks.map(a => a.by || 'Someone').join(', ')
           : null;
         const myText = ackNames
-          ? `Your SOS is active: ${reason} — Acknowledged by: ${ackNames}`
-          : `Your SOS is active: ${reason} — Not yet acknowledged`;
+          ? `Your SOS is active — ${ackNames} responded`
+          : `Your SOS is active — waiting for someone to respond`;
         // SOS banners persist — no auto-clear
         setBanner({ type: 'sos', text: myText, actions: [
-          { label: 'Copy watch link', kind: 'btn-secondary', onClick: () => { if (sos.token) navigator.clipboard.writeText(getShareOrigin() + '/#/watch/' + sos.token).catch(() => {}); } }
+          { label: 'Share watch link', kind: 'btn-secondary', onClick: () => { if (sos.token) navigator.clipboard.writeText(getShareOrigin() + '/#/watch/' + sos.token).catch(() => {}); } }
         ] });
       } else {
         const isGeofence = sos.type === 'geofence';
-        const msg = `${isGeofence ? 'GEOFENCE BREACH' : 'SOS'} from ${from}: ${reason} - ${ackText}`;
+        const alertTitle = isGeofence ? `${from} left their safe zone` : `${from} needs help`;
+        const msg = `${alertTitle} — ${reason}. ${ackText}`;
         // Fire local notification when app is backgrounded
         notifySOS(from, reason).catch(() => {});
         setBanner({ type: 'sos', text: msg, actions: [
-          { label: 'Acknowledge', kind: 'btn-primary', onClick: () => { socket.emit('ackSOS', { socketId: s.socketId }); } },
-          { label: 'Dismiss', kind: 'btn-secondary', onClick: () => setBanner({ type: null, text: null, actions: [] }) }
+          { label: "I'm here", kind: 'btn-primary', onClick: () => { socket.emit('ackSOS', { socketId: s.socketId }); } },
+          { label: 'OK', kind: 'btn-secondary', onClick: () => setBanner({ type: null, text: null, actions: [] }) }
         ] });
         if (ackCount === 0) {
           alertState.set({
             visible: true,
-            title: isGeofence ? 'GEOFENCE BREACH' : 'SOS ALERT',
-            body: msg,
+            title: isGeofence ? `${from} left their safe zone` : `${from} needs help`,
+            body: reason || 'They triggered an SOS alert.',
             actions: [
-              { label: 'Acknowledge', kind: 'btn-primary', onClick: () => socket.emit('ackSOS', { socketId: s.socketId }) }
+              { label: "I'm here — I can help", kind: 'btn-primary', onClick: () => socket.emit('ackSOS', { socketId: s.socketId }) }
             ],
             alarmMs: isGeofence ? 7000 : 10000
           });
@@ -502,10 +502,10 @@ export function setupSocketHandlers() {
         const firstName = firstSos.displayName || 'Someone';
         const firstReason = firstSosData.reason || 'SOS';
         const firstAckCount = typeof firstSosData.ackCount === 'number' ? firstSosData.ackCount : (firstSosData.acks ? firstSosData.acks.length : 0);
-        const firstAckText = firstAckCount ? `Acknowledged (${firstAckCount})` : 'Not acknowledged';
-        setBanner({ type: 'sos', text: `SOS from ${firstName}: ${firstReason} - ${firstAckText}`, actions: [
-          { label: 'Acknowledge', kind: 'btn-primary', onClick: () => { socket.emit('ackSOS', { socketId: firstSos.socketId }); } },
-          { label: 'Dismiss', kind: 'btn-secondary', onClick: () => setBanner({ type: null, text: null, actions: [] }) }
+        const firstAckText = firstAckCount ? `${firstAckCount} responded` : 'No one has responded yet';
+        setBanner({ type: 'sos', text: `${firstName} needs help — ${firstReason}. ${firstAckText}`, actions: [
+          { label: "I'm here", kind: 'btn-primary', onClick: () => { socket.emit('ackSOS', { socketId: firstSos.socketId }); } },
+          { label: 'OK', kind: 'btn-secondary', onClick: () => setBanner({ type: null, text: null, actions: [] }) }
         ] });
       }
     }
@@ -514,22 +514,22 @@ export function setupSocketHandlers() {
   socket.on('checkInRequest', () => {
     alertState.set({
       visible: true,
-      title: 'CHECK-IN REQUIRED',
-      body: "Tap \"I'm OK\" to confirm you are safe.",
+      title: 'Time to check in',
+      body: "Let your family know you're safe.",
       actions: [
         { label: "I'm OK", kind: 'btn-primary', onClick: () => socket.emit('checkInAck') }
       ],
       alarmMs: 5000
     });
-    setBanner({ type: 'info', text: "Check-in requested. Tap \"I'm OK\".", actions: [
+    setBanner({ type: 'info', text: "Your family is waiting — tap to check in", actions: [
       { label: "I'm OK", kind: 'btn-primary', onClick: () => socket.emit('checkInAck') }
     ] });
   });
 
   socket.on('checkInMissed', (p) => {
     if (!p) return;
-    setBanner({ type: 'sos', text: 'Missed check-in: ' + (p.displayName || p.socketId), actions: [
-      { label: 'Acknowledge SOS', kind: 'btn-primary', onClick: () => socket.emit('ackSOS', { socketId: p.socketId }) }
+    setBanner({ type: 'sos', text: `${p.displayName || 'Someone'} missed their check-in`, actions: [
+      { label: "I'm here", kind: 'btn-primary', onClick: () => socket.emit('ackSOS', { socketId: p.socketId }) }
     ] });
   });
 
@@ -559,7 +559,7 @@ export function setupSocketHandlers() {
   socket.on('speedAlert', (data) => {
     if (!data) return;
     setBanner({ type: 'sos', text: `${data.targetName || 'Someone'} is going ${Math.round(data.speed)} km/h (limit: ${Math.round(data.threshold)})`, actions: [
-      { label: 'Dismiss', kind: 'btn-secondary', onClick: () => setBanner({ type: null, text: null, actions: [] }) }
+      { label: 'OK', kind: 'btn-secondary', onClick: () => setBanner({ type: null, text: null, actions: [] }) }
     ] }, 8000);
   });
 
@@ -608,7 +608,7 @@ export function setupSocketHandlers() {
     trailData.update(m => { m.set(data.userId, data); return m; });
   });
   socket.on('trailError', (data) => {
-    setBanner({ type: 'info', text: data?.error || 'Trail unavailable', actions: [] }, 2000);
+    setBanner({ type: 'info', text: data?.error || 'Route history not available right now', actions: [] }, 2000);
   });
 
   // Network graph
@@ -617,15 +617,15 @@ export function setupSocketHandlers() {
   // On My Way
   socket.on('onMyWayBroadcast', (data) => {
     if (!data?.displayName) return;
-    const place = data.placeName ? ` → ${data.placeName}` : '';
-    setBanner({ type: 'info', text: `${data.displayName} is on their way${place}`, actions: [] }, 6000);
+    const place = data.placeName ? ` to ${data.placeName}` : '';
+    setBanner({ type: 'info', text: `${data.displayName} is heading out${place}`, actions: [] }, 6000);
   });
   socket.on('onMyWayCancel', () => {});
 
   // Co-location nudge
   socket.on('colocationNudge', (data) => {
     if (!data?.displayName) return;
-    setBanner({ type: 'info', text: `You're near ${data.displayName}!`, actions: [] }, 8000);
+    setBanner({ type: 'info', text: `${data.displayName} is nearby!`, actions: [] }, 8000);
   });
 
   // Gentle "haven't moved" alert (received by guardian)
@@ -633,7 +633,7 @@ export function setupSocketHandlers() {
     if (!data?.displayName) return;
     const min = data.minutesStill ?? '?';
     notifyHaventMoved(data.displayName, min).catch(() => {});
-    setBanner({ type: 'info', text: `${data.displayName} hasn't moved in ${min} min`, actions: [] }, 8000);
+    setBanner({ type: 'info', text: `${data.displayName} hasn't moved for ${min} minutes — you might want to check in`, actions: [] }, 8000);
   });
 
   // Battery proxy alert
@@ -663,7 +663,7 @@ export function setupSocketHandlers() {
 
   // Ride ended by server (token expired or endRide called from another device)
   socket.on('rideShareError', (data) => {
-    setBanner({ type: 'info', text: data?.message || 'Could not start ride share', actions: [] }, 3000);
+    setBanner({ type: 'info', text: data?.message || 'Could not share your ride right now', actions: [] }, 3000);
   });
 
   // Crowd Mode — someone in your festival group has drifted too far
@@ -672,9 +672,9 @@ export function setupSocketHandlers() {
     const dist = data.distanceM != null ? `${data.distanceM}m` : 'far';
     setBanner({
       type: 'info',
-      text: `${data.fromName} is ${dist} from the group — check in!`,
+      text: `${data.fromName} has drifted ${dist} away from your group`,
       actions: [
-        { label: 'Dismiss', kind: 'btn-secondary', onClick: () => setBanner({ type: null, text: null, actions: [] }) }
+        { label: 'OK', kind: 'btn-secondary', onClick: () => setBanner({ type: null, text: null, actions: [] }) }
       ]
     }, 12000);
   });
@@ -687,7 +687,7 @@ export function setupSocketHandlers() {
       type: 'info',
       text: `Haven't heard from ${data.displayName} today${offline}`,
       actions: [
-        { label: 'Dismiss', kind: 'btn-secondary', onClick: () => setBanner({ type: null, text: null, actions: [] }) }
+        { label: 'OK', kind: 'btn-secondary', onClick: () => setBanner({ type: null, text: null, actions: [] }) }
       ]
     }, 30000);
   });
@@ -695,19 +695,19 @@ export function setupSocketHandlers() {
   // ── Journey Shield events ──────────────────────────────────────────
   socket.on('tripStarted', (data) => {
     if (!data?.displayName) return;
-    setBanner({ type: 'info', text: `${data.displayName} started a trip`, actions: [] }, 8000);
+    setBanner({ type: 'info', text: `${data.displayName} is on the move`, actions: [] }, 8000);
   });
   socket.on('tripArrived', (data) => {
     if (!data?.displayName) return;
-    setBanner({ type: 'info', text: `${data.displayName} arrived at ${data.placeName || 'a saved place'}`, actions: [] }, 10000);
+    setBanner({ type: 'info', text: `${data.displayName} arrived safely at ${data.placeName || 'their destination'}`, actions: [] }, 10000);
   });
   socket.on('tripStoppedNew', (data) => {
     if (!data?.displayName) return;
     setBanner({
       type: 'info',
-      text: `${data.displayName} stopped at an unfamiliar location`,
+      text: `${data.displayName} stopped somewhere new — check in with them?`,
       actions: [
-        { label: 'Dismiss', kind: 'btn-secondary', onClick: () => setBanner({ type: null, text: null, actions: [] }) }
+        { label: 'OK', kind: 'btn-secondary', onClick: () => setBanner({ type: null, text: null, actions: [] }) }
       ]
     }, 20000);
   });
@@ -717,7 +717,7 @@ export function setupSocketHandlers() {
     if (!data?.phones) return;
     setBanner({
       type: 'sos',
-      text: `Emergency SMS sent to ${data.phones.length} contact(s)`,
+      text: `Emergency text sent to ${data.phones.length} ${data.phones.length === 1 ? 'contact' : 'contacts'} outside the app`,
       actions: []
     }, 15000);
   });

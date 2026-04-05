@@ -175,6 +175,15 @@ func (c *Cache) ForEachActiveUser(f func(socketID string, user *ActiveUser)) {
 	}
 }
 
+// ForEachOfflineUser iterates over all offline user entries.
+func (c *Cache) ForEachOfflineUser(f func(userID string, entry *OfflineEntry)) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for uid, entry := range c.OfflineUsers {
+		f(uid, entry)
+	}
+}
+
 // GetRoomMemberSocketIDs returns socket IDs for all members of a room.
 func (c *Cache) GetRoomMemberSocketIDs(roomCode string) []string {
 	c.mu.RLock()

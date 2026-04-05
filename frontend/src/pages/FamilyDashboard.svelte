@@ -7,1199 +7,1264 @@
   import { connectivityStore } from '../lib/stores/connectivity.js';
   import { getUserColor, getUserColorLight } from '../lib/getUserColor.js';
   import { calculateDistance, formatDistance } from '../lib/tracking.js';
-  import TiltCard from '../components/primitives/TiltCard.svelte';
   import FamilyOrbit from '../components/primitives/FamilyOrbit.svelte';
+  import GlobeCanvas from '../components/primitives/GlobeCanvas.svelte';
   import { clearHubBadge } from '../lib/stores/hubBadge.js';
 
   $: if (!$authUser) push('/login');
 
-  // ── Feature freshness tracking ──────────────────────────────────────────────
   const VIS_KEYS = {
-    activity:  'kinnect_vis_activity',
-    replay:    'kinnect_vis_replay',
-    emergency: 'kinnect_vis_emergency',
-    checkins:  'kinnect_vis_checkins',
+    activity: 'kinnect_vis_activity', replay: 'kinnect_vis_replay',
+    emergency: 'kinnect_vis_emergency', checkins: 'kinnect_vis_checkins',
   };
   let visited = { activity: true, replay: true, emergency: true, checkins: true };
 
   function visitFeature(key, route) {
-    if (key) {
-      localStorage.setItem(VIS_KEYS[key], '1');
-      visited = { ...visited, [key]: true };
-    }
+    if (key) { localStorage.setItem(VIS_KEYS[key], '1'); visited = { ...visited, [key]: true }; }
     push(route);
   }
 
-  // ── Clock ──────────────────────────────────────────────────────────────────
   let now = new Date();
   let clockInterval;
   onMount(() => {
     clockInterval = setInterval(() => { now = new Date(); }, 15000);
     clearHubBadge();
-    visited = Object.fromEntries(
-      Object.entries(VIS_KEYS).map(([k, v]) => [k, !!localStorage.getItem(v)])
-    );
+    visited = Object.fromEntries(Object.entries(VIS_KEYS).map(([k, v]) => [k, !!localStorage.getItem(v)]));
   });
   onDestroy(() => clearInterval(clockInterval));
 
   $: timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   $: dateStr = now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
 
-  // ── Greeting ───────────────────────────────────────────────────────────────
   function greeting() {
     const h = now.getHours();
-    if (h < 5)  return 'Up late';
-    if (h < 12) return 'Good morning';
-    if (h < 17) return 'Good afternoon';
-    return 'Good evening';
+    if (h < 5) return 'Up late'; if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon'; return 'Good evening';
   }
   $: firstName = ($authUser?.displayName || '').split(' ')[0] || 'there';
 
-  // ── Members ────────────────────────────────────────────────────────────────
   $: members = Array.from($otherUsers.values());
-  $: onlineCount  = members.filter(m => m.online).length;
-  $: movingCount  = members.filter(m => m.online && m.speed > 1).length;
-  $: sosMembers   = members.filter(m => m.sos?.active);
-  $: allSafe      = sosMembers.length === 0 && !$mySosActive;
+  $: onlineCount = members.filter(m => m.online).length;
+  $: movingCount = members.filter(m => m.online && m.speed > 1).length;
+  $: sosMembers  = members.filter(m => m.sos?.active);
+  $: allSafe     = sosMembers.length === 0 && !$mySosActive;
 
-  function getInitials(name) {
-    return (name || '').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?';
-  }
+  function getInitials(n) { return (n||'').split(' ').map(s=>s[0]).join('').toUpperCase().slice(0,2)||'?'; }
+  function presence(u) { if(u.sos?.active) return 'sos'; if(!u.online) return 'offline'; if(u.speed>1) return 'moving'; return 'online'; }
+  function distText(u) { if(!u.lat||!u.lng||!$myLocation) return null; return formatDistance(calculateDistance($myLocation.latitude,$myLocation.longitude,u.lat,u.lng)); }
+  function speedKmh(u) { return u.speed ? (u.speed*3.6).toFixed(0) : '0'; }
 
-  function presence(user) {
-    if (user.sos?.active) return 'sos';
-    if (!user.online)     return 'offline';
-    if (user.speed > 1)   return 'moving';
-    return 'online';
-  }
+  const SR = 21; const SC = 2 * Math.PI * SR;
+  $: safetyScore = allSafe ? (onlineCount > 0 ? Math.min(100, 55 + onlineCount * 8) : 55) : Math.max(10, 30 - sosMembers.length * 20);
+  $: ringOffset = SC * (1 - safetyScore / 100);
+  $: ringColor = allSafe ? '#10b981' : '#ef4444';
 
-  function distText(user) {
-    if (!user.lat || !user.lng || !$myLocation) return null;
-    return formatDistance(calculateDistance(
-      $myLocation.latitude, $myLocation.longitude, user.lat, user.lng
-    ));
-  }
-
-  function speedKmh(user) {
-    return user.speed ? (user.speed * 3.6).toFixed(0) : '0';
-  }
-
-  // ── Safety ring SVG ────────────────────────────────────────────────────────
-  const R    = 38;
-  const CIRC = 2 * Math.PI * R;
-  $: safetyScore  = allSafe
-    ? (onlineCount > 0 ? Math.min(100, 55 + onlineCount * 8) : 55)
-    : Math.max(10, 30 - sosMembers.length * 20);
-  $: ringOffset   = CIRC * (1 - safetyScore / 100);
-  $: ringColor    = allSafe ? '#10b981' : '#ef4444';
-
-  // ── Deterministic stars (3 size/colour classes) ───────────────────────────
-  const stars = Array.from({ length: 60 }, (_, i) => {
-    const a = (i * 2654435761) >>> 0;
-    const b = (i * 1664525 + 1013904223) >>> 0;
-    return {
-      top:   (a % 1000) / 10,
-      left:  (b % 1000) / 10,
-      size:  0.6 + (a % 20) / 16,
-      delay: (b % 80) / 10,
-      dur:   4 + (a % 60) / 10,
-      cls:   i % 9 === 0 ? 'fd-star-bright' : i % 5 === 0 ? 'fd-star-blue' : '',
-    };
-  });
-
-  // ── Shooting star ──────────────────────────────────────────────────────────
-  let shootingStarActive = false;
-  let shootX = 10, shootY = 10;
-
-  // ── Dynamic quotes ─────────────────────────────────────────────────────────
   const QUOTES = [
     { text: "Family is not an important thing. It's everything.", author: "Michael J. Fox" },
-    { text: "The bond that links your true family is not blood, but respect and joy in each other's life.", author: "Richard Bach" },
-    { text: "Friends are the family we choose for ourselves.", author: "Edna Buchanan" },
-    { text: "A real friend walks in when the rest of the world walks out.", author: "Walter Winchell" },
+    { text: "The bond that links your true family is not blood, but respect and joy.", author: "Richard Bach" },
     { text: "In family life, love is the oil that eases friction.", author: "Friedrich Nietzsche" },
-    { text: "Where there is family, there is love that will never fade.", author: "" },
-    { text: "The memories we make with our family are everything.", author: "Candace Cameron Bure" },
-    { text: "Home is wherever I'm with my people.", author: "" },
-    { text: "A friend is one who knows you and loves you just the same.", author: "Elbert Hubbard" },
     { text: "Family means no one gets left behind or forgotten.", author: "Lilo & Stitch" },
+    { text: "The family is the first essential cell of human society.", author: "Pope John XXIII" },
+    { text: "A happy family is but an earlier heaven.", author: "George Bernard Shaw" },
+    { text: "The love of a family is life's greatest blessing.", author: "Anonymous" },
+    { text: "Other things may change us, but we start and end with family.", author: "Anthony Brandt" },
+    { text: "Family is the anchor that holds us through life's storms.", author: "Anonymous" },
+    { text: "Families are the compass that guides us.", author: "Brad Henry" },
+    { text: "Having somewhere to go is home. Having someone to love is family.", author: "Anonymous" },
+    { text: "The memories we make with our family is everything.", author: "Candace Cameron Bure" },
+    { text: "You don't choose your family. They are God's gift to you, as you are to them.", author: "Desmond Tutu" },
+    { text: "Family is not about blood. It's about who is willing to hold your hand when you need it the most.", author: "Anonymous" },
+    { text: "Being a family means you are a part of something very wonderful.", author: "Lisa Weedn" },
+    { text: "A family is a risky venture, because the greater the love, the greater the loss. That's the trade-off.", author: "Brad Pitt" },
+    { text: "The strength of a family, like the strength of an army, lies in its loyalty to each other.", author: "Mario Puzo" },
+    { text: "To us, family means putting your arms around each other and being there.", author: "Barbara Bush" },
+    { text: "Family is the most important thing in the world.", author: "Princess Diana" },
+    { text: "Home is where you are loved the most and act the worst.", author: "Marjorie Pay Hinckley" },
+    { text: "When everything goes to hell, the people who stand by you without flinching — they are your family.", author: "Jim Butcher" },
+    { text: "The informality of family life is a blessed condition that allows us to become our best while looking our worst.", author: "Marge Kennedy" },
+    { text: "Rejoice with your family in the beautiful land of life.", author: "Albert Einstein" },
+    { text: "Family and friends are hidden treasures. Seek them and enjoy their riches.", author: "Wanda Hope Carter" },
+    { text: "A man travels the world over in search of what he needs, and returns home to find it.", author: "George Moore" },
+    { text: "What can you do to promote world peace? Go home and love your family.", author: "Mother Teresa" },
+    { text: "The only rock I know that stays steady is the rock that is the family.", author: "Nicholas Sparks" },
+    { text: "There is no doubt that it is around the family and the home that all the greatest virtues are created.", author: "Winston Churchill" },
+    { text: "Call it a clan, call it a network, call it a tribe, call it a family: whatever you call it, whoever you are, you need one.", author: "Jane Howard" },
+    { text: "Families are like branches on a tree. We grow in different directions, yet our roots remain as one.", author: "Anonymous" },
+    { text: "My family is my strength and my weakness.", author: "Aishwarya Rai" },
+    { text: "Family makes you who you are and aren't.", author: "Anonymous" },
+    { text: "At the end of the day, a loving family should find everything forgivable.", author: "Mark V. Olsen" },
+    { text: "The greatest thing in family life is to take a hint when a hint is intended — and not to take a hint when a hint isn't intended.", author: "Robert Frost" },
+    { text: "Family is a life jacket in the stormy sea of life.", author: "J.K. Rowling" },
+    { text: "Friends are the family we choose for ourselves.", author: "Edna Buchanan" },
+    { text: "A real friend is one who walks in when the rest of the world walks out.", author: "Walter Winchell" },
+    { text: "Friendship is born at that moment when one person says to another, 'What! You too?'", author: "C.S. Lewis" },
+    { text: "There is nothing on this earth more to be prized than true friendship.", author: "Thomas Aquinas" },
+    { text: "A true friend is somebody who can make us do what we can.", author: "Ralph Waldo Emerson" },
+    { text: "Friendship is the only cement that will ever hold the world together.", author: "Woodrow Wilson" },
+    { text: "A friend is someone who knows all about you and still loves you.", author: "Elbert Hubbard" },
+    { text: "True friendship comes when the silence between two people is comfortable.", author: "David Tyson" },
+    { text: "Friends show their love in times of trouble, not in happiness.", author: "Euripides" },
+    { text: "A sweet friendship refreshes the soul.", author: "Proverbs 27:9" },
+    { text: "No friendship is an accident.", author: "O. Henry" },
+    { text: "One loyal friend is worth ten thousand relatives.", author: "Euripides" },
+    { text: "Walking with a friend in the dark is better than walking alone in the light.", author: "Helen Keller" },
+    { text: "Life is nothing without friendship.", author: "Cicero" },
+    { text: "The greatest gift of life is friendship, and I have received it.", author: "Hubert H. Humphrey" },
+    { text: "A friend is one of the best things you can be and the greatest thing you can have.", author: "Sarah Valdez" },
+    { text: "In the sweetness of friendship let there be laughter, for in the dew of little things the heart finds its morning and is refreshed.", author: "Khalil Gibran" },
+    { text: "Friends are the siblings God never gave us.", author: "Mencius" },
+    { text: "A friend may be waiting behind a stranger's face.", author: "Maya Angelou" },
+    { text: "Good friends, good books, and a sleepy conscience: this is the ideal life.", author: "Mark Twain" },
+    { text: "Lots of people want to ride with you in the limo, but what you want is someone who will take the bus with you when the limo breaks down.", author: "Oprah Winfrey" },
+    { text: "True friends are like diamonds — bright, beautiful, valuable, and always in style.", author: "Nicole Richie" },
+    { text: "Friendship is a sheltering tree.", author: "Samuel Taylor Coleridge" },
+    { text: "There are no strangers here; only friends you haven't yet met.", author: "William Butler Yeats" },
+    { text: "The only way to have a friend is to be one.", author: "Ralph Waldo Emerson" },
+    { text: "Find a group of people who challenge and inspire you; spend a lot of time with them, and it will change your life.", author: "Amy Poehler" },
+    { text: "Home is wherever I'm with my people.", author: "Anonymous" },
+    { text: "Home is not a place — it's a feeling.", author: "Anonymous" },
+    { text: "Where we love is home — home that our feet may leave, but not our hearts.", author: "Oliver Wendell Holmes" },
+    { text: "There is nothing like staying at home for real comfort.", author: "Jane Austen" },
+    { text: "The ache for home lives in all of us.", author: "Maya Angelou" },
+    { text: "Home is the nicest word there is.", author: "Laura Ingalls Wilder" },
+    { text: "Every house where love abides and friendship is a guest, is surely home.", author: "Henry Van Dyke" },
+    { text: "You will never be completely at home again, because part of your heart will always be elsewhere.", author: "Miriam Adeney" },
+    { text: "We may have all come on different ships, but we're in the same boat now.", author: "Martin Luther King Jr." },
+    { text: "Wherever you go, go with all your heart.", author: "Confucius" },
+    { text: "We are most alive when we're in love.", author: "John Updike" },
+    { text: "Love is composed of a single soul inhabiting two bodies.", author: "Aristotle" },
+    { text: "The best thing to hold onto in life is each other.", author: "Audrey Hepburn" },
+    { text: "Being deeply loved by someone gives you strength, while loving someone deeply gives you courage.", author: "Lao Tzu" },
+    { text: "There is only one happiness in this life, to love and be loved.", author: "George Sand" },
+    { text: "You know you're in love when you can't fall asleep because reality is finally better than your dreams.", author: "Dr. Seuss" },
+    { text: "To the world you may be one person, but to one person you may be the world.", author: "Bill Wilson" },
+    { text: "Love recognizes no barriers.", author: "Maya Angelou" },
+    { text: "The giving of love is an education in itself.", author: "Eleanor Roosevelt" },
+    { text: "Love is a friendship set to music.", author: "Joseph Campbell" },
+    { text: "Love does not dominate; it cultivates.", author: "Johann Wolfgang von Goethe" },
+    { text: "Where there is love there is life.", author: "Mahatma Gandhi" },
+    { text: "Life without love is like a tree without blossoms or fruit.", author: "Khalil Gibran" },
+    { text: "We loved with a love that was more than love.", author: "Edgar Allan Poe" },
+    { text: "I have decided to stick with love. Hate is too great a burden to bear.", author: "Martin Luther King Jr." },
+    { text: "Believe you can and you're halfway there.", author: "Theodore Roosevelt" },
+    { text: "The only impossible journey is the one you never begin.", author: "Tony Robbins" },
+    { text: "It always seems impossible until it's done.", author: "Nelson Mandela" },
+    { text: "Act as if what you do makes a difference. It does.", author: "William James" },
+    { text: "What lies behind us and what lies before us are tiny matters compared to what lies within us.", author: "Ralph Waldo Emerson" },
+    { text: "You are never too old to set another goal or to dream a new dream.", author: "C.S. Lewis" },
+    { text: "The future belongs to those who believe in the beauty of their dreams.", author: "Eleanor Roosevelt" },
+    { text: "In the middle of every difficulty lies opportunity.", author: "Albert Einstein" },
+    { text: "Keep your face always toward the sunshine — and shadows will fall behind you.", author: "Walt Whitman" },
+    { text: "It is during our darkest moments that we must focus to see the light.", author: "Aristotle" },
+    { text: "The best time to plant a tree was 20 years ago. The second best time is now.", author: "Anonymous" },
+    { text: "Everything you've ever wanted is on the other side of fear.", author: "George Addair" },
+    { text: "You are braver than you believe, stronger than you seem, and smarter than you think.", author: "A.A. Milne" },
+    { text: "Start where you are. Use what you have. Do what you can.", author: "Arthur Ashe" },
+    { text: "Do what you can, with what you have, where you are.", author: "Theodore Roosevelt" },
+    { text: "The secret of getting ahead is getting started.", author: "Mark Twain" },
+    { text: "Don't watch the clock; do what it does. Keep going.", author: "Sam Levenson" },
+    { text: "Hardships often prepare ordinary people for an extraordinary destiny.", author: "C.S. Lewis" },
+    { text: "You don't have to be great to start, but you have to start to be great.", author: "Zig Ziglar" },
+    { text: "With the new day comes new strength and new thoughts.", author: "Eleanor Roosevelt" },
+    { text: "Courage is not the absence of fear, but rather the judgment that something else is more important than fear.", author: "Ambrose Redmoon" },
+    { text: "Success is not final, failure is not fatal: it is the courage to continue that counts.", author: "Winston Churchill" },
+    { text: "The only limit to our realization of tomorrow will be our doubts of today.", author: "Franklin D. Roosevelt" },
+    { text: "You miss 100% of the shots you don't take.", author: "Wayne Gretzky" },
+    { text: "Life is 10% what happens to us and 90% how we react to it.", author: "Charles R. Swindoll" },
+    { text: "Happiness is not something ready made. It comes from your own actions.", author: "Dalai Lama" },
+    { text: "What you get by achieving your goals is not as important as what you become by achieving your goals.", author: "Zig Ziglar" },
+    { text: "I can't change the direction of the wind, but I can adjust my sails.", author: "Jimmy Dean" },
+    { text: "It does not matter how slowly you go as long as you do not stop.", author: "Confucius" },
+    { text: "When you reach the end of your rope, tie a knot in it and hang on.", author: "Franklin D. Roosevelt" },
+    { text: "Safety is something that happens between your ears, not something you hold in your hands.", author: "Jeff Cooper" },
+    { text: "The greatest protection any person can have is a loving family.", author: "Anonymous" },
+    { text: "A safe family is a strong family.", author: "Anonymous" },
+    { text: "Knowing your people are safe lets you sleep at night.", author: "Anonymous" },
+    { text: "The best security blanket a child can have is parents who respect each other.", author: "Jane Blaustone" },
+    { text: "Being safe is the foundation upon which everything else is built.", author: "Anonymous" },
+    { text: "Caring for your people is the highest form of strength.", author: "Anonymous" },
+    { text: "Peace of mind comes when you know your family is okay.", author: "Anonymous" },
+    { text: "Gratitude turns what we have into enough.", author: "Aesop" },
+    { text: "No act of kindness, no matter how small, is ever wasted.", author: "Aesop" },
+    { text: "Enjoy the little things, for one day you may look back and realize they were the big things.", author: "Robert Brault" },
+    { text: "The roots of all goodness lie in the soil of appreciation for goodness.", author: "Dalai Lama" },
+    { text: "We can complain because rose bushes have thorns, or rejoice because thorn bushes have roses.", author: "Abraham Lincoln" },
+    { text: "When I started counting my blessings, my whole life turned around.", author: "Willie Nelson" },
+    { text: "Gratitude is not only the greatest of virtues, but the parent of all the others.", author: "Cicero" },
+    { text: "Be thankful for what you have; you'll end up having more.", author: "Oprah Winfrey" },
+    { text: "Appreciation is a wonderful thing. It makes what is excellent in others belong to us as well.", author: "Voltaire" },
+    { text: "Kindness is a language which the deaf can hear and the blind can see.", author: "Mark Twain" },
+    { text: "A single act of kindness throws out roots in all directions, and the roots spring up and make new trees.", author: "Amelia Earhart" },
+    { text: "Carry out a random act of kindness with no expectation of reward.", author: "Princess Diana" },
+    { text: "The purpose of our lives is to be happy.", author: "Dalai Lama" },
+    { text: "Life is really simple, but we insist on making it complicated.", author: "Confucius" },
+    { text: "In three words I can sum up everything I've learned about life: it goes on.", author: "Robert Frost" },
+    { text: "Life is what happens when you're busy making other plans.", author: "John Lennon" },
+    { text: "The biggest adventure you can take is to live the life of your dreams.", author: "Oprah Winfrey" },
+    { text: "Do not dwell in the past, do not dream of the future, concentrate the mind on the present moment.", author: "Buddha" },
+    { text: "Not how long, but how well you have lived is the main thing.", author: "Seneca" },
+    { text: "Life is either a daring adventure or nothing at all.", author: "Helen Keller" },
+    { text: "The unexamined life is not worth living.", author: "Socrates" },
+    { text: "Turn your wounds into wisdom.", author: "Oprah Winfrey" },
+    { text: "The best and most beautiful things in the world cannot be seen or even touched — they must be felt with the heart.", author: "Helen Keller" },
+    { text: "Life isn't about finding yourself. Life is about creating yourself.", author: "George Bernard Shaw" },
+    { text: "Spread love everywhere you go. Let no one ever come to you without leaving happier.", author: "Mother Teresa" },
+    { text: "We make a living by what we get, but we make a life by what we give.", author: "Winston Churchill" },
+    { text: "The best preparation for tomorrow is doing your best today.", author: "H. Jackson Brown Jr." },
+    { text: "Be yourself; everyone else is already taken.", author: "Oscar Wilde" },
+    { text: "If you want to lift yourself up, lift up someone else.", author: "Booker T. Washington" },
+    { text: "Strive not to be a success, but rather to be of value.", author: "Albert Einstein" },
+    { text: "Twenty years from now you will be more disappointed by the things that you didn't do than by the ones you did do.", author: "Mark Twain" },
+    { text: "The way to get started is to quit talking and begin doing.", author: "Walt Disney" },
+    { text: "The human spirit is stronger than anything that can happen to it.", author: "C.C. Scott" },
+    { text: "Tough times never last, but tough people do.", author: "Robert H. Schuller" },
+    { text: "Rock bottom became the solid foundation on which I rebuilt my life.", author: "J.K. Rowling" },
+    { text: "A smooth sea never made a skilled sailor.", author: "Franklin D. Roosevelt" },
+    { text: "Fall seven times, stand up eight.", author: "Japanese Proverb" },
+    { text: "Strength does not come from winning. Your struggles develop your strengths.", author: "Arnold Schwarzenegger" },
+    { text: "The oak fought the wind and was broken, the willow bent when it must and survived.", author: "Robert Jordan" },
+    { text: "Stars can't shine without darkness.", author: "Anonymous" },
+    { text: "She stood in the storm, and when the wind did not blow her way, she adjusted her sails.", author: "Elizabeth Edwards" },
+    { text: "You were given this life because you are strong enough to live it.", author: "Anonymous" },
+    { text: "Out of difficulties grow miracles.", author: "Jean de La Bruyere" },
+    { text: "Alone we can do so little; together we can do so much.", author: "Helen Keller" },
+    { text: "If you want to go fast, go alone. If you want to go far, go together.", author: "African Proverb" },
+    { text: "No man is an island, entire of itself.", author: "John Donne" },
+    { text: "We rise by lifting others.", author: "Robert Ingersoll" },
+    { text: "The greatness of a community is most accurately measured by the compassionate actions of its members.", author: "Coretta Scott King" },
+    { text: "It takes a village to raise a child.", author: "African Proverb" },
+    { text: "Coming together is a beginning, staying together is progress, and working together is success.", author: "Henry Ford" },
+    { text: "Unity is strength. When there is teamwork and collaboration, wonderful things can be achieved.", author: "Mattie Stepanek" },
+    { text: "None of us is as smart as all of us.", author: "Ken Blanchard" },
+    { text: "A candle loses nothing by lighting another candle.", author: "James Keller" },
+    { text: "Happiness is not by chance, but by choice.", author: "Jim Rohn" },
+    { text: "The most wasted of days is one without laughter.", author: "E.E. Cummings" },
+    { text: "Think of all the beauty still left around you and be happy.", author: "Anne Frank" },
+    { text: "For every minute you are angry you lose sixty seconds of happiness.", author: "Ralph Waldo Emerson" },
+    { text: "The sun himself is weak when he first rises, and gathers strength and courage as the day gets on.", author: "Charles Dickens" },
+    { text: "Count your age by friends, not years. Count your life by smiles, not tears.", author: "John Lennon" },
+    { text: "Very little is needed to make a happy life; it is all within yourself, in your way of thinking.", author: "Marcus Aurelius" },
+    { text: "Happiness often sneaks in through a door you didn't know you left open.", author: "John Barrymore" },
+    { text: "There is nothing either good or bad, but thinking makes it so.", author: "William Shakespeare" },
+    { text: "Today is a good day to have a good day.", author: "Anonymous" },
+    { text: "Let us always meet each other with smile, for the smile is the beginning of love.", author: "Mother Teresa" },
+    { text: "Be the reason someone smiles today.", author: "Anonymous" },
+    { text: "Happiness is a warm puppy.", author: "Charles M. Schulz" },
+    { text: "The most important thing is to enjoy your life — to be happy — it's all that matters.", author: "Audrey Hepburn" },
   ];
   let quoteIdx = Math.floor(Math.random() * QUOTES.length);
   let quoteVisible = true;
-  let quoteInterval, shootInterval;
+  let quoteInterval;
 
-  // ── Gyroscope + scroll parallax ─────────────────────────────────────────────
-  let gx = 0, gy = 0;       // normalised tilt −1…1
-  let scrollY = 0;
-  let scrollRef;
-  let gyroActive = false;
-  const noMotion = typeof window !== 'undefined'
-    && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-
-  function handleOrientation(e) {
-    if (noMotion) return;
-    const gamma = Math.max(-30, Math.min(30, e.gamma || 0));
-    const beta  = Math.max(-30, Math.min(30, (e.beta || 0) - 55));
-    gx = gamma / 30;
-    gy = beta  / 30;
-    gyroActive = true;
-  }
-  function handleMouseParallax(e) {
-    if (gyroActive || noMotion) return;
-    gx = (e.clientX / window.innerWidth  - 0.5) * 2;
-    gy = (e.clientY / window.innerHeight - 0.5) * 2;
-  }
-  function handleScroll() {
-    scrollY = scrollRef?.scrollTop || 0;
-  }
-
-  // ── Entrance animation ─────────────────────────────────────────────────────
   let mounted = false;
+  function cycleQuote() {
+    quoteVisible = false;
+    setTimeout(() => { quoteIdx = (quoteIdx + 1) % QUOTES.length; quoteVisible = true; }, 400);
+  }
+
+  // Mouse glow tracking
+  let mouseX = 0, mouseY = 0;
+  function handleMouseMove(e) { mouseX = e.clientX; mouseY = e.clientY; mouseOnDash = true; }
+  let mouseOnDash = false;
+
+  // Responsive globe size — fills available left area
+  let globeSize = 400;
+  function updateGlobeSize() {
+    if (typeof window === 'undefined') return;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    if (vw < 768) {
+      // Mobile: globe inline in content, fits without dominating the viewport
+      globeSize = Math.round(Math.min(260, Math.max(200, vw * 0.62)));
+    } else {
+      const sidebarW = vw >= 1200 ? Math.min(460, vw * 0.35) : Math.min(420, vw * 0.38);
+      const leftW = Math.max(400, vw - sidebarW);
+      globeSize = Math.round(Math.min(520, Math.max(320, Math.min(vh * 0.54, leftW * 0.52))));
+    }
+  }
+
   onMount(() => {
     requestAnimationFrame(() => { mounted = true; });
-
-    // Quote rotation — fade out, swap, fade in
-    quoteInterval = setInterval(() => {
-      quoteVisible = false;
-      setTimeout(() => {
-        quoteIdx = (quoteIdx + 1) % QUOTES.length;
-        quoteVisible = true;
-      }, 650);
-    }, 8000);
-
-    // Shooting star: fires 4s after mount, then every ~25-40s (rare = special)
-    function fireStar() {
-      shootX = 5 + Math.random() * 35;
-      shootY = 5 + Math.random() * 30;
-      shootingStarActive = true;
-      setTimeout(() => { shootingStarActive = false; }, 1500);
-    }
-    setTimeout(fireStar, 4000);
-    shootInterval = setInterval(fireStar, 25000 + Math.random() * 15000);
-
-    // Gyroscope (mobile)
-    if (!noMotion && typeof DeviceOrientationEvent !== 'undefined') {
-      window.addEventListener('deviceorientation', handleOrientation, { passive: true });
-    }
+    quoteInterval = setInterval(cycleQuote, 10000);
+    updateGlobeSize();
+    window.addEventListener('resize', updateGlobeSize);
   });
   onDestroy(() => {
     clearInterval(clockInterval);
     clearInterval(quoteInterval);
-    clearInterval(shootInterval);
-    window.removeEventListener('deviceorientation', handleOrientation);
+    window.removeEventListener('resize', updateGlobeSize);
   });
 </script>
 
-<!-- svelte-ignore a11y-no-static-element-interactions -->
-<div class="fd" class:fd-mounted={mounted} bind:this={scrollRef} on:scroll={handleScroll} on:mousemove={handleMouseParallax}>
+<div class="d" class:d-ready={mounted}
+  on:mousemove={handleMouseMove}
+  on:mouseleave={() => mouseOnDash = false}>
+  <div class="d-aurora" aria-hidden="true"></div>
+  <div class="d-noise" aria-hidden="true"></div>
 
-  <!-- ══ Starfield — parallax layer 1 (slowest) ═══════════════════════════ -->
-  <div class="fd-stars" style="transform:translate3d({gx*-16}px,{gy*-11 + scrollY*-0.08}px,0)" aria-hidden="true">
-    {#each stars as s}
-      <span
-        class="fd-star {s.cls}"
-        style="top:{s.top}%;left:{s.left}%;width:{s.size}px;height:{s.size}px;animation-delay:{s.delay}s;animation-duration:{s.dur}s"
-      ></span>
-    {/each}
+  <!-- Mouse cursor glow — follows pointer, desktop only -->
+  <div class="d-cursor-glow" class:d-cursor-visible={mouseOnDash}
+    style="left:{mouseX}px;top:{mouseY}px" aria-hidden="true"></div>
+
+  <!-- FULL-SCREEN ORBIT BACKGROUND -->
+  <div class="d-orbit-bg" aria-hidden="true">
+    <FamilyOrbit />
   </div>
 
-  <!-- Milky Way — parallax layer 2 -->
-  <div class="fd-milkyway" style="transform:translate3d({gx*-22}px,{gy*-15 + scrollY*-0.12}px,0)" aria-hidden="true"></div>
+  <!-- LEFT COLUMN — desktop: centered globe + info + quote -->
+  <div class="d-left-hud" aria-hidden="false">
+    <div class="d-globe-col">
 
-  <!-- Nebula — parallax layer 3 (deepest shift, moves most) -->
-  <div class="fd-nebula-layer" style="transform:translate3d({gx*-30}px,{gy*-22 + scrollY*-0.18}px,0)" aria-hidden="true">
-    <div class="fd-nebula fd-nebula-a"></div>
-    <div class="fd-nebula fd-nebula-b"></div>
-    <div class="fd-nebula fd-nebula-c"></div>
-  </div>
-
-  <!-- Shooting star -->
-  {#if shootingStarActive}
-    <span
-      class="fd-shooting-star"
-      style="top:{shootY}%;left:{shootX}%"
-      aria-hidden="true"
-    ></span>
-  {/if}
-
-  <!-- ══ Header ═════════════════════════════════════════════════════════════ -->
-  <header class="fd-header">
-    <button class="fd-back" on:click={() => push('/')} aria-label="Back to map">
-      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-      Map
-    </button>
-    <div class="fd-clock" aria-label="Current time">{timeStr}</div>
-  </header>
-
-  <!-- ══ Cosmos — greeting + orbit + stats in one unified hero ════════════ -->
-  <section class="fd-cosmos" aria-label="Family orbital view">
-
-    <!-- Top row: greeting (left) + compact safety ring (right) -->
-    <div class="cosmos-top">
-      <div class="cosmos-greeting">
-        <div class="cosmos-greet-line">
-          <span class="cosmos-greet-text">{greeting()},</span>
-          <span class="cosmos-name">{firstName}</span>
+      <!-- TOP: eyebrow + live status pills -->
+      <div class="d-globe-top">
+        <div class="d-globe-eyebrow">
+          <span class="d-globe-blip"></span>
+          FAMILY NETWORK
         </div>
-        <p class="cosmos-date">{dateStr}</p>
+        <div class="d-globe-status-row">
+          <span class="d-gsr-pill" class:gsr-on={$tracking}>
+            <span class="d-gsr-dot"></span>
+            Tracking {$tracking ? 'ON' : 'OFF'}
+          </span>
+          <span class="d-gsr-pill" class:gsr-on={onlineCount > 0}>
+            <span class="d-gsr-dot"></span>
+            {onlineCount} online
+          </span>
+          <span class="d-gsr-pill" class:gsr-safe={allSafe} class:gsr-alert={!allSafe}>
+            <span class="d-gsr-dot"></span>
+            {allSafe ? 'All safe' : `${sosMembers.length + ($mySosActive ? 1 : 0)} alert`}
+          </span>
+          <span class="d-gsr-pill" class:gsr-on={$connectivityStore.isOnline} class:gsr-warn={!$connectivityStore.isOnline}>
+            <span class="d-gsr-dot"></span>
+            {$connectivityStore.isOnline ? 'Connected' : 'Offline'}
+          </span>
+        </div>
       </div>
 
-      <!-- Compact safety ring — replaces the full-size card -->
-      <div class="cosmos-ring" class:cosmos-ring-sos={!allSafe} aria-label="Safety score {safetyScore}">
-        <svg width="52" height="52" viewBox="0 0 52 52" aria-hidden="true">
-          <circle cx="26" cy="26" r="19" stroke="rgba(255,255,255,0.07)" stroke-width="5" fill="none"/>
-          <circle
-            cx="26" cy="26" r="19"
-            stroke="{ringColor}" stroke-width="5" fill="none"
-            stroke-linecap="round"
-            stroke-dasharray="{2 * Math.PI * 19}"
-            stroke-dashoffset="{2 * Math.PI * 19 * (1 - safetyScore / 100)}"
-            transform="rotate(-90 26 26)"
-            style="transition: stroke-dashoffset 1.2s cubic-bezier(0.4,0,0.2,1), stroke 0.5s ease;"
-          />
-          <circle
-            cx="26" cy="26" r="19"
-            stroke="{ringColor}" stroke-width="3" fill="none"
-            stroke-linecap="round"
-            stroke-dasharray="{2 * Math.PI * 19}"
-            stroke-dashoffset="{2 * Math.PI * 19 * (1 - safetyScore / 100)}"
-            transform="rotate(-90 26 26)"
-            opacity="0.22"
-            style="filter:blur(3px);transition: stroke-dashoffset 1.2s cubic-bezier(0.4,0,0.2,1), stroke 0.5s ease;"
-          />
-          <text x="26" y="30" text-anchor="middle" fill="white" font-size="11" font-weight="800" font-family="var(--font-display,system-ui)">{safetyScore}</text>
+      <!-- CENTER: Globe with flanking stat cards on large screens -->
+      <div class="d-globe-center">
+        <!-- Left: Network card -->
+        <div class="d-globe-side d-globe-side-l">
+          <div class="d-side-card">
+            <div class="d-side-label">Network</div>
+            <div class="d-side-big">{members.length}</div>
+            <div class="d-side-sub">Members</div>
+            <div class="d-side-divider"></div>
+            <div class="d-side-row">
+              <span class="d-sd dot-on"></span><span>{onlineCount} online</span>
+            </div>
+            <div class="d-side-row">
+              <span class="d-sd dot-mv"></span><span>{movingCount} moving</span>
+            </div>
+            <div class="d-side-row">
+              <span class="d-sd" style="background:rgba(255,255,255,0.12)"></span>
+              <span>{members.length - onlineCount} offline</span>
+            </div>
+          </div>
+        </div>
+
+        <GlobeCanvas size={globeSize} />
+
+        <!-- Right: Safety card -->
+        <div class="d-globe-side d-globe-side-r">
+          <div class="d-side-card">
+            <div class="d-side-label">Safety</div>
+            <div class="d-side-big" style="color:{ringColor}">{safetyScore}</div>
+            <div class="d-side-sub">Score</div>
+            <div class="d-side-divider"></div>
+            <div class="d-side-row" class:row-safe={allSafe} class:row-sos={!allSafe}>
+              <span class="d-sd" style="background:{ringColor}"></span>
+              <span>{allSafe ? 'All safe' : `${sosMembers.length} SOS`}</span>
+            </div>
+            <div class="d-side-row">
+              <span class="d-sd" style="background:{$connectivityStore.isOnline ? '#10b981' : '#f59e0b'}"></span>
+              <span>{$connectivityStore.isOnline ? 'Connected' : 'Offline'}</span>
+            </div>
+            <div class="d-side-row">
+              <span class="d-sd" style="background:{$tracking ? '#3b82f6' : 'rgba(255,255,255,0.12)'}"></span>
+              <span>Tracking {$tracking ? 'on' : 'off'}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BOTTOM: member ring + location + quote -->
+      <div class="d-globe-bottom">
+
+        <!-- Interactive member avatars — click to focus on map -->
+        {#if members.length > 0}
+          <div class="d-member-ring">
+            {#each members.slice(0, 7) as user (user.userId)}
+              {@const color = getUserColor(user.userId)}
+              {@const pres = presence(user)}
+              <!-- svelte-ignore a11y-no-static-element-interactions -->
+              <!-- svelte-ignore a11y-click-events-have-key-events -->
+              <div class="d-mr-bubble" style="--mc:{color}"
+                on:click={() => { focusUser.set(user.userId); push('/'); }}
+                title="{user.displayName} — {pres}">
+                <span class="d-mr-init">{getInitials(user.displayName)}</span>
+                <span class="d-mr-dot"
+                  class:dot-on={pres==='online'} class:dot-mv={pres==='moving'}
+                  class:dot-sos={pres==='sos'} class:dot-off={pres==='offline'}></span>
+              </div>
+            {/each}
+            {#if members.length > 7}
+              <div class="d-mr-more">+{members.length - 7}</div>
+            {/if}
+          </div>
+        {/if}
+
+        {#if $myLocation?.latitude != null}
+          <div class="d-loc-info">
+            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+            <span class="d-loc-you">You are here</span>
+            <span class="d-loc-coords">
+              {Math.abs($myLocation.latitude).toFixed(3)}°{$myLocation.latitude >= 0 ? 'N' : 'S'}
+              &nbsp;·&nbsp;
+              {Math.abs($myLocation.longitude).toFixed(3)}°{$myLocation.longitude >= 0 ? 'E' : 'W'}
+            </span>
+          </div>
+        {:else}
+          <div class="d-loc-info d-loc-unknown">
+            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            Location not shared
+          </div>
+        {/if}
+
+        <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <div class="d-quote-globe" class:dqg-on={quoteVisible} role="complementary"
+          on:click={cycleQuote} title="Click for next quote">
+          <span class="d-qg-mark" aria-hidden="true">"</span>
+          <p class="d-qg-text">{QUOTES[quoteIdx].text}"</p>
+          <span class="d-qg-author">— {QUOTES[quoteIdx].author}</span>
+          <span class="d-qg-cycle" aria-hidden="true">↻ next</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- HEADER — glass, floating -->
+  <header class="d-header">
+    <button class="d-back" on:click={() => push('/')} aria-label="Back to map">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Map
+    </button>
+    <div class="d-clock">{timeStr}</div>
+  </header>
+
+  <!-- CONTENT OVERLAY — scrollable panels floating over the orbit -->
+  <div class="d-content">
+
+    <!-- Hero: greeting + safety -->
+    <section class="d-hero">
+      <div class="d-greet">
+        <h1 class="d-name">
+          <span class="d-greet-word">{greeting()},&nbsp;</span><span class="d-name-word">{firstName}</span>
+        </h1>
+        <p class="d-date">{dateStr}</p>
+      </div>
+      <div class="d-safety" aria-label="Safety score {safetyScore}">
+        <svg width="56" height="56" viewBox="0 0 56 56" aria-hidden="true">
+          <circle cx="28" cy="28" r="{SR}" stroke="rgba(255,255,255,0.06)" stroke-width="4" fill="none"/>
+          <circle cx="28" cy="28" r="{SR}" stroke="{ringColor}" stroke-width="4" fill="none"
+            stroke-linecap="round" stroke-dasharray="{SC}" stroke-dashoffset="{ringOffset}"
+            transform="rotate(-90 28 28)" class="d-ring-progress"/>
         </svg>
-        <div class="cosmos-ring-badge" class:ring-badge-safe={allSafe} class:ring-badge-sos={!allSafe}>
-          <span class="ring-badge-dot"></span>
+        <span class="d-safety-score">{safetyScore}</span>
+        <div class="d-safety-badge" class:badge-safe={allSafe} class:badge-sos={!allSafe}>
+          <span class="d-badge-dot"></span>
           {allSafe ? 'All safe' : `${sosMembers.length + ($mySosActive ? 1 : 0)} SOS`}
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- Full-width orbit visualization -->
-    <FamilyOrbit />
-
-    <!-- Dynamic family/friendship quote -->
-    <div class="cosmos-quote" class:quote-visible={quoteVisible} aria-live="polite" aria-atomic="true">
-      <span class="quote-glyph" aria-hidden="true">"</span>
-      <p class="quote-text">{QUOTES[quoteIdx].text}</p>
-      {#if QUOTES[quoteIdx].author}
-        <span class="quote-author">— {QUOTES[quoteIdx].author}</span>
+    <!-- Mobile Globe — inline in scroll flow, hidden on desktop (desktop uses d-left-hud) -->
+    <div class="d-mobile-globe">
+      <GlobeCanvas size={globeSize} />
+      {#if $myLocation?.latitude != null}
+        <div class="d-mob-coords">
+          <span class="d-mob-you">You are here</span>
+          <span class="d-mob-ll">
+            {Math.abs($myLocation.latitude).toFixed(3)}°{$myLocation.latitude >= 0 ? 'N' : 'S'}
+            &nbsp;·&nbsp;
+            {Math.abs($myLocation.longitude).toFixed(3)}°{$myLocation.longitude >= 0 ? 'E' : 'W'}
+          </span>
+        </div>
       {/if}
     </div>
 
-    <!-- Stats strip — 4 inline chips -->
-    <div class="cosmos-stats">
-      <div class="cosmos-stat">
-        <span class="cosmos-stat-val">{onlineCount}</span>
-        <span class="cosmos-stat-lbl">Online</span>
-      </div>
-      <div class="cosmos-stat" class:cosmos-stat-live={$tracking}>
-        <span class="cosmos-stat-val">{$tracking ? 'ON' : 'OFF'}</span>
-        <span class="cosmos-stat-lbl">Tracking</span>
-        {#if $tracking}<span class="cosmos-live-ring" aria-hidden="true"></span>{/if}
-      </div>
-      <div class="cosmos-stat">
-        <span class="cosmos-stat-val">{movingCount}</span>
-        <span class="cosmos-stat-lbl">Moving</span>
-      </div>
-      <div class="cosmos-stat" class:cosmos-stat-warn={!$connectivityStore.isOnline}>
-        <span class="cosmos-stat-val">{$connectivityStore.isOnline ? 'OK' : 'OFF'}</span>
-        <span class="cosmos-stat-lbl">Network</span>
-      </div>
+    <!-- Quote (centered, over orbit) -->
+    <div class="d-quote" class:quote-on={quoteVisible} aria-live="polite">
+      <p class="d-quote-text">{QUOTES[quoteIdx].text}</p>
+      <span class="d-quote-author">— {QUOTES[quoteIdx].author}</span>
     </div>
-  </section>
 
-  <!-- ══ Network ════════════════════════════════════════════════════════════ -->
-  <section class="fd-section">
-    <header class="fd-section-header">
-      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      <h2>Your Network</h2>
-      <span class="fd-section-badge">{members.length}</span>
-    </header>
-
-    {#if members.length === 0}
-      <TiltCard>
-        <div class="fd-empty">
-          <div class="fd-empty-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          </div>
-          <p>No one in your network yet.</p>
-          <button class="fd-cta" on:click={() => push('/')}>
-            Open Map to add people
-          </button>
-        </div>
-      </TiltCard>
-    {:else}
-      <div class="fd-member-grid reveal-stagger">
-        {#each members as user (user.userId)}
-          {@const color = getUserColor(user.userId)}
-          {@const colorLight = getUserColorLight(user.userId)}
-          {@const pres = presence(user)}
-          {@const dist = distText(user)}
-          <TiltCard intensity={13} shine={true}>
-            <button
-              class="fd-member"
-              class:member-sos={pres === 'sos'}
-              class:member-offline={pres === 'offline'}
-              class:member-moving={pres === 'moving'}
-              style="--mc:{color};--mcl:{colorLight}"
-              on:click={() => { focusUser.set(user.userId); push('/'); }}
-              aria-label="View {user.displayName || 'member'} on map"
-            >
-              <!-- Card glow -->
-              <div class="member-glow" aria-hidden="true"></div>
-
-              <!-- Top: avatar + status -->
-              <div class="member-top">
-                <div class="member-avatar-wrap">
-                  <div class="member-avatar">
-                    <span class="member-initials">{getInitials(user.displayName)}</span>
-                  </div>
-                  <!-- Presence ring -->
-                  <span
-                    class="presence-dot"
-                    class:dot-sos={pres === 'sos'}
-                    class:dot-offline={pres === 'offline'}
-                    class:dot-moving={pres === 'moving'}
-                    class:dot-online={pres === 'online'}
-                    aria-label="Status: {pres}"
-                  ></span>
-                </div>
-
-                <!-- Battery pill -->
-                {#if user.batteryPct != null}
-                  <div class="battery-pill" class:batt-low={user.batteryPct < 20}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="7" width="16" height="10" rx="2"/><path d="M22 11v2"/></svg>
-                    {user.batteryPct}%
-                  </div>
-                {/if}
-              </div>
-
-              <!-- Name + status -->
-              <div class="member-body">
-                <span class="member-name">{user.displayName || 'Unknown'}</span>
-                <span class="member-status" class:status-sos={pres === 'sos'}>
-                  {#if pres === 'sos'}
-                    SOS Active
-                  {:else if pres === 'moving'}
-                    {speedKmh(user)} km/h
-                  {:else if pres === 'offline'}
-                    Offline
-                  {:else}
-                    Online
-                  {/if}
-                </span>
-                {#if dist}
-                  <span class="member-dist">{dist} away</span>
-                {/if}
-              </div>
-
-              <!-- Locate icon -->
-              <div class="member-locate" aria-hidden="true">
-                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-              </div>
-            </button>
-          </TiltCard>
-        {/each}
+    <!-- Stats row -->
+    <section class="d-stats">
+      <div class="d-stat">
+        <span class="d-stat-val">{onlineCount}</span>
+        <span class="d-stat-lbl">Online</span>
       </div>
-    {/if}
-  </section>
+      <div class="d-stat" class:stat-active={$tracking}>
+        <span class="d-stat-val">{$tracking ? 'ON' : 'OFF'}</span>
+        <span class="d-stat-lbl">Tracking</span>
+        {#if $tracking}<span class="d-stat-dot" aria-hidden="true"></span>{/if}
+      </div>
+      <div class="d-stat">
+        <span class="d-stat-val">{movingCount}</span>
+        <span class="d-stat-lbl">Moving</span>
+      </div>
+      <div class="d-stat" class:stat-warn={!$connectivityStore.isOnline}>
+        <span class="d-stat-val">{$connectivityStore.isOnline ? 'OK' : 'OFF'}</span>
+        <span class="d-stat-lbl">Network</span>
+      </div>
+    </section>
 
-  <!-- ══ Quick Actions ═════════════════════════════════════════════════════ -->
-  <section class="fd-section">
-    <header class="fd-section-header">
-      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-      <h2>Quick Actions</h2>
-    </header>
-    <div class="fd-actions reveal-stagger">
+    <!-- Network -->
+    <section class="d-panel d-panel-network">
+      <header class="d-panel-head">
+        <h2>Your Network</h2>
+        <span class="d-badge">{members.length}</span>
+      </header>
+      {#if members.length === 0}
+        <div class="d-empty">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <p>No one in your network yet</p>
+          <button class="d-cta" on:click={() => push('/')}>Open Map</button>
+        </div>
+      {:else}
+        <div class="d-members">
+          {#each members as user (user.userId)}
+            {@const color = getUserColor(user.userId)}
+            {@const pres = presence(user)}
+            {@const dist = distText(user)}
+            <button class="d-member" class:m-sos={pres==='sos'} class:m-off={pres==='offline'}
+              style="--mc:{color}" on:click={() => { focusUser.set(user.userId); push('/'); }}>
+              <div class="m-av">
+                <span class="m-init">{getInitials(user.displayName)}</span>
+                <span class="m-dot" class:dot-sos={pres==='sos'} class:dot-off={pres==='offline'} class:dot-mv={pres==='moving'} class:dot-on={pres==='online'}></span>
+              </div>
+              <div class="m-info">
+                <span class="m-name">{user.displayName || 'Unknown'}</span>
+                <span class="m-status" class:m-sos-text={pres==='sos'}>
+                  {pres==='sos'?'SOS':pres==='moving'?speedKmh(user)+' km/h':pres==='offline'?'Offline':'Online'}
+                </span>
+              </div>
+              {#if dist}<span class="m-dist">{dist}</span>{/if}
+            </button>
+          {/each}
+        </div>
+      {/if}
+    </section>
 
-      <TiltCard intensity={10} shine={true}>
-        <button class="fd-action fd-action-map" on:click={() => visitFeature(null, '/')}>
-          <div class="action-orb">
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
-          </div>
+    <!-- Quick Actions -->
+    <section class="d-panel d-panel-actions">
+      <header class="d-panel-head"><h2>Quick Actions</h2></header>
+      <div class="d-actions">
+        <button class="d-act act-map" on:click={() => visitFeature(null, '/')}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
           <span>Live Map</span>
         </button>
-      </TiltCard>
-
-      <TiltCard intensity={10} shine={true}>
-        <button class="fd-action fd-action-activity" on:click={() => visitFeature('activity', '/activity')}>
-          <div class="action-orb">
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-            {#if !visited.activity}<span class="action-new-dot" aria-label="Unvisited"></span>{/if}
-          </div>
+        <button class="d-act act-activity" on:click={() => visitFeature('activity', '/activity')}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
           <span>Activity</span>
+          {#if !visited.activity}<span class="d-dot"></span>{/if}
         </button>
-      </TiltCard>
-
-      <TiltCard intensity={10} shine={true}>
-        <button class="fd-action fd-action-history" on:click={() => visitFeature('replay', '/replay')}>
-          <div class="action-orb">
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.61"/></svg>
-            {#if !visited.replay}<span class="action-new-dot" aria-label="Unvisited"></span>{/if}
-          </div>
-          <span>Route History</span>
+        <button class="d-act act-replay" on:click={() => visitFeature('replay', '/replay')}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.61"/></svg>
+          <span>Routes</span>
+          {#if !visited.replay}<span class="d-dot"></span>{/if}
         </button>
-      </TiltCard>
-
-      <TiltCard intensity={10} shine={true}>
-        <button class="fd-action fd-action-sos" class:sos-pulse={$mySosActive} on:click={() => visitFeature('emergency', '/emergency')}>
-          <div class="action-orb">
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            {#if !visited.emergency}<span class="action-new-dot action-new-dot-red" aria-label="Unvisited"></span>{/if}
-          </div>
+        <button class="d-act act-sos" class:act-sos-on={$mySosActive} on:click={() => visitFeature('emergency', '/emergency')}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           <span>Emergency</span>
+          {#if !visited.emergency}<span class="d-dot d-dot-red"></span>{/if}
         </button>
-      </TiltCard>
-
-      <TiltCard intensity={10} shine={true}>
-        <button class="fd-action fd-action-safety" on:click={() => visitFeature('checkins', '/checkins')}>
-          <div class="action-orb">
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            {#if !visited.checkins}<span class="action-new-dot action-new-dot-violet" aria-label="Unvisited"></span>{/if}
-          </div>
+        <button class="d-act act-checkin" on:click={() => visitFeature('checkins', '/checkins')}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
           <span>Check-ins</span>
+          {#if !visited.checkins}<span class="d-dot d-dot-cyan"></span>{/if}
         </button>
-      </TiltCard>
-
-      <TiltCard intensity={10} shine={true}>
-        <button class="fd-action fd-action-network" on:click={() => visitFeature(null, '/')}>
-          <div class="action-orb">
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><line x1="12" y1="7" x2="12" y2="11"/><line x1="8.5" y1="16.5" x2="12" y2="11"/><line x1="15.5" y1="16.5" x2="12" y2="11"/></svg>
-          </div>
+        <button class="d-act act-network" on:click={() => visitFeature(null, '/')}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><line x1="12" y1="7" x2="12" y2="11"/><line x1="8.5" y1="16.5" x2="12" y2="11"/><line x1="15.5" y1="16.5" x2="12" y2="11"/></svg>
           <span>Network</span>
         </button>
-      </TiltCard>
+      </div>
+    </section>
 
-    </div>
-  </section>
-
-  <!-- Bottom padding for safe area -->
-  <div style="height:calc(var(--safe-bottom,0px) + 24px)"></div>
+    <div class="d-spacer" style="height:calc(var(--safe-bottom,0px) + 28px)"></div>
+  </div>
 </div>
 
 <style>
-  /* ══ Page shell ═══════════════════════════════════════════════════════════ */
-  .fd {
+  :root { --ease-expo: cubic-bezier(0.16,1,0.3,1); }
+
+  /* ═══ Shell ═════════════════════════════════════════════════════════ */
+  .d {
     height: 100dvh;
-    background: #050812;
+    background: var(--surface-0, #050812);
     color: #fff;
-    font-family: var(--font-sans, system-ui, sans-serif);
+    font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
     position: relative;
-    overflow-x: hidden;
+    overflow: hidden;
+    opacity: 0; transition: opacity 0.5s ease;
+  }
+  .d.d-ready { opacity: 1; }
+
+  /* ═══ Aurora + noise (behind everything) ════════════════════════════ */
+  .d-aurora {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(ellipse 70% 50% at 15% 20%, rgba(99,102,241,0.12) 0%, transparent 65%),
+      radial-gradient(ellipse 60% 45% at 85% 75%, rgba(139,92,246,0.08) 0%, transparent 60%);
+  }
+  .d-noise {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 180px; mix-blend-mode: overlay;
+  }
+
+  /* ═══ ORBIT — FULL SCREEN BACKGROUND ═══════════════════════════════ */
+  .d-orbit-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+  }
+  /* Orbit is hidden on all viewports — the GlobeCanvas is the primary 3D visual on
+     both desktop (left HUD) and mobile (inline in scroll flow). Hiding saves RAF CPU. */
+  .d-orbit-bg { display: none; }
+
+  /* ═══ HEADER — floating glass bar ══════════════════════════════════ */
+  .d-header {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: calc(var(--safe-top, 0px) + 10px) 20px 10px;
+    background: rgba(5,8,18,0.55);
+    backdrop-filter: blur(24px) saturate(1.5);
+    -webkit-backdrop-filter: blur(24px) saturate(1.5);
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .d-back {
+    display: flex; align-items: center; gap: 4px;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 20px; padding: 5px 11px 5px 7px;
+    color: rgba(255,255,255,0.65); font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: background 0.15s, color 0.15s;
+  }
+  .d-back:hover { background: rgba(255,255,255,0.10); color: #fff; }
+  .d-back:active { transform: scale(0.96); }
+  .d-clock {
+    font-size: 20px; font-weight: 700; letter-spacing: -0.03em;
+    color: rgba(255,255,255,0.85); font-variant-numeric: tabular-nums;
+    font-family: var(--font-display, system-ui);
+  }
+
+  /* ═══ CONTENT OVERLAY — scrolls over the orbit ═════════════════════ */
+  .d-content {
+    position: relative; z-index: 5;
+    height: 100dvh;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-y: contain;
-    padding: 0 0 var(--safe-bottom, 0px);
+    padding-top: calc(var(--safe-top, 0px) + 44px);
+    pointer-events: none; /* let clicks through to orbit */
+  }
+  /* Re-enable pointer events on actual content */
+  .d-content > * { pointer-events: auto; }
 
-    /* Mount animation — gentle fade, no bounce */
-    opacity: 0;
-    transform: translateY(8px);
-    transition: opacity 0.6s cubic-bezier(0.16,1,0.3,1), transform 0.6s cubic-bezier(0.16,1,0.3,1);
+  /* On mobile: content flows normally (orbit behind, content on top) */
+  /* On desktop: no-scroll sidebar — everything fits in 100dvh */
+  @media (min-width: 768px) {
+    .d-content {
+      position: absolute;
+      top: 0; right: 0; bottom: 0;
+      width: min(420px, 38vw);
+      padding: calc(var(--safe-top, 0px) + 52px) 16px calc(var(--safe-bottom, 0px) + 12px) 16px;
+      background: linear-gradient(90deg, transparent 0%, rgba(5,8,18,0.6) 30%, rgba(5,8,18,0.88) 100%);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      /* KEY: no outer scroll — flex distributes sections */
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    /* Hero + stats never shrink */
+    .d-hero { flex-shrink: 0; }
+    .d-stats { flex-shrink: 0; padding-top: 8px; }
+    /* Network panel grows to fill remaining space */
+    .d-panel-network {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .d-panel-network .d-members {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,0.06) transparent;
+    }
+    .d-panel-network .d-empty {
+      flex: 1; min-height: 0;
+      display: flex; flex-direction: column; justify-content: center;
+    }
+    /* Actions panel never shrinks */
+    .d-panel-actions { flex-shrink: 0; }
+    /* Hide mobile-only spacer */
+    .d-spacer { display: none; }
+    /* Compact hero on desktop */
+    .d-hero { padding: 10px 16px 0; gap: 8px; }
+    .d-name { font-size: clamp(1.4rem, 3.5vw, 1.8rem) !important; }
+    .d-panel { margin: 8px 0 0; padding: 10px 12px 10px; }
+    .d-safety svg { width: 48px; height: 48px; }
+    .d-safety-score { font-size: 11px !important; top: 14px !important; }
   }
-  .fd.fd-mounted {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  /* ══ Starfield — parallax layer ═══════════════════════════════════════════ */
-  .fd-stars {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 0;
-    will-change: transform;
-    transition: transform 0.12s ease-out;
-  }
-  .fd-star {
-    position: absolute;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.55);
-    animation: star-twinkle ease-in-out infinite;
-  }
-  /* Bright star class — subtle glow, no aggressive scaling */
-  .fd-star-bright {
-    background: rgba(255, 255, 255, 0.9) !important;
-    box-shadow: 0 0 2px rgba(255,255,255,0.4);
-    animation: star-twinkle-bright ease-in-out infinite !important;
-  }
-  /* Blue-tinted star class */
-  .fd-star-blue {
-    background: rgba(180, 200, 255, 0.6) !important;
-    animation: star-twinkle ease-in-out infinite !important;
-  }
-  /* Stars: opacity-only twinkle, no scale — feels like real night sky */
-  @keyframes star-twinkle {
-    0%, 100% { opacity: 0.15; }
-    50%       { opacity: 0.6; }
-  }
-  @keyframes star-twinkle-bright {
-    0%, 100% { opacity: 0.35; }
-    50%       { opacity: 1.0; }
-  }
-
-  /* ══ Milky Way band — parallax layer ═════════════════════════════════════ */
-  .fd-milkyway {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 0;
-    will-change: transform;
-    transition: transform 0.12s ease-out;
-    background: linear-gradient(
-      128deg,
-      transparent 10%,
-      rgba(160, 120, 255, 0.018) 28%,
-      rgba(120, 160, 255, 0.028) 38%,
-      rgba(180, 140, 255, 0.022) 48%,
-      rgba(100, 180, 255, 0.016) 58%,
-      transparent 72%
-    );
+  @media (min-width: 1200px) {
+    .d-content { width: min(460px, 35vw); }
   }
 
-  /* ══ Shooting star — graceful arc with longer tail ═══════════════════════ */
-  .fd-shooting-star {
-    position: fixed;
-    width: 160px;
-    height: 1px;
-    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.05) 20%, rgba(255,255,255,0.85) 70%, rgba(200,220,255,0.95) 90%, transparent 100%);
-    border-radius: 2px;
-    transform: rotate(32deg);
-    transform-origin: right center;
-    animation: shoot-across 1.4s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
-    pointer-events: none;
-    z-index: 0;
-    filter: drop-shadow(0 0 1px rgba(255,255,255,0.5));
+  /* ═══ Stagger ══════════════════════════════════════════════════════ */
+  .d-hero, .d-stats, .d-panel {
+    opacity: 0; transform: translateY(10px);
+    transition: opacity 0.5s var(--ease-expo), transform 0.5s var(--ease-expo);
   }
-  @keyframes shoot-across {
-    0%   { transform: translateX(0)    translateY(0)    rotate(32deg); opacity: 0; width: 40px; }
-    8%   { opacity: 0.9; width: 160px; }
-    70%  { opacity: 0.7; }
-    100% { transform: translateX(85vw) translateY(40px) rotate(32deg); opacity: 0; width: 160px; }
-  }
+  .d-ready .d-hero   { opacity: 1; transform: none; transition-delay: 0.05s; }
+  .d-ready .d-stats   { opacity: 1; transform: none; transition-delay: 0.15s; }
+  .d-ready .d-panel   { opacity: 1; transform: none; transition-delay: 0.22s; }
+  .d-ready .d-panel + .d-panel { transition-delay: 0.30s; }
+  /* .d-quote controlled purely by .quote-on — no stagger override */
+  .d-quote { opacity: 0; transition: opacity 0.6s ease; }
+  .d-quote.quote-on { opacity: 1; }
 
-  /* ══ Nebula — parallax layer (deepest shift) ═════════════════════════════ */
-  .fd-nebula-layer {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 0;
-    will-change: transform;
-    transition: transform 0.14s ease-out;
-  }
-  .fd-nebula {
-    position: absolute;
-    border-radius: 50%;
-    pointer-events: none;
-    filter: blur(90px);
-  }
-  .fd-nebula-a {
-    width: 550px; height: 450px;
-    top: -180px; left: -120px;
-    background: radial-gradient(ellipse, rgba(99,102,241,0.14) 0%, transparent 70%);
-    animation: nebula-a 40s ease-in-out infinite;
-  }
-  .fd-nebula-b {
-    width: 450px; height: 450px;
-    bottom: -100px; right: -100px;
-    background: radial-gradient(ellipse, rgba(16,185,129,0.10) 0%, transparent 70%);
-    animation: nebula-b 50s ease-in-out infinite;
-  }
-  .fd-nebula-c {
-    width: 350px; height: 350px;
-    top: 40%; left: 55%;
-    background: radial-gradient(ellipse, rgba(139,92,246,0.09) 0%, transparent 70%);
-    animation: nebula-c 35s ease-in-out infinite;
-  }
-  /* Each nebula gets its own gentle, unique drift — no scale, just position + opacity */
-  @keyframes nebula-a {
-    0%, 100% { transform: translate(0, 0);       opacity: 0.9; }
-    50%       { transform: translate(20px, 15px); opacity: 1.0; }
-  }
-  @keyframes nebula-b {
-    0%, 100% { transform: translate(0, 0);         opacity: 0.85; }
-    50%       { transform: translate(-15px, -10px); opacity: 1.0; }
-  }
-  @keyframes nebula-c {
-    0%, 100% { transform: translate(0, 0);       opacity: 0.8; }
-    50%       { transform: translate(12px, -8px); opacity: 0.95; }
-  }
 
-  /* ══ Header ═══════════════════════════════════════════════════════════════ */
-  .fd-header {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: calc(var(--safe-top, 0px) + 12px) 20px 12px;
-    background: rgba(5, 8, 18, 0.72);
-    backdrop-filter: blur(20px) saturate(1.6);
-    -webkit-backdrop-filter: blur(20px) saturate(1.6);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  /* ═══ Hero ═════════════════════════════════════════════════════════ */
+  .d-hero {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    padding: 16px 20px 0; gap: 12px;
   }
-  .fd-back {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    background: rgba(255,255,255,0.07);
-    border: 1px solid rgba(255,255,255,0.10);
-    border-radius: 20px;
-    padding: 6px 12px 6px 8px;
-    color: rgba(255,255,255,0.75);
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease;
+  .d-greet { flex: 1; min-width: 0; }
+  .d-name {
+    font-size: clamp(1.7rem, 5vw, 2.4rem); font-weight: 400;
+    letter-spacing: -0.03em; line-height: 1.15; margin: 0;
+    font-family: var(--font-display, system-ui);
+    color: rgba(255,255,255,0.55); /* base: muted gray for "Up late," */
   }
-  .fd-back:hover { background: rgba(255,255,255,0.12); color: #fff; }
-  .fd-clock {
-    font-size: 22px;
-    font-weight: 700;
-    letter-spacing: -0.03em;
-    color: rgba(255,255,255,0.9);
-    font-variant-numeric: tabular-nums;
-    font-family: var(--font-display, system-ui, sans-serif);
-  }
-
-  /* ══ Cosmos — greeting + orbit + stats unified ════════════════════════════ */
-  .fd-cosmos {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding-top: 4px;
-    /* Smooth entrance — no bounce, just elegant deceleration */
-    opacity: 0;
-    transform: translateY(20px);
-    transition: opacity 0.7s cubic-bezier(0.16,1,0.3,1) 0.1s, transform 0.7s cubic-bezier(0.16,1,0.3,1) 0.1s;
-  }
-  .fd-mounted .fd-cosmos {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  /* Top row: greeting left, compact safety ring right */
-  .cosmos-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    padding: 18px 20px 0;
-    box-sizing: border-box;
-    gap: 12px;
-  }
-  .cosmos-greeting { flex: 1; min-width: 0; }
-  .cosmos-greet-line {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-  .cosmos-greet-text {
-    font-size: clamp(1.4rem, 4.5vw, 2rem);
+  .d-greet-word {
+    /* "Up late," — medium weight, muted */
     font-weight: 400;
-    color: rgba(255,255,255,0.50);
-    font-family: var(--font-display, system-ui, sans-serif);
+    color: rgba(255,255,255,0.55);
   }
-  .cosmos-name {
-    font-size: clamp(1.6rem, 5vw, 2.2rem);
+  .d-name-word {
+    /* "Ankur" — bold, white→purple gradient */
     font-weight: 800;
-    background: linear-gradient(135deg, #fff 30%, rgba(139,92,246,0.85) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    letter-spacing: -0.03em;
-    font-family: var(--font-display, system-ui, sans-serif);
+    background: linear-gradient(135deg, #fff 30%, #c4b5fd 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
   }
-  .cosmos-date {
-    margin: 3px 0 0;
-    font-size: 12px;
-    color: rgba(255,255,255,0.30);
-    font-weight: 500;
-    letter-spacing: 0.01em;
+  .d-date { margin: 5px 0 0; font-size: 12px; font-weight: 400; color: rgba(255,255,255,0.28); letter-spacing: 0.01em; }
+
+  .d-safety { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; flex-shrink: 0; }
+  .d-ring-progress { transition: stroke-dashoffset 1s cubic-bezier(0.4,0,0.2,1), stroke 0.4s; }
+  .d-safety-score { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); font-size: 13px; font-weight: 800; color: rgba(255,255,255,0.9); font-family: var(--font-display, system-ui); }
+  .d-safety-badge { display: flex; align-items: center; gap: 4px; font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 20px; white-space: nowrap; }
+  .badge-safe { background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.25); color: #10b981; }
+  .badge-sos  { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.25); color: #f87171; }
+  .d-badge-dot { width: 4px; height: 4px; border-radius: 50%; background: currentColor; animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* ═══ Quote ════════════════════════════════════════════════════════ */
+  .d-quote {
+    padding: 8px 20px; text-align: center;
+    opacity: 0; transition: opacity 0.6s ease;
+  }
+  .d-quote.quote-on { opacity: 1; }
+  .d-quote-text { font-size: 11.5px; font-style: italic; font-family: Georgia, serif; color: rgba(255,255,255,0.30); line-height: 1.6; margin: 0 0 3px; }
+  .d-quote-author { font-size: 8px; font-weight: 700; color: rgba(139,92,246,0.4); text-transform: uppercase; letter-spacing: 0.06em; }
+  @media (min-width: 768px) {
+    .d-quote { display: none; } /* Replaced by .d-quote-left in the left HUD on desktop */
   }
 
-  /* Compact safety ring widget */
-  .cosmos-ring {
+  /* ═══ Stats ════════════════════════════════════════════════════════ */
+  .d-stats { display: flex; gap: 6px; padding: 12px 20px 0; }
+  .d-stat {
+    flex: 1;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 12px; padding: 8px 6px;
+    display: flex; flex-direction: column; gap: 1px; align-items: center;
+    position: relative; overflow: hidden;
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .d-stat:active { background: rgba(255,255,255,0.07); }
+  .d-stat-val { font-size: 18px; font-weight: 800; color: #fff; line-height: 1; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; font-family: var(--font-display, system-ui); }
+  .d-stat-lbl { font-size: 8px; font-weight: 600; color: rgba(255,255,255,0.25); text-transform: uppercase; letter-spacing: 0.07em; }
+  .stat-active { border-color: rgba(16,185,129,0.25); }
+  .stat-active .d-stat-val { color: #10b981; }
+  .stat-warn { border-color: rgba(245,158,11,0.25); }
+  .stat-warn .d-stat-val { color: #f59e0b; }
+  .d-stat-dot { position: absolute; top: 5px; right: 5px; width: 4px; height: 4px; border-radius: 50%; background: #10b981; animation: pulse 2s ease-in-out infinite; }
+
+  /* ═══ Panel (glass card for Network & Actions) ═════════════════════ */
+  .d-panel {
+    margin: 12px 20px 0;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 16px;
+    padding: 14px 14px 12px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  .d-panel-head { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+  .d-panel-head h2 { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255,255,255,0.35); margin: 0; flex: 1; }
+  .d-badge { font-size: 9px; font-weight: 700; background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.2); color: rgba(139,92,246,0.8); padding: 1px 6px; border-radius: 20px; }
+
+  /* ═══ Members — list layout (works in sidebar) ═════════════════════ */
+  .d-members { display: flex; flex-direction: column; gap: 6px; }
+  .d-member {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 12px; padding: 8px 10px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, transform 0.1s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .d-member:hover { border-color: rgba(255,255,255,0.12); background: rgba(255,255,255,0.05); }
+  .d-member:active { transform: scale(0.98); }
+  .d-member.m-sos { border-color: rgba(239,68,68,0.25); }
+  .d-member.m-off { opacity: 0.45; }
+
+  .m-av { position: relative; width: 32px; height: 32px; border-radius: 50%; background: color-mix(in srgb, var(--mc,#6366f1) 15%, transparent); border: 2px solid var(--mc,#6366f1); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .m-init { font-size: 11px; font-weight: 800; color: var(--mc,#6366f1); line-height: 1; user-select: none; }
+  .m-dot { position: absolute; bottom: -1px; right: -1px; width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--surface-0, #050812); }
+  .dot-on { background: #10b981; } .dot-mv { background: #3b82f6; } .dot-off { background: #475569; } .dot-sos { background: #ef4444; }
+  .m-info { flex: 1; min-width: 0; }
+  .m-name { display: block; font-size: 12px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .m-status { font-size: 10px; color: rgba(255,255,255,0.35); }
+  .m-sos-text { color: #f87171; font-weight: 700; }
+  .m-dist { font-size: 9px; color: rgba(255,255,255,0.22); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+
+  /* ═══ Empty ════════════════════════════════════════════════════════ */
+  .d-empty {
+    text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px;
+    color: rgba(255,255,255,0.28); font-size: 12px; padding: 16px 0;
+  }
+  .d-cta {
+    background: linear-gradient(135deg, var(--primary-500, #4f46e5), var(--primary-600, #7c3aed));
+    color: #fff; border: none; border-radius: 10px; padding: 7px 14px;
+    font-size: 11px; font-weight: 700; cursor: pointer;
+    transition: transform 0.12s, box-shadow 0.2s;
+    box-shadow: 0 2px 10px rgba(99,102,241,0.3);
+  }
+  .d-cta:hover { transform: translateY(-1px); } .d-cta:active { transform: scale(0.97); }
+
+  /* ═══ Actions ══════════════════════════════════════════════════════ */
+  .d-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .d-act {
+    position: relative;
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px; padding: 12px 6px 10px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    cursor: pointer; color: rgba(255,255,255,0.65); font-size: 10px; font-weight: 600;
+    transition: border-color 0.2s, transform 0.1s, background 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .d-act:hover { border-color: rgba(255,255,255,0.12); background: rgba(255,255,255,0.05); }
+  .d-act:active { transform: scale(0.95); }
+  .act-map { color: #818cf8; } .act-activity { color: #34d399; } .act-replay { color: #fbbf24; }
+  .act-sos { color: #f87171; } .act-checkin { color: #22d3ee; } .act-network { color: #a78bfa; }
+  .act-sos-on { border-color: rgba(239,68,68,0.25); animation: sos-b 2s ease-in-out infinite; }
+  @keyframes sos-b { 0%,100%{border-color:rgba(239,68,68,0.15)} 50%{border-color:rgba(239,68,68,0.45)} }
+
+  .d-dot { position: absolute; top: 6px; right: 6px; width: 6px; height: 6px; border-radius: 50%; background: #f59e0b; box-shadow: 0 0 5px rgba(245,158,11,0.6); }
+  .d-dot-red { background: #ef4444; box-shadow: 0 0 5px rgba(239,68,68,0.6); }
+  .d-dot-cyan { background: #22d3ee; box-shadow: 0 0 5px rgba(34,211,238,0.6); }
+
+  /* ═══ Mobile Globe section ══════════════════════════════════════════ */
+  .d-mobile-globe {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
-    flex-shrink: 0;
+    gap: 10px;
+    padding: 4px 20px 4px;
   }
-  .cosmos-ring-badge {
+  @media (min-width: 768px) {
+    .d-mobile-globe { display: none; }
+  }
+  .d-mob-coords {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+  }
+  .d-mob-you {
+    font-size: 8px; font-weight: 800;
+    color: rgba(167,139,250,0.55);
+    text-transform: uppercase; letter-spacing: 0.12em;
+  }
+  .d-mob-ll {
+    font-size: 10px; font-weight: 600;
+    font-family: var(--font-mono, monospace);
+    color: rgba(255,255,255,0.22);
+    letter-spacing: 0.03em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ═══ Reduced motion ═══════════════════════════════════════════════ */
+  @media (prefers-reduced-motion: reduce) {
+    .d-aurora, .d-badge-dot, .d-stat-dot, .d-member.m-sos, .d-act.act-sos-on { animation: none !important; }
+    .d-hero, .d-stats, .d-panel, .d-quote { opacity: 1 !important; transform: none !important; transition: none !important; }
+  }
+
+  /* ═══ Mouse cursor glow ════════════════════════════════════════════ */
+  .d-cursor-glow {
+    position: fixed;
+    width: 360px; height: 360px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(99,102,241,0.055) 0%, rgba(139,92,246,0.025) 45%, transparent 70%);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 2;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    display: none;
+  }
+  @media (min-width: 768px) {
+    .d-cursor-glow { display: block; }
+    .d-cursor-glow.d-cursor-visible { opacity: 1; }
+  }
+
+  /* ═══ Left HUD overlay — globe fills the left area ════════════════ */
+  .d-left-hud {
+    display: none;
+  }
+  @media (min-width: 768px) {
+    .d-left-hud {
+      display: flex;
+      align-items: stretch;   /* stretch so globe-col fills full height */
+      justify-content: center;
+      position: absolute;
+      top: 0; bottom: 0; left: 0;
+      right: min(420px, 38vw);
+      pointer-events: none;
+      z-index: 3;
+    }
+    .d-left-hud > :global(*) { pointer-events: auto; }
+  }
+  @media (min-width: 1200px) {
+    .d-left-hud { right: min(460px, 35vw); }
+  }
+
+  /* ── Globe column layout ────────────────────────────────────────── */
+  .d-globe-col {
     display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: calc(var(--safe-top, 0px) + 64px) 24px 32px;
+    max-width: 480px;
+    width: 100%;
+    height: 100%;
+    pointer-events: auto;
+  }
+
+  /* ── Top section (eyebrow + status pills) ─────────────────────── */
+  .d-globe-top {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+  }
+
+  /* ── Status pills row ─────────────────────────────────────────── */
+  .d-globe-status-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+  }
+  .d-gsr-pill {
+    display: inline-flex;
     align-items: center;
     gap: 5px;
-    font-size: 10px;
-    font-weight: 700;
-    padding: 2px 7px;
+    padding: 4px 10px 4px 8px;
     border-radius: 20px;
-    white-space: nowrap;
-  }
-  .ring-badge-safe {
-    background: rgba(16,185,129,0.15);
-    border: 1px solid rgba(16,185,129,0.3);
-    color: #10b981;
-  }
-  .ring-badge-sos {
-    background: rgba(239,68,68,0.15);
-    border: 1px solid rgba(239,68,68,0.3);
-    color: #f87171;
-  }
-  .ring-badge-dot {
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: currentColor;
-    animation: dot-pulse 1.8s ease-in-out infinite;
-  }
-  @keyframes dot-pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50%       { opacity: 0.4; transform: scale(0.7); }
-  }
-
-  /* Stats strip — 4 chips in one row, tight */
-  .cosmos-stats {
-    display: flex;
-    gap: 8px;
-    width: 100%;
-    padding: 0 16px 4px;
-    box-sizing: border-box;
-  }
-  .cosmos-stat {
-    flex: 1;
     background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 12px;
-    padding: 9px 6px;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    align-items: center;
-    position: relative;
-    overflow: hidden;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
-    transition: transform 0.3s cubic-bezier(0.16,1,0.3,1), box-shadow 0.3s ease, background 0.3s ease;
-  }
-  .cosmos-stat:active {
-    transform: scale(0.96);
-  }
-  .cosmos-stat-val {
-    font-size: 18px;
-    font-weight: 800;
-    color: #fff;
-    letter-spacing: -0.04em;
-    font-variant-numeric: tabular-nums;
-    line-height: 1;
-    font-family: var(--font-display, system-ui, sans-serif);
-  }
-  .cosmos-stat-lbl {
+    border: 1px solid rgba(255,255,255,0.07);
     font-size: 9px;
-    font-weight: 600;
-    color: rgba(255,255,255,0.32);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-  }
-  .cosmos-stat-live { border-color: rgba(16,185,129,0.3); }
-  .cosmos-stat-live .cosmos-stat-val { color: #10b981; }
-  .cosmos-stat-warn { border-color: rgba(245,158,11,0.3); }
-  .cosmos-stat-warn .cosmos-stat-val { color: #f59e0b; }
-  .cosmos-live-ring {
-    position: absolute;
-    inset: -1px;
-    border-radius: inherit;
-    border: 1px solid rgba(16,185,129,0.4);
-    animation: live-ring 2s ease-in-out infinite;
-    pointer-events: none;
-  }
-  @keyframes live-ring {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0.3; }
-  }
-
-  /* ══ Section — staggered slide-up entrance ═══════════════════════════════ */
-  .fd-section {
-    position: relative;
-    z-index: 1;
-    padding: 24px 20px 0;
-    opacity: 0;
-    transform: translateY(16px);
-  }
-  /* First section (Network) — stagger 0.3s */
-  .fd-mounted .fd-section:first-of-type {
-    opacity: 1;
-    transform: translateY(0);
-    transition: opacity 0.6s cubic-bezier(0.16,1,0.3,1) 0.3s, transform 0.6s cubic-bezier(0.16,1,0.3,1) 0.3s;
-  }
-  /* Second section (Quick Actions) — stagger 0.45s */
-  .fd-mounted .fd-section:last-of-type {
-    opacity: 1;
-    transform: translateY(0);
-    transition: opacity 0.6s cubic-bezier(0.16,1,0.3,1) 0.45s, transform 0.6s cubic-bezier(0.16,1,0.3,1) 0.45s;
-  }
-  .fd-section-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 14px;
-    color: rgba(255,255,255,0.45);
-  }
-  .fd-section-header h2 {
-    font-size: 12px;
     font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin: 0;
-    flex: 1;
+    color: rgba(255,255,255,0.35);
+    letter-spacing: 0.04em;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: border-color 0.2s, color 0.2s;
   }
-  .fd-section-badge {
-    font-size: 11px;
-    font-weight: 700;
-    background: rgba(99,102,241,0.2);
-    border: 1px solid rgba(99,102,241,0.3);
-    color: rgba(139,92,246,0.9);
-    padding: 2px 8px;
-    border-radius: 20px;
-  }
-
-  /* ══ Member grid ══════════════════════════════════════════════════════════ */
-  .fd-member-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 10px;
-  }
-
-  .fd-member {
-    position: relative;
-    width: 100%;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(var(--mc, 99,102,241), 0.2);
-    border-radius: 18px;
-    padding: 14px 12px 12px;
-    cursor: pointer;
-    text-align: left;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    overflow: hidden;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.05);
-    transition: border-color 0.25s ease, box-shadow 0.25s ease;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .fd-member:hover {
-    border-color: rgba(255,255,255,0.18);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.08);
-  }
-  .fd-member:active { transform: scale(0.97); }
-
-  /* SOS variant — subtle border glow, no box-shadow explosion */
-  .fd-member.member-sos {
-    border-color: rgba(239,68,68,0.4);
-    animation: member-sos-glow 2s ease-in-out infinite;
-  }
-  @keyframes member-sos-glow {
-    0%, 100% { border-color: rgba(239,68,68,0.25); }
-    50%       { border-color: rgba(239,68,68,0.6); }
-  }
-  /* Offline variant */
-  .fd-member.member-offline { opacity: 0.55; }
-
-  /* Glow behind card */
-  .member-glow {
-    position: absolute;
-    bottom: -20px; left: 50%;
-    transform: translateX(-50%);
-    width: 80px; height: 40px;
-    background: var(--mc, #6366f1);
+  .d-gsr-dot {
+    width: 5px; height: 5px;
     border-radius: 50%;
-    filter: blur(24px);
-    opacity: 0.2;
-    pointer-events: none;
-  }
-
-  /* Top: avatar + battery */
-  .member-top {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-  }
-  .member-avatar-wrap {
-    position: relative;
+    background: rgba(255,255,255,0.18);
     flex-shrink: 0;
+    transition: background 0.2s, box-shadow 0.2s;
   }
-  .member-avatar {
-    width: 46px;
-    height: 46px;
-    border-radius: 50%;
-    background: var(--mcl, rgba(99,102,241,0.15));
-    border: 2.5px solid var(--mc, #6366f1);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  /* ON / green */
+  .gsr-on {
+    border-color: rgba(16,185,129,0.22);
+    color: rgba(52,211,153,0.75);
   }
-  .member-initials {
-    font-size: 16px;
-    font-weight: 800;
-    color: var(--mc, #6366f1);
-    user-select: none;
-    line-height: 1;
+  .gsr-on .d-gsr-dot {
+    background: #10b981;
+    box-shadow: 0 0 5px rgba(16,185,129,0.55);
+    animation: blip-g 2.5s ease-in-out infinite;
   }
-
-  .presence-dot {
-    position: absolute;
-    bottom: 1px;
-    right: 1px;
-    width: 11px;
-    height: 11px;
-    border-radius: 50%;
-    border: 2px solid #050812;
+  /* SAFE / green */
+  .gsr-safe {
+    border-color: rgba(16,185,129,0.22);
+    color: rgba(52,211,153,0.75);
   }
-  .dot-online  { background: #10b981; }
-  .dot-moving  { background: #3b82f6; animation: moving-pulse 2s ease-in-out infinite; }
-  .dot-offline { background: #475569; }
-  .dot-sos     { background: #ef4444; animation: sos-dot-pulse 1.2s ease-in-out infinite; }
-
-  @keyframes moving-pulse {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0.5; }
+  .gsr-safe .d-gsr-dot {
+    background: #10b981;
+    box-shadow: 0 0 5px rgba(16,185,129,0.55);
   }
-  @keyframes sos-dot-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); }
-    50%       { box-shadow: 0 0 0 3px rgba(239,68,68,0); }
+  /* ALERT / red */
+  .gsr-alert {
+    border-color: rgba(239,68,68,0.28);
+    color: rgba(248,113,113,0.85);
   }
-
-  /* Battery */
-  .battery-pill {
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    font-size: 10px;
-    font-weight: 700;
-    color: rgba(255,255,255,0.4);
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 20px;
-    padding: 3px 6px;
+  .gsr-alert .d-gsr-dot {
+    background: #ef4444;
+    box-shadow: 0 0 5px rgba(239,68,68,0.60);
+    animation: pulse 1.5s ease-in-out infinite;
   }
-  .batt-low { color: #f87171; border-color: rgba(239,68,68,0.3); }
-
-  /* Body */
-  .member-body {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
+  /* WARN / amber */
+  .gsr-warn {
+    border-color: rgba(245,158,11,0.24);
+    color: rgba(251,191,36,0.75);
   }
-  .member-name {
-    font-size: 13px;
-    font-weight: 700;
-    color: #fff;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .member-status {
-    font-size: 11px;
-    color: rgba(255,255,255,0.45);
-    font-weight: 500;
-  }
-  .status-sos { color: #f87171; font-weight: 700; }
-  .member-dist {
-    font-size: 10px;
-    color: rgba(255,255,255,0.28);
-    font-variant-numeric: tabular-nums;
+  .gsr-warn .d-gsr-dot {
+    background: #f59e0b;
+    box-shadow: 0 0 5px rgba(245,158,11,0.50);
   }
 
-  /* Locate icon */
-  .member-locate {
-    position: absolute;
-    bottom: 10px;
-    right: 10px;
-    color: rgba(255,255,255,0.18);
-  }
-
-  /* ══ Empty state ══════════════════════════════════════════════════════════ */
-  .fd-empty {
-    background: rgba(255,255,255,0.03);
-    border: 1px dashed rgba(255,255,255,0.10);
-    border-radius: 18px;
-    padding: 32px 20px;
-    text-align: center;
+  /* ── Bottom section (loc + quote) ────────────────────────────── */
+  .d-globe-bottom {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 12px;
-    color: rgba(255,255,255,0.35);
-    font-size: 14px;
-  }
-  .fd-empty-icon {
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background: rgba(99,102,241,0.1);
-    border: 1px solid rgba(99,102,241,0.2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: rgba(99,102,241,0.7);
-  }
-  .fd-cta {
-    background: linear-gradient(135deg, #4f46e5, #7c3aed);
-    color: #fff;
-    border: none;
-    border-radius: 12px;
-    padding: 10px 18px;
-    font-size: 13px;
-    font-weight: 700;
-    cursor: pointer;
-    box-shadow: 0 4px 16px rgba(99,102,241,0.35);
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-  }
-  .fd-cta:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(99,102,241,0.45); }
-  .fd-cta:active { transform: scale(0.97); }
-
-  /* ══ Quick actions ════════════════════════════════════════════════════════ */
-  .fd-actions {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-  }
-  @media (max-width: 360px) {
-    .fd-actions { grid-template-columns: repeat(2, 1fr); }
-  }
-
-  .fd-action {
-    position: relative;
     width: 100%;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 18px;
-    padding: 18px 12px 14px;
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    overflow: hidden;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
-    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.12s ease;
-    -webkit-tap-highlight-color: transparent;
-    color: rgba(255,255,255,0.8);
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.01em;
   }
-  .fd-action:hover { border-color: rgba(255,255,255,0.15); }
-  .fd-action:active { transform: scale(0.95); }
 
-  .action-orb {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
+  .d-globe-eyebrow {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 8.5px; font-weight: 800;
+    color: rgba(255,255,255,0.14);
+    letter-spacing: 0.15em; text-transform: uppercase;
+    font-family: var(--font-mono, monospace);
+  }
+  .d-globe-blip {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 6px rgba(16,185,129,0.7);
+    animation: blip-g 2.5s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+  @keyframes blip-g { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+  .d-loc-info {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: center;
+    color: rgba(167,139,250,0.55);
+  }
+  .d-loc-you {
+    font-size: 9px; font-weight: 800;
+    color: rgba(167,139,250,0.65);
+    text-transform: uppercase; letter-spacing: 0.10em;
+  }
+  .d-loc-coords {
+    font-size: 11px; font-weight: 600;
+    font-family: var(--font-mono, monospace);
+    color: rgba(255,255,255,0.30);
+    letter-spacing: 0.03em;
+    font-variant-numeric: tabular-nums;
+  }
+  .d-loc-unknown {
+    font-size: 9px; font-weight: 600;
+    color: rgba(255,255,255,0.18);
+    letter-spacing: 0.06em; text-transform: uppercase;
+    gap: 5px;
+  }
+
+  /* ── Quote in globe column ──────────────────────────────────────── */
+  .d-quote-globe {
+    position: relative;
+    width: 100%; max-width: 340px;
+    padding: 16px 20px 14px;
+    background: rgba(5,8,18,0.50);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-top: 1px solid rgba(139,92,246,0.12);
+    border-radius: 12px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    cursor: pointer;
+    text-align: center;
+    opacity: 0; transform: translateY(8px);
+    transition: opacity 0.55s ease, transform 0.55s ease, border-color 0.2s, background 0.2s;
+  }
+  .d-quote-globe.dqg-on { opacity: 1; transform: translateY(0); }
+  .d-quote-globe:hover {
+    background: rgba(99,102,241,0.06);
+    border-color: rgba(99,102,241,0.18);
+  }
+  .d-qg-mark {
+    display: block;
+    font-size: 36px; font-family: Georgia, serif;
+    color: rgba(139,92,246,0.14);
+    line-height: 1; margin-bottom: -8px;
+    user-select: none; pointer-events: none;
+  }
+  .d-qg-text {
+    font-size: 12px; font-style: italic;
+    font-family: Georgia, 'Times New Roman', serif;
+    color: rgba(255,255,255,0.38);
+    line-height: 1.7; margin: 0 0 8px;
+  }
+  .d-qg-author {
+    display: block;
+    font-size: 9px; font-weight: 700;
+    color: rgba(139,92,246,0.50);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    margin-bottom: 8px;
+  }
+  .d-qg-cycle {
+    display: block; font-size: 8px; font-weight: 600;
+    color: rgba(255,255,255,0.10); letter-spacing: 0.05em;
+    transition: color 0.2s;
+  }
+  .d-quote-globe:hover .d-qg-cycle { color: rgba(139,92,246,0.40); }
+
+  /* ═══ Globe center — globe + flanking side cards ════════════════════ */
+  .d-globe-center {
     display: flex;
     align-items: center;
     justify-content: center;
-    position: relative;
-    transition: transform 0.2s ease;
-  }
-  .fd-action:hover .action-orb { transform: scale(1.08) translateY(-2px); }
-
-  /* "New feature" freshness dot — amber by default, colour variants per feature */
-  .action-new-dot {
-    position: absolute;
-    top: -1px;
-    right: -1px;
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    background: #f59e0b;
-    border: 2px solid #050812;
-    box-shadow: 0 0 6px rgba(245, 158, 11, 0.7);
-    animation: dot-appear 0.3s cubic-bezier(0.34,1.56,0.64,1) both;
-  }
-  .action-new-dot-red    { background: #ef4444; box-shadow: 0 0 6px rgba(239,68,68,0.7); }
-  .action-new-dot-violet { background: #8b5cf6; box-shadow: 0 0 6px rgba(139,92,246,0.7); }
-  @keyframes dot-appear {
-    from { transform: scale(0); opacity: 0; }
-    to   { transform: scale(1); opacity: 1; }
+    width: 100%;
+    gap: 14px;
   }
 
-  /* Orb color themes */
-  .fd-action-map      .action-orb { background: rgba(99,102,241,0.18);  border: 1px solid rgba(99,102,241,0.3);  color: #818cf8; }
-  .fd-action-sos      .action-orb { background: rgba(239,68,68,0.15);   border: 1px solid rgba(239,68,68,0.3);   color: #f87171; }
-  .fd-action-activity .action-orb { background: rgba(16,185,129,0.15);  border: 1px solid rgba(16,185,129,0.3);  color: #34d399; }
-  .fd-action-history  .action-orb { background: rgba(245,158,11,0.15);  border: 1px solid rgba(245,158,11,0.3);  color: #fbbf24; }
-  .fd-action-safety   .action-orb { background: rgba(6,182,212,0.15);   border: 1px solid rgba(6,182,212,0.3);   color: #22d3ee; }
-  .fd-action-network  .action-orb { background: rgba(139,92,246,0.15);  border: 1px solid rgba(139,92,246,0.3);  color: #a78bfa; }
-
-  /* Active SOS action — breathing border glow */
-  .fd-action-sos.sos-pulse {
-    animation: action-sos-breathe 2s ease-in-out infinite;
-  }
-  @keyframes action-sos-breathe {
-    0%, 100% { border-color: rgba(239,68,68,0.2); }
-    50%       { border-color: rgba(239,68,68,0.55); }
+  /* Side cards hidden below 960px (not enough room beside globe) */
+  .d-globe-side { display: none; flex: 1; max-width: 155px; }
+  @media (min-width: 960px) {
+    .d-globe-side { display: flex; align-items: center; justify-content: center; }
   }
 
-  /* ══ Dynamic quote ════════════════════════════════════════════════════════ */
-  .cosmos-quote {
-    width: calc(100% - 32px);
-    max-width: 360px;
-    padding: 6px 16px 10px;
-    margin: -4px 0 4px;
+  .d-side-card {
+    width: 100%;
+    background: rgba(5,8,18,0.55);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 16px;
+    padding: 14px 12px 12px;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     text-align: center;
-    opacity: 0;
-    transition: opacity 0.8s ease;
-    pointer-events: none;
+    cursor: default;
+    transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1), border-color 0.2s, box-shadow 0.2s;
+    transform-style: preserve-3d;
   }
-  .cosmos-quote.quote-visible {
-    opacity: 1;
+  .d-globe-side-l .d-side-card:hover {
+    transform: perspective(500px) rotateY(6deg) translateY(-3px);
+    border-color: rgba(139,92,246,0.20);
+    box-shadow: 4px 8px 28px rgba(0,0,0,0.22);
   }
-  /* Decorative opening quote mark — centered above the text */
-  .quote-glyph {
-    display: block;
-    font-size: 36px;
-    line-height: 1;
-    font-family: Georgia, 'Times New Roman', serif;
-    font-style: italic;
-    color: rgba(139, 92, 246, 0.28);
-    pointer-events: none;
-    user-select: none;
-    margin-bottom: -4px;
-  }
-  .quote-text {
-    position: relative;
-    font-size: 12.5px;
-    font-style: italic;
-    font-family: Georgia, 'Times New Roman', serif;
-    color: rgba(255, 255, 255, 0.48);
-    line-height: 1.7;
-    letter-spacing: 0.015em;
-    margin: 0 0 5px;
-    padding: 0 8px;
-  }
-  .quote-author {
-    display: block;
-    font-size: 10px;
-    font-weight: 700;
-    font-style: normal;
-    font-family: var(--font-sans, system-ui, sans-serif);
-    color: rgba(139, 92, 246, 0.6);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+  .d-globe-side-r .d-side-card:hover {
+    transform: perspective(500px) rotateY(-6deg) translateY(-3px);
+    border-color: rgba(139,92,246,0.20);
+    box-shadow: -4px 8px 28px rgba(0,0,0,0.22);
   }
 
-  /* ══ Reduced motion ═══════════════════════════════════════════════════════ */
-  @media (prefers-reduced-motion: reduce) {
-    .fd-star, .fd-star-bright, .fd-star-blue,
-    .fd-nebula, .fd-nebula-a, .fd-nebula-b, .fd-nebula-c,
-    .fd-shooting-star, .cosmos-stat,
-    .cosmos-quote { animation: none !important; transition: none !important; opacity: 1 !important; transform: none !important; }
-    .fd-stars, .fd-milkyway, .fd-nebula-layer { transition: none !important; }
-    .fd-cosmos, .fd-section { opacity: 1 !important; transform: none !important; transition: none !important; }
+  .d-side-label {
+    font-size: 8px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.14em; color: rgba(255,255,255,0.20);
+    margin-bottom: 6px;
+    font-family: var(--font-mono, monospace);
+  }
+  .d-side-big {
+    font-size: 38px; font-weight: 800;
+    color: rgba(255,255,255,0.90);
+    line-height: 1; letter-spacing: -0.05em;
+    font-family: var(--font-display, system-ui);
+    font-variant-numeric: tabular-nums;
+    transition: color 0.4s;
+  }
+  .d-side-sub {
+    font-size: 8px; font-weight: 600;
+    color: rgba(255,255,255,0.20); text-transform: uppercase;
+    letter-spacing: 0.08em; margin-top: 2px;
+  }
+  .d-side-divider {
+    height: 1px; background: rgba(255,255,255,0.06); margin: 10px 0 8px;
+  }
+  .d-side-row {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 9px; font-weight: 600; color: rgba(255,255,255,0.28);
+    margin-top: 5px; text-align: left;
+  }
+  .row-safe { color: rgba(52,211,153,0.75); }
+  .row-sos  { color: rgba(248,113,113,0.80); }
+  .d-sd {
+    width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0;
+    background: rgba(255,255,255,0.15);
+  }
+  .d-sd.dot-on { background: #10b981; box-shadow: 0 0 4px rgba(16,185,129,0.55); }
+  .d-sd.dot-mv { background: #3b82f6; box-shadow: 0 0 4px rgba(59,130,246,0.55); }
+
+  /* ═══ Interactive member avatar ring ════════════════════════════════ */
+  .d-member-ring {
+    display: flex; align-items: center; gap: 8px;
+    flex-wrap: wrap; justify-content: center;
+  }
+  .d-mr-bubble {
+    position: relative; width: 40px; height: 40px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--mc,#6366f1) 14%, rgba(5,8,18,0.75));
+    border: 2px solid color-mix(in srgb, var(--mc,#6366f1) 60%, transparent);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.25s, border-color 0.2s;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+  .d-mr-bubble:hover {
+    transform: scale(1.18) translateY(-3px);
+    border-color: var(--mc, #6366f1);
+    box-shadow: 0 6px 20px color-mix(in srgb, var(--mc,#6366f1) 40%, transparent);
+  }
+  .d-mr-bubble:active { transform: scale(0.92); }
+  .d-mr-init {
+    font-size: 12px; font-weight: 800;
+    color: color-mix(in srgb, var(--mc,#6366f1) 90%, white);
+    line-height: 1; user-select: none; pointer-events: none;
+  }
+  .d-mr-dot {
+    position: absolute; bottom: -1px; right: -1px;
+    width: 11px; height: 11px;
+    border-radius: 50%; border: 2px solid rgba(5,8,18,0.9);
+    background: rgba(255,255,255,0.15);
+  }
+  .d-mr-dot.dot-on  { background: #10b981; }
+  .d-mr-dot.dot-mv  { background: #3b82f6; }
+  .d-mr-dot.dot-sos { background: #ef4444; box-shadow: 0 0 5px rgba(239,68,68,0.7); }
+  .d-mr-dot.dot-off { background: #475569; }
+  .d-mr-more {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(255,255,255,0.04);
+    border: 2px solid rgba(255,255,255,0.10);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; font-weight: 700; color: rgba(255,255,255,0.30);
   }
 </style>

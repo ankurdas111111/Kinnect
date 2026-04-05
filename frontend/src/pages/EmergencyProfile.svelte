@@ -3,6 +3,7 @@
   import { push } from 'svelte-spa-router';
   import { authUser } from '../lib/stores/auth.js';
   import { toasts } from '../lib/stores/toast.js';
+  import { socket } from '../lib/socket.js';
 
   // ── Auth guard ────────────────────────────────────────────────────────────
   $: if (!$authUser) push('/login');
@@ -36,8 +37,28 @@
 
   // ── State ─────────────────────────────────────────────────────────────────
   let profile = { ...DEFAULTS };
-  let openSections = { personal: true, contacts: false, medical: false, responder: false, qr: false };
+  let openSections = { personal: true, contacts: false, medical: false, responder: false, qr: false, panicRelay: false };
   let saving = false;
+
+  // ── Panic Relay phones (persisted server-side) ──────────────────────────
+  let panicPhone1 = '';
+  let panicPhone2 = '';
+  let panicSaving = false;
+
+  function savePanicPhones() {
+    panicSaving = true;
+    socket.emit('setEmergencyPhones', { phone1: panicPhone1.trim(), phone2: panicPhone2.trim() });
+    setTimeout(() => { panicSaving = false; toasts.add('Emergency SMS contacts saved'); }, 600);
+  }
+
+  // ── Heartbeat settings (persisted server-side) ──────────────────────────
+  let heartbeatEnabled = false;
+  let heartbeatDeadline = '10:00';
+
+  function saveHeartbeat() {
+    socket.emit('setHeartbeat', { enabled: heartbeatEnabled, deadline: heartbeatDeadline });
+    toasts.add(heartbeatEnabled ? 'Heartbeat check enabled' : 'Heartbeat check disabled');
+  }
   let saveSuccess = false;
   let saveTimer = null;
 
@@ -495,6 +516,57 @@
             </button>
           {/if}
 
+        </div>
+      {/if}
+    </section>
+
+    <!-- ── Panic Relay: External SMS escalation ──────────────────────────── -->
+    <section class="ep-section">
+      <button class="ep-section-header" on:click={() => openSections.panicRelay = !openSections.panicRelay}>
+        <span class="ep-section-icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.63A2 2 0 012 .92h3"/><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+        </span>
+        <span class="ep-section-title">Panic Relay (SMS Escalation)</span>
+        <span class="ep-section-chevron" class:ep-section-chevron--open={openSections.panicRelay} aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </span>
+      </button>
+      {#if openSections.panicRelay}
+        <div class="ep-section-body">
+          <p class="ep-hint">If no one acknowledges your SOS within 3 minutes, Kinnect sends an SMS with your live location to these phone numbers.</p>
+          <label class="ep-field-label">Emergency Phone 1</label>
+          <input class="ep-input" type="tel" bind:value={panicPhone1} placeholder="+91 98765 43210" maxlength="20" />
+          <label class="ep-field-label" style="margin-top:8px">Emergency Phone 2 (optional)</label>
+          <input class="ep-input" type="tel" bind:value={panicPhone2} placeholder="+91 98765 43210" maxlength="20" />
+          <button class="ep-save-btn" style="margin-top:12px" on:click={savePanicPhones} disabled={panicSaving}>
+            {panicSaving ? 'Saving...' : 'Save SMS Contacts'}
+          </button>
+        </div>
+      {/if}
+    </section>
+
+    <!-- ── Heartbeat Check: daily wellness pulse ───────────────────────────── -->
+    <section class="ep-section">
+      <button class="ep-section-header" on:click={() => openSections = { ...openSections, heartbeat: !openSections.heartbeat }}>
+        <span class="ep-section-icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        </span>
+        <span class="ep-section-title">Heartbeat Check</span>
+        <span class="ep-section-chevron" class:ep-section-chevron--open={openSections.heartbeat} aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </span>
+      </button>
+      {#if openSections.heartbeat}
+        <div class="ep-section-body">
+          <p class="ep-hint">If you don't open the app or share location by the deadline, your family gets a gentle "Haven't heard from you today" notification.</p>
+          <label class="ep-field-label" style="display:flex;align-items:center;gap:8px">
+            <input type="checkbox" bind:checked={heartbeatEnabled} on:change={saveHeartbeat} />
+            Enable daily heartbeat check
+          </label>
+          {#if heartbeatEnabled}
+            <label class="ep-field-label" style="margin-top:8px">Deadline (UTC)</label>
+            <input class="ep-input" type="time" bind:value={heartbeatDeadline} on:change={saveHeartbeat} />
+          {/if}
         </div>
       {/if}
     </section>
@@ -1299,8 +1371,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
+    width: 44px;
+    height: 44px;
     border: 1px solid rgba(239,68,68,0.20);
     border-radius: 7px;
     background: rgba(239,68,68,0.05);

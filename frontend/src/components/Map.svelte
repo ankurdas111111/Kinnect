@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import maplibregl from 'maplibre-gl';
   import 'maplibre-gl/dist/maplibre-gl.css';
-  import { otherUsers, myLocation, mySocketId, mySafetyStatus, focusUser } from '../lib/stores/map.js';
+  import { otherUsers, myLocation, mySocketId, mySafetyStatus, focusUser, mapFlyTo, routeGeometry, navigationState } from '../lib/stores/map.js';
   import { arrivalProjections } from '../lib/stores/arrivals.js';
   import { trailData } from '../lib/stores/trail.js';
   import { createMapIcon, createPersonMarker, getPresenceState, escapeAttr, calculateDistance, formatDistance, circleGeoJSON } from '../lib/tracking.js';
@@ -22,6 +22,36 @@
   let myMarker = null;
   let myPopup = null;
   let hasSetView = false;
+
+  /** Creates a Google Maps-style blue navigation arrow marker */
+  function createNavArrow() {
+    const el = document.createElement('div');
+    el.className = 'nav-arrow-marker';
+    el.style.cssText = 'width:48px;height:48px;display:flex;align-items:center;justify-content:center;';
+    el.innerHTML = `
+      <div style="position:relative;width:48px;height:48px;">
+        <div style="position:absolute;inset:0;border-radius:50%;background:rgba(59,130,246,0.15);animation:nav-pulse 2s ease-out infinite;"></div>
+        <div style="position:absolute;inset:8px;border-radius:50%;background:#3b82f6;border:3px solid #fff;box-shadow:0 2px 8px rgba(59,130,246,0.5);display:flex;align-items:center;justify-content:center;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
+        </div>
+      </div>`;
+    return el;
+  }
+
+  // ── Navigation camera state ────────────────────────────────────────
+  let prevNavLat = null;
+  let prevNavLng = null;
+  let currentBearing = 0; // degrees, 0=north, 90=east
+
+  /** Compute bearing in degrees from point A to point B */
+  function computeBearing(lat1, lng1, lat2, lng2) {
+    const toRad = Math.PI / 180;
+    const dLng = (lng2 - lng1) * toRad;
+    const y = Math.sin(dLng) * Math.cos(lat2 * toRad);
+    const x = Math.cos(lat1 * toRad) * Math.sin(lat2 * toRad) -
+              Math.sin(lat1 * toRad) * Math.cos(lat2 * toRad) * Math.cos(dLng);
+    return ((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360;
+  }
   let isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
   let renderUsersRaf = null;
   let pendingUsers = new Map();
@@ -172,8 +202,24 @@
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }),
       isMobile ? 'bottom-right' : 'top-right');
 
-    map.on('dragstart', () => { followMode = false; });
+    map.on('dragstart', () => {
+      // During navigation, let user pan but re-center on next GPS update
+      if (!navActive) followMode = false;
+    });
     map.on('load', () => {
+      // Apply Hindi/regional label preference if configured
+      const labelPref = localStorage.getItem('kinnect_map_lang') || 'auto';
+      if (labelPref === 'hi' || (labelPref === 'auto' && navigator.language?.startsWith('hi'))) {
+        try {
+          for (const layer of map.getStyle().layers) {
+            if (layer.layout?.['text-field']) {
+              map.setLayoutProperty(layer.id, 'text-field', [
+                'coalesce', ['get', 'name:hi'], ['get', 'name:en'], ['get', 'name']
+              ]);
+            }
+          }
+        } catch { /* style may not have named layers */ }
+      }
       addCircleSources();
       // Subscribe to trail data — draw/update dashed polylines for requested users
       trailData.subscribe($trailData => {
@@ -232,19 +278,58 @@
     selfPopupHtml += '</div>';
 
     if (!myMarker) {
-      const el = createMapIcon('var(--primary-500)', '', { markerType: 'self' });
+      const el = navActive ? createNavArrow() : createMapIcon('var(--primary-500)', '', { markerType: 'self' });
       myPopup = new maplibregl.Popup({ offset: [0, -44], maxWidth: '280px', closeButton: false })
         .setHTML(selfPopupHtml);
-      myMarker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+      myMarker = new maplibregl.Marker({ element: el, anchor: 'center', rotationAlignment: 'map' })
         .setLngLat(lngLat)
         .setPopup(myPopup)
         .addTo(map);
     } else {
       animateMarkerTo('__self__', myMarker, lngLat);
       myPopup.setHTML(selfPopupHtml);
+      // Swap marker style when entering/exiting nav mode
+      const el = myMarker.getElement();
+      if (navActive && !el.classList.contains('nav-arrow-marker')) {
+        const newEl = createNavArrow();
+        myMarker.remove();
+        myMarker = new maplibregl.Marker({ element: newEl, anchor: 'center', rotationAlignment: 'map' })
+          .setLngLat(lngLat).setPopup(myPopup).addTo(map);
+      } else if (!navActive && el.classList.contains('nav-arrow-marker')) {
+        const newEl = createMapIcon('var(--primary-500)', '', { markerType: 'self' });
+        myMarker.remove();
+        myMarker = new maplibregl.Marker({ element: newEl, anchor: 'bottom' })
+          .setLngLat(lngLat).setPopup(myPopup).addTo(map);
+      }
     }
 
-    if (followMode) {
+    if (followMode && navActive) {
+      // ── Google Maps-style 3D navigation camera ──────────────────
+      // Compute bearing from previous position (need >5m movement to avoid jitter)
+      if (prevNavLat != null && prevNavLng != null) {
+        const dLat = latitude - prevNavLat;
+        const dLng = longitude - prevNavLng;
+        const movedM = Math.sqrt(dLat * dLat + dLng * dLng) * 111320;
+        if (movedM > 5) {
+          currentBearing = computeBearing(prevNavLat, prevNavLng, latitude, longitude);
+          prevNavLat = latitude;
+          prevNavLng = longitude;
+        }
+      } else {
+        prevNavLat = latitude;
+        prevNavLng = longitude;
+      }
+
+      // Tilt + rotate + follow from behind (user at bottom 1/3)
+      map.easeTo({
+        center: lngLat,
+        zoom: 17.5,
+        bearing: currentBearing,
+        pitch: 55,  // 3D tilt
+        duration: 600,
+        padding: { top: 200, bottom: 40, left: 0, right: 0 },
+      });
+    } else if (followMode) {
       map.easeTo({ center: lngLat, zoom: Math.max(map.getZoom(), 15), duration: 600 });
     } else if (!hasSetView) {
       map.jumpTo({ center: lngLat, zoom: 15 });
@@ -359,7 +444,8 @@
     const presenceState = getPresenceState(user);
     // Include presenceState + motionClass in key so rings/badges re-render when state changes
     const mClass = user.motionClass || '';
-    const iconKey = `person|${color}|${presenceState}|${isSos}|${mClass}`;
+    const qhActive = !!user.quietHoursActive;
+    const iconKey = `person|${color}|${presenceState}|${isSos}|${mClass}|${qhActive}`;
     const popupContent = buildPopupCached(user);
 
     function makePersonEl() {
@@ -371,6 +457,7 @@
         isSos,
         presenceState,
         motionClass: mClass,
+        quietHoursActive: qhActive,
       });
     }
 
@@ -479,6 +566,100 @@
       });
     }
     map.getSource('users-cluster').setData({ type: 'FeatureCollection', features });
+  }
+
+  // ── Place search fly-to ──────────────────────────────────────────────
+  $: if (map && $mapFlyTo) {
+    const target = $mapFlyTo;
+    mapFlyTo.set(null);
+    map.flyTo({ center: [target.lng, target.lat], zoom: target.zoom || 16, duration: 900 });
+  }
+
+  // ── Route polyline from directions ─────────────────────────────────
+  $: if (map) {
+    const geo = $routeGeometry;
+    if (geo && geo.coordinates?.length) {
+      const srcId = 'directions-route';
+      const layerId = 'directions-route-line';
+      const glowId = 'directions-route-glow';
+      const geojson = { type: 'Feature', geometry: geo, properties: {} };
+      if (map.getSource(srcId)) {
+        map.getSource(srcId).setData(geojson);
+      } else {
+        map.addSource(srcId, { type: 'geojson', data: geojson });
+        map.addLayer({ id: glowId, type: 'line', source: srcId,
+          paint: { 'line-color': '#6366f1', 'line-width': 8, 'line-opacity': 0.18, 'line-blur': 3 } });
+        map.addLayer({ id: layerId, type: 'line', source: srcId,
+          paint: { 'line-color': '#818cf8', 'line-width': 4, 'line-opacity': 0.85 },
+          layout: { 'line-cap': 'round', 'line-join': 'round' } });
+      }
+    } else {
+      // Clear route
+      if (map.getLayer('directions-route-line')) map.removeLayer('directions-route-line');
+      if (map.getLayer('directions-route-glow')) map.removeLayer('directions-route-glow');
+      if (map.getSource('directions-route')) map.removeSource('directions-route');
+    }
+  }
+
+  // ── Navigation mode — follow user + destination marker + fit bounds ──
+  let destMarker = null;
+  let navActive = false;
+
+  $: if (map) {
+    const nav = $navigationState;
+    if (nav?.active && nav.routeCoords?.length) {
+      navActive = true;
+      followMode = true;
+
+      // Compute initial bearing: user → destination
+      if ($myLocation?.latitude) {
+        currentBearing = computeBearing(
+          $myLocation.latitude, $myLocation.longitude,
+          nav.destLat, nav.destLng
+        );
+        prevNavLat = $myLocation.latitude;
+        prevNavLng = $myLocation.longitude;
+      }
+
+      // Add destination marker (red pin with flag)
+      if (destMarker) destMarker.remove();
+      const destEl = document.createElement('div');
+      destEl.innerHTML = `<div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#ef4444,#dc2626);border:3px solid #fff;box-shadow:0 2px 16px rgba(239,68,68,0.5);display:flex;align-items:center;justify-content:center;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 119.5 9 2.5 2.5 0 0112 11.5z"/></svg>
+      </div><div style="width:2px;height:10px;background:#ef4444;margin:0 auto;border-radius:0 0 2px 2px;opacity:0.6;"></div>`;
+      destEl.style.cssText = 'display:flex;flex-direction:column;align-items:center;';
+      destMarker = new maplibregl.Marker({ element: destEl, anchor: 'bottom' })
+        .setLngLat([nav.destLng, nav.destLat])
+        .addTo(map);
+
+      // Step 1: Fit to route overview (2D, north-up)
+      const coords = nav.routeCoords;
+      const bounds = coords.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(coords[0], coords[0]));
+      map.fitBounds(bounds, { padding: { top: 100, bottom: 100, left: 50, right: 50 }, duration: 800, pitch: 0, bearing: 0 });
+
+      // Step 2: After overview, swoop into 3D navigation view
+      setTimeout(() => {
+        if (!$myLocation?.latitude) return;
+        map.easeTo({
+          center: [$myLocation.longitude, $myLocation.latitude],
+          zoom: 17.5,
+          bearing: currentBearing,
+          pitch: 55,
+          duration: 1000,
+          padding: { top: 200, bottom: 40, left: 0, right: 0 },
+        });
+      }, 1400);
+
+    } else if (navActive) {
+      // ── Navigation ended — reset camera to 2D north-up ──────────
+      navActive = false;
+      followMode = false;
+      prevNavLat = null;
+      prevNavLng = null;
+      if (destMarker) { destMarker.remove(); destMarker = null; }
+      // Smoothly return to flat north-up view
+      map.easeTo({ pitch: 0, bearing: 0, duration: 600 });
+    }
   }
 
   $: if (map && $focusUser) {
@@ -909,5 +1090,12 @@
     font-size: 11px;
     color: #a5b4fc;
     line-height: 1.2;
+  }
+
+  /* Navigation arrow pulse */
+  :global(.nav-arrow-marker) { z-index: 10 !important; }
+  @keyframes nav-pulse {
+    0% { transform: scale(1); opacity: 0.6; }
+    100% { transform: scale(2.2); opacity: 0; }
   }
 </style>

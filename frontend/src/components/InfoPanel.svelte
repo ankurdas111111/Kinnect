@@ -1,6 +1,6 @@
 <script>
   import { createEventDispatcher } from 'svelte';
-  import { myLocation, tracking } from '../lib/stores/map.js';
+  import { myLocation, tracking, walkDestination } from '../lib/stores/map.js';
   import { authUser } from '../lib/stores/auth.js';
   import { myShareCode, myContactInfo } from '../lib/stores/rooms.js';
   import { socket } from '../lib/socket.js';
@@ -12,6 +12,7 @@
   import { latencyMetrics } from '../lib/stores/latency.js';
   import CopyButton from './primitives/CopyButton.svelte';
   import ShareMyRide from './ShareMyRide.svelte';
+  import WalkWithMe from './WalkWithMe.svelte';
   import { rideShare } from '../lib/stores/rideShare.js';
   import { crowdMode } from '../lib/stores/crowdMode.js';
 
@@ -20,6 +21,10 @@
   let debugTaps = 0;
   let showQr = false;
   let rideShareOpen = false;
+  let walkWithMeOpen = false;
+
+  // Auto-open Walk With Me when PlaceSearch sets a destination
+  $: if ($walkDestination) { walkWithMeOpen = true; }
 
   function toggleCrowdMode() {
     const next = !$crowdMode.active;
@@ -41,7 +46,7 @@
 
   function toggleSOS() {
     if (!socket.connected) {
-      banner.set({ type: 'info', text: 'Not connected — reconnecting. Try again in a moment.', actions: [] });
+      banner.set({ type: 'info', text: 'Trying to reconnect... hang tight.', actions: [] });
       setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 3000);
       return;
     }
@@ -51,7 +56,7 @@
 
   function checkIn() {
     socket.emit('checkInAck');
-    banner.set({ type: 'info', text: 'Check-in sent.', actions: [] });
+    banner.set({ type: 'info', text: 'Check-in sent — your family knows you\'re okay.', actions: [] });
     setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 2000);
   }
 
@@ -66,7 +71,7 @@
       message: statusDraft.trim(),
       expiryMinutes: statusExpiry === '0' ? 0 : parseInt(statusExpiry, 10),
     });
-    banner.set({ type: 'info', text: statusDraft.trim() ? 'Status set.' : 'Status cleared.', actions: [] });
+    banner.set({ type: 'info', text: statusDraft.trim() ? 'Status updated.' : 'Status cleared.', actions: [] });
     setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 1500);
   }
 
@@ -88,7 +93,7 @@
     }
     window.open('https://wa.me/?text=' + encodeURIComponent(waText), '_blank', 'noopener');
 
-    banner.set({ type: 'info', text: 'On My Way broadcast sent.', actions: [] });
+    banner.set({ type: 'info', text: 'Your family knows you\'re on the way.', actions: [] });
     setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 2000);
   }
 
@@ -99,11 +104,16 @@
 
   function attest() {
     socket.emit('attest');
-    banner.set({ type: 'info', text: 'Safety confirmed.', actions: [] });
+    banner.set({ type: 'info', text: 'Your location has been verified.', actions: [] });
     setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 2000);
   }
 
+  let busyRequests = new Set();
   function approveRequest(req, idx) {
+    const key = req.type + '-' + req.from;
+    if (busyRequests.has(key)) return;
+    busyRequests.add(key);
+    busyRequests = busyRequests;
     if (req.type === 'roomAdmin') {
       socket.emit('voteRoomAdmin', { roomCode: req.roomCode, userId: req.from, vote: 'approve' });
     } else if (req.type === 'guardianInvite') {
@@ -117,9 +127,14 @@
       }
       arr.splice(idx, 1); return [...arr];
     });
+    setTimeout(() => { busyRequests.delete(key); busyRequests = busyRequests; }, 5000);
   }
 
   function denyRequest(req, idx) {
+    const key = req.type + '-' + req.from;
+    if (busyRequests.has(key)) return;
+    busyRequests.add(key);
+    busyRequests = busyRequests;
     if (req.type === 'roomAdmin') {
       socket.emit('voteRoomAdmin', { roomCode: req.roomCode, userId: req.from, vote: 'deny' });
     } else if (req.type === 'guardianInvite') {
@@ -133,6 +148,7 @@
       }
       arr.splice(idx, 1); return [...arr];
     });
+    setTimeout(() => { busyRequests.delete(key); busyRequests = busyRequests; }, 5000);
   }
 
   function revokeGuardian(wardId, guardianId) {
@@ -157,7 +173,7 @@
     : '';
   $: accLabel = $trackingMetrics.lastAccuracy != null
     ? ($trackingMetrics.lastAccuracy <= 15 ? 'Sharp' : $trackingMetrics.lastAccuracy <= 50 ? 'Decent' : 'Rough') + ` ±${$trackingMetrics.lastAccuracy}m`
-    : $tracking ? 'Acquiring fix…' : 'Tap Track to begin';
+    : $tracking ? 'Getting location...' : 'Tap Track to start';
 </script>
 
 <!-- ═══════════════════════════════════════════════════════════════════════
@@ -193,8 +209,8 @@
       <div class="gps-acquire-card animate-breathe">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="acquire-icon" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49"/><path d="M7.76 7.76a6 6 0 0 0 0 8.49"/><path d="M20.49 3.51a12 12 0 0 1 0 16.97"/><path d="M3.51 3.51a12 12 0 0 0 0 16.97"/></svg>
         <div>
-          <p class="acquire-title">Finding your position…</p>
-          <p class="acquire-hint">Tap <strong>Track</strong> to start</p>
+          <p class="acquire-title">Getting your location...</p>
+          <p class="acquire-hint">Tap <strong>Track</strong> to share your location</p>
         </div>
       </div>
     {/if}
@@ -218,7 +234,7 @@
 
     <!-- ── IDENTITY CARD ────────────────────────────────────────────── -->
     <div class="identity-card">
-      <span class="card-eyebrow">Signal Code</span>
+      <span class="card-eyebrow">Your Code</span>
       <div class="identity-body">
         <code class="signal-code">{$myShareCode || '—'}</code>
         <div class="signal-btns">
@@ -252,11 +268,11 @@
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="13"/><circle cx="12" cy="18" r="1" fill="currentColor" stroke="none"/></svg>
             {/if}
           </span>
-          {$mySosActive ? 'Cancel SOS' : 'Emergency SOS'}
+          {$mySosActive ? 'Cancel SOS' : 'SOS'}
         </button>
         <button class="ok-action-btn" on:click={checkIn} aria-label="Send scheduled check-in">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
-          Check-in ✓
+          I'm OK
         </button>
       </div>
       <div class="safety-actions" style="margin-top:6px;">
@@ -279,11 +295,15 @@
       <div class="safety-actions" style="margin-top:6px;">
         <button class="ok-action-btn" class:ok-action-btn--active={$rideShare.active} on:click={() => rideShareOpen = true} aria-label="Share My Ride with family">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
-          {$rideShare.active ? 'Ride Active' : 'Share Ride'}
+          {$rideShare.active ? 'Ride Active' : 'Share My Ride'}
         </button>
         <button class="ok-action-btn" class:ok-action-btn--crowd={$crowdMode.active} on:click={toggleCrowdMode} aria-label="Toggle Festival / Crowd mode">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          {$crowdMode.active ? 'Group On' : 'Group Mode'}
+          {$crowdMode.active ? 'Group Active' : 'Stay Together'}
+        </button>
+        <button class="ok-action-btn" on:click={() => walkWithMeOpen = true} aria-label="Walk With Me — virtual escort">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="12" cy="5" r="1.5"/><path d="M9 20l1.5-5 2.5 2 2.5-7"/><path d="M6 9h12"/></svg>
+          Walk With Me
         </button>
       </div>
     </div>
@@ -317,7 +337,7 @@
     <!-- ── GUARDIAN NETWORK ──────────────────────────────────────────── -->
     {#if $myGuardianData.asGuardian.length > 0 || $myGuardianData.asWard.length > 0}
       <div class="network-section">
-        <span class="card-eyebrow">Guardian Network</span>
+        <span class="card-eyebrow">Guardians</span>
         {#each $myGuardianData.asGuardian as g}
           <div class="network-item">
             <div class="network-avatar">{(g.wardName || '?')[0].toUpperCase()}</div>
@@ -375,14 +395,14 @@
                 {:else if req.myVote === 'deny'}
                   <span class="badge badge-danger badge-xs">You denied</span>
                 {:else}
-                  <button class="btn btn-primary btn-sm" on:click={() => approveRequest(req, idx)}>Approve</button>
-                  <button class="btn btn-danger btn-sm" on:click={() => denyRequest(req, idx)}>Deny</button>
+                  <button class="btn btn-primary btn-sm" on:click={() => approveRequest(req, idx)} disabled={busyRequests.has(req.type + '-' + req.from)}>Approve</button>
+                  <button class="btn btn-danger btn-sm" on:click={() => denyRequest(req, idx)} disabled={busyRequests.has(req.type + '-' + req.from)}>Deny</button>
                 {/if}
               </div>
             {:else}
               <div class="req-actions">
-                <button class="btn btn-primary btn-sm" on:click={() => approveRequest(req, idx)}>Approve</button>
-                <button class="btn btn-danger btn-sm" on:click={() => denyRequest(req, idx)}>Deny</button>
+                <button class="btn btn-primary btn-sm" on:click={() => approveRequest(req, idx)} disabled={busyRequests.has(req.type + '-' + req.from)}>Approve</button>
+                <button class="btn btn-danger btn-sm" on:click={() => denyRequest(req, idx)} disabled={busyRequests.has(req.type + '-' + req.from)}>Deny</button>
               </div>
             {/if}
           </div>
@@ -392,6 +412,16 @@
 
   </div>
   <ShareMyRide bind:open={rideShareOpen} />
+  {#if walkWithMeOpen}
+    <div class="wwm-overlay">
+      <div class="wwm-modal">
+        <button class="wwm-close" on:click={() => walkWithMeOpen = false} aria-label="Close">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <WalkWithMe on:close={() => walkWithMeOpen = false} />
+      </div>
+    </div>
+  {/if}
 
 <!-- ═══════════════════════════════════════════════════════════════════════
      PANEL SHELL MODE (desktop standalone panel)
@@ -399,7 +429,7 @@
 {:else}
   <div class="panel-shell panel-left panel-base">
     <div class="panel-header">
-      <h3>Info</h3>
+      <h3>You</h3>
       <button class="btn btn-icon btn-ghost" aria-label="Close info panel" on:click={() => dispatch('close')}>
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
@@ -434,8 +464,8 @@
         <div class="gps-acquire-card animate-breathe">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="acquire-icon" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49"/><path d="M7.76 7.76a6 6 0 0 0 0 8.49"/><path d="M20.49 3.51a12 12 0 0 1 0 16.97"/><path d="M3.51 3.51a12 12 0 0 0 0 16.97"/></svg>
           <div>
-            <p class="acquire-title">Finding your position…</p>
-            <p class="acquire-hint">Hit <strong>Track</strong> in the top bar to begin.</p>
+            <p class="acquire-title">Getting your location...</p>
+            <p class="acquire-hint">Tap <strong>Track</strong> in the top bar to share your location.</p>
           </div>
         </div>
       {/if}
@@ -458,7 +488,7 @@
 
       <!-- IDENTITY CARD -->
       <div class="identity-card">
-        <span class="card-eyebrow">Signal Code</span>
+        <span class="card-eyebrow">Your Code</span>
         <div class="identity-body">
           <code class="signal-code">{$myShareCode || '—'}</code>
           <div class="signal-btns">
@@ -487,11 +517,11 @@
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="13"/><circle cx="12" cy="18" r="1" fill="currentColor" stroke="none"/></svg>
               {/if}
             </span>
-            {$mySosActive ? 'Cancel SOS' : 'Emergency SOS'}
+            {$mySosActive ? 'Cancel SOS' : 'SOS'}
           </button>
           <button class="ok-action-btn" on:click={checkIn} aria-label="Send scheduled check-in">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
-            Check-in ✓
+            I'm OK
           </button>
         </div>
         <div class="safety-actions" style="margin-top:6px;">
@@ -508,17 +538,17 @@
           {/if}
           <button class="ok-action-btn" on:click={attest} aria-label="Confirm your location is genuine" title="Confirm your location is real">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            I'm Safe
+            Verify Location
           </button>
         </div>
         <div class="safety-actions" style="margin-top:6px;">
           <button class="ok-action-btn" class:ok-action-btn--active={$rideShare.active} on:click={() => rideShareOpen = true} aria-label="Share My Ride with family">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
-            {$rideShare.active ? 'Ride Active' : 'Share Ride'}
+            {$rideShare.active ? 'Ride Active' : 'Share My Ride'}
           </button>
           <button class="ok-action-btn" class:ok-action-btn--crowd={$crowdMode.active} on:click={toggleCrowdMode} aria-label="Toggle Festival / Crowd mode">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            {$crowdMode.active ? 'Group On' : 'Group Mode'}
+            {$crowdMode.active ? 'Group Active' : 'Stay Together'}
           </button>
         </div>
       </div>
@@ -552,7 +582,7 @@
       <!-- GUARDIAN NETWORK -->
       {#if $myGuardianData.asGuardian.length > 0 || $myGuardianData.asWard.length > 0}
         <div class="network-section">
-          <span class="card-eyebrow">Guardian Network</span>
+          <span class="card-eyebrow">Guardians</span>
           {#each $myGuardianData.asGuardian as g}
             <div class="network-item">
               <div class="network-avatar">{(g.wardName || '?')[0].toUpperCase()}</div>
@@ -608,14 +638,14 @@
                   {:else if req.myVote === 'deny'}
                     <span class="badge badge-danger badge-xs">You denied</span>
                   {:else}
-                    <button class="btn btn-primary btn-sm" on:click={() => approveRequest(req, idx)}>Approve</button>
-                    <button class="btn btn-danger btn-sm" on:click={() => denyRequest(req, idx)}>Deny</button>
+                    <button class="btn btn-primary btn-sm" on:click={() => approveRequest(req, idx)} disabled={busyRequests.has(req.type + '-' + req.from)}>Approve</button>
+                    <button class="btn btn-danger btn-sm" on:click={() => denyRequest(req, idx)} disabled={busyRequests.has(req.type + '-' + req.from)}>Deny</button>
                   {/if}
                 </div>
               {:else}
                 <div class="req-actions">
-                  <button class="btn btn-primary btn-sm" on:click={() => approveRequest(req, idx)}>Approve</button>
-                  <button class="btn btn-danger btn-sm" on:click={() => denyRequest(req, idx)}>Deny</button>
+                  <button class="btn btn-primary btn-sm" on:click={() => approveRequest(req, idx)} disabled={busyRequests.has(req.type + '-' + req.from)}>Approve</button>
+                  <button class="btn btn-danger btn-sm" on:click={() => denyRequest(req, idx)} disabled={busyRequests.has(req.type + '-' + req.from)}>Deny</button>
                 </div>
               {/if}
             </div>
@@ -626,6 +656,16 @@
     </div>
   </div>
   <ShareMyRide bind:open={rideShareOpen} />
+  {#if walkWithMeOpen}
+    <div class="wwm-overlay">
+      <div class="wwm-modal">
+        <button class="wwm-close" on:click={() => walkWithMeOpen = false} aria-label="Close">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <WalkWithMe on:close={() => walkWithMeOpen = false} />
+      </div>
+    </div>
+  {/if}
 {/if}
 
 <!-- ── QR code modal (fixed overlay, always in DOM) ──────────────────────── -->
@@ -636,7 +676,7 @@
       <button class="qr-close-btn" on:click={() => showQr = false} aria-label="Close QR code">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
-      <span class="qr-title">Your Signal Code</span>
+      <span class="qr-title">Your Family Code</span>
       <div class="qr-image-wrap">
         <img
           src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={encodeURIComponent(getShareOrigin() + '/#/add-contact/' + $myShareCode)}&margin=6&bgcolor=ffffff&color=0f0f23"
@@ -648,7 +688,7 @@
         />
       </div>
       <code class="qr-code-display">{$myShareCode}</code>
-      <p class="qr-hint">Have someone scan this to add you as a contact</p>
+      <p class="qr-hint">Anyone who scans this can connect with you on Kinnect</p>
     </div>
   </div>
 {/if}
@@ -1248,4 +1288,31 @@
     margin: 0;
     max-width: 200px;
   }
+
+  /* Walk With Me modal */
+  .wwm-overlay {
+    position: fixed; inset: 0; z-index: 60;
+    background: rgba(0,0,0,0.55);
+    display: flex; align-items: center; justify-content: center;
+    animation: wwm-fade-in 0.2s ease;
+  }
+  @keyframes wwm-fade-in { from { opacity: 0; } }
+  .wwm-modal {
+    position: relative;
+    width: min(380px, 92vw);
+    max-height: 85vh;
+    overflow-y: auto;
+    background: var(--surface-0, #0a0e1a);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 20px;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+  }
+  .wwm-close {
+    position: absolute; top: 12px; right: 12px; z-index: 2;
+    width: 32px; height: 32px; border-radius: 50%;
+    background: rgba(255,255,255,0.06); border: none;
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(255,255,255,0.4); cursor: pointer;
+  }
+  .wwm-close:hover { background: rgba(255,255,255,0.12); }
 </style>

@@ -89,7 +89,7 @@
   {#if embedded}
     <div class="panel-body">
       <div class="section">
-        <label class="label" for="admin-target-user-embedded">Target User</label>
+        <label class="label" for="admin-target-user-embedded">Choose a person</label>
         <select id="admin-target-user-embedded" class="select" bind:value={targetId}>
           {#each targetOptions as opt}
             <option value={opt.value}>{opt.label}</option>
@@ -103,16 +103,16 @@
       <div class="auto-sos-card">
         <span class="label-eyebrow auto-sos-eyebrow">
           <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
-          Auto-SOS Config
+          Auto-SOS
         </span>
         <div class="section" style="padding: 0;">
           <label class="toggle"><input type="checkbox" bind:checked={autoSosEnabled}><span class="toggle-track"></span>Auto SOS</label>
           <div class="field-row">
-            <span class="label mini">No-move minutes</span>
+            <span class="label mini">Alert if still for (min)</span>
             <input class="input w-input-sm" type="number" bind:value={noMoveMin} min="1" />
           </div>
           <div class="field-row">
-            <span class="label mini">Hard-stop minutes</span>
+            <span class="label mini">Alert on sudden stop (min)</span>
             <input class="input w-input-sm" type="number" bind:value={hardStopMin} min="1" />
           </div>
         </div>
@@ -123,7 +123,7 @@
       <div class="section">
         <label class="toggle"><input type="checkbox" bind:checked={geofenceEnabled}><span class="toggle-track"></span>Geofence</label>
         <div class="field-row">
-          <span class="label mini">Radius (meters)</span>
+          <span class="label mini">Safe zone radius (m)</span>
           <input class="input w-input-md" type="number" bind:value={geofenceRadius} min="0" />
         </div>
       </div>
@@ -133,11 +133,11 @@
       <div class="section">
         <label class="toggle"><input type="checkbox" bind:checked={checkInEnabled}><span class="toggle-track"></span>Check-In</label>
         <div class="field-row">
-          <span class="label mini">Interval (min)</span>
+          <span class="label mini">Check-in every (min)</span>
           <input class="input w-input-sm" type="number" bind:value={checkInIntervalMin} min="1" />
         </div>
         <div class="field-row">
-          <span class="label mini">Overdue (min)</span>
+          <span class="label mini">Alert if late by (min)</span>
           <input class="input w-input-sm" type="number" bind:value={checkInOverdueMin} min="1" />
         </div>
       </div>
@@ -145,16 +145,16 @@
       {#if isAdmin}
         <hr class="divider" />
         <div class="section">
-          <label class="toggle"><input type="checkbox" bind:checked={keepForever}><span class="toggle-track"></span>Keep Location Forever</label>
+          <label class="toggle"><input type="checkbox" bind:checked={keepForever}><span class="toggle-track"></span>Save location history</label>
         </div>
       {/if}
 
-      <button class="btn btn-primary full-width mt-4" on:click={applySettings}>Apply Settings</button>
+      <button class="btn btn-primary full-width mt-4" on:click={applySettings}>Save</button>
     </div>
   {:else}
     <div class="panel-shell panel-left panel-base">
       <div class="panel-header">
-        <h3>Admin Controls</h3>
+        <h3>Safety Settings</h3>
         <button class="btn btn-icon btn-ghost" aria-label="Close admin panel" on:click={() => dispatch('close')}>
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
@@ -162,7 +162,7 @@
 
       <div class="panel-body">
         <div class="section">
-          <label class="label" for="admin-target-user-panel">Target User</label>
+          <label class="label" for="admin-target-user-panel">Choose a person</label>
           <select id="admin-target-user-panel" class="select" bind:value={targetId}>
             {#each targetOptions as opt}
               <option value={opt.value}>{opt.label}</option>
@@ -181,7 +181,7 @@
         <div class="section">
           <label class="toggle"><input type="checkbox" bind:checked={checkInEnabled}><span class="toggle-track"></span>Check-In</label>
         </div>
-        <button class="btn btn-primary full-width mt-4" on:click={applySettings}>Apply Settings</button>
+        <button class="btn btn-primary full-width mt-4" on:click={applySettings}>Save</button>
       </div>
     </div>
   {/if}
@@ -189,7 +189,7 @@
   {#if embedded}
     <div class="panel-body">
       <div class="empty-state">
-        <p>No admin privileges. Request Room Admin or Contact Guardian access to manage safety features.</p>
+        <p>You need admin or guardian access to manage someone's safety settings.</p>
       </div>
     </div>
   {/if}

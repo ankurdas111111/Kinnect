@@ -39,7 +39,7 @@
 
   function formatCountdown(ms) {
     if (ms == null) return '—';
-    if (ms <= 0) return 'Due now';
+    if (ms <= 0) return 'Check in now';
     const totalSec = Math.floor(ms / 1000);
     const m = Math.floor(totalSec / 60);
     const s = totalSec % 60;
@@ -93,7 +93,7 @@
     mySafetyStatus.update(s => ({ ...s, checkIn: { ...s.checkIn, lastCheckInAt: lastCheckInAt } }));
     addLog('ok', "I'm OK sent");
     updateCountdown();
-    banner.set({ type: 'info', text: "Check-in sent — you're all good.", actions: [] });
+    banner.set({ type: 'info', text: "Check-in sent — your family knows you're safe.", actions: [] });
     setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 2500);
   }
 
@@ -102,7 +102,7 @@
     countdownInterval = setInterval(() => updateCountdown(), 1000);
 
     socket.on('checkInRequest', () => {
-      addLog('request', 'Server requested check-in');
+      addLog('request', 'Check-in reminder sent');
     });
 
     socket.on('checkInUpdate', (data) => {
@@ -115,7 +115,7 @@
     });
 
     socket.on('checkInMissed', () => {
-      addLog('missed', 'Check-in missed — alert sent to contacts');
+      addLog('missed', 'Missed check-in — your family was notified');
     });
 
     return () => {
@@ -629,7 +629,8 @@
     background: none;
     border: none;
     cursor: pointer;
-    padding: 2px 6px;
+    padding: 10px 12px;
+    min-height: 44px;
     border-radius: var(--radius-sm);
     transition: color 120ms, background 120ms;
   }

@@ -173,6 +173,8 @@
     cursor: pointer;
     color: var(--text-tertiary);
     padding: 4px;
+    min-width: 44px;
+    min-height: 44px;
     border-radius: var(--radius-sm);
     flex-shrink: 0;
     transition:

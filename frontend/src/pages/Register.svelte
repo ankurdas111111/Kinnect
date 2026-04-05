@@ -190,12 +190,12 @@
       </div>
       <div class="auth-brand-badge">Kinnect = Kin + Connect</div>
       <h1>Join your<br>family network</h1>
-      <p>Set up location sharing for your whole family in minutes. Private, secure, real-time.</p>
+      <p>Know where your family is, anytime. Private, secure, always free.</p>
       <ul class="auth-brand-features">
-        <li><span class="feature-check" aria-hidden="true"></span> Real-time GPS tracking</li>
-        <li><span class="feature-check" aria-hidden="true"></span> Guardian &amp; ward system</li>
-        <li><span class="feature-check" aria-hidden="true"></span> Private rooms for families</li>
-        <li><span class="feature-check" aria-hidden="true"></span> End-to-end secure sharing</li>
+        <li><span class="feature-check" aria-hidden="true"></span> See your family on a live map</li>
+        <li><span class="feature-check" aria-hidden="true"></span> Get notified when they arrive safely</li>
+        <li><span class="feature-check" aria-hidden="true"></span> One-tap SOS in emergencies</li>
+        <li><span class="feature-check" aria-hidden="true"></span> Private — only your family can see you</li>
       </ul>
     </div>
   </div>
@@ -214,8 +214,8 @@
     </div>
 
     <div class="auth-card">
-      <h2>Create account</h2>
-      <p class="subtitle">Join your family in minutes</p>
+      <h2>Get started</h2>
+      <p class="subtitle">Set up in under a minute — free forever for families</p>
 
       {#if error}
         <div class="auth-error" role="alert">
@@ -308,7 +308,7 @@
           {/if}
         </div>
 
-        <div class="auth-field" style="margin-bottom: var(--space-2);"><p class="label">Contact method</p></div>
+        <div class="auth-field" style="margin-bottom: var(--space-2);"><label class="label">Contact method</label></div>
         <div class="auth-toggle" role="tablist" aria-label="Contact method">
           <button type="button" class="auth-toggle-btn" class:active={contactType === 'email'} on:click={() => contactType = 'email'} on:keydown={(e) => onContactToggleKeydown(e, 'email')} role="tab" aria-selected={contactType === 'email'} tabindex={contactType === 'email' ? 0 : -1}>Email</button>
           <button type="button" class="auth-toggle-btn" class:active={contactType === 'mobile'} on:click={() => contactType = 'mobile'} on:keydown={(e) => onContactToggleKeydown(e, 'mobile')} role="tab" aria-selected={contactType === 'mobile'} tabindex={contactType === 'mobile' ? 0 : -1}>Mobile</button>
@@ -420,7 +420,9 @@
     color: var(--text-tertiary);
     display: flex;
     align-items: center;
-    padding: 2px;
+    padding: 12px;
+    min-width: 44px;
+    min-height: 44px;
     border-radius: 4px;
     transition: color 0.15s;
   }

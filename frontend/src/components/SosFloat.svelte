@@ -233,7 +233,7 @@
     -webkit-tap-highlight-color: transparent;
     transition: background 150ms ease;
   }
-  .sf-pill:hover { background: rgba(239, 68, 68, 0.06); }
+  .sf-pill:hover { background: rgba(239, 68, 68, 0.14); }
 
   /* Pulsing live dot */
   .sf-pulse {

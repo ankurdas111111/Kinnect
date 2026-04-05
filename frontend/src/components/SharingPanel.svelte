@@ -74,8 +74,19 @@
     if (!contactCode.trim()) return;
     withLoading('addContact', () => { socket.emit('addContact', { shareCode: contactCode.trim().toUpperCase() }); contactCode = ''; });
   }
-  function leaveRoom(code) { socket.emit('leaveRoom', { code }); }
-  function removeContact(userId) { socket.emit('removeContact', { userId }); }
+  let busyAction = null;
+  function leaveRoom(code) {
+    if (busyAction) return;
+    busyAction = 'leave-' + code;
+    socket.emit('leaveRoom', { code });
+    setTimeout(() => { busyAction = null; }, 5000);
+  }
+  function removeContact(userId) {
+    if (busyAction) return;
+    busyAction = 'remove-' + userId;
+    socket.emit('removeContact', { userId });
+    setTimeout(() => { busyAction = null; }, 5000);
+  }
   let guardianDurations = {};
   let roomAdminDurations = {};
 
@@ -111,14 +122,14 @@
     if (isNative) {
       try {
         const { Share } = await import('@capacitor/share');
-        await Share.share({ title: 'Watch my live location', text: 'Follow my live location on Kinnect', url, dialogTitle: 'Share live link' });
+        await Share.share({ title: 'See where I am right now', text: 'Follow my live location on Kinnect', url, dialogTitle: 'Share live link' });
         return;
       } catch (_) {
         // User dismissed share sheet or plugin failed — fall through to clipboard
       }
     }
     navigator.clipboard.writeText(url).catch(() => {});
-    banner.set({ type: 'info', text: 'Link copied. Let the watching begin.', actions: [] });
+    banner.set({ type: 'info', text: 'Link copied — share it with anyone.', actions: [] });
     setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 2000);
   }
   function revokeLink(token) { socket.emit('revokeLiveLink', { token }); }
@@ -221,17 +232,17 @@
     <!-- ── ROOMS ─────────────────────────────────────────────────── -->
     <div class="sharing-section">
       <div class="sharing-section-header">
-        <span class="section-header-label">Groups</span>
+        <span class="section-header-label">Family Groups</span>
         {#if $myRooms.length > 0}
           <span class="section-badge">{$myRooms.length}</span>
         {/if}
       </div>
       <div class="rooms-create-row">
-        <input class="input" bind:value={roomName} placeholder="New group name" />
+        <input class="input" bind:value={roomName} placeholder="Group name (e.g. Family)" />
         <button class="btn btn-primary btn-sm" on:click={createRoom} disabled={loading.createRoom}>{loading.createRoom ? '…' : 'Create'}</button>
       </div>
       <div class="rooms-join-row">
-        <input class="input" bind:value={joinCode} placeholder="Enter room code to join" on:keydown={e => e.key === 'Enter' && joinRoom()} />
+        <input class="input" bind:value={joinCode} placeholder="Paste a group code" on:keydown={e => e.key === 'Enter' && joinRoom()} />
         <button class="btn btn-secondary btn-sm" on:click={joinRoom} disabled={loading.joinRoom}>{loading.joinRoom ? '…' : 'Join'}</button>
       </div>
 
@@ -240,7 +251,7 @@
           <div class="section-empty-icon">
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           </div>
-          <span class="section-empty-text">No groups yet — create one and invite your people</span>
+          <span class="section-empty-text">No groups yet — create one and share the code with your family</span>
         </div>
       {:else}
         <div class="rooms-list">
@@ -255,7 +266,7 @@
                   </span>
                   <span class="room-card-code">{room.code}</span>
                 </div>
-                <button class="btn btn-danger btn-sm" on:click={() => leaveRoom(room.code)}>Leave</button>
+                <button class="btn btn-danger btn-sm" on:click={() => leaveRoom(room.code)} disabled={busyAction === 'leave-' + room.code}>{busyAction === 'leave-' + room.code ? 'Leaving...' : 'Leave Group'}</button>
               </div>
 
               {#if (room.members || []).length > 0}
@@ -323,13 +334,13 @@
     <!-- ── YOUR PEOPLE ────────────────────────────────────────────── -->
     <div class="sharing-section">
       <div class="sharing-section-header">
-        <span class="section-header-label">Your People</span>
+        <span class="section-header-label">Contacts</span>
         {#if $myContacts.length > 0}
           <span class="section-badge">{$myContacts.length}</span>
         {/if}
       </div>
       <div class="rooms-create-row">
-        <input class="input" bind:value={contactCode} placeholder="Paste their signal code" on:keydown={e => e.key === 'Enter' && addContact()} />
+        <input class="input" bind:value={contactCode} placeholder="Paste their family code" on:keydown={e => e.key === 'Enter' && addContact()} />
         <button class="btn btn-primary btn-sm" on:click={addContact} disabled={loading.addContact}>{loading.addContact ? '…' : 'Add'}</button>
       </div>
       {#if $myContacts.length === 0}
@@ -337,7 +348,7 @@
           <div class="section-empty-icon">
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           </div>
-          <span class="section-empty-text">No contacts yet — share your signal code and connect</span>
+          <span class="section-empty-text">No contacts yet — share your code with family to get started</span>
         </div>
       {:else}
           {#each $myContacts as c, i}
@@ -364,8 +375,8 @@
               <div class="person-name-block">
                 <span class="person-name">
                   {c.displayName}
-                  {#if isGuardianOf(c.userId)}<span class="badge badge-primary badge-xs" style="margin-left:4px">Ward</span>{/if}
-                  {#if isWardOf(c.userId)}<span class="badge badge-primary badge-xs" style="margin-left:4px">Guardian</span>{/if}
+                  {#if isGuardianOf(c.userId)}<span class="badge badge-primary badge-xs" style="margin-left:4px">You watch</span>{/if}
+                  {#if isWardOf(c.userId)}<span class="badge badge-primary badge-xs" style="margin-left:4px">Watches you</span>{/if}
                   {#if isPendingGuardianOf(c.userId) || isPendingWardOf(c.userId)}<span class="badge badge-warning badge-xs" style="margin-left:4px">Pending</span>{/if}
                 </span>
                 <span class="person-status" class:status-now={pState==='now'} class:status-sos={pState==='sos'}>{pText}</span>
@@ -377,7 +388,7 @@
                 <button class="locate-pill" on:click={() => locateContact(c.userId)} title="Find {c.displayName} on map" aria-label="Locate {c.displayName}">
                   <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 1.892.402 3.13 1.5 4.5L12 22l6.5-7.5c1.098-1.37 1.5-2.608 1.5-4.5a8 8 0 0 0-8-8z"/></svg>
                 </button>
-                <button class="btn btn-danger btn-sm" on:click={() => removeContact(c.userId)}>Remove</button>
+                <button class="btn btn-danger btn-sm" on:click={() => removeContact(c.userId)} disabled={busyAction === 'remove-' + c.userId}>{busyAction === 'remove-' + c.userId ? 'Removing…' : 'Remove'}</button>
                 {#if !isGuardianOf(c.userId) && !isWardOf(c.userId) && !isPendingGuardianOf(c.userId) && !isPendingWardOf(c.userId)}
                   <select class="duration-select" bind:value={guardianDurations[c.userId]}>
                     <option value={null}>Permanent</option>
@@ -398,7 +409,7 @@
     <!-- ── LIVE BROADCASTS ───────────────────────────────────────── -->
     <div class="sharing-section">
       <div class="sharing-section-header">
-        <span class="section-header-label">Live Broadcasts</span>
+        <span class="section-header-label">Live Links</span>
         {#if $myLiveLinks.length > 0}
           <span class="section-badge section-badge-live">{$myLiveLinks.length}</span>
         {/if}
@@ -414,14 +425,14 @@
             >{label}</button>
           {/each}
         </div>
-        <button class="btn btn-primary btn-sm" on:click={generateLiveLink}>Start Broadcast</button>
+        <button class="btn btn-primary btn-sm" on:click={generateLiveLink}>Share Live Location</button>
       </div>
       {#if $myLiveLinks.length === 0}
         <div class="section-empty">
           <div class="section-empty-icon">
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 6l10.5 6L22 6"/><rect x="1" y="4" width="21" height="16" rx="2"/></svg>
           </div>
-          <span class="section-empty-text">No broadcasts running</span>
+          <span class="section-empty-text">No live links active</span>
         </div>
       {:else}
         <div class="broadcasts-list">
@@ -432,7 +443,7 @@
               <div class="broadcast-header">
                 <span class="rec-dot animate-rec-blink" aria-hidden="true"></span>
                 <span class="broadcast-label">Live</span>
-                <span class="broadcast-expiry">{link.expiresAt ? 'Expires ' + new Date(link.expiresAt).toLocaleTimeString() : 'Until I Say Stop'}</span>
+                <span class="broadcast-expiry">{link.expiresAt ? 'Expires ' + new Date(link.expiresAt).toLocaleTimeString() : 'No expiry'}</span>
               </div>
               <div class="live-link-actions">
                 <CopyButton text={url} label="Copy Link" />
@@ -448,7 +459,7 @@
                   </svg>
                   WhatsApp
                 </a>
-                <button class="btn btn-danger btn-sm" on:click={() => revokeLink(link.token)}>End Broadcast</button>
+                <button class="btn btn-danger btn-sm" on:click={() => revokeLink(link.token)}>Stop Sharing</button>
               </div>
             </div>
           {/each}
@@ -458,7 +469,7 @@
 
     {#if !hasAny}
       <div class="empty-state-hero">
-        <p>Just you out here. Share your signal code to connect with someone.</p>
+        <p>Share your family code to connect with your people.</p>
       </div>
     {/if}
   </div>
@@ -471,7 +482,7 @@
       </button>
     </div>
     <div class="panel-body">
-      <p class="mini">Use the sidebar for sharing controls.</p>
+      <p class="mini">Manage sharing from the sidebar.</p>
     </div>
   </div>
 {/if}

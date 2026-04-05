@@ -54,12 +54,14 @@
     return 'Online';
   }
 
+  let deletingUser = null;
   function deleteUser(user) {
-    if (!isAdmin) return;
+    if (!isAdmin || deletingUser) return;
     if (!confirm(`Delete user "${user.displayName}"? This will disconnect them.`)) return;
+    deletingUser = user.socketId;
     socket.emit('adminDeleteUser', { socketId: user.socketId });
     banner.set({ type: 'info', text: `Deleted ${user.displayName}`, actions: [] });
-    setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 1500);
+    setTimeout(() => { banner.set({ type: null, text: null, actions: [] }); deletingUser = null; }, 3000);
   }
 
   // ── Swipe-right to locate on map ────────────────────────────────────────
@@ -199,7 +201,7 @@
 <div class="panel-shell panel-right panel-base" class:embedded-view={embedded} transition:fly={{ x: 400, duration: 250, easing: cubicOut }}>
   {#if !embedded}
     <div class="panel-header">
-      <h3>People</h3>
+      <h3>Family</h3>
       <button class="btn btn-icon btn-ghost panel-close-btn" aria-label="Close people panel" on:click={() => dispatch('close')}>
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
@@ -258,13 +260,13 @@
       <!-- Full empty state — nobody here yet -->
       <div class="empty-state-container">
         <KinnectNexus />
-        <p class="empty-title">No one here yet</p>
-        <p class="empty-desc">Share your room code with family to see them on your map</p>
+        <p class="empty-title">Your family will appear here</p>
+        <p class="empty-desc">Share your code with family members so you can see each other on the map</p>
       </div>
     {:else if userList.length === 0}
       <!-- Just self is visible — prompt to add people -->
       <div class="empty-state-container empty-state-solo">
-        <p class="empty-desc">Invite family to join your room to see them here</p>
+        <p class="empty-desc">Invite your family to Kinnect — they'll appear here once connected</p>
       </div>
     {:else}
       <div class="vlist-region">
@@ -317,6 +319,12 @@
                   <span class="crowd-badge" title="Festival mode active">
                     <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                     Group
+                  </span>
+                {/if}
+                {#if user.quietHoursActive}
+                  <span class="quiet-badge" title="Quiet Hours — location approximate">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                    Quiet
                   </span>
                 {/if}
               </div>
@@ -374,7 +382,7 @@
                 <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 1.892.402 3.13 1.5 4.5L12 22l6.5-7.5c1.098-1.37 1.5-2.608 1.5-4.5a8 8 0 0 0-8-8z"/></svg>
               </span>
               {#if isAdmin}
-                <button class="btn btn-danger btn-sm" on:click|stopPropagation={() => deleteUser(user)}>×</button>
+                <button class="btn btn-danger btn-sm" on:click|stopPropagation={() => deleteUser(user)} disabled={deletingUser === user.socketId}>×</button>
               {/if}
             </div>
           </div>
@@ -727,6 +735,21 @@
     color: var(--warning-500, #f59e0b);
     background: rgba(245, 158, 11, 0.12);
     border: 1px solid rgba(245, 158, 11, 0.22);
+    border-radius: var(--radius-full);
+    padding: 1px 6px 1px 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .quiet-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 0.625rem;
+    font-weight: 700;
+    color: var(--primary-400, #818cf8);
+    background: rgba(99, 102, 241, 0.12);
+    border: 1px solid rgba(99, 102, 241, 0.22);
     border-radius: var(--radius-full);
     padding: 1px 6px 1px 4px;
     white-space: nowrap;

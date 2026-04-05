@@ -5,7 +5,7 @@
   import { socket, setupSocketHandlers, cancelReconnectBanner, setBanner as socketSetBanner } from '../lib/socket.js';
   import { banner, mySosActive } from '../lib/stores/sos.js';
   import { pendingIncomingRequests } from '../lib/stores/guardians.js';
-  import { otherUsers, mySocketId, myLocation, tracking, focusUser, mapFlyTo } from '../lib/stores/map.js';
+  import { otherUsers, mySocketId, myLocation, tracking, focusUser, mapFlyTo, routeGeometry, walkDestination } from '../lib/stores/map.js';
 
   import AppLayout from '../components/layout/AppLayout.svelte';
   import Sidebar from '../components/layout/Sidebar.svelte';
@@ -348,7 +348,7 @@
       lastCoarseNoticeAt = now;
       // KR-003: use socketSetBanner so this goes through the timer-managed path and
       // doesn't overwrite or persist-clear SOS/reconnect banners unconditionally.
-      socketSetBanner({ type: 'info', text: `Location updated (low precision: ~${Math.round(accuracy)}m). Move near open sky for GPS-level accuracy.`, actions: [] }, 7000);
+      socketSetBanner({ type: 'info', text: `Location is approximate (~${Math.round(accuracy)}m). Step outside for better accuracy.`, actions: [] }, 7000);
     }
 
     const timeSinceLastEmit = now - lastEmitAt;
@@ -389,13 +389,12 @@
 
   function startTracking() {
     if (geoPermission === 'denied') {
-      banner.set({ type: 'info', text: 'Location permission is denied. Enable it in your settings, then try again.', actions: [] });
+      banner.set({ type: 'info', text: "Kinnect needs location access to work. Turn it on in your device settings.", actions: [] });
       return;
     }
     if ($tracking) return;
     tracking.set(true);
     setBufferedCount(bufferSize());
-    banner.set({ type: 'info', text: 'Starting high-accuracy tracking...', actions: [] });
     lastAcceptedFix = null;
     lastEmittedFix = null;
     lastEmitAt = 0;
@@ -409,14 +408,14 @@
         if (err.code === 1) {
           const isDesktop = !/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
           const msg = isDesktop
-            ? 'Location access denied. Allow location in your browser, and check OS Settings → Privacy → Location Services too.'
-            : 'Location access denied. Enable location permission for this site in your device settings.';
+            ? "Location access is off. Allow it in your browser settings, then try again."
+            : "Location access is off. Enable it in your device settings for Kinnect.";
           banner.set({ type: 'info', text: msg, actions: [] });
           stopTracking();
           return;
         }
         if (!lastAcceptedFix) {
-          banner.set({ type: 'info', text: 'Waiting for GPS... fallback tracking is active.', actions: [] });
+          banner.set({ type: 'info', text: "Getting your location... this may take a moment.", actions: [] });
         }
       }
     );
@@ -425,7 +424,7 @@
     // "Starting..." banner so the user knows we're still searching, not frozen.
     setTimeout(() => {
       if ($tracking && !lastAcceptedFix) {
-        banner.set({ type: 'info', text: 'Waiting for GPS signal...', actions: [] });
+        banner.set({ type: 'info', text: "Finding your location...", actions: [] });
       }
     }, 12000);
 
@@ -666,7 +665,12 @@
   <svelte:fragment slot="map">
     <MapView {followMode} />
     <div class="place-search-overlay">
-      <PlaceSearch on:select={e => mapFlyTo.set({ lat: e.detail.lat, lng: e.detail.lng })} />
+      <PlaceSearch
+        on:select={e => mapFlyTo.set({ lat: e.detail.lat, lng: e.detail.lng, zoom: 15 })}
+        on:route={e => routeGeometry.set(e.detail.geometry)}
+        on:clearRoute={() => routeGeometry.set(null)}
+        on:setDestination={e => walkDestination.set(e.detail)}
+      />
     </div>
   </svelte:fragment>
 
@@ -823,11 +827,11 @@
           <div class="sos-icon-ring">
             <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           </div>
-          <h3 class="sos-confirm-title">Send SOS Alert?</h3>
-          <p class="sos-confirm-desc">Everyone in your network will be alerted immediately. Your live location will be broadcast to all contacts.</p>
+          <h3 class="sos-confirm-title">Send an SOS to your family?</h3>
+          <p class="sos-confirm-desc">Everyone connected to you will be notified right away. They'll see your live location until you're safe.</p>
           <div class="sos-confirm-actions">
-            <button class="btn btn-ghost sos-cancel-btn" on:click={() => sosConfirmOpen = false}>Not now</button>
-            <button class="btn btn-danger sos-send-btn" on:click={() => { haptics.sos(); socket.emit('triggerSOS', { reason: 'SOS', medicalCard: getMedicalSnapshot() }); sosConfirmOpen = false; }}>Send SOS</button>
+            <button class="btn btn-ghost sos-cancel-btn" on:click={() => sosConfirmOpen = false}>Cancel</button>
+            <button class="btn btn-danger sos-send-btn" on:click={() => { haptics.sos(); socket.emit('triggerSOS', { reason: 'SOS', medicalCard: getMedicalSnapshot() }); sosConfirmOpen = false; }}>Yes, send SOS</button>
           </div>
         </div>
       </div>
@@ -1211,10 +1215,13 @@
   }
   @media (max-width: 767px) {
     .place-search-overlay {
-      top: calc(var(--safe-top, 0px) + 8px);
-      left: 8px;
-      right: 8px;
+      /* Fixed so it escapes layout-map overflow:hidden */
+      position: fixed;
+      top: calc(var(--safe-top, 0px) + 10px);
+      left: 10px;
+      right: 10px;
       transform: none;
+      z-index: 2500; /* above mobile navbar (2000) */
     }
     .place-search-overlay :global(.ps-wrap) {
       width: 100%;

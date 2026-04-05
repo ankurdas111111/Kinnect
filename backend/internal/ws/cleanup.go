@@ -155,6 +155,34 @@ func (h *Hub) StartCleanupRoutines(ctx context.Context) {
 		}
 	}()
 
+	// 11. Heartbeat check — daily wellness pulse (every 60s)
+	go func() {
+		ticker := time.NewTicker(60 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				h.cleanupHeartbeatCheck()
+			}
+		}
+	}()
+
+	// 12. Walk With Me monitoring — arrival, stop, offline, deviation (every 30s)
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				h.EvaluateWalk()
+			}
+		}
+	}()
+
 	slog.Info("Cleanup routines started")
 }
 

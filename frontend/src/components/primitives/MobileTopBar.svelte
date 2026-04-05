@@ -29,7 +29,7 @@
   <div class="bar-main">
     <div class="title-wrap">
       <h1>{title}</h1>
-      <p>{trackingActive ? 'Live location active' : 'Tracking paused'}</p>
+      <p>{trackingActive ? 'Sharing your location' : 'Location paused'}</p>
     </div>
     <div class="top-actions">
       <button class="icon-btn dashboard-btn" aria-label="Family Dashboard" on:click={() => push('/dashboard')}>

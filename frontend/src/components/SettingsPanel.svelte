@@ -384,23 +384,23 @@
     </div>
 
     <hr class="divider" />
-    <h4 class="section-title-bold">Go Dark</h4>
+    <h4 class="section-title-bold">Privacy Mode</h4>
     <div class="form-section">
-      <p class="hint">Temporarily vanish from everyone's map. No trace. Full ghost.</p>
+      <p class="hint">Temporarily hide your location from everyone. Guardians can still see you.</p>
       {#if privacyActive}
         <div class="privacy-active animate-slide-up">
           <span class="ghost-emoji animate-ghost-float" aria-hidden="true">👻</span>
           <div class="ghost-info">
-            <p class="ghost-status">You're invisible</p>
+            <p class="ghost-status">You're hidden</p>
             <p class="ghost-time">{privacyTimeLeft} left</p>
           </div>
-          <button class="btn btn-secondary btn-sm" on:click={() => setPrivacyMode('resume')}>Come Back</button>
+          <button class="btn btn-secondary btn-sm" on:click={() => setPrivacyMode('resume')}>Show My Location</button>
         </div>
       {:else}
         <div class="privacy-btns">
-          <button class="btn btn-secondary btn-sm" on:click={() => setPrivacyMode('1h')}>Ghost: 1 Hour</button>
-          <button class="btn btn-secondary btn-sm" on:click={() => setPrivacyMode('4h')}>Ghost: 4 Hours</button>
-          <button class="btn btn-secondary btn-sm" on:click={() => setPrivacyMode('8h')}>Ghost: 8 Hours</button>
+          <button class="btn btn-secondary btn-sm" on:click={() => setPrivacyMode('1h')}>Hide for 1 hour</button>
+          <button class="btn btn-secondary btn-sm" on:click={() => setPrivacyMode('4h')}>Hide for 4 hours</button>
+          <button class="btn btn-secondary btn-sm" on:click={() => setPrivacyMode('8h')}>Hide for 8 hours</button>
         </div>
       {/if}
     </div>
@@ -408,7 +408,7 @@
     <hr class="divider" />
     <h4 class="section-title-bold">Quiet Hours</h4>
     <div class="form-section">
-      <p class="hint">During Quiet Hours, contacts see a blurred location (±500m). Guardians always get your exact position.</p>
+      <p class="hint">During Quiet Hours your location is approximate for everyone except your guardians.</p>
       <label class="toggle-row">
         <span>Enable Quiet Hours</span>
         <button
@@ -436,9 +436,9 @@
     </div>
 
     <hr class="divider" />
-    <h4 class="section-title-bold">Stay Visible For</h4>
+    <h4 class="section-title-bold">Offline Visibility</h4>
     <div class="form-section">
-      <p class="hint">How long your last known spot stays visible after you go offline. Longer = your people can still find you.</p>
+      <p class="hint">How long your last location stays visible after you close the app.</p>
       <div class="retention-pills">
         {#each [['default','1 Day'],['48h','2 Days'],['5d','5 Days'],['10d','10 Days'],['30d','30 Days']] as [mode, label]}
           <button
@@ -452,12 +452,12 @@
     </div>
 
     <hr class="divider" />
-    <h4 class="section-title-bold">Alerts & Pings</h4>
+    <h4 class="section-title-bold">Notifications</h4>
     <div class="form-section">
       {#if pushSupported}
-        <p class="hint">SOS alerts, check-in reminders, guardian updates. We only interrupt when it matters, promise.</p>
+        <p class="hint">SOS alerts, check-in reminders, and family updates. We only notify you when it matters.</p>
         <label class="toggle-row">
-          <span>{pushEnabled ? 'Notifications on' : 'Enable notifications'}</span>
+          <span>{pushEnabled ? 'Notifications are on' : 'Turn on notifications'}</span>
           <button
             class="toggle-btn"
             class:on={pushEnabled}
@@ -468,30 +468,30 @@
             <span class="toggle-knob"></span>
           </button>
         </label>
-        {#if togglingPush}<p class="hint">Updating&hellip;</p>{/if}
+        {#if togglingPush}<p class="hint">Updating...</p>{/if}
       {:else}
-        <p class="hint">Push notifications are not supported in this browser.</p>
+        <p class="hint">Notifications aren't available in this browser.</p>
       {/if}
     </div>
 
     {#if isNative}
       <hr class="divider" />
-      <h4 class="section-title-bold">Background Tracking</h4>
+      <h4 class="section-title-bold">Background Location</h4>
       <div class="form-section">
         {#if batteryOptIgnoring}
           <div class="battery-status battery-status--ok">
             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            Unrestricted — background tracking stays alive
+            Background location is allowed
           </div>
-          <p class="hint">Android will not kill Kinnect while tracking is active. You're all set.</p>
+          <p class="hint">Kinnect can share your location even when the app is in the background.</p>
         {:else}
           <div class="battery-status battery-status--warn">
             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-            Battery optimization is ON — may stop tracking
+            Background location may be restricted
           </div>
-          <p class="hint">Android may suspend Kinnect in the background on Samsung, Xiaomi, and other devices. Tap below to allow unrestricted background access.</p>
+          <p class="hint">Your phone might stop Kinnect from working in the background. Tap below to fix this.</p>
           <button class="btn btn-primary btn-sm" on:click={handleBatteryOptimization} disabled={checkingBattery}>
-            {checkingBattery ? 'Checking...' : 'Allow Background Access'}
+            {checkingBattery ? 'Checking...' : 'Fix Background Access'}
           </button>
         {/if}
       </div>
@@ -520,7 +520,7 @@
     <hr class="divider" />
     <h4 class="section-title-bold">Help</h4>
     <div class="form-section">
-      <button class="btn btn-secondary btn-sm" on:click={() => dispatch('openGuide')}>Feature Guide</button>
+      <button class="btn btn-secondary btn-sm" on:click={() => dispatch('openGuide')}>How Kinnect Works</button>
     </div>
 
     <hr class="divider" />
@@ -531,13 +531,13 @@
 
     <hr class="divider" />
     <div class="danger-zone-header">
-      <h4 class="section-title-bold danger-title">Point of No Return</h4>
+      <h4 class="section-title-bold danger-title">Delete Account</h4>
     </div>
     <div class="form-section">
       {#if showDelete}
-        <p class="hint danger-text">This permanently deletes your account, location history, and all connections. <strong>This cannot be undone.</strong></p>
+        <p class="hint danger-text">This will permanently delete your account, all your data, and remove you from every group. This cannot be undone.</p>
         <label class="field-label">
-          Enter your password to confirm
+          Enter your password to confirm deletion
           <input type="password" bind:value={deletePassword} class="field-input" />
         </label>
         <div class="delete-actions">
@@ -550,12 +550,12 @@
             on:click={deleteAccount}
             disabled={deleting || !deletePassword || deleteCountdown > 0}
           >
-            {deleting ? 'Deleting...' : deleteCountdown > 0 ? `Wait ${deleteCountdown}…` : 'Delete Everything'}
+            {deleting ? 'Deleting...' : deleteCountdown > 0 ? `Wait ${deleteCountdown}…` : 'Permanently Delete'}
           </button>
           <button class="btn btn-secondary btn-sm" on:click={() => { showDelete = false; deletePassword = ''; deleteCountdown = 0; if (deleteTimer) clearInterval(deleteTimer); }}>Cancel</button>
         </div>
       {:else}
-        <button class="btn btn-danger-outline btn-sm" on:click={startDeleteFlow}>Delete Everything</button>
+        <button class="btn btn-danger-outline btn-sm" on:click={startDeleteFlow}>Permanently Delete</button>
       {/if}
     </div>
   </div>

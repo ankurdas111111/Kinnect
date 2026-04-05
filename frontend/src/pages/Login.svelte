@@ -168,12 +168,12 @@
       </div>
       <div class="auth-brand-badge">Kinnect = Kin + Connect</div>
       <h1>Keep your<br>family close</h1>
-      <p>Real-time GPS location sharing for families. Stay connected, stay safe.</p>
+      <p>Always know your family is safe. Real-time location sharing, built for families who care.</p>
       <ul class="auth-brand-features">
-        <li><span class="feature-check" aria-hidden="true"></span> Live location sharing</li>
-        <li><span class="feature-check" aria-hidden="true"></span> SOS emergency alerts</li>
-        <li><span class="feature-check" aria-hidden="true"></span> Safe zone notifications</li>
-        <li><span class="feature-check" aria-hidden="true"></span> Works on all devices</li>
+        <li><span class="feature-check" aria-hidden="true"></span> See your family on a live map</li>
+        <li><span class="feature-check" aria-hidden="true"></span> One-tap SOS when you need help</li>
+        <li><span class="feature-check" aria-hidden="true"></span> Arrival alerts and safe zones</li>
+        <li><span class="feature-check" aria-hidden="true"></span> Works on every phone and browser</li>
       </ul>
     </div>
   </div>
@@ -193,7 +193,7 @@
 
     <div class="auth-card">
       <h2>Welcome back</h2>
-      <p class="subtitle">Your family is waiting</p>
+      <p class="subtitle">Your family is just a tap away</p>
 
       {#if error}
         <div class="auth-error" role="alert">
@@ -341,7 +341,9 @@
     color: var(--text-tertiary);
     display: flex;
     align-items: center;
-    padding: 2px;
+    padding: 12px;
+    min-width: 44px;
+    min-height: 44px;
     border-radius: 4px;
     transition: color 0.15s;
   }

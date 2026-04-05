@@ -276,7 +276,7 @@
       {#each $alertState.actions as action}
         <button class="btn {action.kind || 'btn-primary'} btn-lg" on:click={() => { if (action.onClick) action.onClick(); dismiss(); }}>{action.label}</button>
       {/each}
-      <button class="btn btn-secondary btn-lg" on:click={dismiss}>Dismiss</button>
+      <button class="btn btn-secondary btn-lg" on:click={dismiss}>Got it</button>
     </svelte:fragment>
   </Modal>
 </div>
@@ -369,7 +369,7 @@
     text-align: left;
     transition: background 150ms ease;
   }
-  .med-card-header:hover { background: rgba(239,68,68,0.05); }
+  .med-card-header:hover { background: rgba(239,68,68,0.14); }
 
   .med-card-icon {
     display: flex;

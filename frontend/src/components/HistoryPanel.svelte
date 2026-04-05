@@ -1,5 +1,5 @@
 <script>
-  import { createEventDispatcher, onDestroy } from 'svelte';
+  import { createEventDispatcher, onMount, onDestroy } from 'svelte';
   import { socket } from '../lib/socket.js';
   import { otherUsers } from '../lib/stores/map.js';
   import { authUser } from '../lib/stores/auth.js';
@@ -13,6 +13,7 @@
   let selectedUserId = '';
   let dateInput = $historyDate;
   let playTimer = null;
+  let historyTimeout;
 
   $: visibleUsers = buildUserList($otherUsers, $myContacts, $authUser);
 
@@ -25,24 +26,32 @@
     return list;
   }
 
+  function onHistoryData(res) {
+    clearTimeout(historyTimeout);
+    historyLoading.set(false);
+    if (res && res.ok) {
+      historyPoints.set(res.points || []);
+      historyVisible.set(true);
+      historyPlayback.set({ playing: false, index: 0, speed: 1 });
+    } else {
+      historyPoints.set([]);
+    }
+  }
+
+  onMount(() => { socket.on('historyData', onHistoryData); });
+  onDestroy(() => { stopPlayback(); clearTimeout(historyTimeout); socket.off('historyData', onHistoryData); });
+
   function fetchHistory() {
-    if (!selectedUserId) return;
+    if (!selectedUserId || $historyLoading) return;
     const d = new Date(dateInput);
     const start = d.getTime();
     const end = start + 24 * 60 * 60 * 1000;
     historyLoading.set(true);
     historyTarget.set(selectedUserId);
     historyDate.set(dateInput);
-    socket.emit('getHistory', { userId: selectedUserId, start, end }, (res) => {
-      historyLoading.set(false);
-      if (res && res.ok) {
-        historyPoints.set(res.points || []);
-        historyVisible.set(true);
-        historyPlayback.set({ playing: false, index: 0, speed: 1 });
-      } else {
-        historyPoints.set([]);
-      }
-    });
+    socket.emit('getHistory', { userId: selectedUserId, start, end });
+    clearTimeout(historyTimeout);
+    historyTimeout = setTimeout(() => { historyLoading.set(false); historyPoints.set([]); }, 15000);
   }
 
   function clearHistory() {
@@ -91,18 +100,17 @@
     return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
-  onDestroy(() => stopPlayback());
 </script>
 
 {#if embedded}
   <div class="panel-body history-panel">
-    <h4>Location History</h4>
+    <h4>Route History</h4>
 
     <div class="history-controls">
       <label class="field-label">
         User
         <select bind:value={selectedUserId} class="field-input">
-          <option value="">Select user...</option>
+          <option value="">Choose someone</option>
           {#each visibleUsers as u}
             <option value={u.id}>{u.name}</option>
           {/each}
@@ -116,7 +124,7 @@
 
       <div class="history-actions">
         <button class="btn btn-primary btn-sm" on:click={fetchHistory} disabled={!selectedUserId || $historyLoading}>
-          {$historyLoading ? 'Loading...' : 'Show Trail'}
+          {$historyLoading ? 'Loading...' : 'Show Route'}
         </button>
         {#if $historyVisible}
           <button class="btn btn-secondary btn-sm" on:click={clearHistory}>Clear</button>
@@ -163,17 +171,17 @@
         </div>
       {/if}
     {:else if $historyVisible}
-      <div class="empty-state">No history data for this date.</div>
+      <div class="empty-state">No location data for this day.</div>
     {/if}
   </div>
 {:else}
   <div class="panel-shell panel-left panel-base">
     <div class="panel-header">
-      <h3>Location History</h3>
+      <h3>Route History</h3>
       <button class="panel-close" on:click={() => dispatch('close')} aria-label="Close">&times;</button>
     </div>
     <div class="panel-body">
-      <p>Use the sidebar History tab to view location trails.</p>
+      <p>View route history from the sidebar.</p>
     </div>
   </div>
 {/if}
