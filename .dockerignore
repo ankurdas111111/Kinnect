@@ -3,11 +3,9 @@ frontend/node_modules
 frontend/dist
 frontend/android
 frontend/.svelte-kit
-.claude
 .git
 *.md
 *.skill
 test
-bencium-claude-code-design-skill
-claude-agentic-framework
+.local-tools
 web-quality-skills
