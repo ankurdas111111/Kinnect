@@ -152,6 +152,14 @@ func (h *Hub) handlePosition(c *Client, data json.RawMessage) {
 	// ── Movement phase (intelligence label) ──────────────────────────────────
 	user.MovementPhase = toMovementPhase(pos.Speed)
 
+	// ── Heartbeat signal (any position update = sign of life) ────────────────
+	if user.HeartbeatEnabled {
+		user.HeartbeatLastSignal = now
+	}
+
+	// ── Journey Shield — trip detection ──────────────────────────────────────
+	h.EvaluateTrip(user)
+
 	// ── Safety score (recomputed on every position update) ───────────────────
 	{
 		checkInOverdueAt := int64(0)
@@ -291,12 +299,30 @@ func (h *Hub) handlePositionBatch(c *Client, data json.RawMessage) {
 		return
 	}
 
+	// KR-014: per-user rate limit so reconnect cycles can't bypass the per-client limit.
+	// One drain per 12 s ≈ 5 / min, same as positionBatchRateMin.
+	const batchUserCooldownMs = 12000
+	nowMs := time.Now().UnixMilli()
+	if nowMs-h.batchUserLast[user.UserID] < batchUserCooldownMs {
+		return
+	}
+	h.batchUserLast[user.UserID] = nowMs
+
 	for _, m := range batch {
 		pos := shared.ValidatePosition(m)
 		if pos == nil {
 			continue
 		}
+		// KR-013: use the original GPS timestamp when available so position_history
+		// records reflect when the fix was taken, not when it was replayed.
 		now := time.Now().UnixMilli()
+		if pos.Timestamp != nil {
+			ts := *pos.Timestamp
+			// Accept only timestamps in the past and within the last hour.
+			if ts > 0 && ts <= now && now-ts <= 3600000 {
+				now = ts
+			}
+		}
 		user.Latitude = &pos.Latitude
 		user.Longitude = &pos.Longitude
 		user.Speed = pos.Speed
@@ -382,6 +408,7 @@ func (h *Hub) handlePositionBatch(c *Client, data json.RawMessage) {
 		h.SendToGroup("live:"+token, "liveUpdate", map[string]interface{}{"user": sanitized})
 	}
 	h.runAutoRules(user)
+	h.checkCrowdMode(user) // KR-005: crowd mode must re-evaluate after batch replay, same as single position
 }
 
 // handleProfileUpdate updates battery, deviceType, connectionQuality.
@@ -1371,9 +1398,11 @@ func (h *Hub) handleRequestGuardian(c *Client, data json.RawMessage) {
 		return
 	}
 
-	entry := &db.GuardianshipEntry{Status: "pending", InitiatedBy: "guardian", ExpiresAt: nil, CreatedAt: time.Now().UnixMilli()}
+	// KR-012: store the real expiry timestamp so it can be enforced, not just displayed.
+	pendingExpiresAt := h.parseExpiresIn(expiresIn)
+	entry := &db.GuardianshipEntry{Status: "pending", InitiatedBy: "guardian", ExpiresAt: pendingExpiresAt, CreatedAt: time.Now().UnixMilli()}
 	h.Cache.SetGuardianship(user.UserID, wardID, entry)
-	_ = db.CreateGuardianship(context.Background(), h.pool.DB, user.UserID, wardID, "pending", nil, entry.CreatedAt, "guardian")
+	_ = db.CreateGuardianship(context.Background(), h.pool.DB, user.UserID, wardID, "pending", pendingExpiresAt, entry.CreatedAt, "guardian")
 
 	h.Cache.AddPendingRequest(wardID+":guardian", map[string]interface{}{"type": "guardian", "from": user.UserID, "expiresIn": expiresIn})
 
@@ -1382,7 +1411,8 @@ func (h *Hub) handleRequestGuardian(c *Client, data json.RawMessage) {
 		h.emitMyGuardians(wardCli, wardID)
 		h.emitPendingRequests(wardCli, wardID)
 	}
-	c.Send("contactError", map[string]interface{}{"message": "Guardian request sent"})
+	// KR-002: use guardianInfo (not contactError) so success isn't rendered as an error banner.
+	c.Send("guardianInfo", map[string]interface{}{"message": "Guardian request sent"})
 	h.emitMyGuardians(c, user.UserID)
 }
 
@@ -1435,9 +1465,11 @@ func (h *Hub) handleInviteGuardian(c *Client, data json.RawMessage) {
 		return
 	}
 
-	entry := &db.GuardianshipEntry{Status: "pending", InitiatedBy: "ward", ExpiresAt: nil, CreatedAt: time.Now().UnixMilli()}
+	// KR-012: store the real expiry timestamp so it can be enforced, not just displayed.
+	pendingExpiresAt := h.parseExpiresIn(expiresIn)
+	entry := &db.GuardianshipEntry{Status: "pending", InitiatedBy: "ward", ExpiresAt: pendingExpiresAt, CreatedAt: time.Now().UnixMilli()}
 	h.Cache.SetGuardianship(guardianID, user.UserID, entry)
-	_ = db.CreateGuardianship(context.Background(), h.pool.DB, guardianID, user.UserID, "pending", nil, entry.CreatedAt, "ward")
+	_ = db.CreateGuardianship(context.Background(), h.pool.DB, guardianID, user.UserID, "pending", pendingExpiresAt, entry.CreatedAt, "ward")
 
 	h.Cache.AddPendingRequest(guardianID+":guardianInvite", map[string]interface{}{"type": "guardianInvite", "from": user.UserID, "expiresIn": expiresIn})
 
@@ -1446,7 +1478,8 @@ func (h *Hub) handleInviteGuardian(c *Client, data json.RawMessage) {
 		h.emitMyGuardians(gCli, guardianID)
 		h.emitPendingRequests(gCli, guardianID)
 	}
-	c.Send("contactError", map[string]interface{}{"message": "Guardian invite sent"})
+	// KR-002: use guardianInfo (not contactError) so success isn't rendered as an error banner.
+	c.Send("guardianInfo", map[string]interface{}{"message": "Guardian invite sent"})
 	h.emitMyGuardians(c, user.UserID)
 }
 

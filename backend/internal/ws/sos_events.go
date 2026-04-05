@@ -188,6 +188,9 @@ func (h *Hub) handleTriggerSOS(c *Client, data json.RawMessage) {
 			})
 		})
 	}
+
+	// ── Panic Relay: start 3-minute SMS escalation timer ─────────────────
+	h.StartPanicRelayTimer(user)
 }
 
 // sanitizeMedicalCard keeps only known string fields and truncates each to 500 chars.
@@ -256,12 +259,14 @@ func (h *Hub) handleCancelSOS(c *Client, data json.RawMessage) {
 	if user == nil {
 		return
 	}
+	// KR-015: emit watchUpdate with active:false BEFORE clearing the token.
+	// emitWatch exits early if user.SOS.Token is nil, so send the final update first.
+	h.emitWatch(user)
 	token := user.SOS.Token
 	h.setSos(user, false, "", "", "")
 	if token != nil {
 		h.Cache.DeleteWatchToken(*token)
 	}
-	h.emitWatch(user)
 	payload := h.publicSos(user)
 	h.emitToVisibleAndSelf(user, "sosUpdate", payload)
 	h.emitLiveSos(user)

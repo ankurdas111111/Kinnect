@@ -72,6 +72,10 @@ type Hub struct {
 	rollingBufMu sync.RWMutex
 	rollingBufs  map[string]*rollingBuffer
 
+	// Per-user positionBatch rate limiting (KR-014): last accepted batch timestamp per userID.
+	// Accessed only from the hub's single dispatch goroutine — no mutex needed.
+	batchUserLast map[string]int64
+
 	// Free-tier optimizations
 	ConnLimiter     *ConnectionLimiter
 	MemoryMonitor   *MemoryMonitor
@@ -95,6 +99,7 @@ func NewHub(c *cache.Cache, p *db.Pool, cfg *config.Config) *Hub {
 		groups:           make(map[string]map[string]bool),
 		pendingPositions: make(map[string]positionBroadcast),
 		rollingBufs:      make(map[string]*rollingBuffer),
+		batchUserLast:    make(map[string]int64),
 		ConnLimiter:      NewConnectionLimiter(config.MaxWebSocketConnections),
 		MemoryMonitor:    NewMemoryMonitor(10 * time.Second),
 		IsShuttingDown:   false,
@@ -147,6 +152,7 @@ func (h *Hub) buildEventHandlers() map[string]func(*Client, json.RawMessage) {
 		"liveAckSOS":           h.handleLiveAckSOS,
 		"attest":               h.handleAttest,
 		"getRecentTrail":       h.handleGetRecentTrail,
+		"getHistory":           h.handleGetHistory,
 		"getNetworkGraph":      h.handleGetNetworkGraph,
 		"onMyWay":              h.handleOnMyWay,
 		"cancelOnMyWay":        h.handleCancelOnMyWay,
@@ -154,6 +160,10 @@ func (h *Hub) buildEventHandlers() map[string]func(*Client, json.RawMessage) {
 		"shareRide":            h.handleShareRide,
 		"endRide":              h.handleEndRide,
 		"toggleCrowdMode":      h.handleToggleCrowdMode,
+		"setHeartbeat":         h.handleSetHeartbeat,
+		"setEmergencyPhones":   h.handleSetEmergencyPhones,
+		"startWalkWithMe":     h.handleStartWalkWithMe,
+		"endWalkWithMe":       h.handleEndWalkWithMe,
 	}
 }
 
@@ -246,6 +256,8 @@ func (h *Hub) handleRegister(c *Client) {
 			BatteryAlertSentAt: make(map[int]int64),
 		}
 		user.Retention = &cache.Retention{Mode: "default", ClientID: clientID}
+		// Load persisted user settings from DB (heartbeat, emergency phones, quiet hours)
+		h.loadUserSettings(user)
 		h.Cache.SetActiveUser(clientID, user)
 		h.Cache.SetUserIdToSocketId(userID, clientID)
 		if role == "admin" {
@@ -479,6 +491,7 @@ func (h *Hub) HandleUpgrade(w http.ResponseWriter, r *http.Request, sessionData 
 	default:
 		slog.Warn("Register channel full")
 		client.Close()
+		h.ConnLimiter.ReleaseConnection() // KR-016: release the slot acquired before upgrade
 	}
 }
 
@@ -575,4 +588,45 @@ func (h *Hub) SendToGroup(group, event string, data interface{}) {
 	}
 	h.mu.RUnlock()
 	h.SendToClients(ids, event, data)
+}
+
+// loadUserSettings loads persisted settings from the users table into an ActiveUser.
+func (h *Hub) loadUserSettings(user *cache.ActiveUser) {
+	var qhEnabled, hbEnabled *bool
+	var qhStart, qhEnd, hbDeadline, ePhone1, ePhone2 *string
+	var hbLastSignal *int64
+
+	row := h.pool.DB.QueryRow(
+		`SELECT quiet_hours_enabled, quiet_hours_start::text, quiet_hours_end::text,
+		        heartbeat_enabled, heartbeat_deadline::text, heartbeat_last_signal,
+		        emergency_phone_1, emergency_phone_2
+		   FROM users WHERE id = $1`, user.UserID)
+
+	if err := row.Scan(&qhEnabled, &qhStart, &qhEnd, &hbEnabled, &hbDeadline, &hbLastSignal, &ePhone1, &ePhone2); err != nil {
+		return // non-fatal: defaults are all zero-values
+	}
+	if qhEnabled != nil {
+		user.QuietHoursEnabled = *qhEnabled
+	}
+	if qhStart != nil && len(*qhStart) >= 5 {
+		user.QuietHoursStart = (*qhStart)[:5]
+	}
+	if qhEnd != nil && len(*qhEnd) >= 5 {
+		user.QuietHoursEnd = (*qhEnd)[:5]
+	}
+	if hbEnabled != nil {
+		user.HeartbeatEnabled = *hbEnabled
+	}
+	if hbDeadline != nil && len(*hbDeadline) >= 5 {
+		user.HeartbeatDeadline = (*hbDeadline)[:5]
+	}
+	if hbLastSignal != nil {
+		user.HeartbeatLastSignal = *hbLastSignal
+	}
+	if ePhone1 != nil {
+		user.EmergencyPhone1 = *ePhone1
+	}
+	if ePhone2 != nil {
+		user.EmergencyPhone2 = *ePhone2
+	}
 }

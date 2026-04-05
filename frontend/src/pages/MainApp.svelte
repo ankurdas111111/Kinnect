@@ -2,10 +2,10 @@
   import { onMount, onDestroy } from 'svelte';
   import { push } from 'svelte-spa-router';
   import { authUser } from '../lib/stores/auth.js';
-  import { socket, setupSocketHandlers, cancelReconnectBanner } from '../lib/socket.js';
+  import { socket, setupSocketHandlers, cancelReconnectBanner, setBanner as socketSetBanner } from '../lib/socket.js';
   import { banner, mySosActive } from '../lib/stores/sos.js';
   import { pendingIncomingRequests } from '../lib/stores/guardians.js';
-  import { otherUsers, mySocketId, myLocation, tracking, focusUser } from '../lib/stores/map.js';
+  import { otherUsers, mySocketId, myLocation, tracking, focusUser, mapFlyTo } from '../lib/stores/map.js';
 
   import AppLayout from '../components/layout/AppLayout.svelte';
   import Sidebar from '../components/layout/Sidebar.svelte';
@@ -23,6 +23,7 @@
   import BottomSheet from '../components/primitives/BottomSheet.svelte';
   import BottomTabBar from '../components/primitives/BottomTabBar.svelte';
   import MapFab from '../components/primitives/MapFab.svelte';
+  import PlaceSearch from '../components/PlaceSearch.svelte';
   import MobileTopBar from '../components/primitives/MobileTopBar.svelte';
   import TrackingNowCard from '../components/primitives/TrackingNowCard.svelte';
   import OnboardingOverlay from '../components/OnboardingOverlay.svelte';
@@ -345,9 +346,9 @@
     recordFix({ accuracy, kalmanCorrectionM, filterWarm: gpsFilter.isWarm });
     if (accuracy > 150 && now - lastCoarseNoticeAt > 7000) {
       lastCoarseNoticeAt = now;
-      banner.set({ type: 'info', text: `Location updated (low precision: ~${Math.round(accuracy)}m). Move near open sky for GPS-level accuracy.`, actions: [] });
-    } else if (accuracy <= 150) {
-      banner.set({ type: null, text: null, actions: [] });
+      // KR-003: use socketSetBanner so this goes through the timer-managed path and
+      // doesn't overwrite or persist-clear SOS/reconnect banners unconditionally.
+      socketSetBanner({ type: 'info', text: `Location updated (low precision: ~${Math.round(accuracy)}m). Move near open sky for GPS-level accuracy.`, actions: [] }, 7000);
     }
 
     const timeSinceLastEmit = now - lastEmitAt;
@@ -664,6 +665,9 @@
 
   <svelte:fragment slot="map">
     <MapView {followMode} />
+    <div class="place-search-overlay">
+      <PlaceSearch on:select={e => mapFlyTo.set({ lat: e.detail.lat, lng: e.detail.lng })} />
+    </div>
   </svelte:fragment>
 
   <svelte:fragment slot="banner">
@@ -850,9 +854,9 @@
           {/if}
           <div class="battery-prompt-actions">
             <button class="btn battery-skip-btn" on:click={() => batteryPromptOpen = false}>Not now</button>
-            <button class="btn battery-allow-btn" on:click={async () => {
-              await requestIgnoreBatteryOptimizations();
-              batteryPromptOpen = false;
+            <button class="btn battery-allow-btn" on:click={async (e) => {
+              e.target.disabled = true;
+              try { await requestIgnoreBatteryOptimizations(); } finally { batteryPromptOpen = false; }
             }}>Open Battery Settings</button>
           </div>
         </div>
@@ -1196,4 +1200,24 @@
   }
   .battery-skip-btn:hover { color: rgba(255, 255, 255, 0.70); }
 
+  /* ── Place search overlay on map ─────────────────────────────────── */
+  .place-search-overlay {
+    position: absolute;
+    top: calc(var(--safe-top, 0px) + 52px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 15;
+    pointer-events: auto;
+  }
+  @media (max-width: 767px) {
+    .place-search-overlay {
+      top: calc(var(--safe-top, 0px) + 8px);
+      left: 8px;
+      right: 8px;
+      transform: none;
+    }
+    .place-search-overlay :global(.ps-wrap) {
+      width: 100%;
+    }
+  }
 </style>

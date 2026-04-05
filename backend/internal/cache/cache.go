@@ -127,6 +127,38 @@ type ActiveUser struct {
 	Geofence         Geofence
 	AutoSOS          AutoSOS
 	CheckIn          CheckIn
+
+	// Heartbeat Check — daily "sign of life" wellness monitoring
+	HeartbeatEnabled    bool
+	HeartbeatDeadline   string // "HH:MM" UTC
+	HeartbeatLastSignal int64  // unix ms — updated on any position/checkIn/connect
+	HeartbeatNotifiedAt int64  // unix ms — debounce: only notify once per day
+
+	// Journey Shield — auto-trip detection (ephemeral, not persisted)
+	TripActive       bool
+	TripStartedAt    int64    // unix ms when trip confirmed
+	TripVehicleStart int64    // unix ms when speed first exceeded 15km/h
+	TripStoppedAt    int64    // unix ms when speed dropped to 0; 0 = still moving
+	TripStartLat     float64
+	TripStartLng     float64
+	TripNotifiedStop bool     // debounce: already sent "stopped" notification
+
+	// Panic Relay — external SMS escalation for SOS
+	EmergencyPhone1 string
+	EmergencyPhone2 string
+
+	// Walk With Me — virtual escort session (ephemeral)
+	WalkActive      bool
+	WalkDestLat     float64
+	WalkDestLng     float64
+	WalkDestName    string
+	WalkToken       string // live link token for the watcher
+	WalkWatcherID   string // userId of the contact watching
+	WalkStartedAt   int64
+	WalkStoppedAt   int64  // unix ms when user stopped; 0 = moving
+	WalkOfflineAt   int64  // unix ms when last position was received; for offline detection
+	WalkDeviationNotifiedAt int64 // debounce deviation alerts
+
 	Retention          *Retention
 	PrivacyPausedUntil *int64
 	QuietHoursEnabled  bool
@@ -478,33 +510,9 @@ func (c *Cache) GetUserRooms(userID string) []string {
 func (c *Cache) GetVisibleSet(userID string) map[string]bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-
-	if cached, ok := c.VisibilityCache[userID]; ok && len(cached) > 0 {
-		return cached
-	}
-	visible := make(map[string]bool)
-	visible[userID] = true
-
-	// Room members
-	if roomSet, ok := c.UserRooms[userID]; ok {
-		for code := range roomSet {
-			if room, ok := c.Rooms[code]; ok {
-				for mid := range room.Members {
-					visible[mid] = true
-				}
-			}
-		}
-	}
-
-	// Contacts are stored bidirectionally, so Contacts[userID] covers both directions.
-	if contactSet, ok := c.Contacts[userID]; ok {
-		for cid := range contactSet {
-			visible[cid] = true
-		}
-	}
-
-	c.VisibilityCache[userID] = visible
-	return visible
+	// KR-006: delegate to the single locked implementation so guardian visibility
+	// is included here too (previously this function omitted guardians).
+	return c.getVisibleSetLocked(userID)
 }
 
 // InvalidateVisibility clears cached visibility for a user (call after room/contact mutations).
@@ -608,16 +616,20 @@ func (c *Cache) GetVisibleSocketIDs(targetUser *ActiveUser) []string {
 
 	visibleSet := c.getVisibleSetLocked(targetUser.UserID)
 	var out []string
+	seen := make(map[string]bool)
 	for uid := range visibleSet {
 		if uid == targetUser.UserID {
 			continue
 		}
 		if sid, ok := c.UserIdToSocketId[uid]; ok && sid != targetUser.SocketID {
 			out = append(out, sid)
+			seen[sid] = true
 		}
 	}
+	// KR-008: deduplicate admin socket IDs — an admin who is also a contact/room
+	// member would otherwise appear twice and receive every event twice.
 	for sid := range c.AdminClientIds {
-		if sid != targetUser.SocketID {
+		if sid != targetUser.SocketID && !seen[sid] {
 			out = append(out, sid)
 		}
 	}
@@ -647,17 +659,19 @@ func (c *Cache) getVisibleSetLocked(userID string) map[string]bool {
 			visible[cid] = true
 		}
 	}
-	// Guardians: I see my wards (I am guardian) and my guardians (WardToGuardians index)
+	// Guardians: I see my wards (I am guardian) and my guardians (WardToGuardians index).
+	// KR-009: only active guardianships grant visibility — pending requests do not, to
+	// prevent a malicious actor from discovering someone's location via an unsolicited request.
 	if wards, ok := c.Guardianships[userID]; ok {
 		for wID, e := range wards {
-			if e != nil && (e.Status == "active" || e.Status == "pending") {
+			if e != nil && e.Status == "active" {
 				visible[wID] = true
 			}
 		}
 	}
 	for gID := range c.WardToGuardians[userID] {
 		if wards, ok := c.Guardianships[gID]; ok {
-			if e := wards[userID]; e != nil && (e.Status == "active" || e.Status == "pending") {
+			if e := wards[userID]; e != nil && e.Status == "active" { // KR-009: active only
 				visible[gID] = true
 			}
 		}
@@ -722,6 +736,20 @@ func (c *Cache) SanitizeUser(user *ActiveUser) map[string]interface{} {
 			"intervalMin":   user.CheckIn.IntervalMin,
 			"overdueMin":    user.CheckIn.OverdueMin,
 			"lastCheckInAt": user.CheckIn.LastCheckInAt,
+		},
+		"quietHours": map[string]interface{}{
+			"enabled": user.QuietHoursEnabled,
+			"start":   user.QuietHoursStart,
+			"end":     user.QuietHoursEnd,
+		},
+		"heartbeat": map[string]interface{}{
+			"enabled":  user.HeartbeatEnabled,
+			"deadline": user.HeartbeatDeadline,
+		},
+		"tripActive": user.TripActive,
+		"walkWithMe": map[string]interface{}{
+			"active":   user.WalkActive,
+			"destName": user.WalkDestName,
 		},
 		"retention": nil,
 	}

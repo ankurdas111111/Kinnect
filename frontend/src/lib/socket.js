@@ -40,7 +40,9 @@ let handlersRegistered = false;
 
 // ── Fix F: single cancellable banner timer to prevent timer pile-up ──────────
 let _bannerClearTimer = null;
-function setBanner(b, autoClearMs) {
+// KR-003: exported so MainApp.svelte (and any other module) can route all banner
+// mutations through the same timer-managed path instead of calling banner.set() directly.
+export function setBanner(b, autoClearMs) {
   if (_bannerClearTimer) { clearTimeout(_bannerClearTimer); _bannerClearTimer = null; }
   banner.set(b);
   if (autoClearMs) {
@@ -298,6 +300,13 @@ export function setupSocketHandlers() {
     }));
   });
 
+  // KR-002: guardianInfo is the success notification for requestGuardian / inviteGuardian.
+  // Previously these used contactError which showed as a red error banner.
+  socket.on('guardianInfo', (data) => {
+    if (!data) return;
+    setBanner({ type: 'info', text: data.message || 'Guardian request sent', actions: [] }, 3000);
+  });
+
   socket.on('guardianRequest', (data) => {
     if (!data) return;
     pendingIncomingRequests.update(arr => {
@@ -439,7 +448,9 @@ export function setupSocketHandlers() {
       }
     }
     if (sos.active) {
-      const from = isMe ? 'You' : ((_localMap.get(s.socketId) || {}).displayName || s.socketId);
+      // KR-010: s.displayName is always present in the payload — use it before falling
+      // back to _localMap so we never show a raw socket ID UUID in the banner.
+      const from = isMe ? 'You' : (s.displayName || (_localMap.get(s.socketId) || {}).displayName || 'Unknown');
       const reason = sos.reason || 'SOS';
       const ackCount = typeof sos.ackCount === 'number' ? sos.ackCount : (sos.acks ? sos.acks.length : 0);
       const ackText = ackCount ? `Acknowledged (${ackCount})` : 'Not acknowledged';
@@ -479,8 +490,24 @@ export function setupSocketHandlers() {
     } else if (isMe) {
       setBanner({ type: null, text: null, actions: [] });
     } else {
-      // Non-self SOS resolved — clear any active SOS banner for this user.
-      setBanner({ type: null, text: null, actions: [] });
+      // KR-001: only clear the banner when NO other SOS is still active.
+      // The activeSosUsers update runs before this check; size reflects the post-delete state.
+      const remainingSos = get(activeSosUsers);
+      if (remainingSos.size === 0) {
+        setBanner({ type: null, text: null, actions: [] });
+      } else {
+        // Re-raise banner for the first remaining active SOS so it isn't silently lost.
+        const [, firstSos] = [...remainingSos.entries()][0];
+        const firstSosData = firstSos.sos || {};
+        const firstName = firstSos.displayName || 'Someone';
+        const firstReason = firstSosData.reason || 'SOS';
+        const firstAckCount = typeof firstSosData.ackCount === 'number' ? firstSosData.ackCount : (firstSosData.acks ? firstSosData.acks.length : 0);
+        const firstAckText = firstAckCount ? `Acknowledged (${firstAckCount})` : 'Not acknowledged';
+        setBanner({ type: 'sos', text: `SOS from ${firstName}: ${firstReason} - ${firstAckText}`, actions: [
+          { label: 'Acknowledge', kind: 'btn-primary', onClick: () => { socket.emit('ackSOS', { socketId: firstSos.socketId }); } },
+          { label: 'Dismiss', kind: 'btn-secondary', onClick: () => setBanner({ type: null, text: null, actions: [] }) }
+        ] });
+      }
     }
   });
 
@@ -650,6 +677,54 @@ export function setupSocketHandlers() {
         { label: 'Dismiss', kind: 'btn-secondary', onClick: () => setBanner({ type: null, text: null, actions: [] }) }
       ]
     }, 12000);
+  });
+
+  // ── Heartbeat missed ────────────────────────────────────────────────
+  socket.on('heartbeatMissed', (data) => {
+    if (!data?.displayName) return;
+    const offline = data.offline ? ' (offline)' : '';
+    setBanner({
+      type: 'info',
+      text: `Haven't heard from ${data.displayName} today${offline}`,
+      actions: [
+        { label: 'Dismiss', kind: 'btn-secondary', onClick: () => setBanner({ type: null, text: null, actions: [] }) }
+      ]
+    }, 30000);
+  });
+
+  // ── Journey Shield events ──────────────────────────────────────────
+  socket.on('tripStarted', (data) => {
+    if (!data?.displayName) return;
+    setBanner({ type: 'info', text: `${data.displayName} started a trip`, actions: [] }, 8000);
+  });
+  socket.on('tripArrived', (data) => {
+    if (!data?.displayName) return;
+    setBanner({ type: 'info', text: `${data.displayName} arrived at ${data.placeName || 'a saved place'}`, actions: [] }, 10000);
+  });
+  socket.on('tripStoppedNew', (data) => {
+    if (!data?.displayName) return;
+    setBanner({
+      type: 'info',
+      text: `${data.displayName} stopped at an unfamiliar location`,
+      actions: [
+        { label: 'Dismiss', kind: 'btn-secondary', onClick: () => setBanner({ type: null, text: null, actions: [] }) }
+      ]
+    }, 20000);
+  });
+
+  // ── Panic Relay SMS sent ───────────────────────────────────────────
+  socket.on('panicRelaySent', (data) => {
+    if (!data?.phones) return;
+    setBanner({
+      type: 'sos',
+      text: `Emergency SMS sent to ${data.phones.length} contact(s)`,
+      actions: []
+    }, 15000);
+  });
+
+  // ── Emergency phones updated ───────────────────────────────────────
+  socket.on('emergencyPhonesUpdated', () => {
+    // Handled by EmergencyProfile page directly
   });
 
   // Network online/offline detection for immediate UX feedback

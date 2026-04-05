@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"math"
 	"strings"
 	"time"
 
@@ -377,10 +378,11 @@ func (h *Hub) queuePositionBroadcast(user *cache.ActiveUser, data map[string]int
 	h.positionTimerMu.Lock()
 	defer h.positionTimerMu.Unlock()
 	if len(h.pendingPositions) >= maxPositionQueue {
-		// Drop oldest
-		for k := range h.pendingPositions {
-			delete(h.pendingPositions, k)
-			break
+		// KR-007: queue full — overwrite this user's existing slot if present, otherwise drop.
+		// "Drop oldest" via random map iteration was incorrect (Go maps have no order).
+		// Overwriting the same user's slot is safe and ensures the latest position wins.
+		if _, exists := h.pendingPositions[user.SocketID]; !exists {
+			return
 		}
 	}
 	h.pendingPositions[user.SocketID] = positionBroadcast{user: user, data: data}
@@ -437,7 +439,7 @@ func (h *Hub) flushPositionBroadcasts() {
 					if isGuardian {
 						h.SendToClient(sid, "userUpdate", pb.data)
 					} else {
-						h.SendToClient(sid, "userUpdate", copyMapWithJitter(pb.data))
+						h.SendToClient(sid, "userUpdate", copyMapWithCoarsened(pb.data))
 					}
 				} else {
 					h.SendToClient(sid, "userUpdate", pb.data)
@@ -449,19 +451,26 @@ func (h *Hub) flushPositionBroadcasts() {
 	}
 }
 
-// copyMapWithJitter creates a shallow copy of data with jittered lat/lng.
-func copyMapWithJitter(data map[string]interface{}) map[string]interface{} {
+// copyMapWithCoarsened creates a shallow copy of data with location rounded
+// to 2 decimal places (~1.1 km precision) for quiet-hours privacy.
+// Deterministic rounding is used instead of random jitter so the position
+// doesn't jump around between updates.
+func copyMapWithCoarsened(data map[string]interface{}) map[string]interface{} {
 	out := make(map[string]interface{}, len(data))
 	for k, v := range data {
 		out[k] = v
 	}
-	if lat, ok := data["lat"].(float64); ok {
-		if lng, ok := data["lng"].(float64); ok {
-			jLat, jLng := applyPrivacyJitter(lat, lng)
-			out["lat"] = jLat
-			out["lng"] = jLng
-		}
+	if lat, ok := data["latitude"].(*float64); ok && lat != nil {
+		rounded := math.Round(*lat*100) / 100
+		out["latitude"] = &rounded
 	}
+	if lng, ok := data["longitude"].(*float64); ok && lng != nil {
+		rounded := math.Round(*lng*100) / 100
+		out["longitude"] = &rounded
+	}
+	out["accuracy"] = nil // hide precise accuracy during quiet hours
+	out["speed"] = 0.0    // hide speed during quiet hours
+	out["quietHoursActive"] = true
 	return out
 }
 

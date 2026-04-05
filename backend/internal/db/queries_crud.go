@@ -52,10 +52,13 @@ func FindUserByMobile(ctx context.Context, db *sql.DB, mobile string) (string, e
 	return id, err
 }
 
-// UpdateUserLocation updates last position for a user.
+// UpdateUserLocation updates last position for a user only when the new timestamp is
+// strictly newer than what is already stored. This prevents a fire-and-forget disconnect
+// goroutine (KR-004) from overwriting a more recent position written by a reconnected session.
 func UpdateUserLocation(ctx context.Context, db *sql.DB, userID string, lat, lng float64, speed string, timestamp int64) error {
 	_, err := db.ExecContext(ctx,
-		`UPDATE users SET last_latitude=$1, last_longitude=$2, last_speed=$3, last_update=$4 WHERE id=$5`,
+		`UPDATE users SET last_latitude=$1, last_longitude=$2, last_speed=$3, last_update=$4
+		 WHERE id=$5 AND (last_update IS NULL OR last_update < $4)`,
 		lat, lng, speed, timestamp, userID)
 	return err
 }
@@ -424,6 +427,34 @@ func GetRecentTrail(ctx context.Context, db *sql.DB, userID string, windowMinute
 		 ORDER BY recorded_at ASC
 		 LIMIT 500`,
 		userID, windowMinutes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var points []TrailPoint
+	for rows.Next() {
+		var p TrailPoint
+		if err := rows.Scan(&p.Lat, &p.Lng, &p.Ts); err != nil {
+			return nil, err
+		}
+		points = append(points, p)
+	}
+	return points, rows.Err()
+}
+
+// GetHistory returns position history for a user within an absolute time range (ms timestamps).
+// Results are ordered oldest-first, capped at 2000 points.
+func GetHistory(ctx context.Context, db *sql.DB, userID string, startMs, endMs int64) ([]TrailPoint, error) {
+	rows, err := db.QueryContext(ctx,
+		`SELECT latitude, longitude,
+		        EXTRACT(EPOCH FROM recorded_at)::bigint * 1000 AS ts_ms
+		 FROM position_history
+		 WHERE user_id = $1
+		   AND recorded_at >= TO_TIMESTAMP($2::double precision / 1000)
+		   AND recorded_at < TO_TIMESTAMP($3::double precision / 1000)
+		 ORDER BY recorded_at ASC
+		 LIMIT 2000`,
+		userID, startMs, endMs)
 	if err != nil {
 		return nil, err
 	}
