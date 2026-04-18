@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"time"
@@ -168,4 +169,47 @@ func (h *PagesHandler) MInvite(w http.ResponseWriter, r *http.Request) {
 		"ok":       true,
 		"messages": msgs,
 	})
+}
+
+// MInviteReply handles POST /api/m/{token}.
+// Allows the invite recipient (peer) to send an encrypted reply without a session.
+// The token proves access; the PIN on the message is the security layer.
+func (h *PagesHandler) MInviteReply(w http.ResponseWriter, r *http.Request) {
+	token := r.PathValue("token")
+	invite := h.cache.GetSecretChatInvite(token)
+	if invite == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "expired": true})
+		return
+	}
+	if time.Now().UnixMilli() > invite.ExpiresAt {
+		h.cache.DeleteSecretChatInvite(token)
+		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "expired": true})
+		return
+	}
+
+	var body struct {
+		Ciphertext string `json:"ciphertext"`
+		IV         string `json:"iv"`
+		Salt       string `json:"salt"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil ||
+		len(body.Ciphertext) == 0 || len(body.Ciphertext) > 10000 ||
+		body.IV == "" || body.Salt == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid"})
+		return
+	}
+
+	var msgID int64
+	err := h.db.QueryRowContext(r.Context(),
+		`INSERT INTO secret_messages (sender_id, receiver_id, ciphertext, iv, salt)
+		 VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+		invite.PeerID, invite.OwnerID, body.Ciphertext, body.IV, body.Salt,
+	).Scan(&msgID)
+	if err != nil {
+		slog.Error("MInviteReply: insert failed", "error", err)
+		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": "temporarily_unavailable"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "id": msgID})
 }

@@ -40,6 +40,7 @@ func NewRouter(cfg *config.Config, pool *db.Pool, c *cache.Cache, store *auth.Se
 	mux.Handle("GET /api/live/{token}", http.HandlerFunc(pagesHandler.LiveToken))
 	mux.Handle("GET /api/watch/{token}", http.HandlerFunc(pagesHandler.WatchToken))
 	mux.Handle("GET /api/m/{token}", http.HandlerFunc(pagesHandler.MInvite))
+	mux.Handle("POST /api/m/{token}", http.HandlerFunc(pagesHandler.MInviteReply))
 	mux.Handle("GET /api/health", http.HandlerFunc(healthHandler.Health))
 	mux.Handle("GET /api/diagnostics", RequireAuth(RequireAdmin(http.HandlerFunc(healthHandler.HealthDb))))
 	mux.Handle("GET /api/metrics", RequireAuth(RequireAdmin(http.HandlerFunc(metricsHandler.GetMetrics))))
