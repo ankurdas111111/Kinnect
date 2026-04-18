@@ -45,10 +45,20 @@ type sessPayload struct {
 	CsrfToken string      `json:"csrfToken"`
 }
 
+// redisClient is the minimal Redis interface needed for session storage.
+// *cache.RedisCache satisfies this interface.
+type redisClient interface {
+	Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error
+	Get(ctx context.Context, key string) ([]byte, error)
+	Del(ctx context.Context, key string) error
+	Expire(ctx context.Context, key string, ttl time.Duration) error
+}
+
 // SessionStore reads/writes the session table with an in-memory cache to avoid DB hits per request.
 type SessionStore struct {
 	db    *sql.DB
 	cache sync.Map // map[string]*sessionCacheEntry
+	redis redisClient
 }
 
 // NewSessionStore creates a SessionStore.
@@ -56,8 +66,17 @@ func NewSessionStore(db *sql.DB) *SessionStore {
 	return &SessionStore{db: db}
 }
 
-// Get loads session by sid. Checks in-memory cache first; falls back to DB.
+// SetRedis wires an optional Redis backend for session storage.
+// When set, new sessions are written to Redis (not PostgreSQL), eliminating
+// session INSERT queries from the DB. Existing DB sessions remain accessible
+// as a read fallback during migration.
+func (s *SessionStore) SetRedis(rc redisClient) {
+	s.redis = rc
+}
+
+// Get loads session by sid. Checks in-memory cache → Redis → PostgreSQL.
 func (s *SessionStore) Get(sid string) (*SessionData, error) {
+	// 1. In-memory cache (same-process hot path)
 	if v, ok := s.cache.Load(sid); ok {
 		entry := v.(*sessionCacheEntry)
 		if time.Now().Before(entry.expiresAt) {
@@ -66,6 +85,20 @@ func (s *SessionStore) Get(sid string) (*SessionData, error) {
 		s.cache.Delete(sid)
 	}
 
+	// 2. Redis (avoids a DB round-trip; sessions created after Redis was wired live here)
+	if s.redis != nil {
+		raw, err := s.redis.Get(context.Background(), "session:"+sid)
+		if err == nil && raw != nil {
+			var data SessionData
+			if jsonErr := json.Unmarshal(raw, &data); jsonErr == nil {
+				s.cache.Store(sid, &sessionCacheEntry{data: &data, expiresAt: time.Now().Add(sessionCacheTTL)})
+				return &data, nil
+			}
+		}
+		// Redis miss — fall through to DB for sessions predating Redis wiring
+	}
+
+	// 3. PostgreSQL fallback (legacy sessions created before Redis was wired)
 	var raw []byte
 	var expire time.Time
 	err := s.db.QueryRowContext(context.Background(),
@@ -89,14 +122,17 @@ func (s *SessionStore) Get(sid string) (*SessionData, error) {
 	return data, nil
 }
 
-// Create inserts a session row and populates the in-memory cache.
-// The cache is always updated first so that subsequent requests on the same
-// server instance see a consistent CSRF token even if the DB write fails.
+// Create stores a session. When Redis is available, writes only to Redis (not PostgreSQL),
+// eliminating session INSERT queries from the DB load.
 func (s *SessionStore) Create(sid string, data *SessionData, maxAge time.Duration) error {
-	// Populate cache immediately — this ensures CSRF is consistent within the
-	// same process even on transient DB failures.
+	// Always populate in-memory cache first for same-process CSRF consistency.
 	s.cache.Store(sid, &sessionCacheEntry{data: data, expiresAt: time.Now().Add(sessionCacheTTL)})
 
+	if s.redis != nil {
+		return s.redis.Set(context.Background(), "session:"+sid, data, maxAge)
+	}
+
+	// Fallback: PostgreSQL
 	expire := time.Now().Add(maxAge)
 	payload := sessPayload{User: data.User, CsrfToken: data.CsrfToken}
 	raw, err := json.Marshal(payload)
@@ -110,25 +146,29 @@ func (s *SessionStore) Create(sid string, data *SessionData, maxAge time.Duratio
 	return err
 }
 
-// Destroy deletes the session by sid from DB and cache.
+// Destroy deletes the session by sid from cache, Redis (if wired), and DB.
 func (s *SessionStore) Destroy(sid string) error {
 	s.cache.Delete(sid)
+	if s.redis != nil {
+		_ = s.redis.Del(context.Background(), "session:"+sid)
+	}
+	// Always attempt DB delete to clean up any legacy session that predates Redis wiring.
 	_, err := s.db.ExecContext(context.Background(), `DELETE FROM session WHERE sid = $1`, sid)
 	return err
 }
 
-// Touch updates the expire time in DB and refreshes the cache TTL.
+// Touch extends the TTL of an existing session.
 func (s *SessionStore) Touch(sid string, maxAge time.Duration) error {
-	expire := time.Now().Add(maxAge)
-	_, err := s.db.ExecContext(context.Background(), `UPDATE session SET expire = $1 WHERE sid = $2`, expire, sid)
-	if err != nil {
-		return err
-	}
 	if v, ok := s.cache.Load(sid); ok {
 		entry := v.(*sessionCacheEntry)
 		s.cache.Store(sid, &sessionCacheEntry{data: entry.data, expiresAt: time.Now().Add(sessionCacheTTL)})
 	}
-	return nil
+	if s.redis != nil {
+		return s.redis.Expire(context.Background(), "session:"+sid, maxAge)
+	}
+	expire := time.Now().Add(maxAge)
+	_, err := s.db.ExecContext(context.Background(), `UPDATE session SET expire = $1 WHERE sid = $2`, expire, sid)
+	return err
 }
 
 // ParseSessionID extracts session ID from connect.sid cookie value.

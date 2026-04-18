@@ -186,10 +186,6 @@ func (h *Hub) handlePosition(c *Client, data json.RawMessage) {
 	}
 
 	// ── Meaningful movement threshold ────────────────────────────────────────
-	var speedPtr *float64
-	if pos.Speed != 0 {
-		speedPtr = &pos.Speed
-	}
 	var accPtr *float64
 	if pos.Accuracy != nil {
 		a := *pos.Accuracy
@@ -201,25 +197,15 @@ func (h *Hub) handlePosition(c *Client, data json.RawMessage) {
 		user.LastDBLng = pos.Longitude
 		user.LastDBAt = now
 
-		// Determine movement_events event type
-		evType := "waypoint"
+		// Only write semantic transition events — raw waypoints removed to cut storage.
+		// Plain movement is already captured by trip_start/trip_end/arrival/departure.
+		evType := ""
 		if classChanged && prevClass == "still" && newClass != "still" {
 			evType = "trip_start"
 		} else if classChanged && prevClass != "still" && newClass == "still" {
 			evType = "trip_end"
 		} else if classChanged {
 			evType = "motion_class_change"
-		} else {
-			// Throttle plain waypoints: vehicle=60s, walk/run=120s
-			waypointInterval := int64(120_000)
-			if newClass == "vehicle" {
-				waypointInterval = 60_000
-			}
-			if now-user.LastWaypointAt < waypointInterval {
-				evType = "" // skip waypoint write this cycle
-			} else {
-				user.LastWaypointAt = now
-			}
 		}
 
 		lat, lng, spd := pos.Latitude, pos.Longitude, pos.Speed
@@ -234,9 +220,7 @@ func (h *Hub) handlePosition(c *Client, data json.RawMessage) {
 			go func() {
 				defer func() { <-dbWriteSem }()
 				bCtx := context.Background()
-				// Dual-write: position_history (transition phase)
-				h.RecordPosition(uid, lat, lng, speedPtr, accPtr)
-				// movement_events (new semantic log)
+				// movement_events: semantic transitions only (no raw waypoints)
 				if evType != "" {
 					spdF := spd
 					_ = db.InsertMovementEvent(bCtx, h.pool.DB, db.MovementEventRow{
@@ -352,27 +336,7 @@ func (h *Hub) handlePositionBatch(c *Client, data json.RawMessage) {
 			user.HardStopAt = &t
 		}
 
-		// Record position history
-		var speedPtr *float64
-		if pos.Speed != 0 {
-			speedPtr = &pos.Speed
-		}
-		var accPtr *float64
-		if pos.Accuracy != nil {
-			a := *pos.Accuracy
-			accPtr = &a
-		}
-		uid := user.UserID
-		lat, lng := pos.Latitude, pos.Longitude
-		select {
-		case dbWriteSem <- struct{}{}:
-			go func(u string, la, ln float64, sp, ap *float64) {
-				defer func() { <-dbWriteSem }()
-				h.RecordPosition(u, la, ln, sp, ap)
-			}(uid, lat, lng, speedPtr, accPtr)
-		default:
-			// semaphore full — skip this historical position write
-		}
+		// position_history dual-write removed — movement_events covers semantic history
 	}
 
 	// Safety score on final position

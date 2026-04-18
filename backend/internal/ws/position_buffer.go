@@ -9,82 +9,21 @@ import (
 )
 
 const (
-	maxPositionBuffer = 10000
-	flushInterval      = 10 * time.Second
-	purgeInterval      = 24 * time.Hour
+	purgeInterval         = 24 * time.Hour
 	positionRetentionDays = 7
+	movementRetentionDays = 7 // was 30 — semantic events only, 7 days is enough
 )
 
-// PositionRecord holds a single position history entry.
-type PositionRecord struct {
-	UserID   string
-	Lat      float64
-	Lng      float64
-	Speed    *float64
-	Accuracy *float64
-}
-
-// RecordPosition adds a position to the buffer and trims if over max.
-func (h *Hub) RecordPosition(userID string, lat, lng float64, speed, accuracy *float64) {
-	h.positionBufMu.Lock()
-	defer h.positionBufMu.Unlock()
-	h.positionBuffer = append(h.positionBuffer, PositionRecord{
-		UserID:   userID,
-		Lat:      lat,
-		Lng:      lng,
-		Speed:    speed,
-		Accuracy: accuracy,
-	})
-	if len(h.positionBuffer) > maxPositionBuffer {
-		h.positionBuffer = h.positionBuffer[len(h.positionBuffer)-maxPositionBuffer:]
-	}
-}
-
-// FlushPositionHistory inserts batch via db.InsertPositionHistory, then clears buffer.
-func (h *Hub) FlushPositionHistory() {
-	h.positionBufMu.Lock()
-	batch := h.positionBuffer
-	h.positionBuffer = nil
-	h.positionBufMu.Unlock()
-
-	if len(batch) == 0 {
-		return
-	}
-
-	rows := make([]db.PositionHistoryRow, 0, len(batch))
-	for _, r := range batch {
-		rows = append(rows, db.PositionHistoryRow{
-			UserID:   r.UserID,
-			Latitude: r.Lat,
-			Longitude: r.Lng,
-			Speed:    r.Speed,
-			Accuracy: r.Accuracy,
-		})
-	}
-
-	ctx := context.Background()
-	if err := db.InsertPositionHistory(ctx, h.pool.DB, rows); err != nil {
-		slog.Error("Failed to insert position history", "error", err, "count", len(rows))
-	}
-}
-
-// StartPositionFlusher runs a goroutine that flushes every 10s.
-func (h *Hub) StartPositionFlusher(ctx context.Context) {
-	ticker := time.NewTicker(flushInterval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			h.FlushPositionHistory()
-		}
-	}
-}
-
-// StartPositionPurger runs a goroutine that purges old records every 24h (7 day retention).
-// Also purges zone_visits older than 7 days to respect 1GB DB constraint.
+// StartPositionPurger runs daily:
+//   - Drains any remaining position_history rows (dual-write stopped; table empties naturally)
+//   - Purges movement_events older than 7 days
+//   - Purges zone_visits older than 7 days
+//   - Purges expired sos_watch_tokens
+//   - Runs VACUUM ANALYZE on the heavy time-series tables (non-blocking, updates planner stats)
 func (h *Hub) StartPositionPurger(ctx context.Context) {
+	// Run once immediately at startup so the first deployment cleans up right away.
+	h.runPurge(ctx)
+
 	ticker := time.NewTicker(purgeInterval)
 	defer ticker.Stop()
 	for {
@@ -92,19 +31,40 @@ func (h *Hub) StartPositionPurger(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			bCtx := context.Background()
-			if err := db.PurgePositionHistory(bCtx, h.pool.DB, positionRetentionDays); err != nil {
-				slog.Error("Failed to purge position history", "error", err)
-			}
-			// Purge old zone visits (7-day retention, matches position_history)
-			if _, err := h.pool.DB.ExecContext(bCtx,
-				`DELETE FROM zone_visits WHERE arrived_at < NOW() - INTERVAL '7 days'`); err != nil {
-				slog.Warn("Failed to purge zone_visits", "error", err)
-			}
-			// Purge movement_events (30-day retention)
-			if err := db.PurgeMovementEvents(bCtx, h.pool.DB, 30); err != nil {
-				slog.Warn("Failed to purge movement_events", "error", err)
-			}
+			h.runPurge(ctx)
+		}
+	}
+}
+
+func (h *Hub) runPurge(ctx context.Context) {
+	// Drain legacy position_history (dual-write removed; rows expire naturally over 7 days)
+	if err := db.PurgePositionHistory(ctx, h.pool.DB, positionRetentionDays); err != nil {
+		slog.Error("Failed to purge position_history", "error", err)
+	}
+
+	// Movement events — keep 7 days of semantic transitions
+	if err := db.PurgeMovementEvents(ctx, h.pool.DB, movementRetentionDays); err != nil {
+		slog.Warn("Failed to purge movement_events", "error", err)
+	}
+
+	// Zone visits — 7-day retention
+	if _, err := h.pool.DB.ExecContext(ctx,
+		`DELETE FROM zone_visits WHERE arrived_at < NOW() - INTERVAL '7 days'`); err != nil {
+		slog.Warn("Failed to purge zone_visits", "error", err)
+	}
+
+	// SOS watch tokens — delete expired rows (no previous purge existed)
+	if _, err := h.pool.DB.ExecContext(ctx,
+		`DELETE FROM sos_watch_tokens WHERE expires_at < $1`, time.Now().UnixMilli()); err != nil {
+		slog.Warn("Failed to purge sos_watch_tokens", "error", err)
+	}
+
+	// VACUUM ANALYZE: non-blocking — updates planner statistics and marks dead tuples
+	// for reuse. Does NOT lock the table (unlike VACUUM FULL).
+	// Runs after deletes so the planner immediately benefits from updated row counts.
+	for _, table := range []string{"position_history", "movement_events", "zone_visits", "sos_watch_tokens"} {
+		if _, err := h.pool.DB.ExecContext(ctx, "VACUUM ANALYZE "+table); err != nil {
+			slog.Warn("VACUUM ANALYZE failed", "table", table, "error", err)
 		}
 	}
 }

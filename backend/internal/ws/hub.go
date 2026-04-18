@@ -61,9 +61,6 @@ type Hub struct {
 
 	groups map[string]map[string]bool // groupName -> set of clientIDs
 
-	positionBuffer []PositionRecord
-	positionBufMu  sync.Mutex
-
 	pendingPositions map[string]positionBroadcast
 	positionTimer    *time.Timer
 	positionTimerMu  sync.Mutex

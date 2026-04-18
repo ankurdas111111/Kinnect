@@ -91,6 +91,5 @@ func (h *Hub) flushOnShutdown() {
 		}
 	}
 
-	// Flush position history buffer to DB
-	h.FlushPositionHistory()
+	// position_history flush removed — dual-write discontinued
 }

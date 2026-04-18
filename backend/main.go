@@ -77,7 +77,6 @@ func main() {
 
 	hub := ws.NewHub(c, pool, cfg)
 	go hub.Run(ctx)
-	go hub.StartPositionFlusher(ctx)
 	go hub.StartPositionPurger(ctx)
 	hub.StartCleanupRoutines(ctx)
 	go hub.StartArrivalMonitor(ctx)
@@ -91,6 +90,16 @@ func main() {
 		"max_db_connections", cfglimits.MaxDatabaseConnections)
 
 	store := auth.NewSessionStore(pool.DB)
+	if cfg.RedisURL != "" {
+		rc, rcErr := cache.NewRedisCache(ctx, cache.RedisConfig{URL: cfg.RedisURL, Prefix: "kinnect:"})
+		if rcErr != nil {
+			slog.Warn("Redis/Valkey unavailable, sessions will use PostgreSQL", "error", rcErr)
+		} else {
+			defer rc.Close()
+			store.SetRedis(rc)
+			slog.Info("Redis/Valkey wired for session storage")
+		}
+	}
 	handler := api.NewRouter(cfg, pool, c, store, hub)
 
 	// Start monitoring server in background
