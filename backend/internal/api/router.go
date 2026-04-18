@@ -48,6 +48,7 @@ func NewRouter(cfg *config.Config, pool *db.Pool, c *cache.Cache, store *auth.Se
 	mux.Handle("GET /api/diagnostics", RequireAuth(RequireAdmin(http.HandlerFunc(healthHandler.HealthDb))))
 	mux.Handle("GET /api/metrics", RequireAuth(RequireAdmin(http.HandlerFunc(metricsHandler.GetMetrics))))
 	mux.Handle("GET /health", http.HandlerFunc(healthHandler.Health))
+	mux.Handle("GET /status", http.HandlerFunc(StatusPage))
 	mux.Handle("GET /health/db", RequireAuth(RequireAdmin(http.HandlerFunc(healthHandler.HealthDb))))
 	mux.Handle("POST /api/admin/promote", RequireAuth(RequireAdmin(CsrfMiddleware(http.HandlerFunc(adminHandler.Promote)))))
 

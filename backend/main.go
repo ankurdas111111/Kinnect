@@ -41,32 +41,25 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Initialize empty cache for lazy loading
-	c := cache.New()
-
-	// Set up lazy loader
-	lazyLoader := cache.NewLazyLoader(pool.DB)
-	c.SetLazyLoader(lazyLoader)
-
-	// Load only minimal data at startup (for free-tier optimization)
-	// Full LoadAll is commented out - uncomment if needed for backward compatibility
-	result := &db.LoadAllResult{
-		UsersCache:       make(map[string]*db.UserCacheEntry),
-		ShareCodes:       make(map[string]string),
-		EmailIndex:       make(map[string]string),
-		MobileIndex:      make(map[string]string),
-		Rooms:            make(map[string]*db.RoomEntry),
-		RoomMemberRoles:  make(map[string]map[string]*db.RoomMemberRole),
-		Contacts:         make(map[string]map[string]bool),
-		LiveTokens:       make(map[string]*db.LiveTokenEntry),
-		Guardianships:    make(map[string]map[string]*db.GuardianshipEntry),
-		RoomAdminRequests: make(map[string][]*db.RoomAdminRequestEntry),
+	// Load all persistent data (users, rooms, contacts, guardianships, live tokens)
+	// into the in-memory cache at startup. This is required so that family members,
+	// contacts, and guardianships are visible immediately after deployment/restart.
+	// The prior "lazy load" approach was a stub that loaded nothing, causing all
+	// relationship data to appear missing until the process was restarted with activity.
+	startupCtx, startupCancel := context.WithTimeout(ctx, 30*time.Second)
+	result, err := db.LoadAll(startupCtx, pool.DB)
+	startupCancel()
+	if err != nil {
+		slog.Error("Failed to load data from database", "error", err)
+		os.Exit(1)
 	}
+
+	c := cache.New()
 	c.Init(result)
 
-	// Warm up cache with recently active data in background
-	slog.Info("Starting cache warmup in background")
-	c.WarmupRecentData(ctx, lazyLoader)
+	// Lazy loader for on-demand user lookups (share codes, email/mobile search)
+	lazyLoader := cache.NewLazyLoader(pool.DB)
+	c.SetLazyLoader(lazyLoader)
 
 	// Initialize monitoring
 	metrics := monitoring.NewMetrics()
