@@ -3,6 +3,10 @@ import { writable } from 'svelte/store';
 // Map<peerId, { messages: Array, locked: boolean, decryptedMessages: Map<msgId, string> }>
 export const secretChats = writable(new Map());
 
+// Map<userId, { open: boolean, at: number (unix ms) }>
+// Tracks whether a peer currently has our secret chat open
+export const secretChatPresence = writable(new Map());
+
 // Which peer's chat window is currently open (userId string or null)
 export const activeSecretChatPeer = writable(null);
 

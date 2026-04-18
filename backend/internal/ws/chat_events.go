@@ -217,6 +217,41 @@ func (h *Hub) handleMarkSecretMsgSeen(c *Client, data json.RawMessage) {
 	}
 }
 
+// handleSecretChatPresence forwards an open/close presence signal to the peer.
+// Payload: { "peerId": "...", "open": true|false }
+// The peer receives "secretChatPresence": { "userId": "...", "open": true, "at": <unix ms> }
+func (h *Hub) handleSecretChatPresence(c *Client, data json.RawMessage) {
+	if !c.CheckRateLimit("secretChatPresence", 30) {
+		return
+	}
+	user := h.Cache.GetActiveUser(c.ID())
+	if user == nil {
+		return
+	}
+
+	var p struct {
+		PeerID string `json:"peerId"`
+		Open   bool   `json:"open"`
+	}
+	if err := json.Unmarshal(data, &p); err != nil || p.PeerID == "" {
+		return
+	}
+
+	// Authorization: peer must be visible to sender.
+	visible := h.Cache.GetVisibleSet(user.UserID)
+	if !visible[p.PeerID] {
+		return
+	}
+
+	if peerSocketID := h.Cache.GetUserIdToSocketId(p.PeerID); peerSocketID != "" {
+		h.SendToClient(peerSocketID, "secretChatPresence", map[string]interface{}{
+			"userId": user.UserID,
+			"open":   p.Open,
+			"at":     time.Now().UnixMilli(),
+		})
+	}
+}
+
 // handleCreateSecretChatInvite generates a short-lived token that lets anyone fetch
 // the ciphertext of a secret conversation via GET /api/m/{token}. No auth is required
 // to redeem — the PIN is the security layer (ciphertext is worthless without it).

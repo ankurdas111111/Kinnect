@@ -18,7 +18,7 @@ import { notifySOS, notifyProximitySOS, notifyGuardianRequest, notifyBatteryLow,
 import { rideShare } from './stores/rideShare.js';
 import { crowdMode } from './stores/crowdMode.js';
 import { bumpHubBadge } from './stores/hubBadge.js';
-import { addSecretMessage, setSecretMessages, removeSecretMessage, updateSecretMessageSeen } from './stores/secretChat.js';
+import { addSecretMessage, setSecretMessages, removeSecretMessage, updateSecretMessageSeen, secretChatPresence } from './stores/secretChat.js';
 import { savedPlaces } from './stores/savedPlaces.js';
 import { apiGet } from './api.js';
 import { getShareOrigin } from './env.js';
@@ -426,6 +426,14 @@ export function setupSocketHandlers() {
   socket.on('secretMsgSeen', (data) => {
     if (!data || !data.id) return;
     updateSecretMessageSeen(data.id, data.seenAt);
+  });
+  socket.on('secretChatPresence', (data) => {
+    if (!data || !data.userId) return;
+    secretChatPresence.update(m => {
+      const copy = new Map(m);
+      copy.set(data.userId, { open: !!data.open, at: data.at ?? Date.now() });
+      return copy;
+    });
   });
 
   // SOS Narrative — builds crisis card for AlertOverlay / WatchViewer

@@ -166,6 +166,7 @@ func (h *Hub) buildEventHandlers() map[string]func(*Client, json.RawMessage) {
 		"deleteSecretMsg":     h.handleDeleteSecretMsg,
 		"markSecretMsgSeen":      h.handleMarkSecretMsgSeen,
 		"createSecretChatInvite": h.handleCreateSecretChatInvite,
+		"secretChatPresence":     h.handleSecretChatPresence,
 		"syncPlace":              h.handleSyncPlace,
 	}
 }

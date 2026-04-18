@@ -4,10 +4,9 @@
   import { fade } from 'svelte/transition';
   import { socket, markSecretMsgSeen, createSecretChatInvite } from '../lib/socket.js';
   import { authUser } from '../lib/stores/auth.js';
-  import { secretChats, lockSecretChat, storeDecrypted } from '../lib/stores/secretChat.js';
+  import { secretChats, lockSecretChat, storeDecrypted, secretChatPresence } from '../lib/stores/secretChat.js';
   import { encryptMessage, decryptMessage } from '../lib/crypto.js';
   import { toasts } from '../lib/stores/toast.js';
-  import { otherUsers } from '../lib/stores/map.js';
 
   export let peerId;
   export let peerName = 'Contact';
@@ -74,16 +73,22 @@
   // Unread = received messages where seenAt is null
   $: unreadCount = sortedMsgs.filter(m => m.senderId !== myId && !m.seenAt).length;
 
-  // Peer presence
-  $: peerUser = $otherUsers ? [...$otherUsers.values()].find(u => u.userId === peerId) : null;
-  $: peerOnline = !!peerUser;
-  $: peerLastSeen = peerUser?.lastSeen ?? null;
+  // Peer presence — chat-specific (did they open THIS chat)
+  $: peerPresence = $secretChatPresence.get(peerId) ?? null;
+  $: peerChatOpen = peerPresence?.open ?? false;
+  $: peerLastOpenedAt = (peerPresence && !peerPresence.open) ? peerPresence.at : null;
+
+  function emitPresence(open) {
+    socket.emit('secretChatPresence', { peerId, open });
+  }
 
   onMount(() => {
     socket.emit('getSecretMsgs', { peerId, limit: 20 });
+    emitPresence(true);
   });
 
   onDestroy(() => {
+    emitPresence(false);
     lockSecretChat(peerId);
     sessionPin = '';
     gateOpen = false;
@@ -226,11 +231,11 @@
     return msg.senderId !== myId && !msg.seenAt;
   }
 
-  function getMsgDisplay(msg) {
+  function getMsgDisplay(msg, locked, decryptedMsgs) {
     if (msg.senderId === myId) return { isOwn: true, plain: null };
     // If manually or auto re-locked, treat as still locked
-    if (lockedSet.has(msg.id)) return { isOwn: false, plain: null };
-    const plain = chat.decryptedMessages.get(msg.id);
+    if (locked.has(msg.id)) return { isOwn: false, plain: null };
+    const plain = decryptedMsgs.get(msg.id);
     return { isOwn: false, plain: plain ?? null };
   }
 
@@ -260,10 +265,10 @@
       <span class="scp-header-sub">
         {#if !gateOpen}
           <span class="scp-subtext">Enter PIN to open</span>
-        {:else if peerOnline}
+        {:else if peerChatOpen}
           <span class="scp-dot scp-dot--online"></span><span class="scp-subtext">Online</span>
-        {:else if peerLastSeen}
-          <span class="scp-dot"></span><span class="scp-subtext">Last seen {formatLastSeen(peerLastSeen)}</span>
+        {:else if peerLastOpenedAt}
+          <span class="scp-dot"></span><span class="scp-subtext">Last opened {formatLastSeen(peerLastOpenedAt)}</span>
         {:else}
           <span class="scp-subtext">End-to-end encrypted</span>
         {/if}
@@ -349,7 +354,7 @@
       {/if}
 
       {#each sortedMsgs as msg (msg.id)}
-        {@const d = getMsgDisplay(msg)}
+        {@const d = getMsgDisplay(msg, lockedSet, chat.decryptedMessages)}
         {@const unread = isUnread(msg)}
         {@const decrypted = !d.isOwn && d.plain !== null}
         {@const showInline = activeDecryptId === msg.id}
