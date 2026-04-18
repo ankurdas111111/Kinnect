@@ -26,6 +26,42 @@
   let inlineErrors = {};            // msgId → error string
   let inlineUnlocking = {};         // msgId → boolean
 
+  // Re-lock state — messages can be locked again after reading
+  let lockedSet = new Set();        // msgId → manually re-locked
+  let lockCountdowns = {};          // msgId → seconds remaining before auto-lock
+  let lockIntervals = {};           // msgId → setInterval handle
+
+  const AUTO_LOCK_SECS = 15;
+
+  function relockMsg(msgId) {
+    // Clear any running countdown
+    if (lockIntervals[msgId]) {
+      clearInterval(lockIntervals[msgId]);
+      delete lockIntervals[msgId];
+    }
+    delete lockCountdowns[msgId];
+    lockCountdowns = { ...lockCountdowns };
+    // Add to locked set — triggers re-render to locked bubble
+    lockedSet = new Set([...lockedSet, msgId]);
+    // Reset inline state so PIN input is fresh next time
+    inlinePins = { ...inlinePins, [msgId]: '' };
+    inlineErrors = { ...inlineErrors, [msgId]: '' };
+    activeDecryptId = null;
+  }
+
+  function startAutoLock(msgId) {
+    if (lockIntervals[msgId]) clearInterval(lockIntervals[msgId]);
+    lockCountdowns = { ...lockCountdowns, [msgId]: AUTO_LOCK_SECS };
+    lockIntervals[msgId] = setInterval(() => {
+      const cur = lockCountdowns[msgId];
+      if (cur == null || cur <= 1) {
+        relockMsg(msgId);
+      } else {
+        lockCountdowns = { ...lockCountdowns, [msgId]: cur - 1 };
+      }
+    }, 1000);
+  }
+
   let composeText = '';
   let sending = false;
   let copyDone = false;
@@ -51,6 +87,8 @@
     lockSecretChat(peerId);
     sessionPin = '';
     gateOpen = false;
+    // Clear all running auto-lock timers
+    for (const id of Object.values(lockIntervals)) clearInterval(id);
   });
 
   // ── Gate ──────────────────────────────────────────────────────
@@ -109,6 +147,11 @@
       storeDecrypted(peerId, msg.id, plain);
       markSecretMsgSeen(msg.id);
       activeDecryptId = null;
+      // Remove from lockedSet if it was manually re-locked before
+      lockedSet.delete(msg.id);
+      lockedSet = new Set(lockedSet);
+      // Start auto-lock countdown
+      startAutoLock(msg.id);
     } catch {
       inlineErrors = { ...inlineErrors, [msg.id]: 'Wrong PIN' };
     } finally {
@@ -185,6 +228,8 @@
 
   function getMsgDisplay(msg) {
     if (msg.senderId === myId) return { isOwn: true, plain: null };
+    // If manually or auto re-locked, treat as still locked
+    if (lockedSet.has(msg.id)) return { isOwn: false, plain: null };
     const plain = chat.decryptedMessages.get(msg.id);
     return { isOwn: false, plain: plain ?? null };
   }
@@ -330,11 +375,21 @@
 
           {:else if decrypted}
             <!-- Received + decrypted -->
-            <div class="scp-bubble scp-bubble--their">
+            <div class="scp-bubble scp-bubble--their scp-bubble--decrypted">
               <p class="scp-body">{d.plain}</p>
+              <button
+                class="scp-relock-btn"
+                on:click={() => relockMsg(msg.id)}
+                title="Lock message"
+                aria-label="Lock message"
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              </button>
             </div>
             <div class="scp-meta scp-meta--their">
-              {#if unread}
+              {#if lockCountdowns[msg.id] != null}
+                <span class="scp-countdown">Locks in {lockCountdowns[msg.id]}s</span>
+              {:else if unread}
                 <span class="scp-unread-dot" aria-label="Unread"></span>
                 <span class="scp-time scp-time--unread">{timeAgo(msg.createdAt)}</span>
               {:else}
@@ -693,6 +748,31 @@
     border-bottom-left-radius: 4px;
     color: #e2e8f0;
     word-break: break-word;
+  }
+
+  .scp-bubble--decrypted {
+    position: relative;
+    padding-right: 30px; /* room for lock button */
+  }
+
+  .scp-relock-btn {
+    position: absolute;
+    top: 7px; right: 8px;
+    width: 22px; height: 22px;
+    display: flex; align-items: center; justify-content: center;
+    background: none; border: none; cursor: pointer;
+    color: rgba(255,255,255,0.18);
+    border-radius: 6px;
+    padding: 0;
+    transition: color 0.15s, background 0.15s;
+  }
+  .scp-relock-btn:hover { color: rgba(129,140,248,0.7); background: rgba(129,140,248,0.08); }
+
+  .scp-countdown {
+    font-size: 10px;
+    color: rgba(129,140,248,0.5);
+    font-family: system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
   }
 
   .scp-bubble--locked {
