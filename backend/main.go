@@ -91,18 +91,20 @@ func main() {
 
 	store := auth.NewSessionStore(pool.DB)
 	monServer := monitoring.NewMonitoringServer(monitoringPort, metrics, c, pool.DB)
+	var redisCache *cache.RedisCache
 	if cfg.RedisURL != "" {
 		rc, rcErr := cache.NewRedisCache(ctx, cache.RedisConfig{URL: cfg.RedisURL, Prefix: "kinnect:"})
 		if rcErr != nil {
 			slog.Warn("Redis/Valkey unavailable, sessions will use PostgreSQL", "error", rcErr)
 		} else {
 			defer rc.Close()
+			redisCache = rc
 			store.SetRedis(rc)
 			monServer.SetRedis(rc)
 			slog.Info("Redis/Valkey wired for session storage")
 		}
 	}
-	handler := api.NewRouter(cfg, pool, c, store, hub)
+	handler := api.NewRouter(cfg, pool, c, store, hub, redisCache)
 	go func() {
 		if err := monServer.Start(); err != nil && err != http.ErrServerClosed {
 			slog.Error("Monitoring server error", "error", err)

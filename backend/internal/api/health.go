@@ -15,10 +15,16 @@ import (
 
 var startTime = time.Now()
 
+// redisHealthChecker is satisfied by *cache.RedisCache.
+type redisHealthChecker interface {
+	HealthCheck(ctx context.Context) bool
+}
+
 // HealthHandler handles health check endpoints.
 type HealthHandler struct {
 	db    *sql.DB
 	cache *cache.Cache
+	redis redisHealthChecker
 }
 
 // Health handles GET /health.
@@ -35,12 +41,22 @@ func (h *HealthHandler) Health(w http.ResponseWriter, r *http.Request) {
 	var mem runtime.MemStats
 	runtime.ReadMemStats(&mem)
 
+	redisStatus := "not_configured"
+	if h.redis != nil {
+		if h.redis.HealthCheck(ctx) {
+			redisStatus = "ok"
+		} else {
+			redisStatus = "error"
+		}
+	}
+
 	response := map[string]interface{}{
 		"status":       "ok",
 		"uptime":       int64(time.Since(startTime).Seconds()),
 		"connections":  stats.OpenConnections,
 		"rooms":        roomsCount,
-		"db":            dbStatus,
+		"db":           dbStatus,
+		"redis":        redisStatus,
 		"memory": map[string]interface{}{
 			"alloc":       mem.Alloc,
 			"totalAlloc":  mem.TotalAlloc,

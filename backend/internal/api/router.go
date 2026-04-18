@@ -19,13 +19,16 @@ import (
 const sessionMaxAgeSec = 7 * 24 * 60 * 60
 
 // NewRouter creates the HTTP mux with all routes and middleware.
-func NewRouter(cfg *config.Config, pool *db.Pool, c *cache.Cache, store *auth.SessionStore, hub *ws.Hub) http.Handler {
+func NewRouter(cfg *config.Config, pool *db.Pool, c *cache.Cache, store *auth.SessionStore, hub *ws.Hub, rc ...redisHealthChecker) http.Handler {
 	mux := http.NewServeMux()
 
 	isProduction := cfg.NodeEnv == "production"
 	authHandler := &AuthHandler{db: pool.DB, cache: c, store: store, secret: cfg.SessionSecret, adminEmail: cfg.AdminEmail, secure: isProduction}
 	pagesHandler := &PagesHandler{cache: c, db: pool.DB}
 	healthHandler := &HealthHandler{db: pool.DB, cache: c}
+	if len(rc) > 0 {
+		healthHandler.redis = rc[0]
+	}
 	adminHandler := &AdminHandler{db: pool.DB, cache: c}
 	metricsHandler := NewMetricsHandler(hub)
 	placesHandler := &PlacesHandler{db: pool.DB}
