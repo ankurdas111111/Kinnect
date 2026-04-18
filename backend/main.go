@@ -90,6 +90,7 @@ func main() {
 		"max_db_connections", cfglimits.MaxDatabaseConnections)
 
 	store := auth.NewSessionStore(pool.DB)
+	monServer := monitoring.NewMonitoringServer(monitoringPort, metrics, c, pool.DB)
 	if cfg.RedisURL != "" {
 		rc, rcErr := cache.NewRedisCache(ctx, cache.RedisConfig{URL: cfg.RedisURL, Prefix: "kinnect:"})
 		if rcErr != nil {
@@ -97,13 +98,11 @@ func main() {
 		} else {
 			defer rc.Close()
 			store.SetRedis(rc)
+			monServer.SetRedis(rc)
 			slog.Info("Redis/Valkey wired for session storage")
 		}
 	}
 	handler := api.NewRouter(cfg, pool, c, store, hub)
-
-	// Start monitoring server in background
-	monServer := monitoring.NewMonitoringServer(monitoringPort, metrics, c, pool.DB)
 	go func() {
 		if err := monServer.Start(); err != nil && err != http.ErrServerClosed {
 			slog.Error("Monitoring server error", "error", err)

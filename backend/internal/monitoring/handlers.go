@@ -14,6 +14,11 @@ import (
 	"kinnect-v3/internal/cache"
 )
 
+// redisHealthChecker is satisfied by *cache.RedisCache.
+type redisHealthChecker interface {
+	HealthCheck(ctx context.Context) bool
+}
+
 // MonitoringServer wraps a separate HTTP server for monitoring endpoints.
 // This allows isolating monitoring endpoints on a different port for security.
 type MonitoringServer struct {
@@ -23,6 +28,12 @@ type MonitoringServer struct {
 	cache   *cache.Cache
 	db      *sql.DB
 	mu      sync.Mutex
+	redis   redisHealthChecker
+}
+
+// SetRedis wires an optional Redis health checker into the /health response.
+func (ms *MonitoringServer) SetRedis(rc redisHealthChecker) {
+	ms.redis = rc
 }
 
 // NewMonitoringServer creates a new monitoring server.
@@ -89,6 +100,15 @@ func (ms *MonitoringServer) healthHandler(w http.ResponseWriter, r *http.Request
 		dbStatus = "error"
 	}
 
+	redisStatus := "not_configured"
+	if ms.redis != nil {
+		if ms.redis.HealthCheck(ctx) {
+			redisStatus = "ok"
+		} else {
+			redisStatus = "error"
+		}
+	}
+
 	stats := ms.db.Stats()
 	var mem runtime.MemStats
 	runtime.ReadMemStats(&mem)
@@ -97,6 +117,7 @@ func (ms *MonitoringServer) healthHandler(w http.ResponseWriter, r *http.Request
 		"status":      "ok",
 		"timestamp":   time.Now().Unix(),
 		"db":          dbStatus,
+		"redis":       redisStatus,
 		"connections": stats.OpenConnections,
 		"memory": map[string]interface{}{
 			"alloc_mb":     mem.Alloc / (1024 * 1024),
