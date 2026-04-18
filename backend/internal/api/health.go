@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"runtime"
 	"time"
@@ -20,29 +21,48 @@ type redisHealthChecker interface {
 	HealthCheck(ctx context.Context) bool
 }
 
-// HealthHandler handles health check endpoints.
-type HealthHandler struct {
-	db    *sql.DB
-	cache *cache.Cache
-	redis redisHealthChecker
+// wsClientCounter is satisfied by *ws.Hub.
+type wsClientCounter interface {
+	ClientCount() int
 }
 
-// Health handles GET /health.
+// HealthHandler handles health check endpoints.
+type HealthHandler struct {
+	db      *sql.DB
+	cache   *cache.Cache
+	redis   redisHealthChecker
+	hub     wsClientCounter
+	env     string
+}
+
+// formatUptime returns a human-readable uptime string like "2h 14m 33s".
+func formatUptime(d time.Duration) string {
+	d = d.Truncate(time.Second)
+	h := int(d.Hours())
+	m := int(d.Minutes()) % 60
+	s := int(d.Seconds()) % 60
+	if h > 0 {
+		return fmt.Sprintf("%dh %dm %ds", h, m, s)
+	}
+	if m > 0 {
+		return fmt.Sprintf("%dm %ds", m, s)
+	}
+	return fmt.Sprintf("%ds", s)
+}
+
+// Health handles GET /health and GET /api/health.
 func (h *HealthHandler) Health(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
+
 	dbStatus := "ok"
 	if err := h.db.PingContext(ctx); err != nil {
 		dbStatus = "error"
 	}
 
-	stats := h.db.Stats()
-	roomsCount := h.cache.RoomCount()
-
-	var mem runtime.MemStats
-	runtime.ReadMemStats(&mem)
-
 	redisStatus := "not_configured"
+	sessionBackend := "postgres"
 	if h.redis != nil {
+		sessionBackend = "redis"
 		if h.redis.HealthCheck(ctx) {
 			redisStatus = "ok"
 		} else {
@@ -50,20 +70,42 @@ func (h *HealthHandler) Health(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	stats := h.db.Stats()
+	var mem runtime.MemStats
+	runtime.ReadMemStats(&mem)
+
+	wsClients := 0
+	if h.hub != nil {
+		wsClients = h.hub.ClientCount()
+	}
+
+	// Only include perf if something has been recorded
+	var perfData interface{}
+	snap := shared.PerfMetrics.Snapshot()
+	counters, _ := snap["counters"].(map[string]int64)
+	histograms, _ := snap["histograms"].(map[string]interface{})
+	if len(counters) > 0 || len(histograms) > 0 {
+		perfData = snap
+	}
+
 	response := map[string]interface{}{
-		"status":       "ok",
-		"uptime":       int64(time.Since(startTime).Seconds()),
-		"connections":  stats.OpenConnections,
-		"rooms":        roomsCount,
-		"db":           dbStatus,
-		"redis":        redisStatus,
-		"memory": map[string]interface{}{
-			"alloc":       mem.Alloc,
-			"totalAlloc":  mem.TotalAlloc,
-			"sys":         mem.Sys,
-			"numGC":       mem.NumGC,
+		"status":           "ok",
+		"env":              h.env,
+		"uptime":           formatUptime(time.Since(startTime)),
+		"db":               dbStatus,
+		"db_pool":          map[string]interface{}{"open": stats.OpenConnections, "in_use": stats.InUse, "idle": stats.Idle},
+		"redis":            redisStatus,
+		"session_backend":  sessionBackend,
+		"ws_clients":       wsClients,
+		"rooms":            h.cache.RoomCount(),
+		"memory_mb": map[string]interface{}{
+			"heap":       mem.HeapAlloc / (1024 * 1024),
+			"sys":        mem.Sys / (1024 * 1024),
+			"gc_runs":    mem.NumGC,
 		},
-		"perf": shared.PerfMetrics.Snapshot(),
+	}
+	if perfData != nil {
+		response["perf"] = perfData
 	}
 
 	w.Header().Set("Content-Type", "application/json")

@@ -25,7 +25,7 @@ func NewRouter(cfg *config.Config, pool *db.Pool, c *cache.Cache, store *auth.Se
 	isProduction := cfg.NodeEnv == "production"
 	authHandler := &AuthHandler{db: pool.DB, cache: c, store: store, secret: cfg.SessionSecret, adminEmail: cfg.AdminEmail, secure: isProduction}
 	pagesHandler := &PagesHandler{cache: c, db: pool.DB}
-	healthHandler := &HealthHandler{db: pool.DB, cache: c}
+	healthHandler := &HealthHandler{db: pool.DB, cache: c, hub: hub, env: cfg.NodeEnv}
 	if len(rc) > 0 {
 		healthHandler.redis = rc[0]
 	}
