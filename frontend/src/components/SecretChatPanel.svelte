@@ -31,7 +31,7 @@
   let lockCountdowns = {};          // msgId → seconds remaining before auto-lock
   let lockIntervals = {};           // msgId → setInterval handle
 
-  const AUTO_LOCK_SECS = 15;
+  const AUTO_LOCK_SECS = 30;
 
   function relockMsg(msgId) {
     // Clear any running countdown
