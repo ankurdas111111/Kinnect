@@ -53,6 +53,14 @@ class WsCompatSocket {
     this.listeners[event] = this.listeners[event].filter((fn) => fn !== cb);
   }
 
+  once(event, cb) {
+    const wrapper = (...args) => {
+      this.off(event, wrapper);
+      cb(...args);
+    };
+    this.on(event, wrapper);
+  }
+
   emit(event, data) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
     this.ws.send(JSON.stringify({ e: event, d: data }));
@@ -72,6 +80,15 @@ class WsCompatSocket {
   }
 
   open() {
+    // Detach handlers from any existing WebSocket before replacing it.
+    // This prevents an old socket's onclose from triggering another reconnect
+    // after it gets evicted by the server when the new socket connects.
+    if (this.ws) {
+      this.ws.onopen = null;
+      this.ws.onmessage = null;
+      this.ws.onerror = null;
+      this.ws.onclose = null;
+    }
     this.ws = new WebSocket(this.url);
     this.ws.onopen = () => {
       this.connected = true;
@@ -130,6 +147,8 @@ class WsCompatSocket {
     const wait = Math.max(0, baseDelay + jitter);
     setTimeout(() => {
       if (this.manualDisconnect) return;
+      // Don't open a new socket if one is already open or connecting.
+      if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) return;
       this.open();
     }, wait);
   }

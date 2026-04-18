@@ -95,6 +95,17 @@ func DeleteRoom(ctx context.Context, db *sql.DB, roomID string) error {
 	return err
 }
 
+// GetUserIDByShareCode looks up a user ID by share code directly from DB.
+// Used as a cache-miss fallback in handleAddContact.
+func GetUserIDByShareCode(ctx context.Context, db *sql.DB, shareCode string) (string, error) {
+	var id string
+	err := db.QueryRowContext(ctx, `SELECT id FROM users WHERE share_code = $1`, shareCode).Scan(&id)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return id, err
+}
+
 // AddContactBidirectional adds A->B and B->A contacts in a transaction.
 func AddContactBidirectional(ctx context.Context, db *sql.DB, userA, userB string) error {
 	tx, err := db.BeginTx(ctx, nil)

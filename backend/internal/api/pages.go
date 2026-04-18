@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -102,4 +103,69 @@ func (h *PagesHandler) WatchToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "token": token})
+}
+
+// SecretChatMessage is the shape returned by GET /api/m/{token}.
+// Only encrypted fields are included — the server never has plaintext.
+type SecretChatMessage struct {
+	Ciphertext  string    `json:"ciphertext"`
+	IV          string    `json:"iv"`
+	Salt        string    `json:"salt"`
+	FromOwner   bool      `json:"fromOwner"` // true = sent by the link creator
+	CreatedAt   time.Time `json:"createdAt"`
+}
+
+// MInvite handles GET /api/m/{token}.
+// No authentication required — ciphertext is worthless without the PIN,
+// so serving it publicly is safe. The PIN is the only security layer.
+func (h *PagesHandler) MInvite(w http.ResponseWriter, r *http.Request) {
+	token := r.PathValue("token")
+	invite := h.cache.GetSecretChatInvite(token)
+	if invite == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "expired": true})
+		return
+	}
+	if time.Now().UnixMilli() > invite.ExpiresAt {
+		h.cache.DeleteSecretChatInvite(token)
+		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "expired": true})
+		return
+	}
+
+	rows, err := h.db.QueryContext(r.Context(),
+		`SELECT sender_id, ciphertext, iv, salt, created_at
+		 FROM secret_messages
+		 WHERE (sender_id = $1 AND receiver_id = $2)
+		    OR (sender_id = $2 AND receiver_id = $1)
+		 ORDER BY created_at ASC LIMIT 50`,
+		invite.OwnerID, invite.PeerID,
+	)
+	if err != nil {
+		slog.Error("MInvite: failed to query secret messages", "error", err)
+		writeJSON(w, http.StatusOK, map[string]any{
+			"ok":      false,
+			"expired": false,
+			"error":   "temporarily_unavailable",
+		})
+		return
+	}
+	defer rows.Close()
+
+	var msgs []SecretChatMessage
+	for rows.Next() {
+		var senderID string
+		var m SecretChatMessage
+		if err := rows.Scan(&senderID, &m.Ciphertext, &m.IV, &m.Salt, &m.CreatedAt); err != nil {
+			continue
+		}
+		m.FromOwner = senderID == invite.OwnerID
+		msgs = append(msgs, m)
+	}
+	if msgs == nil {
+		msgs = []SecretChatMessage{}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":       true,
+		"messages": msgs,
+	})
 }

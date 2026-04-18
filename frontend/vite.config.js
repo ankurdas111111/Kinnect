@@ -43,6 +43,7 @@ export default defineConfig({
           if (id.includes('node_modules/svelte')) return 'svelte-runtime';
           if (id.includes('/pages/LiveViewer')) return 'page-live';
           if (id.includes('/pages/WatchViewer')) return 'page-watch';
+          if (id.includes('/pages/SecretChatViewer')) return 'page-m';
           if (id.includes('/pages/Monitoring')) return 'page-monitoring';
         }
       },

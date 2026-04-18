@@ -3,13 +3,17 @@
   import maplibregl from 'maplibre-gl';
   import 'maplibre-gl/dist/maplibre-gl.css';
   import { otherUsers, myLocation, mySocketId, mySafetyStatus, focusUser, mapFlyTo, routeGeometry, navigationState } from '../lib/stores/map.js';
+  import { savedPlaces } from '../lib/stores/savedPlaces.js';
   import { arrivalProjections } from '../lib/stores/arrivals.js';
   import { trailData } from '../lib/stores/trail.js';
-  import { createMapIcon, createPersonMarker, getPresenceState, escapeAttr, calculateDistance, formatDistance, circleGeoJSON } from '../lib/tracking.js';
+  import { createMapIcon, createPersonMarker, getPresenceState, escapeAttr, calculateDistance, formatDistance, circleGeoJSON, createCustomPinIcon } from '../lib/tracking.js';
   import { animateMarkerTo, cancelAnimation, cancelAllAnimations } from '../lib/markerInterpolator.js';
   import { getUserColor } from '../lib/getUserColor.js';
   import { MAP_STYLE, RASTER_STYLE } from '../lib/mapStyle.js';
   import { debounce } from '../lib/debounce.js';
+  import { emitSyncPlace } from '../lib/socket.js';
+  import { apiDelete } from '../lib/api.js';
+  import CustomPinDialog from './CustomPinDialog.svelte';
 
   export let followMode = false;
 
@@ -189,6 +193,14 @@
 
       map.on('mouseenter', 'cluster-circles', () => { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', 'cluster-circles', () => { map.getCanvas().style.cursor = ''; });
+
+      // Click on empty map area → open add-pin dialog
+      map.on('click', (e) => {
+        const features = map.queryRenderedFeatures(e.point, { layers: ['cluster-circles'] });
+        if (features.length > 0) return; // hit a cluster, skip
+        pendingPin = { lat: e.lngLat.lat, lng: e.lngLat.lng };
+        showPinDialog = true;
+      });
     }
 
     map = new maplibregl.Map({
@@ -207,6 +219,7 @@
       if (!navActive) followMode = false;
     });
     map.on('load', () => {
+      mapReady = true;
       // Apply Hindi/regional label preference if configured
       const labelPref = localStorage.getItem('kinnect_map_lang') || 'auto';
       if (labelPref === 'hi' || (labelPref === 'auto' && navigator.language?.startsWith('hi'))) {
@@ -251,6 +264,10 @@
     markers.clear();
     for (const p of markerPopups.values()) p.remove();
     markerPopups.clear();
+    for (const m of pinMarkers.values()) m.remove();
+    pinMarkers.clear();
+    for (const p of pinPopups.values()) p.remove();
+    pinPopups.clear();
     if (myMarker) myMarker.remove();
     if (myPopup) myPopup.remove();
     if (map) map.remove();
@@ -605,6 +622,13 @@
   let destMarker = null;
   let navActive = false;
 
+  // ── Custom location pins ────────────────────────────────────────────────────
+  let pinMarkers = new Map();        // placeId → maplibregl.Marker
+  let pinPopups = new Map();         // placeId → maplibregl.Popup
+  let showPinDialog = false;
+  let pendingPin = null;             // { lat, lng } awaiting dialog
+  let mapReady = false;
+
   $: if (map) {
     const nav = $navigationState;
     if (nav?.active && nav.routeCoords?.length) {
@@ -662,6 +686,67 @@
     }
   }
 
+  // ── Render saved place pins from store ──────────────────────────────────────
+  $: if (map && mapReady && $savedPlaces) {
+    const places = $savedPlaces;
+
+    // Remove markers for deleted/missing pins
+    for (const [id, marker] of pinMarkers) {
+      if (!places.has(id)) {
+        marker.remove();
+        pinMarkers.delete(id);
+        const popup = pinPopups.get(id);
+        if (popup) { popup.remove(); pinPopups.delete(id); }
+      }
+    }
+
+    // Add markers for new pins
+    for (const [id, pin] of places) {
+      if (pinMarkers.has(id)) continue;
+      if (pin.latitude == null || pin.longitude == null) continue;
+
+      const el = createCustomPinIcon(pin.icon || 'pin', pin.name);
+
+      const visLabel = pin.visibility === 'universal' ? '👨‍👩‍👧 Family' : '🔒 Personal';
+      const popupHtml = `<div class="pu-wrap">
+        <div class="pu-hdr"><strong class="pu-name">${escapeAttr(pin.name)}</strong></div>
+        <div class="pu-grid">
+          <span class="pu-lbl">Visibility</span><span class="pu-val">${visLabel}</span>
+          <span class="pu-lbl">Position</span>
+          <span class="pu-val pu-mono">${Number(pin.latitude).toFixed(5)}, ${Number(pin.longitude).toFixed(5)}</span>
+        </div>
+        <div style="margin-top:8px;text-align:right;">
+          <button class="btn btn-sm btn-danger" data-pin-delete="${id}" style="font-size:11px;padding:4px 10px;">Remove</button>
+        </div>
+      </div>`;
+
+      const popup = new maplibregl.Popup({ offset: [0, -50], maxWidth: '220px', closeButton: true })
+        .setHTML(popupHtml);
+
+      const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+        .setLngLat([pin.longitude, pin.latitude])
+        .setPopup(popup)
+        .addTo(map);
+
+      // Delegate delete-button clicks from inside the popup
+      popup.on('open', () => {
+        const btn = popup.getElement()?.querySelector(`[data-pin-delete="${id}"]`);
+        if (btn) {
+          btn.onclick = async () => {
+            popup.remove();
+            await apiDelete(`/api/places/${id}`);
+            const wasUniversal = pin.visibility === 'universal';
+            savedPlaces.update(m => { m.delete(id); return m; });
+            if (wasUniversal) emitSyncPlace('remove', { id, visibility: 'universal' });
+          };
+        }
+      });
+
+      pinMarkers.set(id, marker);
+      pinPopups.set(id, popup);
+    }
+  }
+
   $: if (map && $focusUser) {
     const sid = $focusUser;
     focusUser.set(null);
@@ -689,6 +774,14 @@
 </script>
 
 <div class="map-container" bind:this={mapContainer}></div>
+
+{#if showPinDialog && pendingPin}
+  <CustomPinDialog
+    lat={pendingPin.lat}
+    lng={pendingPin.lng}
+    onClose={() => { showPinDialog = false; pendingPin = null; }}
+  />
+{/if}
 <!-- MERIDIAN: Map vignette — connects UI chrome to map visually -->
 <div class="map-vignette-top" aria-hidden="true"></div>
 <div class="map-vignette-bottom" aria-hidden="true"></div>

@@ -29,6 +29,7 @@
   import OnboardingOverlay from '../components/OnboardingOverlay.svelte';
   import PulseButton from '../components/primitives/PulseButton.svelte';
   import SosFloat from '../components/SosFloat.svelte';
+  import SecretChatPanel from '../components/SecretChatPanel.svelte';
   import HubSpotlight from '../components/HubSpotlight.svelte';
   import FeatureGuide from '../components/FeatureGuide.svelte';
   import { calculateDistance } from '../lib/tracking.js';
@@ -52,6 +53,7 @@
   let sidebarCollapsed = false;
   let sosConfirmOpen = false;
   let batteryPromptOpen = false;
+  let secretChatPeer = null; // { id: string, name: string }
 
   /**
    * Detect Android device manufacturer from the WebView UA string.
@@ -680,7 +682,7 @@
 
   <svelte:fragment slot="rightPanel">
     {#if activePanel === 'users'}
-      <UsersList on:close={() => activePanel = null} />
+      <UsersList on:close={() => activePanel = null} on:secretChat={(e) => { activePanel = null; secretChatPeer = e.detail; }} />
     {:else if activePanel === 'superAdmin' && isAdmin}
       <SuperAdminPanel on:close={() => activePanel = null} />
     {/if}
@@ -765,7 +767,7 @@
         </div>
         <AdminPanel embedded={true} />
       {:else if mobileTab === 'people'}
-        <UsersList embedded={true} />
+        <UsersList embedded={true} on:secretChat={(e) => { setSheetOpen(false); secretChatPeer = e.detail; }} />
       {/if}
     </BottomSheet>
   </svelte:fragment>
@@ -782,6 +784,15 @@
 
   <svelte:fragment slot="overlay">
     <AlertOverlay />
+
+    <!-- Secret encrypted chat overlay -->
+    {#if secretChatPeer}
+      <SecretChatPanel
+        peerId={secretChatPeer.id}
+        peerName={secretChatPeer.name}
+        onClose={() => secretChatPeer = null}
+      />
+    {/if}
 
     <!-- Persistent emergency float card — appears above SOS FAB when a network member has active SOS + medical data -->
     <SosFloat />

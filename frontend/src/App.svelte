@@ -23,7 +23,8 @@
     '/checkins': wrap({ asyncComponent: () => import('./pages/CheckinSchedule.svelte') }),
     '/add-contact/:code': wrap({ asyncComponent: () => import('./pages/AddContact.svelte') }),
     '/live/:token': wrap({ asyncComponent: () => import('./pages/LiveViewer.svelte') }),
-    '/watch/:token': wrap({ asyncComponent: () => import('./pages/WatchViewer.svelte') })
+    '/watch/:token': wrap({ asyncComponent: () => import('./pages/WatchViewer.svelte') }),
+    '/m/:token': wrap({ asyncComponent: () => import('./pages/SecretChatViewer.svelte') })
   };
 
   let loading = true;

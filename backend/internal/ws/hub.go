@@ -164,6 +164,12 @@ func (h *Hub) buildEventHandlers() map[string]func(*Client, json.RawMessage) {
 		"setEmergencyPhones":   h.handleSetEmergencyPhones,
 		"startWalkWithMe":     h.handleStartWalkWithMe,
 		"endWalkWithMe":       h.handleEndWalkWithMe,
+		"sendSecretMsg":       h.handleSendSecretMsg,
+		"getSecretMsgs":       h.handleGetSecretMsgs,
+		"deleteSecretMsg":     h.handleDeleteSecretMsg,
+		"markSecretMsgSeen":      h.handleMarkSecretMsgSeen,
+		"createSecretChatInvite": h.handleCreateSecretChatInvite,
+		"syncPlace":              h.handleSyncPlace,
 	}
 }
 
@@ -317,6 +323,7 @@ func (h *Hub) handleRegister(c *Client) {
 	h.emitMyGuardians(c, userID)
 	h.emitMyLiveLinks(c, userID)
 	h.emitPendingRequests(c, userID)
+	h.emitExistingPlaces(c, userID)
 }
 
 func (h *Hub) handleUnregister(c *Client) {

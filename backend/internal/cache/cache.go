@@ -224,8 +224,19 @@ type Cache struct {
 	PushSubs         map[string][]PushSubscription // userID -> subscriptions
 	SharingSchedules map[string][]ScheduleRule      // userID -> rules
 
+	// Secret chat invite tokens (ephemeral, in-memory only)
+	SecretChatInvites map[string]*SecretChatInvite
+
 	// Lazy loading
 	lazyLoader *LazyLoader
+}
+
+// SecretChatInvite is an ephemeral token linking to a secret chat conversation.
+type SecretChatInvite struct {
+	Token     string
+	OwnerID   string // userId of person who generated the link
+	PeerID    string // userId of the other person in the conversation
+	ExpiresAt int64  // UnixMilli
 }
 
 // ScheduleRule defines when a user shares their location with a specific target.
@@ -265,9 +276,10 @@ func New() *Cache {
 		LiveTokensByUser:  make(map[string]map[string]bool),
 		UserRooms:         make(map[string]map[string]bool),
 		AdminClientIds:    make(map[string]bool),
-		PushSubs:          make(map[string][]PushSubscription),
-		SharingSchedules:  make(map[string][]ScheduleRule),
-		lazyLoader:        nil, // Set via SetLazyLoader
+		PushSubs:            make(map[string][]PushSubscription),
+		SharingSchedules:    make(map[string][]ScheduleRule),
+		SecretChatInvites:   make(map[string]*SecretChatInvite),
+		lazyLoader:          nil, // Set via SetLazyLoader
 	}
 }
 
@@ -781,6 +793,20 @@ func (c *Cache) GetUserIDByShareCode(code string) string {
 	return c.ShareCodes[code]
 }
 
+// WarmShareCode stores a share code → userID mapping that was resolved via DB fallback.
+func (c *Cache) WarmShareCode(shareCode, userID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.ShareCodes[shareCode] = userID
+}
+
+// AreContacts returns true if userA has userB in their contact list.
+func (c *Cache) AreContacts(userA, userB string) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.Contacts[userA] != nil && c.Contacts[userA][userB]
+}
+
 // SetActiveUser adds or replaces an active user. Also updates UserIdToSocketId and AdminClientIds.
 func (c *Cache) SetActiveUser(socketID string, user *ActiveUser) {
 	c.mu.Lock()
@@ -1226,5 +1252,45 @@ func (c *Cache) GetPushSubscriptions(userID string) []PushSubscription {
 	}
 	out := make([]PushSubscription, len(subs))
 	copy(out, subs)
+	return out
+}
+
+// AddSecretChatInvite stores a new invite token in the ephemeral cache.
+func (c *Cache) AddSecretChatInvite(token, ownerID, peerID string, expiresAt int64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.SecretChatInvites[token] = &SecretChatInvite{
+		Token:     token,
+		OwnerID:   ownerID,
+		PeerID:    peerID,
+		ExpiresAt: expiresAt,
+	}
+}
+
+// GetSecretChatInvite returns the invite for the given token, or nil.
+func (c *Cache) GetSecretChatInvite(token string) *SecretChatInvite {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.SecretChatInvites[token]
+}
+
+// DeleteSecretChatInvite removes an invite token.
+func (c *Cache) DeleteSecretChatInvite(token string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.SecretChatInvites, token)
+}
+
+// CollectExpiredSecretChatInvites removes and returns all expired invite tokens.
+func (c *Cache) CollectExpiredSecretChatInvites(now int64) []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	var out []string
+	for token, inv := range c.SecretChatInvites {
+		if now > inv.ExpiresAt {
+			out = append(out, token)
+			delete(c.SecretChatInvites, token)
+		}
+	}
 	return out
 }

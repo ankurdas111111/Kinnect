@@ -227,6 +227,53 @@ export function createPersonMarker(options = {}) {
   return el;
 }
 
+import { getPinIcon } from './pinIcons.js';
+
+const _customPinCache = new Map();
+
+/**
+ * Create a teardrop-pin marker element for a custom saved place.
+ * Displays the icon's emoji inside a white pin shape.
+ * Use `anchor: 'bottom'` on the MapLibre Marker.
+ *
+ * @param {string} iconId  - One of the PIN_ICONS ids (e.g. 'home', 'star')
+ * @param {string} name    - Place name shown as a label below the pin
+ */
+export function createCustomPinIcon(iconId, name) {
+  const cacheKey = iconId;
+  const cached = _customPinCache.get(cacheKey);
+  const pinIcon = getPinIcon(iconId);
+  const emoji = pinIcon.emoji;
+
+  function buildEl() {
+    const el = document.createElement('div');
+    el.className = 'map-pin pin-custom';
+    el.style.cssText = 'width:36px;height:50px;cursor:pointer;position:relative;display:flex;flex-direction:column;align-items:center;';
+    el.innerHTML =
+      `<svg width="36" height="44" viewBox="0 0 36 44" xmlns="http://www.w3.org/2000/svg">`
+      + `<path d="M18 2C10.28 2 4 8.28 4 16c0 10.5 14 26 14 26S32 26.5 32 16C32 8.28 25.72 2 18 2z" fill="white" stroke="#4b5563" stroke-width="1.5"/>`
+      + `<text x="18" y="20" text-anchor="middle" dominant-baseline="middle" font-size="15">${emoji}</text>`
+      + `</svg>`;
+    if (name) {
+      const label = document.createElement('div');
+      label.style.cssText = 'position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:10px;font-weight:700;color:#1e293b;background:rgba(255,255,255,0.92);padding:1px 6px;border-radius:4px;box-shadow:0 1px 4px rgba(0,0,0,0.15);max-width:120px;overflow:hidden;text-overflow:ellipsis;';
+      label.textContent = name;
+      el.appendChild(label);
+    }
+    return el;
+  }
+
+  if (!cached) {
+    const el = buildEl();
+    _customPinCache.set(cacheKey, el.cloneNode(true));
+    return el;
+  }
+
+  // Clone and update label (name varies per pin even with same icon)
+  const el = buildEl();
+  return el;
+}
+
 export function formatDistance(meters) {
   if (meters == null || !isFinite(meters)) return null;
   if (meters >= 1000) return (meters / 1000).toFixed(1) + ' km';

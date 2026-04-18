@@ -18,6 +18,9 @@ import { notifySOS, notifyProximitySOS, notifyGuardianRequest, notifyBatteryLow,
 import { rideShare } from './stores/rideShare.js';
 import { crowdMode } from './stores/crowdMode.js';
 import { bumpHubBadge } from './stores/hubBadge.js';
+import { addSecretMessage, setSecretMessages, removeSecretMessage, updateSecretMessageSeen } from './stores/secretChat.js';
+import { savedPlaces } from './stores/savedPlaces.js';
+import { apiGet } from './api.js';
 import { getShareOrigin } from './env.js';
 
 const storedClientId = localStorage.getItem('clientId');
@@ -402,6 +405,29 @@ export function setupSocketHandlers() {
     }
   });
 
+  // Secret chat — ciphertext-only delivery; decryption is client-side
+  socket.on('secretMsgReceived', (msg) => {
+    if (!msg || !msg.senderId) return;
+    addSecretMessage(msg.senderId, msg);
+  });
+  socket.on('secretMsgSent', (msg) => {
+    if (!msg || !msg.receiverId) return;
+    const myId = get(authUser)?.userId;
+    addSecretMessage(msg.receiverId, { ...msg, senderId: myId });
+  });
+  socket.on('secretMsgsHistory', (data) => {
+    if (!data || !data.peerId) return;
+    setSecretMessages(data.peerId, data.messages ?? []);
+  });
+  socket.on('secretMsgDeleted', (data) => {
+    if (!data || !data.id) return;
+    removeSecretMessage(data.id);
+  });
+  socket.on('secretMsgSeen', (data) => {
+    if (!data || !data.id) return;
+    updateSecretMessageSeen(data.id, data.seenAt);
+  });
+
   // SOS Narrative — builds crisis card for AlertOverlay / WatchViewer
   socket.on('sosNarrative', (data) => {
     if (!data || !data.userId) return;
@@ -741,8 +767,89 @@ export function setupSocketHandlers() {
     });
   }
 
+  // ── Custom pins: load own places on connect + receive real-time sync ──────
+  socket.on('connect', async () => {
+    const result = await apiGet('/api/places');
+    // Full replacement (not additive) so places deleted while offline are removed from the map.
+    if (Array.isArray(result)) {
+      savedPlaces.set(new Map(result.map(p => [p.id, p])));
+    }
+  });
+
+  socket.on('syncPlace', ({ action, placeId, userId, name, icon, latitude, longitude, visibility, roomCode }) => {
+    savedPlaces.update(m => {
+      if (action === 'add') {
+        m.set(placeId, { id: placeId, userId, name, icon, latitude, longitude, radiusM: 0, visibility: visibility || 'universal', roomCode: roomCode || '' });
+      } else if (action === 'remove') {
+        m.delete(placeId);
+      }
+      return m;
+    });
+  });
+
+  // Shared pins from contacts/rooms — sent by server on connect
+  socket.on('existingPlaces', (places) => {
+    if (!Array.isArray(places)) return;
+    savedPlaces.update(m => {
+      for (const p of places) {
+        m.set(p.placeId, {
+          id: p.placeId, userId: p.userId, name: p.name, icon: p.icon,
+          latitude: p.latitude, longitude: p.longitude, radiusM: 0,
+          visibility: p.visibility || 'universal', roomCode: p.roomCode || '',
+        });
+      }
+      return m;
+    });
+  });
+
   // All handlers registered -- now connect
   socket.connect();
 }
 
 export function isConnected() { return connected; }
+
+/** Notify the backend that the receiver has decrypted (read) a secret message. */
+export function markSecretMsgSeen(msgId) {
+  socket.emit('markSecretMsgSeen', { msgId });
+}
+
+/**
+ * Ask the backend to generate a 24h invite token for the given secret chat conversation.
+ * Returns a Promise that resolves to the token string.
+ */
+export function createSecretChatInvite(peerId) {
+  return new Promise((resolve, reject) => {
+    const nonce = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : String(Date.now()) + '-' + Math.random().toString(36).slice(2);
+
+    const handler = (data) => {
+      if (data?.nonce !== nonce) return; // not our response
+      socket.off('secretChatInviteCreated', handler);
+      clearTimeout(timer);
+      resolve(data.token);
+    };
+
+    const timer = setTimeout(() => {
+      socket.off('secretChatInviteCreated', handler);
+      reject(new Error('createSecretChatInvite timed out'));
+    }, 10000);
+
+    socket.on('secretChatInviteCreated', handler);
+    socket.emit('createSecretChatInvite', { peerId, nonce });
+  });
+}
+
+/** Broadcast a non-personal pin add/remove to the appropriate recipients. */
+export function emitSyncPlace(action, place) {
+  socket.emit('syncPlace', {
+    action,
+    placeId: place.id,
+    name: place.name || '',
+    icon: place.icon || 'pin',
+    latitude: place.latitude || 0,
+    longitude: place.longitude || 0,
+    visibility: place.visibility || 'universal',
+    roomCode: place.roomCode || '',
+  });
+}

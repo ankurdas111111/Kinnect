@@ -16,14 +16,16 @@ type PlacesHandler struct {
 }
 
 type savedPlaceRow struct {
-	ID        string  `json:"id"`
-	UserID    string  `json:"userId"`
-	Name      string  `json:"name"`
-	Icon      string  `json:"icon"`
-	Latitude  float64 `json:"latitude"`
-	Longitude float64 `json:"longitude"`
-	RadiusM   int     `json:"radiusM"`
-	CreatedAt int64   `json:"createdAt"`
+	ID         string  `json:"id"`
+	UserID     string  `json:"userId"`
+	Name       string  `json:"name"`
+	Icon       string  `json:"icon"`
+	Latitude   float64 `json:"latitude"`
+	Longitude  float64 `json:"longitude"`
+	RadiusM    int     `json:"radiusM"`
+	Visibility string  `json:"visibility"`
+	RoomCode   string  `json:"roomCode,omitempty"`
+	CreatedAt  int64   `json:"createdAt"`
 }
 
 // ListPlaces returns all saved places for the authenticated user.
@@ -34,7 +36,7 @@ func (h *PlacesHandler) ListPlaces(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rows, err := h.db.QueryContext(r.Context(),
-		`SELECT id, user_id, name, icon, latitude, longitude, radius_m, created_at
+		`SELECT id, user_id, name, icon, latitude, longitude, radius_m, COALESCE(visibility,'personal'), COALESCE(room_code,''), created_at
 		 FROM saved_places WHERE user_id = $1 ORDER BY created_at DESC`,
 		sess.User.ID)
 	if err != nil {
@@ -45,7 +47,7 @@ func (h *PlacesHandler) ListPlaces(w http.ResponseWriter, r *http.Request) {
 	var places []savedPlaceRow
 	for rows.Next() {
 		var p savedPlaceRow
-		if err := rows.Scan(&p.ID, &p.UserID, &p.Name, &p.Icon, &p.Latitude, &p.Longitude, &p.RadiusM, &p.CreatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.UserID, &p.Name, &p.Icon, &p.Latitude, &p.Longitude, &p.RadiusM, &p.Visibility, &p.RoomCode, &p.CreatedAt); err != nil {
 			continue
 		}
 		places = append(places, p)
@@ -65,11 +67,13 @@ func (h *PlacesHandler) CreatePlace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Name      string  `json:"name"`
-		Icon      string  `json:"icon"`
-		Latitude  float64 `json:"latitude"`
-		Longitude float64 `json:"longitude"`
-		RadiusM   int     `json:"radiusM"`
+		Name       string  `json:"name"`
+		Icon       string  `json:"icon"`
+		Latitude   float64 `json:"latitude"`
+		Longitude  float64 `json:"longitude"`
+		RadiusM    int     `json:"radiusM"`
+		Visibility string  `json:"visibility"`
+		RoomCode   string  `json:"roomCode"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "Bad request", http.StatusBadRequest)
@@ -85,15 +89,47 @@ func (h *PlacesHandler) CreatePlace(w http.ResponseWriter, r *http.Request) {
 		icon = "pin"
 	}
 	radiusM := body.RadiusM
-	if radiusM <= 0 {
-		radiusM = 100
+	if radiusM < 0 {
+		radiusM = 0
+	}
+	visibility := body.Visibility
+	roomCode := ""
+	switch visibility {
+	case "universal":
+		// no extra validation
+	case "room":
+		roomCode = body.RoomCode
+		if len(roomCode) == 0 || len(roomCode) > 6 {
+			http.Error(w, "Valid roomCode required for room visibility", http.StatusBadRequest)
+			return
+		}
+		// Validate caller is a member of that room
+		var dummy string
+		err := h.db.QueryRowContext(r.Context(),
+			`SELECT r.code FROM rooms r JOIN room_members rm ON rm.room_id = r.id
+			 WHERE r.code = $1 AND rm.user_id = $2`,
+			roomCode, sess.User.ID).Scan(&dummy)
+		if err == sql.ErrNoRows {
+			http.Error(w, "Not a member of that room", http.StatusForbidden)
+			return
+		}
+		if err != nil {
+			http.Error(w, "DB error", http.StatusInternalServerError)
+			return
+		}
+	default:
+		visibility = "personal"
 	}
 	createdAt := time.Now().UnixMilli()
 	var id string
+	var roomCodeArg interface{}
+	if roomCode != "" {
+		roomCodeArg = roomCode
+	}
 	err := h.db.QueryRowContext(r.Context(),
-		`INSERT INTO saved_places (user_id, name, icon, latitude, longitude, radius_m, created_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-		sess.User.ID, name, icon, body.Latitude, body.Longitude, radiusM, createdAt).Scan(&id)
+		`INSERT INTO saved_places (user_id, name, icon, latitude, longitude, radius_m, visibility, room_code, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+		sess.User.ID, name, icon, body.Latitude, body.Longitude, radiusM, visibility, roomCodeArg, createdAt).Scan(&id)
 	if err != nil {
 		http.Error(w, "DB error", http.StatusInternalServerError)
 		return
@@ -102,7 +138,7 @@ func (h *PlacesHandler) CreatePlace(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(savedPlaceRow{
 		ID: id, UserID: sess.User.ID, Name: name, Icon: icon,
 		Latitude: body.Latitude, Longitude: body.Longitude,
-		RadiusM: radiusM, CreatedAt: createdAt,
+		RadiusM: radiusM, Visibility: visibility, RoomCode: roomCode, CreatedAt: createdAt,
 	})
 }
 

@@ -766,8 +766,25 @@ func (h *Hub) handleAddContact(c *Client, data json.RawMessage) {
 	}
 
 	targetID := h.Cache.GetUserIDByShareCode(shareCode)
-	if targetID == "" || targetID == user.UserID {
-		c.Send("contactError", map[string]interface{}{"message": "User not found"})
+	if targetID == "" {
+		// Cache miss: fall back to DB (handles users registered after last cache load)
+		var err error
+		targetID, err = db.GetUserIDByShareCode(context.Background(), h.pool.DB, shareCode)
+		if err != nil || targetID == "" {
+			c.Send("contactError", map[string]interface{}{"message": "No user found with that code"})
+			return
+		}
+		// Warm the cache so future lookups hit memory
+		h.Cache.WarmShareCode(shareCode, targetID)
+	}
+	if targetID == user.UserID {
+		c.Send("contactError", map[string]interface{}{"message": "That's your own code — share it with someone else to connect"})
+		return
+	}
+
+	// Already contacts? Tell them explicitly instead of silently doing nothing.
+	if h.Cache.AreContacts(user.UserID, targetID) {
+		c.Send("contactError", map[string]interface{}{"message": "You're already connected with this person"})
 		return
 	}
 

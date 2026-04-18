@@ -378,6 +378,16 @@
                   {user.batteryPct}%
                 </span>
               {/if}
+              {#if user.userId}
+                <button
+                  class="secret-chat-icon"
+                  title="Secret Chat"
+                  aria-label="Open secret chat with {user.displayName}"
+                  on:click|stopPropagation={() => dispatch('secretChat', { id: user.userId, name: user.displayName })}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                </button>
+              {/if}
               <span class="locate-icon" aria-hidden="true">
                 <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 1.892.402 3.13 1.5 4.5L12 22l6.5-7.5c1.098-1.37 1.5-2.608 1.5-4.5a8 8 0 0 0-8-8z"/></svg>
               </span>
@@ -440,6 +450,15 @@
           </div>
           <span>Copy Coordinates</span>
         </button>
+
+        {#if quickUser.userId}
+          <button class="qa-action-btn" on:click={() => { dispatch('secretChat', { id: quickUser.userId, name: quickUser.displayName }); quickUser = null; }}>
+            <div class="qa-action-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </div>
+            <span>Secret Chat</span>
+          </button>
+        {/if}
       </div>
 
       <button class="qa-cancel-btn" on:click={closeQuickActions}>Cancel</button>
@@ -853,6 +872,39 @@
   .user-item-btn:hover .locate-icon {
     color: var(--primary-400);
     transform: scale(1.15);
+  }
+
+  /* Secret chat icon button — hidden until row hover on desktop */
+  .secret-chat-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    padding: 4px;
+    border-radius: var(--radius-full);
+    color: var(--text-tertiary);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);
+    -webkit-tap-highlight-color: transparent;
+    flex-shrink: 0;
+  }
+  /* Always visible on touch devices (no hover state) */
+  @media (hover: none) {
+    .secret-chat-icon { opacity: 1; }
+  }
+  .user-item-btn:hover .secret-chat-icon {
+    opacity: 1;
+    color: var(--primary-400, #818cf8);
+  }
+  .secret-chat-icon:hover {
+    background: rgba(99, 102, 241, 0.14);
+    color: var(--primary-300, #a5b4fc);
+  }
+  .secret-chat-icon:active {
+    transform: scale(0.88);
+    transition-duration: 60ms;
   }
 
   /* Battery chip — icon + percentage */

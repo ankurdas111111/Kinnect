@@ -13,175 +13,59 @@ const (
 	sevenDaysMs = 7 * 24 * 60 * 60 * 1000
 )
 
-// StartCleanupRoutines starts 7 periodic goroutines for cache and DB cleanup.
+// safeLoop runs fn on each ticker tick, recovering from panics and restarting the loop.
+// It stops cleanly when ctx is done. Panics are logged and the routine restarts after 5s.
+func safeLoop(ctx context.Context, interval time.Duration, name string, fn func()) {
+	go func() {
+		for {
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						slog.Error("cleanup goroutine panicked", "routine", name, "panic", r)
+					}
+				}()
+				ticker := time.NewTicker(interval)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-ticker.C:
+						fn()
+					}
+				}
+			}()
+			// Inner func returned — either ctx.Done() or panic recovery.
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				slog.Info("cleanup goroutine restarting after panic", "routine", name)
+				time.Sleep(5 * time.Second)
+			}
+		}
+	}()
+}
+
+// StartCleanupRoutines starts 14 periodic goroutines for cache and DB cleanup.
+// All routines use safeLoop so a panic in one is recovered and the routine restarts.
 func (h *Hub) StartCleanupRoutines(ctx context.Context) {
-	// 1. Expire offline users (every 60s)
-	go func() {
-		ticker := time.NewTicker(60 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				h.cleanupExpireOfflineUsers()
-			}
-		}
-	}()
-
-	// 2. Expire watch tokens (every 30s)
-	go func() {
-		ticker := time.NewTicker(30 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				h.cleanupExpireWatchTokens()
-			}
-		}
-	}()
-
-	// 3. Expire live tokens (every 60s)
-	go func() {
-		ticker := time.NewTicker(60 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				h.cleanupExpireLiveTokens()
-			}
-		}
-	}()
-
-	// 4. Clean empty old rooms (every 1h)
-	go func() {
-		ticker := time.NewTicker(1 * time.Hour)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				h.cleanupEmptyOldRooms()
-			}
-		}
-	}()
-
-	// 5. Expire time-limited room admins (every 60s)
-	go func() {
-		ticker := time.NewTicker(60 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				h.cleanupExpireRoomAdmins()
-			}
-		}
-	}()
-
-	// 6. Expire time-limited guardianships (every 60s)
-	go func() {
-		ticker := time.NewTicker(60 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				h.cleanupExpireGuardianships()
-			}
-		}
-	}()
-
-	// 7. Check-in overdue polling (every 60s)
-	go func() {
-		ticker := time.NewTicker(60 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				h.cleanupCheckInOverdue()
-			}
-		}
-	}()
-
-	// 8. Purge stale guardianship rows (expired/revoked, older than 30 days) — every 24h
-	go func() {
-		ticker := time.NewTicker(24 * time.Hour)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				h.cleanupStaleGuardianships()
-			}
-		}
-	}()
-
-	// 9. Gentle "haven't moved" alerts for wards (every 5 min)
-	go func() {
-		ticker := time.NewTicker(5 * time.Minute)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				h.checkHaventMovedAlerts()
-			}
-		}
-	}()
-
-	// 10. Expire ambient status messages (every 60s)
-	go func() {
-		ticker := time.NewTicker(60 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				h.cleanupExpiredStatusMessages()
-			}
-		}
-	}()
-
-	// 11. Heartbeat check — daily wellness pulse (every 60s)
-	go func() {
-		ticker := time.NewTicker(60 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				h.cleanupHeartbeatCheck()
-			}
-		}
-	}()
-
-	// 12. Walk With Me monitoring — arrival, stop, offline, deviation (every 30s)
-	go func() {
-		ticker := time.NewTicker(30 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				h.EvaluateWalk()
-			}
-		}
-	}()
+	safeLoop(ctx, 60*time.Second, "expireOfflineUsers",      h.cleanupExpireOfflineUsers)
+	safeLoop(ctx, 30*time.Second, "expireWatchTokens",       h.cleanupExpireWatchTokens)
+	safeLoop(ctx, 60*time.Second, "expireLiveTokens",        h.cleanupExpireLiveTokens)
+	safeLoop(ctx, 1*time.Hour,    "cleanEmptyOldRooms",      h.cleanupEmptyOldRooms)
+	safeLoop(ctx, 60*time.Second, "expireRoomAdmins",        h.cleanupExpireRoomAdmins)
+	safeLoop(ctx, 60*time.Second, "expireGuardianships",     h.cleanupExpireGuardianships)
+	safeLoop(ctx, 60*time.Second, "checkInOverdue",          h.cleanupCheckInOverdue)
+	safeLoop(ctx, 24*time.Hour,   "purgeStaleGuardianships", h.cleanupStaleGuardianships)
+	safeLoop(ctx, 5*time.Minute,  "haventMovedAlerts",       h.checkHaventMovedAlerts)
+	safeLoop(ctx, 60*time.Second, "expireStatusMessages",    h.cleanupExpiredStatusMessages)
+	safeLoop(ctx, 60*time.Second, "heartbeatWellness",       h.cleanupHeartbeatCheck)
+	safeLoop(ctx, 30*time.Second, "walkWithMe",              h.EvaluateWalk)
+	safeLoop(ctx, 5*time.Minute,  "expireSecretChatInvites", func() {
+		h.Cache.CollectExpiredSecretChatInvites(time.Now().UnixMilli())
+	})
+	safeLoop(ctx, 24*time.Hour,   "purgeSecretMessages",     h.cleanupExpiredSecretMessages)
 
 	slog.Info("Cleanup routines started")
 }
@@ -384,4 +268,14 @@ func (h *Hub) checkHaventMovedAlerts() {
 			}
 		}
 	})
+}
+
+// cleanupExpiredSecretMessages deletes secret messages older than 7 days.
+func (h *Hub) cleanupExpiredSecretMessages() {
+	_, err := h.pool.DB.ExecContext(context.Background(),
+		`DELETE FROM secret_messages WHERE created_at < NOW() - INTERVAL '7 days'`,
+	)
+	if err != nil {
+		slog.Error("Failed to purge expired secret messages", "error", err)
+	}
 }

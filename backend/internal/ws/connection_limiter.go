@@ -23,22 +23,21 @@ func NewConnectionLimiter(maxConnections int) *ConnectionLimiter {
 	}
 }
 
-// AcquireConnection attempts to add a new connection
-// Returns true if allowed, false if at limit
+// AcquireConnection attempts to add a new connection.
+// Returns true if allowed, false if at limit.
+// Uses a CAS loop instead of recursion to avoid stack growth under thundering herd.
 func (cl *ConnectionLimiter) AcquireConnection() bool {
-	current := atomic.LoadInt32(&cl.activeConns)
-
-	if current >= cl.maxConnections {
-		atomic.AddInt64(&cl.rejectedCount, 1)
-		return false
+	for {
+		current := atomic.LoadInt32(&cl.activeConns)
+		if current >= cl.maxConnections {
+			atomic.AddInt64(&cl.rejectedCount, 1)
+			return false
+		}
+		if atomic.CompareAndSwapInt32(&cl.activeConns, current, current+1) {
+			return true
+		}
+		// CAS lost the race — another goroutine updated first, retry immediately.
 	}
-
-	if !atomic.CompareAndSwapInt32(&cl.activeConns, current, current+1) {
-		// Race condition, try again (with backoff in real code)
-		return cl.AcquireConnection()
-	}
-
-	return true
 }
 
 // ReleaseConnection removes a connection from the limit

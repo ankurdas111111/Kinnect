@@ -209,6 +209,26 @@ func InitDB(db *sql.DB) error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_sos_watch_tokens_user ON sos_watch_tokens(user_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_sos_watch_tokens_exp ON sos_watch_tokens(expires_at)`,
+
+		// Secret Messages — end-to-end encrypted ephemeral messages between contacts
+		`CREATE TABLE IF NOT EXISTS secret_messages (
+			id           BIGSERIAL PRIMARY KEY,
+			sender_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			receiver_id  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			ciphertext   TEXT NOT NULL,
+			iv           TEXT NOT NULL,
+			salt         TEXT NOT NULL,
+			seen_at      TIMESTAMPTZ,
+			created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_secret_messages_receiver ON secret_messages(receiver_id, created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_secret_messages_sender ON secret_messages(sender_id, created_at DESC)`,
+		// Migration guard: add seen_at to existing deployments that predate this column
+		`ALTER TABLE secret_messages ADD COLUMN IF NOT EXISTS seen_at TIMESTAMPTZ`,
+
+		// Custom pins: visibility scoping — 'personal' (owner only), 'universal' (all family), 'room' (specific room)
+		`ALTER TABLE saved_places ADD COLUMN IF NOT EXISTS visibility VARCHAR(10) DEFAULT 'personal'`,
+		`ALTER TABLE saved_places ADD COLUMN IF NOT EXISTS room_code VARCHAR(6)`,
 	}
 
 	for _, stmt := range statements {
