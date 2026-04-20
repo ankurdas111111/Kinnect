@@ -196,6 +196,8 @@
 
       // Click on empty map area → open add-pin dialog
       map.on('click', (e) => {
+        // Skip if click landed on a person/pin marker or a cluster
+        if (e.originalEvent.target.closest('.maplibregl-marker')) return;
         const features = map.queryRenderedFeatures(e.point, { layers: ['cluster-circles'] });
         if (features.length > 0) return; // hit a cluster, skip
         pendingPin = { lat: e.lngLat.lat, lng: e.lngLat.lng };
