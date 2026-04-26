@@ -1,0 +1,8 @@
+frontend/src/components/SecretChatPanel.svelte
+  01a780c1-9bf9-4293-99ad-c513cfa4e8ab:2026-04-26T22:12:55.555Z 12,73-75,256-260,263-266,419-423,510-523,528,541-558,591-596,1121-1128,1144-1156,1158-1163
+frontend/src/components/primitives/StickerPicker.svelte
+  01a780c1-9bf9-4293-99ad-c513cfa4e8ab:2026-04-26T22:12:55.555Z 1-2,4,6-7,9-10,12,14-18,20-87,89-91,93-96,98-103,105-107,109-111,113-115,117-119,121-126,128-130,132-163,165-179,181-185,187-205,207-217,219-234,236-242,244-248
+frontend/src/pages/SecretChatViewer.svelte
+  01a780c1-9bf9-4293-99ad-c513cfa4e8ab:2026-04-26T22:12:55.555Z 9,32-34,208-213,216-219,313-317,391-404,409,421-438,470-475,625-632,634-636,638
+---
+{"schema_version": "authorship/3.0.0", "base_commit_sha": "HEAD~1", "prompts": {"01a780c1-9bf9-4293-99ad-c513cfa4e8ab:2026-04-26T22:12:55.555Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 84, "overriden_lines": 0}}}
