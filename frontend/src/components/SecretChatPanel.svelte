@@ -5,6 +5,7 @@
   import { socket, markSecretMsgSeen, createSecretChatInvite } from '../lib/socket.js';
   import { authUser } from '../lib/stores/auth.js';
   import { secretChats, lockSecretChat, storeDecrypted, secretChatPresence } from '../lib/stores/secretChat.js';
+  import { otherUsers } from '../lib/stores/map.js';
   import { encryptMessage, decryptMessage } from '../lib/crypto.js';
   import { toasts } from '../lib/stores/toast.js';
 
@@ -77,6 +78,9 @@
   $: peerPresence = $secretChatPresence.get(peerId) ?? null;
   $: peerChatOpen = peerPresence?.open ?? false;
   $: peerLastOpenedAt = (peerPresence && !peerPresence.open) ? peerPresence.at : null;
+
+  // General online status — is this peer connected to Kinnect at all?
+  $: peerKinnectOnline = Array.from($otherUsers.values()).some(u => u.userId === peerId && u.online !== false);
 
   function emitPresence(open) {
     socket.emit('secretChatPresence', { peerId, open });
@@ -270,11 +274,13 @@
         {#if !gateOpen}
           <span class="scp-subtext">Enter PIN to open</span>
         {:else if peerChatOpen}
-          <span class="scp-dot scp-dot--online"></span><span class="scp-subtext">Online</span>
+          <span class="scp-dot scp-dot--online"></span><span class="scp-subtext">In this chat</span>
+        {:else if peerKinnectOnline}
+          <span class="scp-dot scp-dot--online" style="background:#60a5fa;box-shadow:0 0 0 2px rgba(96,165,250,0.25)"></span><span class="scp-subtext">Online</span>
         {:else if peerLastOpenedAt}
-          <span class="scp-dot"></span><span class="scp-subtext">Last opened {formatLastSeen(peerLastOpenedAt)}</span>
+          <span class="scp-dot"></span><span class="scp-subtext">Last seen {formatLastSeen(peerLastOpenedAt)}</span>
         {:else}
-          <span class="scp-subtext">End-to-end encrypted</span>
+          <span class="scp-dot" style="background:rgba(255,255,255,0.12)"></span><span class="scp-subtext">Offline</span>
         {/if}
       </span>
     </div>

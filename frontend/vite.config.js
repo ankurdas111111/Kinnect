@@ -6,7 +6,31 @@ const isCapacitorTarget = process.env.VITE_TARGET === 'capacitor';
 const capacitorStubPath = fileURLToPath(new URL('./src/lib/capacitor-stub.js', import.meta.url));
 
 export default defineConfig({
-  plugins: [svelte()],
+  plugins: [
+    svelte(),
+    // Ensure the maplibre chunk gets a <link rel="modulepreload"> in the built
+    // HTML. Vite's built-in modulepreload injection already handles this for
+    // statically-imported chunks; this plugin is a no-op safety net for when
+    // Vite does not automatically detect it (e.g. if the import becomes deeply
+    // dynamic). It checks first so it never duplicates what Vite already added.
+    {
+      name: 'inject-maplibre-preload',
+      transformIndexHtml(html, ctx) {
+        if (!ctx.bundle) return html;
+        const maplibreChunk = Object.values(ctx.bundle).find(
+          chunk => chunk.type === 'chunk' && chunk.name === 'maplibre'
+        );
+        if (!maplibreChunk) return html;
+        // maplibreChunk.fileName may already include "assets/" prefix
+        const fileName = maplibreChunk.fileName.replace(/^assets\//, '');
+        const assetPath = `/assets/${fileName}`;
+        // Skip if Vite already injected a modulepreload for this chunk
+        if (html.includes(assetPath)) return html;
+        const tag = `<link rel="modulepreload" href="${assetPath}" crossorigin />`;
+        return html.replace('</head>', `${tag}\n</head>`);
+      }
+    }
+  ],
   cacheDir: process.env.VITE_CACHE_DIR || 'node_modules/.vite',
   resolve: {
     alias: isCapacitorTarget

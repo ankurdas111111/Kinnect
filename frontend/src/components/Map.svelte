@@ -1,7 +1,8 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import maplibregl from 'maplibre-gl';
-  import 'maplibre-gl/dist/maplibre-gl.css';
+  // maplibregl is loaded dynamically inside onMount so the main bundle
+  // does not block on the ~283 kB maplibre chunk at parse time.
+  let maplibregl;
   import { otherUsers, myLocation, mySocketId, mySafetyStatus, focusUser, mapFlyTo, routeGeometry, navigationState } from '../lib/stores/map.js';
   import { savedPlaces } from '../lib/stores/savedPlaces.js';
   import { arrivalProjections } from '../lib/stores/arrivals.js';
@@ -121,7 +122,14 @@
 
   const debouncedCheckMobile = debounce(checkMobile, 80);
 
-  onMount(() => {
+  onMount(async () => {
+    // Dynamic import breaks the eager-load dependency on the maplibre chunk.
+    // The Vite manualChunks config already puts maplibre in its own chunk; this
+    // import() call makes that chunk truly lazy so main-bundle parse time is lower.
+    const ml = await import('maplibre-gl');
+    maplibregl = ml.default;
+    await import('maplibre-gl/dist/maplibre-gl.css');
+
     checkMobile();
     window.addEventListener('resize', debouncedCheckMobile);
 
@@ -221,6 +229,9 @@
       if (!navActive) followMode = false;
     });
     map.on('load', () => {
+      // Defensive resize in case the container had 0×0 dimensions at init time
+      // (e.g. the DOM was not yet fully laid out when MapLibre mounted).
+      requestAnimationFrame(() => map.resize());
       mapReady = true;
       // Apply Hindi/regional label preference if configured
       const labelPref = localStorage.getItem('kinnect_map_lang') || 'auto';

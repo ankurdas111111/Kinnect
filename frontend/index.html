@@ -26,12 +26,20 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="dns-prefetch" href="https://tiles.openfreemap.org" />
   <link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin />
+  <!-- Preload the MapLibre CSP worker (454 kB) so the browser fetches it at HTML
+       parse time rather than after maplibre-gl.js executes. -->
+  <link rel="preload" href="/maplibre-gl-csp-worker.js" as="script" />
+  <!-- Preload the local liberty style JSON so it is in the prefetch cache
+       when MapLibre requests it during initialisation, cutting one serial RTT. -->
+  <link rel="preload" href="/map-style.json" as="fetch" crossorigin />
   <!-- Sora: geometric, distinctive display/heading font — uncommon, characterful -->
   <!-- Nunito: rounded, warm body font — friendly and family-appropriate          -->
   <!-- JetBrains Mono: monospace for coordinates, codes, metrics                 -->
   <!-- Non-blocking font load: preload as style, swap rel on load so fonts don't block first paint -->
-  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Nunito:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'" />
-  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Nunito:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" /></noscript>
+  <!-- Weights trimmed to only those actually used (~50-80 kB saving): -->
+  <!--   Sora 600;700;800 | Nunito 400;600;700 | JetBrains Mono 500  -->
+  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Nunito:wght@400;600;700&family=JetBrains+Mono:wght@500&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Nunito:wght@400;600;700&family=JetBrains+Mono:wght@500&display=swap" /></noscript>
 </head>
 <body>
   <div id="app"></div>

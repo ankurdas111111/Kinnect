@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { push } from 'svelte-spa-router';
-  import { authUser } from '../lib/stores/auth.js';
+  import { authUser, authLoading } from '../lib/stores/auth.js';
   import { socket, setupSocketHandlers, cancelReconnectBanner, setBanner as socketSetBanner } from '../lib/socket.js';
   import { banner, mySosActive } from '../lib/stores/sos.js';
   import { pendingIncomingRequests } from '../lib/stores/guardians.js';
@@ -141,7 +141,7 @@
     } catch { return null; }
   }
 
-  $: if (!$authUser) push('/login');
+  $: if (!$authLoading && !$authUser) push('/login');
   $: isAdmin = $authUser && $authUser.role === 'admin';
 
   // Force-update persistent notification when ride status changes
