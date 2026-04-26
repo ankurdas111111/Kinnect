@@ -74,6 +74,22 @@
   let stickerAnchor;
   let panicMode = false;
 
+  function restoreFromPanic() {
+    panicMode = false;
+    // Re-lock everything — force PIN re-entry
+    gateOpen = false;
+    sessionPin = '';
+    gatePin = '';
+    // Clear all auto-lock timers and decrypted state
+    for (const id of Object.keys(lockIntervals)) clearInterval(lockIntervals[id]);
+    lockIntervals = {};
+    lockCountdowns = {};
+    lockedSet = new Set();
+    activeDecryptId = null;
+    inlinePins = {};
+    inlineErrors = {};
+  }
+
   $: chat = $secretChats.get(peerId) ?? { messages: [], locked: true, decryptedMessages: new Map() };
   $: myId = get(authUser)?.userId;
   $: sortedMsgs = [...chat.messages].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
@@ -262,7 +278,7 @@
 
 {#if panicMode}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div class="scp-panic" on:click={() => panicMode = false}></div>
+  <div class="scp-panic" on:click={restoreFromPanic}></div>
 {/if}
 
 <div class="scp-backdrop" transition:fade={{ duration: 180 }} on:click|self={onClose}>

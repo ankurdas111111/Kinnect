@@ -33,6 +33,23 @@
   let stickerAnchor;
   let panicMode = false;
 
+  function restoreFromPanic() {
+    panicMode = false;
+    // Re-lock to gate — PIN required again
+    state = 'gate';
+    pin = '';
+    pinError = '';
+    gatePin = '';
+    decrypted = [];
+    activeDecryptId = null;
+    inlinePins = {};
+    inlineErrors = {};
+    lockedSet = new Set();
+    for (const id of Object.keys(lockIntervals)) clearInterval(lockIntervals[id]);
+    lockIntervals = {};
+    lockCountdowns = {};
+  }
+
   // Per-message inline decrypt (messages locked by default after gate)
   let activeDecryptId = null;
   let inlinePins = {};
@@ -215,7 +232,7 @@
 
 {#if panicMode}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div class="scv-panic" on:click={() => panicMode = false}></div>
+  <div class="scv-panic" on:click={restoreFromPanic}></div>
 {/if}
 
 <div class="scv">
