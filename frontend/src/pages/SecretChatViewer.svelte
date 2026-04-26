@@ -6,6 +6,7 @@
   import { onMount, tick } from 'svelte';
   import { decryptMessage, encryptMessage } from '../lib/crypto.js';
   import EmojiPicker from '../components/primitives/EmojiPicker.svelte';
+  import StickerPicker from '../components/primitives/StickerPicker.svelte';
 
   export let params = {};
   $: token = params.token || '';
@@ -28,6 +29,9 @@
   let messagesEl;
   let emojiOpen = false;
   let emojiAnchor;
+  let stickerOpen = false;
+  let stickerAnchor;
+  let panicMode = false;
 
   // Per-message inline decrypt (messages locked by default after gate)
   let activeDecryptId = null;
@@ -200,7 +204,19 @@
     if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
     return new Date(ts).toLocaleDateString([], { month: 'short', day: 'numeric' });
   }
+
+  const GIF_RE = /^\[gif:(https?:\/\/[^\]]+)\]$/;
+  function parseGif(text) {
+    if (!text) return null;
+    const m = GIF_RE.exec(text);
+    return m ? m[1] : null;
+  }
 </script>
+
+{#if panicMode}
+  <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+  <div class="scv-panic" on:click={() => panicMode = false}></div>
+{/if}
 
 <div class="scv">
   <!-- ── Loading ──────────────────────────────────────────────────── -->
@@ -294,7 +310,11 @@
             {:else if isDecrypted}
               <!-- Received + decrypted -->
               <div class="scv-bubble scv-bubble--their scv-bubble--decrypted">
-                <p class="scv-body">{msg.body}</p>
+                {#if parseGif(msg.body)}
+                  <img src={parseGif(msg.body)} class="msg-sticker" alt="sticker" loading="lazy" />
+                {:else}
+                  <p class="scv-body">{msg.body}</p>
+                {/if}
                 <button class="scv-relock-btn" on:click={() => relockMsg(msg.id)} aria-label="Lock message">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                 </button>
@@ -368,10 +388,25 @@
       <!-- Compose -->
       <div class="scv-compose">
         <div class="scv-compose-inner">
+          <!-- Panic / blank button -->
+          <button
+            class="scv-compose-icon-btn"
+            on:click={() => panicMode = true}
+            aria-label="Blank screen"
+            title="Blank screen (tap screen to restore)"
+            type="button"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+              <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+              <line x1="1" y1="1" x2="23" y2="23"/>
+            </svg>
+          </button>
+
           <button
             class="scv-emoji-btn"
             bind:this={emojiAnchor}
-            on:click={() => emojiOpen = !emojiOpen}
+            on:click={() => { emojiOpen = !emojiOpen; stickerOpen = false; }}
             aria-label="Emoji picker"
             type="button"
           >
@@ -382,6 +417,26 @@
               <line x1="15" y1="9" x2="15.01" y2="9"/>
             </svg>
           </button>
+
+          <!-- Sticker button -->
+          <button
+            class="scv-compose-icon-btn"
+            bind:this={stickerAnchor}
+            on:click={() => { stickerOpen = !stickerOpen; emojiOpen = false; }}
+            aria-label="Sticker picker"
+            aria-expanded={stickerOpen}
+            title="Stickers"
+            type="button"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M8 13s1.5 2 4 2 4-2 4-2"/>
+              <line x1="9" y1="9" x2="9.01" y2="9"/>
+              <line x1="15" y1="9" x2="15.01" y2="9"/>
+              <path d="M12 2v2M12 20v2M2 12h2M20 12h2"/>
+            </svg>
+          </button>
+
           <label class="scv-sr" for="scv-reply">Reply</label>
           <textarea
             id="scv-reply"
@@ -411,6 +466,12 @@
           anchor={emojiAnchor}
           on:pick={(e) => { replyText += e.detail; }}
           on:close={() => emojiOpen = false}
+        />
+        <StickerPicker
+          open={stickerOpen}
+          anchor={stickerAnchor}
+          on:pick={(e) => { replyText += e.detail; stickerOpen = false; }}
+          on:close={() => stickerOpen = false}
         />
 
         {#if replyError}
@@ -560,6 +621,21 @@
   .scv-send-ring { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.25); border-top-color: #fff; border-radius: 50%; animation: scv-spin 0.8s linear infinite; }
   .scv-compose-hint { display: flex; align-items: center; gap: 5px; margin: 0; font-size: 10px; color: rgba(255,255,255,0.18); }
   .scv-reply-err { margin: 0; font-size: 12px; color: #f87171; }
+
+  /* Panic overlay */
+  .scv-panic {
+    position: fixed;
+    inset: 0;
+    background: #fff;
+    z-index: 99999;
+    cursor: default;
+  }
+
+  /* Compose icon buttons (panic, sticker) */
+  .scv-compose-icon-btn { width: 36px; height: 36px; min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; background: none; border: none; color: rgba(255,255,255,0.3); cursor: pointer; border-radius: 10px; flex-shrink: 0; transition: color 0.15s, background 0.15s; touch-action: manipulation; }
+  .scv-compose-icon-btn:hover { color: rgba(255,255,255,0.65); background: rgba(255,255,255,0.06); }
+
+  :global(.msg-sticker) { max-width: 120px; max-height: 120px; border-radius: 8px; display: block; }
 
   /* Utils */
   .scv-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
