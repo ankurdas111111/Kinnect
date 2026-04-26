@@ -88,17 +88,19 @@
     pinError = '';
     unlocking = true;
 
-    // Gate PIN = your outgoing reply PIN. Owner's messages are decrypted
-    // individually via inline decrypt using the owner's PIN (shared out-of-band).
-    // No validation here: any 4+ digit code opens the view.
-
-    // Build message list — owner messages stay locked (inline decrypt), own replies opaque
+    // Your PIN encrypts replies AND auto-decrypts received messages.
+    // Works seamlessly if both use the same PIN; falls back to inline decrypt if not.
     const results = [];
     for (const m of rawMessages) {
       if (!m.fromOwner) {
         results.push({ id: m.createdAt + Math.random(), body: null, own: true, createdAt: m.createdAt });
       } else {
-        results.push({ id: m.createdAt + Math.random(), body: null, own: false, createdAt: m.createdAt, raw: m });
+        // Try to auto-decrypt with the entered PIN
+        let body = null;
+        try {
+          body = await decryptMessage(m.ciphertext, m.iv, m.salt, pin);
+        } catch { /* different PIN — stays locked, inline decrypt available */ }
+        results.push({ id: m.createdAt + Math.random(), body, own: false, createdAt: m.createdAt, raw: m });
       }
     }
     decrypted = results;

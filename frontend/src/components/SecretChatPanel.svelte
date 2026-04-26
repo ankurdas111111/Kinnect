@@ -97,6 +97,19 @@
   // Unread = received messages where seenAt is null
   $: unreadCount = sortedMsgs.filter(m => m.senderId !== myId && !m.seenAt).length;
 
+  // Auto-decrypt new incoming messages with session PIN as they arrive
+  $: if (gateOpen && sessionPin && myId) {
+    for (const msg of sortedMsgs) {
+      if (msg.senderId !== myId && !chat.decryptedMessages.has(msg.id) && !lockedSet.has(msg.id)) {
+        decryptMessage(msg.ciphertext, msg.iv, msg.salt, sessionPin).then(plain => {
+          storeDecrypted(peerId, msg.id, plain);
+          if (!msg.seenAt) markSecretMsgSeen(msg.id);
+          startAutoLock(msg.id);
+        }).catch(() => { /* different PIN — stays locked */ });
+      }
+    }
+  }
+
   // Peer presence — chat-specific (did they open THIS chat)
   $: peerPresence = $secretChatPresence.get(peerId) ?? null;
   $: peerChatOpen = peerPresence?.open ?? false;
@@ -132,9 +145,25 @@
     if (gateUnlocking || gatePin.length < 4) return;
     gateError = '';
     gateUnlocking = true;
-    // No validation — gate PIN is purely YOUR encryption key for outgoing messages.
-    // Received messages are decrypted per-message with the SENDER's PIN.
-    sessionPin = gatePin;
+
+    // Set session PIN — used for outgoing messages AND auto-decrypting received ones.
+    // Try to decrypt every received message with this PIN; if it works (same PIN used
+    // by sender) it unlocks automatically. If not, message stays locked as fallback.
+    const pin = gatePin;
+    for (const msg of sortedMsgs) {
+      if (msg.senderId !== myId) {
+        try {
+          const plain = await decryptMessage(msg.ciphertext, msg.iv, msg.salt, pin);
+          storeDecrypted(peerId, msg.id, plain);
+          if (!msg.seenAt) markSecretMsgSeen(msg.id);
+          startAutoLock(msg.id);
+        } catch {
+          // Different PIN — stays locked, inline decrypt available as fallback
+        }
+      }
+    }
+
+    sessionPin = pin;
     gatePin = '';
     gateUnlocking = false;
     gateOpen = true;
@@ -345,8 +374,8 @@
       <div class="scp-gate-text">
         <p class="scp-gate-title">Secret Chat</p>
         <p class="scp-gate-sub">
-          Your PIN encrypts your messages.<br>
-          Share it with {peerFirst === '••••••' ? 'them' : peerFirst} so they can read what you send.
+          Your PIN encrypts your messages and unlocks theirs.<br>
+          Both using the same PIN means everything opens automatically.
         </p>
       </div>
 
