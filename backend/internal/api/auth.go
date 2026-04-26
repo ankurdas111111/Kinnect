@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -41,24 +42,35 @@ type ipRateEntry struct {
 var authIPLimiter sync.Map // map[string]*ipRateEntry
 
 func init() {
-	// Periodically purge expired entries from authIPLimiter to prevent unbounded
-	// memory growth under sustained attack traffic (IPs that attack once and disappear
-	// leave permanent allocations otherwise).
+	// authIPLimiter is initialized as a package-level var (zero value is usable).
+	// The cleanup goroutine is started via StartAuthCleaner(ctx) from main.go so it
+	// has a controlled shutdown path and does not leak between tests.
+}
+
+// StartAuthCleaner starts a goroutine that periodically purges expired entries from
+// authIPLimiter to prevent unbounded memory growth under sustained attack traffic.
+// Call once from main.go alongside other cleanup routines.
+func StartAuthCleaner(ctx context.Context) {
 	go func() {
 		ticker := time.NewTicker(5 * time.Minute)
 		defer ticker.Stop()
-		for range ticker.C {
-			now := time.Now()
-			authIPLimiter.Range(func(k, v any) bool {
-				e := v.(*ipRateEntry)
-				e.mu.Lock()
-				expired := now.After(e.resetAt.Add(time.Minute))
-				e.mu.Unlock()
-				if expired {
-					authIPLimiter.Delete(k)
-				}
-				return true
-			})
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				now := time.Now()
+				authIPLimiter.Range(func(k, v any) bool {
+					e := v.(*ipRateEntry)
+					e.mu.Lock()
+					expired := now.After(e.resetAt.Add(time.Minute))
+					e.mu.Unlock()
+					if expired {
+						authIPLimiter.Delete(k)
+					}
+					return true
+				})
+			}
 		}
 	}()
 }
@@ -292,7 +304,12 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		mobile = &contactValue
 	}
 
-	shareCode := h.generateUniqueShareCode()
+	shareCode, err := h.generateUniqueShareCode()
+	if err != nil {
+		slog.Error("Failed to generate share code", "error", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "Server error"})
+		return
+	}
 	passwordHash, err := auth.HashPassword(password)
 	if err != nil {
 		slog.Error("Password hash failed", "error", err)
@@ -339,13 +356,14 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "userId": userID, "role": role})
 }
 
-func (h *AuthHandler) generateUniqueShareCode() string {
-	for {
+func (h *AuthHandler) generateUniqueShareCode() (string, error) {
+	for i := 0; i < 1000; i++ {
 		c := shared.GenerateCode()
 		if !h.cache.ShareCodeExists(c) {
-			return c
+			return c, nil
 		}
 	}
+	return "", fmt.Errorf("could not generate unique share code after 1000 attempts")
 }
 
 // Logout handles POST /api/logout.

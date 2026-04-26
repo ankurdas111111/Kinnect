@@ -13,15 +13,24 @@ const (
 	sevenDaysMs = 7 * 24 * 60 * 60 * 1000
 )
 
-// safeLoop runs fn on each ticker tick, recovering from panics and restarting the loop.
-// It stops cleanly when ctx is done. Panics are logged and the routine restarts after 5s.
-func safeLoop(ctx context.Context, interval time.Duration, name string, fn func()) {
+// safeLoop runs fn(ctx) on each ticker tick, recovering from panics and restarting
+// the loop with exponential backoff (5s → 10s → 20s … capped at 60s).
+// It stops cleanly when ctx is done.
+func safeLoop(ctx context.Context, interval time.Duration, name string, fn func(ctx context.Context)) {
 	go func() {
+		panicCount := 0
 		for {
 			func() {
 				defer func() {
 					if r := recover(); r != nil {
-						slog.Error("cleanup goroutine panicked", "routine", name, "panic", r)
+						panicCount++
+						if panicCount > 3 {
+							slog.Error("cleanup goroutine panicking repeatedly",
+								"routine", name, "panic", r, "panicCount", panicCount)
+						} else {
+							slog.Error("cleanup goroutine panicked",
+								"routine", name, "panic", r)
+						}
 					}
 				}()
 				ticker := time.NewTicker(interval)
@@ -31,7 +40,7 @@ func safeLoop(ctx context.Context, interval time.Duration, name string, fn func(
 					case <-ctx.Done():
 						return
 					case <-ticker.C:
-						fn()
+						fn(ctx)
 					}
 				}
 			}()
@@ -40,32 +49,70 @@ func safeLoop(ctx context.Context, interval time.Duration, name string, fn func(
 			case <-ctx.Done():
 				return
 			default:
-				slog.Info("cleanup goroutine restarting after panic", "routine", name)
-				time.Sleep(5 * time.Second)
+				// Exponential backoff: 5 * 2^panicCount, capped at 60s.
+				backoff := time.Duration(5*(1<<uint(panicCount-1))) * time.Second
+				if backoff > 60*time.Second {
+					backoff = 60 * time.Second
+				}
+				if backoff < 5*time.Second {
+					backoff = 5 * time.Second
+				}
+				slog.Info("cleanup goroutine restarting after panic",
+					"routine", name, "backoff", backoff)
+				time.Sleep(backoff)
 			}
 		}
 	}()
 }
 
-// StartCleanupRoutines starts 14 periodic goroutines for cache and DB cleanup.
+// StartCleanupRoutines starts periodic goroutines for cache and DB cleanup.
 // All routines use safeLoop so a panic in one is recovered and the routine restarts.
 func (h *Hub) StartCleanupRoutines(ctx context.Context) {
-	safeLoop(ctx, 60*time.Second, "expireOfflineUsers",      h.cleanupExpireOfflineUsers)
-	safeLoop(ctx, 30*time.Second, "expireWatchTokens",       h.cleanupExpireWatchTokens)
-	safeLoop(ctx, 60*time.Second, "expireLiveTokens",        h.cleanupExpireLiveTokens)
-	safeLoop(ctx, 1*time.Hour,    "cleanEmptyOldRooms",      h.cleanupEmptyOldRooms)
-	safeLoop(ctx, 60*time.Second, "expireRoomAdmins",        h.cleanupExpireRoomAdmins)
-	safeLoop(ctx, 60*time.Second, "expireGuardianships",     h.cleanupExpireGuardianships)
-	safeLoop(ctx, 60*time.Second, "checkInOverdue",          h.cleanupCheckInOverdue)
-	safeLoop(ctx, 24*time.Hour,   "purgeStaleGuardianships", h.cleanupStaleGuardianships)
-	safeLoop(ctx, 5*time.Minute,  "haventMovedAlerts",       h.checkHaventMovedAlerts)
-	safeLoop(ctx, 60*time.Second, "expireStatusMessages",    h.cleanupExpiredStatusMessages)
-	safeLoop(ctx, 60*time.Second, "heartbeatWellness",       h.cleanupHeartbeatCheck)
-	safeLoop(ctx, 30*time.Second, "walkWithMe",              h.EvaluateWalk)
-	safeLoop(ctx, 5*time.Minute,  "expireSecretChatInvites", func() {
+	safeLoop(ctx, 60*time.Second, "expireOfflineUsers", func(ctx context.Context) {
+		h.cleanupExpireOfflineUsers()
+	})
+	safeLoop(ctx, 30*time.Second, "expireWatchTokens", func(ctx context.Context) {
+		h.cleanupExpireWatchTokens()
+	})
+	safeLoop(ctx, 60*time.Second, "expireLiveTokens", func(ctx context.Context) {
+		h.cleanupExpireLiveTokens()
+	})
+	safeLoop(ctx, 1*time.Hour, "cleanEmptyOldRooms", func(ctx context.Context) {
+		h.cleanupEmptyOldRooms()
+	})
+	safeLoop(ctx, 60*time.Second, "expireRoomAdmins", func(ctx context.Context) {
+		h.cleanupExpireRoomAdmins()
+	})
+	safeLoop(ctx, 60*time.Second, "expireGuardianships", func(ctx context.Context) {
+		h.cleanupExpireGuardianships()
+	})
+	safeLoop(ctx, 60*time.Second, "checkInOverdue", func(ctx context.Context) {
+		h.cleanupCheckInOverdue()
+	})
+	safeLoop(ctx, 24*time.Hour, "purgeStaleGuardianships", func(ctx context.Context) {
+		h.cleanupStaleGuardianships(ctx)
+	})
+	safeLoop(ctx, 5*time.Minute, "haventMovedAlerts", func(ctx context.Context) {
+		h.checkHaventMovedAlerts()
+	})
+	safeLoop(ctx, 60*time.Second, "expireStatusMessages", func(ctx context.Context) {
+		h.cleanupExpiredStatusMessages()
+	})
+	safeLoop(ctx, 60*time.Second, "heartbeatWellness", func(ctx context.Context) {
+		h.cleanupHeartbeatCheck()
+	})
+	safeLoop(ctx, 30*time.Second, "walkWithMe", func(ctx context.Context) {
+		h.EvaluateWalk()
+	})
+	safeLoop(ctx, 5*time.Minute, "expireSecretChatInvites", func(ctx context.Context) {
 		h.Cache.CollectExpiredSecretChatInvites(time.Now().UnixMilli())
 	})
-	safeLoop(ctx, 24*time.Hour,   "purgeSecretMessages",     h.cleanupExpiredSecretMessages)
+	safeLoop(ctx, 24*time.Hour, "purgeSecretMessages", func(ctx context.Context) {
+		h.cleanupExpiredSecretMessages(ctx)
+	})
+	safeLoop(ctx, 1*time.Hour, "cleanupArrivalMaps", func(ctx context.Context) {
+		cleanupArrivalMaps()
+	})
 
 	slog.Info("Cleanup routines started")
 }
@@ -113,10 +160,10 @@ func (h *Hub) cleanupExpireRoomAdmins() {
 	list := h.Cache.ExpireRoomAdminsInCache(now)
 	payload := func(roomCode, userID string) map[string]interface{} {
 		return map[string]interface{}{
-			"roomCode":   roomCode,
-			"userId":     userID,
-			"role":       "member",
-			"expiresAt":  nil,
+			"roomCode":  roomCode,
+			"userId":    userID,
+			"role":      "member",
+			"expiresAt": nil,
 		}
 	}
 	for _, e := range list {
@@ -157,8 +204,10 @@ func (h *Hub) cleanupExpireGuardianships() {
 	}
 }
 
-func (h *Hub) cleanupStaleGuardianships() {
-	_, err := h.pool.DB.ExecContext(context.Background(),
+// cleanupStaleGuardianships purges old expired/revoked guardianship rows.
+// ctx is threaded so the query can be cancelled on shutdown.
+func (h *Hub) cleanupStaleGuardianships(ctx context.Context) {
+	_, err := h.pool.DB.ExecContext(ctx,
 		`DELETE FROM guardianships
 		 WHERE status IN ('expired', 'revoked')
 		   AND created_at < extract(epoch from now() - interval '30 days')::bigint * 1000`)
@@ -177,7 +226,6 @@ func (h *Hub) cleanupCheckInOverdue() {
 		lastAt := ch.LastCheckInAt
 		if lastAt == 0 {
 			// First evaluation: set baseline to now so the first interval starts counting.
-			// Persist it so the user doesn't reset every cleanup cycle.
 			ch.LastCheckInAt = now
 			lastAt = now
 		}
@@ -237,9 +285,9 @@ func (h *Hub) cleanupExpiredStatusMessages() {
 // stationary for 45–240 minutes. Rate-limited to once per 60 min per ward.
 func (h *Hub) checkHaventMovedAlerts() {
 	now := time.Now().UnixMilli()
-	const minStillMs = 45 * 60 * 1000  // 45 min
+	const minStillMs = 45 * 60 * 1000     // 45 min
 	const maxStillMs = 4 * 60 * 60 * 1000 // 4 hours (after this assume intentional)
-	const cooldownMs = 60 * 60 * 1000  // 1 hour between alerts
+	const cooldownMs = 60 * 60 * 1000     // 1 hour between alerts
 
 	h.Cache.ForEachActiveUser(func(_ string, user *cache.ActiveUser) {
 		if user.MotionClass != "still" {
@@ -271,8 +319,9 @@ func (h *Hub) checkHaventMovedAlerts() {
 }
 
 // cleanupExpiredSecretMessages deletes secret messages older than 7 days.
-func (h *Hub) cleanupExpiredSecretMessages() {
-	_, err := h.pool.DB.ExecContext(context.Background(),
+// ctx is threaded so the query can be cancelled on shutdown.
+func (h *Hub) cleanupExpiredSecretMessages(ctx context.Context) {
+	_, err := h.pool.DB.ExecContext(ctx,
 		`DELETE FROM secret_messages WHERE created_at < NOW() - INTERVAL '7 days'`,
 	)
 	if err != nil {

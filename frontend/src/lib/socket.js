@@ -116,10 +116,15 @@ export function setupSocketHandlers() {
   }
   handlersRegistered = true;
 
-  socket.on('connect', () => {
+  socket.on('connect', async () => {
     connected = true;
     cancelReconnectBanner();
     setBanner({ type: null, text: null, actions: [] });
+    // Fetch saved places on every (re)connect so stale/offline-deleted places are removed.
+    const result = await apiGet('/api/places');
+    if (Array.isArray(result)) {
+      savedPlaces.set(new Map(result.map(p => [p.id, p])));
+    }
   });
 
   // Server tells us our assigned socket ID — use this for self-filtering
@@ -775,15 +780,7 @@ export function setupSocketHandlers() {
     });
   }
 
-  // ── Custom pins: load own places on connect + receive real-time sync ──────
-  socket.on('connect', async () => {
-    const result = await apiGet('/api/places');
-    // Full replacement (not additive) so places deleted while offline are removed from the map.
-    if (Array.isArray(result)) {
-      savedPlaces.set(new Map(result.map(p => [p.id, p])));
-    }
-  });
-
+  // ── Custom pins: real-time sync (places are loaded in the merged connect handler above) ──
   socket.on('syncPlace', ({ action, placeId, userId, name, icon, latitude, longitude, visibility, roomCode }) => {
     savedPlaces.update(m => {
       if (action === 'add') {

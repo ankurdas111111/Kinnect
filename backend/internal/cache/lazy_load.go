@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"log/slog"
+	"sort"
 	"sync"
 	"time"
 
@@ -60,35 +61,60 @@ func (c *Cache) LoadUserCacheEntry(userID string) *db.UserCacheEntry {
 	// Convert to cache entry (GetUserByID already returns *UserCacheEntry)
 	entry := user
 
-	// Store in cache
+	// Store in cache — acquire write lock, evict if needed, then insert.
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// Check if eviction needed
+	// Check if eviction needed (call locked variant — we already hold c.mu).
 	if len(c.UsersCache) >= int(float64(MaxCachedUsers)*EvictionThreshold) {
-		c.EvictLRU(10) // Evict 10 oldest users
+		c.evictLRULocked(10)
 	}
 
+	entry.LastAccessedAt = time.Now().UnixMilli()
 	c.UsersCache[userID] = entry
 	return entry
 }
 
-// EvictLRU removes the least recently used entries from cache
-// This is a simple implementation that removes oldest entries by creation time
-// In production, track actual access times for better LRU
+// EvictLRU removes the least recently used inactive entries from cache.
+// Safe to call without holding c.mu — acquires the lock internally.
+// Never evicts a user who is currently active (present in UserIdToSocketId).
 func (c *Cache) EvictLRU(count int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.evictLRULocked(count)
+}
+
+// evictLRULocked is the lock-free inner implementation.
+// MUST be called with c.mu held.
+func (c *Cache) evictLRULocked(count int) {
 	if count <= 0 || len(c.UsersCache) == 0 {
 		return
 	}
 
+	// Collect candidate (inactive) entries sorted by LastAccessedAt ascending (oldest first).
+	type candidate struct {
+		id             string
+		lastAccessedAt int64
+	}
+	candidates := make([]candidate, 0, len(c.UsersCache))
+	for id, e := range c.UsersCache {
+		// Never evict a currently active (connected) user.
+		if _, active := c.UserIdToSocketId[id]; active {
+			continue
+		}
+		candidates = append(candidates, candidate{id, e.LastAccessedAt})
+	}
+
+	sort.Slice(candidates, func(i, j int) bool {
+		return candidates[i].lastAccessedAt < candidates[j].lastAccessedAt
+	})
+
 	evicted := 0
-	// Simple: remove entries until we've evicted count items
-	// TODO: Implement proper LRU tracking with access times
-	for userID := range c.UsersCache {
+	for _, cand := range candidates {
 		if evicted >= count {
 			break
 		}
-		delete(c.UsersCache, userID)
+		delete(c.UsersCache, cand.id)
 		evicted++
 	}
 

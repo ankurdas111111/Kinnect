@@ -9,10 +9,10 @@ const (
 
 	// MaxDatabaseConnections is the size of the connection pool
 	// Render free tier: Shared database, limited resources
-	MaxDatabaseConnections = 20
+	MaxDatabaseConnections = 10
 
 	// MaxIdleDatabaseConnections is the number of idle connections to maintain
-	MaxIdleDatabaseConnections = 5
+	MaxIdleDatabaseConnections = 3
 
 	// MaxConcurrentDatabaseQueries is the limit on in-flight database operations
 	// Prevents overwhelming the database with concurrent queries

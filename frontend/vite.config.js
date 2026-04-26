@@ -45,6 +45,11 @@ export default defineConfig({
           if (id.includes('/pages/WatchViewer')) return 'page-watch';
           if (id.includes('/pages/SecretChatViewer')) return 'page-m';
           if (id.includes('/pages/Monitoring')) return 'page-monitoring';
+          // Heavy infrequently-used sidebar panels — split out to reduce initial bundle size
+          if (id.includes('/components/HistoryPanel') || id.includes('/pages/RoutePlayback')) return 'panel-history';
+          if (id.includes('/components/SavedPlacesPanel')) return 'panel-places';
+          if (id.includes('/components/SecretChatPanel')) return 'panel-chat';
+          if (id.includes('/components/WalkWithMe')) return 'panel-walk';
         }
       },
       treeshake: true

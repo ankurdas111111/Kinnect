@@ -44,6 +44,10 @@ export function createMapIcon(color, _text, options = {}) {
   const cacheKey = `${color}|${type}`;
   const cached = _iconCache.get(cacheKey);
   if (cached) return cached.cloneNode(true);
+  // Guard: _iconCache is keyed by color|type — with one unique hex color per user
+  // the map can grow to O(unique users seen). Cap at 500 and reset entirely;
+  // icons are recomputed on next access so this is a safe performance-only eviction.
+  if (_iconCache.size >= 500) _iconCache.clear();
 
   const [w, h] = _pinSizes[type] || [28, 37];
   const el = document.createElement('div');

@@ -2,17 +2,18 @@ package db
 
 // UserCacheEntry holds cached user profile data.
 type UserCacheEntry struct {
-	FirstName   string
-	LastName    string
-	Role        string
-	ShareCode   string
-	Email       *string
-	Mobile      *string
-	CreatedAt   int64
-	LastLat     *float64
-	LastLng     *float64
-	LastSpeed   *string
-	LastUpdate  *int64
+	FirstName      string
+	LastName       string
+	Role           string
+	ShareCode      string
+	Email          *string
+	Mobile         *string
+	CreatedAt      int64
+	LastLat        *float64
+	LastLng        *float64
+	LastSpeed      *string
+	LastUpdate     *int64
+	LastAccessedAt int64 // unix ms — updated on every cache read; used by EvictLRU
 }
 
 // RoomEntry holds cached room data.
@@ -54,6 +55,27 @@ type RoomAdminRequestEntry struct {
 	CreatedAt int64
 	Approvals map[string]bool // voterId -> true
 	Denials   map[string]bool // voterId -> true
+}
+
+// SavedPlace mirrors a row from the saved_places table.
+type SavedPlace struct {
+	ID      string
+	Name    string
+	Lat     float64
+	Lng     float64
+	RadiusM float64
+}
+
+// UserSettings holds persisted per-user settings loaded on connection.
+type UserSettings struct {
+	QuietHoursEnabled  bool
+	QuietHoursStart    string
+	QuietHoursEnd      string
+	HeartbeatEnabled   bool
+	HeartbeatDeadline  string
+	HeartbeatLastSignal int64
+	EmergencyPhone1    string
+	EmergencyPhone2    string
 }
 
 // LoadAllResult contains all data loaded from DB for cache init.

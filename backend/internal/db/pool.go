@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	maxOpenConns    = 20
-	maxIdleConns    = 10
+	maxOpenConns    = 10 // keep in sync with config/limits.go:MaxDatabaseConnections
+	maxIdleConns    = 3
 	connMaxIdleTime = 30 * time.Second
 	connMaxLifetime = 5 * time.Minute
 )

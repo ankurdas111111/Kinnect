@@ -3,9 +3,12 @@ package db
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/lib/pq"
 )
 
 // LoadAll loads all persistent data from the DB in parallel.
@@ -86,6 +89,7 @@ func LoadAll(ctx context.Context, db *sql.DB) (*LoadAllResult, error) {
 				mi[mobile.String] = id
 			}
 		}
+		slog.Info("LoadAll: users loaded", "count", len(uc))
 		usersCache = uc
 		shareCodes = sc
 		emailIndex = ei
@@ -155,6 +159,7 @@ func LoadAll(ctx context.Context, db *sql.DB) (*LoadAllResult, error) {
 				delete(rm, code)
 			}
 		}
+		slog.Info("LoadAll: rooms loaded", "count", len(rm))
 		rooms = rm
 		roomMemberRoles = rmr
 	}()
@@ -180,6 +185,7 @@ func LoadAll(ctx context.Context, db *sql.DB) (*LoadAllResult, error) {
 			}
 			ct[ownerId][contactId] = true
 		}
+		slog.Info("LoadAll: contacts loaded", "count", len(ct))
 		contacts = ct
 	}()
 
@@ -208,6 +214,7 @@ func LoadAll(ctx context.Context, db *sql.DB) (*LoadAllResult, error) {
 			}
 			lt[token] = &LiveTokenEntry{UserID: userId, ExpiresAt: exp, CreatedAt: ca}
 		}
+		slog.Info("LoadAll: live tokens loaded", "count", len(lt))
 		liveTokens = lt
 		// Fire-and-forget cleanup of expired tokens
 		go func() {
@@ -246,6 +253,7 @@ func LoadAll(ctx context.Context, db *sql.DB) (*LoadAllResult, error) {
 				CreatedAt:   ca,
 			}
 		}
+		slog.Info("LoadAll: guardianships loaded", "count", len(gs))
 		guardianships = gs
 	}()
 
@@ -306,6 +314,7 @@ func LoadAll(ctx context.Context, db *sql.DB) (*LoadAllResult, error) {
 				}
 			}
 		}
+		slog.Info("LoadAll: room_admin_requests loaded", "count", len(rar))
 		roomAdminReqs = rar
 	}()
 
@@ -363,6 +372,34 @@ func coalesceStr(s, def string) string {
 		return s
 	}
 	return def
+}
+
+// GetPlacesForUsers loads saved_places for a slice of user IDs in a single query.
+// Returns a map from userID → []SavedPlace.
+func GetPlacesForUsers(ctx context.Context, database *sql.DB, userIDs []string) (map[string][]SavedPlace, error) {
+	if len(userIDs) == 0 {
+		return map[string][]SavedPlace{}, nil
+	}
+	// ANY($1) with a single array bind parameter allows the query planner to
+	// cache the plan regardless of how many user IDs are passed.
+	rows, err := database.QueryContext(ctx,
+		`SELECT id, name, latitude, longitude, radius_m, user_id FROM saved_places WHERE user_id = ANY($1)`,
+		pq.Array(userIDs),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make(map[string][]SavedPlace, len(userIDs))
+	for rows.Next() {
+		var p SavedPlace
+		var uid string
+		if err := rows.Scan(&p.ID, &p.Name, &p.Lat, &p.Lng, &p.RadiusM, &uid); err != nil {
+			return nil, err
+		}
+		result[uid] = append(result[uid], p)
+	}
+	return result, rows.Err()
 }
 
 // GetUserByID loads a single user from the database by ID (for lazy loading)

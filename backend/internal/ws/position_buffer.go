@@ -61,9 +61,13 @@ func (h *Hub) runPurge(ctx context.Context) {
 
 	// VACUUM ANALYZE: non-blocking — updates planner statistics and marks dead tuples
 	// for reuse. Does NOT lock the table (unlike VACUUM FULL).
-	// Runs after deletes so the planner immediately benefits from updated row counts.
+	// Uses a detached context with a 30s timeout so it is never cancelled by the
+	// shutdown context or by the purge cycle's own cancellation.
 	for _, table := range []string{"position_history", "movement_events", "zone_visits", "sos_watch_tokens"} {
-		if _, err := h.pool.DB.ExecContext(ctx, "VACUUM ANALYZE "+table); err != nil {
+		vacCtx, vacCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		_, err := h.pool.DB.ExecContext(vacCtx, "VACUUM ANALYZE "+table)
+		vacCancel()
+		if err != nil {
 			slog.Warn("VACUUM ANALYZE failed", "table", table, "error", err)
 		}
 	}

@@ -260,7 +260,9 @@ func (h *Hub) handleRegister(c *Client) {
 			BatteryAlertSentAt: make(map[int]int64),
 		}
 		user.Retention = &cache.Retention{Mode: "default", ClientID: clientID}
-		// Load persisted user settings from DB (heartbeat, emergency phones, quiet hours)
+		// Load persisted settings synchronously before SetActiveUser so that
+		// fields like HeartbeatEnabled and QuietHoursEnabled are fully populated
+		// before any other goroutine (cleanup, SanitizeUser) can observe the user.
 		h.loadUserSettings(user)
 		h.Cache.SetActiveUser(clientID, user)
 		h.Cache.SetUserIdToSocketId(userID, clientID)
@@ -350,7 +352,11 @@ func (h *Hub) handleUnregister(c *Client) {
 		flushTs := time.Now().UnixMilli()
 		go func() {
 			speedStr := fmt.Sprintf("%.2f", spd)
-			_ = db.UpdateUserLocation(context.Background(), h.pool.DB, uid, lat, lng, speedStr, flushTs)
+			flushCtx, flushCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer flushCancel()
+			if err := db.UpdateUserLocation(flushCtx, h.pool.DB, uid, lat, lng, speedStr, flushTs); err != nil {
+				slog.Warn("failed to save last position on disconnect", "userID", uid, "error", err)
+			}
 		}()
 	}
 	// Release rolling buffer memory
@@ -596,42 +602,21 @@ func (h *Hub) SendToGroup(group, event string, data interface{}) {
 }
 
 // loadUserSettings loads persisted settings from the users table into an ActiveUser.
+// Delegates to db.GetUserSettings so the SQL lives in the db layer.
+// Non-fatal: if the query fails the user's settings remain at zero-values.
 func (h *Hub) loadUserSettings(user *cache.ActiveUser) {
-	var qhEnabled, hbEnabled *bool
-	var qhStart, qhEnd, hbDeadline, ePhone1, ePhone2 *string
-	var hbLastSignal *int64
-
-	row := h.pool.DB.QueryRow(
-		`SELECT quiet_hours_enabled, quiet_hours_start::text, quiet_hours_end::text,
-		        heartbeat_enabled, heartbeat_deadline::text, heartbeat_last_signal,
-		        emergency_phone_1, emergency_phone_2
-		   FROM users WHERE id = $1`, user.UserID)
-
-	if err := row.Scan(&qhEnabled, &qhStart, &qhEnd, &hbEnabled, &hbDeadline, &hbLastSignal, &ePhone1, &ePhone2); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	s, err := db.GetUserSettings(ctx, h.pool.DB, user.UserID)
+	if err != nil || s == nil {
 		return // non-fatal: defaults are all zero-values
 	}
-	if qhEnabled != nil {
-		user.QuietHoursEnabled = *qhEnabled
-	}
-	if qhStart != nil && len(*qhStart) >= 5 {
-		user.QuietHoursStart = (*qhStart)[:5]
-	}
-	if qhEnd != nil && len(*qhEnd) >= 5 {
-		user.QuietHoursEnd = (*qhEnd)[:5]
-	}
-	if hbEnabled != nil {
-		user.HeartbeatEnabled = *hbEnabled
-	}
-	if hbDeadline != nil && len(*hbDeadline) >= 5 {
-		user.HeartbeatDeadline = (*hbDeadline)[:5]
-	}
-	if hbLastSignal != nil {
-		user.HeartbeatLastSignal = *hbLastSignal
-	}
-	if ePhone1 != nil {
-		user.EmergencyPhone1 = *ePhone1
-	}
-	if ePhone2 != nil {
-		user.EmergencyPhone2 = *ePhone2
-	}
+	user.QuietHoursEnabled = s.QuietHoursEnabled
+	user.QuietHoursStart = s.QuietHoursStart
+	user.QuietHoursEnd = s.QuietHoursEnd
+	user.HeartbeatEnabled = s.HeartbeatEnabled
+	user.HeartbeatDeadline = s.HeartbeatDeadline
+	user.HeartbeatLastSignal = s.HeartbeatLastSignal
+	user.EmergencyPhone1 = s.EmergencyPhone1
+	user.EmergencyPhone2 = s.EmergencyPhone2
 }

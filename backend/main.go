@@ -41,6 +41,29 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// Wait for the database to be ready before loading data.
+	// On Render free tier, the DB and app cold-start together; the DB may take 5–10s
+	// before it accepts connections. Retry up to 5 times with 2s backoff.
+	{
+		const maxPingAttempts = 5
+		const pingBackoff = 2 * time.Second
+		for i := 1; i <= maxPingAttempts; i++ {
+			pingCtx, pingCancel := context.WithTimeout(ctx, 3*time.Second)
+			err := pool.DB.PingContext(pingCtx)
+			pingCancel()
+			if err == nil {
+				slog.Info("Database ready", "attempt", i)
+				break
+			}
+			if i == maxPingAttempts {
+				slog.Error("Database not ready after retries", "attempts", maxPingAttempts, "error", err)
+				os.Exit(1)
+			}
+			slog.Warn("Database not yet ready, retrying...", "attempt", i, "error", err)
+			time.Sleep(pingBackoff)
+		}
+	}
+
 	// Load all persistent data (users, rooms, contacts, guardianships, live tokens)
 	// into the in-memory cache at startup. This is required so that family members,
 	// contacts, and guardianships are visible immediately after deployment/restart.
@@ -73,6 +96,9 @@ func main() {
 	go hub.StartPositionPurger(ctx)
 	hub.StartCleanupRoutines(ctx)
 	go hub.StartArrivalMonitor(ctx)
+
+	// Start auth IP-limiter cleaner with a shutdown path.
+	api.StartAuthCleaner(ctx)
 
 	// Start memory monitoring for free-tier optimization
 	go hub.MemoryMonitor.Start(ctx, hub)

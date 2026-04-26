@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -103,16 +104,35 @@ func (h *Hub) checkArrivals(ctx context.Context) {
 
 	h.checkColocations(users)
 
-	for _, u := range users {
-		places := h.loadUserPlaces(ctx, u.userID)
-		// Populate placeNames cache for computeActivityContext
-		arrival.mu.Lock()
+	// Batch-load all saved places for all active users in a single DB query (P2).
+	userIDs := make([]string, len(users))
+	for i, u := range users {
+		userIDs[i] = u.userID
+	}
+	allPlaces, err := db.GetPlacesForUsers(ctx, h.pool.DB, userIDs)
+	if err != nil {
+		slog.Warn("checkArrivals: failed to load places", "error", err)
+		allPlaces = map[string][]db.SavedPlace{}
+	}
+
+	// Rebuild placeNames from scratch each cycle to avoid unbounded accumulation.
+	arrival.mu.Lock()
+	arrival.placeNames = make(map[string]string)
+	for _, places := range allPlaces {
 		for _, p := range places {
-			if arrival.placeNames[p.ID] == "" {
-				arrival.placeNames[p.ID] = p.Name
-			}
+			arrival.placeNames[p.ID] = p.Name
 		}
-		arrival.mu.Unlock()
+	}
+	arrival.mu.Unlock()
+
+	for _, u := range users {
+		// Convert db.SavedPlace slice to local savedPlace slice.
+		dbPlaces := allPlaces[u.userID]
+		places := make([]savedPlace, len(dbPlaces))
+		for i, p := range dbPlaces {
+			places[i] = savedPlace{ID: p.ID, Name: p.Name, Lat: p.Lat, Lng: p.Lng, RadiusM: p.RadiusM}
+		}
+		// placeNames already populated above — no per-user lock needed here.
 		for _, p := range places {
 			dist := shared.HaversineM(u.lat, u.lng, p.Lat, p.Lng)
 			isInside := dist <= p.RadiusM
@@ -324,6 +344,13 @@ func (h *Hub) CloseZoneVisitsForUser(userID string) {
 	}
 	delete(arrival.insidePlaces, userID)
 	delete(arrival.lastEtaByUser, userID)
+	// Remove all lastColocationAt entries that involve this user (either side of the pair key).
+	for key := range arrival.lastColocationAt {
+		// Keys are stored as "smallerID:largerID" — check both positions.
+		if strings.HasPrefix(key, userID+":") || strings.HasSuffix(key, ":"+userID) {
+			delete(arrival.lastColocationAt, key)
+		}
+	}
 	arrival.mu.Unlock()
 
 	if len(toClose) == 0 {
@@ -344,5 +371,18 @@ func (h *Hub) CloseZoneVisitsForUser(userID string) {
 				slog.Warn("Failed to close zone_visit on disconnect", "error", err)
 			}
 		}(entry.placeID, entry.entryTime, departedAt, durSec)
+	}
+}
+
+// cleanupArrivalMaps removes lastColocationAt entries that are older than 2 hours.
+// Called hourly from StartCleanupRoutines to prevent the map growing unbounded.
+func cleanupArrivalMaps() {
+	cutoff := time.Now().Add(-2 * time.Hour).UnixMilli()
+	arrival.mu.Lock()
+	defer arrival.mu.Unlock()
+	for key, ts := range arrival.lastColocationAt {
+		if ts < cutoff {
+			delete(arrival.lastColocationAt, key)
+		}
 	}
 }
