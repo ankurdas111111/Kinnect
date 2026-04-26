@@ -97,18 +97,6 @@
   // Unread = received messages where seenAt is null
   $: unreadCount = sortedMsgs.filter(m => m.senderId !== myId && !m.seenAt).length;
 
-  // Auto-decrypt new incoming messages with session PIN as they arrive
-  $: if (gateOpen && sessionPin && myId) {
-    for (const msg of sortedMsgs) {
-      if (msg.senderId !== myId && !chat.decryptedMessages.has(msg.id) && !lockedSet.has(msg.id)) {
-        decryptMessage(msg.ciphertext, msg.iv, msg.salt, sessionPin).then(plain => {
-          storeDecrypted(peerId, msg.id, plain);
-          if (!msg.seenAt) markSecretMsgSeen(msg.id);
-          startAutoLock(msg.id);
-        }).catch(() => { /* different PIN — stays locked */ });
-      }
-    }
-  }
 
   // Peer presence — chat-specific (did they open THIS chat)
   $: peerPresence = $secretChatPresence.get(peerId) ?? null;
@@ -146,24 +134,9 @@
     gateError = '';
     gateUnlocking = true;
 
-    // Set session PIN — used for outgoing messages AND auto-decrypting received ones.
-    // Try to decrypt every received message with this PIN; if it works (same PIN used
-    // by sender) it unlocks automatically. If not, message stays locked as fallback.
-    const pin = gatePin;
-    for (const msg of sortedMsgs) {
-      if (msg.senderId !== myId) {
-        try {
-          const plain = await decryptMessage(msg.ciphertext, msg.iv, msg.salt, pin);
-          storeDecrypted(peerId, msg.id, plain);
-          if (!msg.seenAt) markSecretMsgSeen(msg.id);
-          startAutoLock(msg.id);
-        } catch {
-          // Different PIN — stays locked, inline decrypt available as fallback
-        }
-      }
-    }
-
-    sessionPin = pin;
+    // Gate PIN = your encryption key for outgoing messages only.
+    // Received messages are always locked — tap each one to enter PIN and read.
+    sessionPin = gatePin;
     gatePin = '';
     gateUnlocking = false;
     gateOpen = true;
@@ -374,8 +347,8 @@
       <div class="scp-gate-text">
         <p class="scp-gate-title">Secret Chat</p>
         <p class="scp-gate-sub">
-          Your PIN encrypts your messages and unlocks theirs.<br>
-          Both using the same PIN means everything opens automatically.
+          Your PIN encrypts your messages.<br>
+          Tap any received message to enter a PIN and read it.
         </p>
       </div>
 

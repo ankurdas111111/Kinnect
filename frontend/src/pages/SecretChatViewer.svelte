@@ -88,19 +88,14 @@
     pinError = '';
     unlocking = true;
 
-    // Your PIN encrypts replies AND auto-decrypts received messages.
-    // Works seamlessly if both use the same PIN; falls back to inline decrypt if not.
+    // Gate PIN = reply encryption key only.
+    // All received messages stay locked — tap each one to enter PIN and read.
     const results = [];
     for (const m of rawMessages) {
       if (!m.fromOwner) {
         results.push({ id: m.createdAt + Math.random(), body: null, own: true, createdAt: m.createdAt });
       } else {
-        // Try to auto-decrypt with the entered PIN
-        let body = null;
-        try {
-          body = await decryptMessage(m.ciphertext, m.iv, m.salt, pin);
-        } catch { /* different PIN — stays locked, inline decrypt available */ }
-        results.push({ id: m.createdAt + Math.random(), body, own: false, createdAt: m.createdAt, raw: m });
+        results.push({ id: m.createdAt + Math.random(), body: null, own: false, createdAt: m.createdAt, raw: m });
       }
     }
     decrypted = results;
