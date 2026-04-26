@@ -6,17 +6,20 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"kinnect-v3/internal/auth"
 	"kinnect-v3/internal/cache"
 	"kinnect-v3/internal/db"
+	"kinnect-v3/internal/shared"
 )
 
-// PagesHandler handles CSRF, Me, LiveToken, WatchToken.
+// PagesHandler handles CSRF, Me, LiveToken, WatchToken, and profile mutations.
 type PagesHandler struct {
 	cache *cache.Cache
 	db    *sql.DB
+	store *auth.SessionStore
 }
 
 // Csrf handles GET /api/csrf.
@@ -66,6 +69,119 @@ func (h *PagesHandler) Me(w http.ResponseWriter, r *http.Request) {
 		"email":       email,
 		"mobile":      mobile,
 	})
+}
+
+// UpdateProfile handles POST /api/profile/update.
+func (h *PagesHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
+	sess := auth.GetSession(r)
+	if sess == nil || sess.User == nil || sess.User.ID == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"ok": false, "error": "Not authenticated"})
+		return
+	}
+	var req struct {
+		FirstName string `json:"firstName"`
+		LastName  string `json:"lastName"`
+		Email     string `json:"email"`
+		Mobile    string `json:"mobile"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "Invalid request"})
+		return
+	}
+	firstName := shared.SanitizeString(strings.TrimSpace(req.FirstName), 64)
+	lastName := shared.SanitizeString(strings.TrimSpace(req.LastName), 64)
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	mobile := strings.TrimSpace(req.Mobile)
+
+	if email != "" && !emailRegex.MatchString(email) {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "Invalid email address"})
+		return
+	}
+	if mobile != "" && !mobileRegex.MatchString(mobile) {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "Mobile must be in +E.164 format"})
+		return
+	}
+
+	if err := db.UpdateUserProfile(r.Context(), h.db, sess.User.ID, firstName, lastName, email, mobile); err != nil {
+		slog.Error("UpdateProfile: db error", "error", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "Failed to update profile"})
+		return
+	}
+	h.cache.UpdateUserProfile(sess.User.ID, firstName, lastName, email, mobile)
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// ChangePassword handles POST /api/profile/password.
+func (h *PagesHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	sess := auth.GetSession(r)
+	if sess == nil || sess.User == nil || sess.User.ID == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"ok": false, "error": "Not authenticated"})
+		return
+	}
+	var req struct {
+		CurrentPassword string `json:"currentPassword"`
+		NewPassword     string `json:"newPassword"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "Invalid request"})
+		return
+	}
+	if len(req.NewPassword) < minPasswordBytes || len(req.NewPassword) > maxPasswordBytes {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "Password must be 6–72 characters"})
+		return
+	}
+	hash, err := db.GetUserPasswordHash(r.Context(), h.db, sess.User.ID)
+	if err != nil || hash == "" {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "Could not verify password"})
+		return
+	}
+	if !auth.ComparePassword(hash, req.CurrentPassword) {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"ok": false, "error": "Current password is incorrect"})
+		return
+	}
+	newHash, err := auth.HashPassword(req.NewPassword)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "Failed to hash password"})
+		return
+	}
+	if err := db.UpdateUserPassword(r.Context(), h.db, sess.User.ID, newHash); err != nil {
+		slog.Error("ChangePassword: db error", "error", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "Failed to update password"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// DeleteAccount handles POST /api/profile/delete.
+func (h *PagesHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
+	sess := auth.GetSession(r)
+	if sess == nil || sess.User == nil || sess.User.ID == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"ok": false, "error": "Not authenticated"})
+		return
+	}
+	var req struct {
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "Invalid request"})
+		return
+	}
+	hash, err := db.GetUserPasswordHash(r.Context(), h.db, sess.User.ID)
+	if err != nil || hash == "" || !auth.ComparePassword(hash, req.Password) {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"ok": false, "error": "Incorrect password"})
+		return
+	}
+	if err := db.DeleteUser(r.Context(), h.db, sess.User.ID); err != nil {
+		slog.Error("DeleteAccount: db error", "error", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "Failed to delete account"})
+		return
+	}
+	// Destroy server-side session and clear cookie
+	if sid := auth.GetSessionID(r); sid != "" {
+		_ = h.store.Destroy(sid)
+	}
+	clearSessionCookie(w)
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 // LiveToken handles GET /api/live/{token}.

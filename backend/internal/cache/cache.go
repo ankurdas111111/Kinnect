@@ -295,6 +295,11 @@ func (c *Cache) Init(result *db.LoadAllResult) {
 	if c.UsersCache == nil {
 		c.UsersCache = make(map[string]*db.UserCacheEntry)
 	}
+	// Stamp all loaded users with current access time so LRU starts with a fair baseline.
+	now := time.Now().UnixMilli()
+	for _, e := range c.UsersCache {
+		e.LastAccessedAt = now
+	}
 	c.ShareCodes = result.ShareCodes
 	if c.ShareCodes == nil {
 		c.ShareCodes = make(map[string]string)
@@ -772,10 +777,15 @@ func (c *Cache) SanitizeUser(user *ActiveUser) map[string]interface{} {
 }
 
 // GetUser returns a user cache entry by ID. Caller must not modify.
+// Updates LastAccessedAt under a write lock so EvictLRU can track recency.
 func (c *Cache) GetUser(userID string) *db.UserCacheEntry {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.UsersCache[userID]
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	e := c.UsersCache[userID]
+	if e != nil {
+		e.LastAccessedAt = time.Now().UnixMilli()
+	}
+	return e
 }
 
 // HasShareCode returns true if the share code exists.
@@ -1102,6 +1112,7 @@ func (c *Cache) GetShareCodeInfo(userID string) (shareCode, email, mobile string
 func (c *Cache) AddUser(userID string, entry *db.UserCacheEntry, shareCode string, email, mobile *string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	entry.LastAccessedAt = time.Now().UnixMilli()
 	c.UsersCache[userID] = entry
 	c.ShareCodes[shareCode] = userID
 	if email != nil && *email != "" {
@@ -1118,6 +1129,37 @@ func (c *Cache) UpdateUserRole(userID, newRole string) {
 	defer c.mu.Unlock()
 	if u := c.UsersCache[userID]; u != nil {
 		u.Role = newRole
+	}
+}
+
+// UpdateUserProfile updates profile fields in the cache after a successful DB write.
+func (c *Cache) UpdateUserProfile(userID, firstName, lastName, email, mobile string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	u := c.UsersCache[userID]
+	if u == nil {
+		return
+	}
+	// Remove old email/mobile index entries
+	if u.Email != nil && *u.Email != "" {
+		delete(c.EmailIndex, strings.ToLower(*u.Email))
+	}
+	if u.Mobile != nil && *u.Mobile != "" {
+		delete(c.MobileIndex, *u.Mobile)
+	}
+	u.FirstName = firstName
+	u.LastName = lastName
+	if email != "" {
+		u.Email = &email
+		c.EmailIndex[strings.ToLower(email)] = userID
+	} else {
+		u.Email = nil
+	}
+	if mobile != "" {
+		u.Mobile = &mobile
+		c.MobileIndex[mobile] = userID
+	} else {
+		u.Mobile = nil
 	}
 }
 
@@ -1209,7 +1251,10 @@ func (c *Cache) CacheSize() int64 {
 	return size
 }
 
+const maxPushSubsPerUser = 10
+
 // AddPushSubscription stores a Web Push subscription for the user (deduped by endpoint).
+// Enforces a cap of maxPushSubsPerUser endpoints per user via FIFO eviction.
 func (c *Cache) AddPushSubscription(userID, endpoint, p256dh, auth string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -1220,6 +1265,10 @@ func (c *Cache) AddPushSubscription(userID, endpoint, p256dh, auth string) {
 			c.PushSubs[userID] = subs
 			return
 		}
+	}
+	// Enforce per-user cap: drop the oldest entry (index 0) before appending.
+	if len(subs) >= maxPushSubsPerUser {
+		subs = subs[1:]
 	}
 	c.PushSubs[userID] = append(subs, PushSubscription{Endpoint: endpoint, P256dh: p256dh, Auth: auth})
 }

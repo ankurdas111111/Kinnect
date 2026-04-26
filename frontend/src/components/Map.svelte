@@ -629,6 +629,7 @@
   let pinPopups = new Map();         // placeId → maplibregl.Popup
   let showPinDialog = false;
   let pendingPin = null;             // { lat, lng } awaiting dialog
+  let pendingPinMarker = null;       // maplibregl.Marker — preview dot while dialog is open
   let mapReady = false;
 
   $: if (map) {
@@ -749,6 +750,32 @@
     }
   }
 
+  // ── Preview pin — visible marker while add-location dialog is open ───────
+  $: if (map) {
+    if (pendingPin) {
+      // Remove any old preview marker
+      if (pendingPinMarker) { pendingPinMarker.remove(); pendingPinMarker = null; }
+
+      // Build the preview element
+      const el = document.createElement('div');
+      el.className = 'pending-pin-marker';
+      el.innerHTML = `
+        <div class="pending-pin-pulse"></div>
+        <div class="pending-pin-dot">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 119.5 9 2.5 2.5 0 0112 11.5z"/>
+          </svg>
+        </div>
+        <div class="pending-pin-stem"></div>
+      `;
+      pendingPinMarker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+        .setLngLat([pendingPin.lng, pendingPin.lat])
+        .addTo(map);
+    } else {
+      if (pendingPinMarker) { pendingPinMarker.remove(); pendingPinMarker = null; }
+    }
+  }
+
   $: if (map && $focusUser) {
     const sid = $focusUser;
     focusUser.set(null);
@@ -864,6 +891,55 @@
     position: absolute;
     inset: 0;
     z-index: 1;
+  }
+
+  /* ── Pending pin preview marker ──────────────────────────────── */
+  :global(.pending-pin-marker) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: none;
+  }
+  :global(.pending-pin-dot) {
+    width: 40px;
+    height: 40px;
+    border-radius: 50% 50% 50% 4px;
+    transform: rotate(-45deg);
+    background: linear-gradient(135deg, #818cf8, #6366f1);
+    border: 2.5px solid #fff;
+    box-shadow: 0 4px 18px rgba(99,102,241,0.55), 0 2px 6px rgba(0,0,0,0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: pending-pin-drop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+  :global(.pending-pin-dot svg) {
+    transform: rotate(45deg);
+  }
+  :global(.pending-pin-stem) {
+    width: 2px;
+    height: 8px;
+    background: rgba(99,102,241,0.5);
+    border-radius: 0 0 2px 2px;
+    margin-top: -1px;
+  }
+  :global(.pending-pin-pulse) {
+    position: absolute;
+    bottom: 8px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(99,102,241,0.2);
+    animation: pending-pin-pulse 1.4s ease-out infinite;
+    pointer-events: none;
+  }
+  @keyframes -global-pending-pin-drop {
+    from { transform: rotate(-45deg) translateY(-20px) scale(0.7); opacity: 0; }
+    to   { transform: rotate(-45deg) translateY(0)     scale(1);   opacity: 1; }
+  }
+  @keyframes -global-pending-pin-pulse {
+    0%   { transform: scale(0.6); opacity: 0.7; }
+    100% { transform: scale(1.8); opacity: 0; }
   }
 
   /* MERIDIAN: Gradient vignettes blend the map into the UI chrome */

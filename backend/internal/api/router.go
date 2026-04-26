@@ -24,7 +24,7 @@ func NewRouter(cfg *config.Config, pool *db.Pool, c *cache.Cache, store *auth.Se
 
 	isProduction := cfg.NodeEnv == "production"
 	authHandler := &AuthHandler{db: pool.DB, cache: c, store: store, secret: cfg.SessionSecret, adminEmail: cfg.AdminEmail, secure: isProduction}
-	pagesHandler := &PagesHandler{cache: c, db: pool.DB}
+	pagesHandler := &PagesHandler{cache: c, db: pool.DB, store: store}
 	healthHandler := &HealthHandler{db: pool.DB, cache: c, hub: hub, env: cfg.NodeEnv}
 	if len(rc) > 0 {
 		healthHandler.redis = rc[0]
@@ -40,6 +40,9 @@ func NewRouter(cfg *config.Config, pool *db.Pool, c *cache.Cache, store *auth.Se
 	mux.Handle("POST /api/logout", CsrfMiddleware(http.HandlerFunc(authHandler.Logout)))
 	mux.Handle("GET /api/csrf", http.HandlerFunc(pagesHandler.Csrf))
 	mux.Handle("GET /api/me", http.HandlerFunc(pagesHandler.Me))
+	mux.Handle("POST /api/profile/update", RequireAuth(CsrfMiddleware(http.HandlerFunc(pagesHandler.UpdateProfile))))
+	mux.Handle("POST /api/profile/password", RequireAuth(CsrfMiddleware(http.HandlerFunc(pagesHandler.ChangePassword))))
+	mux.Handle("POST /api/profile/delete", RequireAuth(CsrfMiddleware(http.HandlerFunc(pagesHandler.DeleteAccount))))
 	mux.Handle("GET /api/live/{token}", http.HandlerFunc(pagesHandler.LiveToken))
 	mux.Handle("GET /api/watch/{token}", http.HandlerFunc(pagesHandler.WatchToken))
 	mux.Handle("GET /api/m/{token}", http.HandlerFunc(pagesHandler.MInvite))
