@@ -1,0 +1,30 @@
+backend/internal/api/auth.go
+  71f21f98-5114-4141-8db6-cf6a724bc1e8:2026-04-26T20:58:37.250Z 7,45-48,50-53,57-73,307-312,359-360,363,366
+backend/internal/cache/lazy_load.go
+  71f21f98-5114-4141-8db6-cf6a724bc1e8:2026-04-26T20:58:37.250Z 7,64,68,70,73,78-80,82-85,87-89,94-106,108-110,113,117
+backend/internal/config/limits.go
+  71f21f98-5114-4141-8db6-cf6a724bc1e8:2026-04-26T20:58:37.250Z 12,15
+backend/internal/db/pool.go
+  71f21f98-5114-4141-8db6-cf6a724bc1e8:2026-04-26T21:17:47.838Z 14-15
+backend/internal/db/queries.go
+  71f21f98-5114-4141-8db6-cf6a724bc1e8:2026-04-26T21:18:13.179Z 6,11,92,162,188,217,256,317,377-403
+backend/internal/db/types.go
+  71f21f98-5114-4141-8db6-cf6a724bc1e8:2026-04-26T20:58:37.250Z 5-16,60-67,69-79
+backend/internal/ws/arrival_monitor.go
+  71f21f98-5114-4141-8db6-cf6a724bc1e8:2026-04-26T20:58:37.250Z 7,107-116,118-121,123,125-126,128-135,347-353,377-388
+backend/internal/ws/cleanup.go
+  71f21f98-5114-4141-8db6-cf6a724bc1e8:2026-04-26T20:58:37.250Z 16-19,21,26-33,43,52-62,68,71-107,110-115,163-166,207-210,288,290,322-324
+backend/internal/ws/hub.go
+  71f21f98-5114-4141-8db6-cf6a724bc1e8:2026-04-26T21:17:21.187Z 263-265,355-359,605-606,608-611,614-621
+backend/internal/ws/position_buffer.go
+  71f21f98-5114-4141-8db6-cf6a724bc1e8:2026-04-26T20:58:37.250Z 64-65,67-70
+backend/main.go
+  71f21f98-5114-4141-8db6-cf6a724bc1e8:2026-04-26T20:58:37.250Z 44-65,100-101
+frontend/src/lib/socket.js
+  71f21f98-5114-4141-8db6-cf6a724bc1e8:2026-04-26T20:58:37.250Z 119,123-127,783
+frontend/src/lib/tracking.js
+  71f21f98-5114-4141-8db6-cf6a724bc1e8:2026-04-26T20:58:37.250Z 47-50
+frontend/vite.config.js
+  71f21f98-5114-4141-8db6-cf6a724bc1e8:2026-04-26T20:58:37.250Z 48-52
+---
+{"schema_version": "authorship/3.0.0", "base_commit_sha": "HEAD~1", "prompts": {"71f21f98-5114-4141-8db6-cf6a724bc1e8:2026-04-26T20:58:37.250Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 36, "overriden_lines": 0}, "71f21f98-5114-4141-8db6-cf6a724bc1e8:2026-04-26T21:17:47.838Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 2, "overriden_lines": 0}, "71f21f98-5114-4141-8db6-cf6a724bc1e8:2026-04-26T21:18:13.179Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 35, "overriden_lines": 0}, "71f21f98-5114-4141-8db6-cf6a724bc1e8:2026-04-26T21:17:21.187Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 22, "overriden_lines": 0}}}
