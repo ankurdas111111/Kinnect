@@ -1,0 +1,6 @@
+frontend/src/components/SecretChatPanel.svelte
+  01a780c1-9bf9-4293-99ad-c513cfa4e8ab:2026-04-26T22:18:25.395Z 77-91,281
+frontend/src/pages/SecretChatViewer.svelte
+  01a780c1-9bf9-4293-99ad-c513cfa4e8ab:2026-04-26T22:18:41.397Z 36-51,235
+---
+{"schema_version": "authorship/3.0.0", "base_commit_sha": "HEAD~1", "prompts": {"01a780c1-9bf9-4293-99ad-c513cfa4e8ab:2026-04-26T22:18:25.395Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 16, "overriden_lines": 0}, "01a780c1-9bf9-4293-99ad-c513cfa4e8ab:2026-04-26T22:18:41.397Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 17, "overriden_lines": 0}}}
