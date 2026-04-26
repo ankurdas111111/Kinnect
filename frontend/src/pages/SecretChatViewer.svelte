@@ -86,23 +86,11 @@
   async function unlock() {
     if (unlocking || pin.length < 4) return;
     pinError = '';
-
-    if (rawMessages.length === 0) {
-      gatePin = pin;
-      decrypted = [];
-      state = 'messages';
-      return;
-    }
-
     unlocking = true;
-    const first = rawMessages.find(m => m.fromOwner) ?? rawMessages[0];
-    try {
-      await decryptMessage(first.ciphertext, first.iv, first.salt, pin);
-    } catch {
-      pinError = 'Wrong code';
-      unlocking = false;
-      return;
-    }
+
+    // Gate PIN = your outgoing reply PIN. Owner's messages are decrypted
+    // individually via inline decrypt using the owner's PIN (shared out-of-band).
+    // No validation here: any 4+ digit code opens the view.
 
     // Build message list — owner messages stay locked (inline decrypt), own replies opaque
     const results = [];

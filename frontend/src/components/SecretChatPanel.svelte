@@ -133,18 +133,10 @@
     gateError = '';
     gateUnlocking = true;
 
-    // If there are received messages, validate PIN against first one
-    const receivedMsgs = sortedMsgs.filter(m => m.senderId !== myId);
-    if (receivedMsgs.length > 0) {
-      try {
-        await decryptMessage(receivedMsgs[0].ciphertext, receivedMsgs[0].iv, receivedMsgs[0].salt, gatePin);
-      } catch {
-        gateError = 'Wrong PIN — try again';
-        gateUnlocking = false;
-        return;
-      }
-    }
-
+    // Gate PIN only sets the session PIN for YOUR outgoing messages.
+    // Received messages from the other person use their own PIN —
+    // those are decrypted individually via inline decrypt, not at the gate.
+    // No validation here: any 4+ digit PIN opens the chat.
     sessionPin = gatePin;
     gatePin = '';
     gateUnlocking = false;
@@ -356,8 +348,8 @@
       <div class="scp-gate-text">
         <p class="scp-gate-title">Secret Chat</p>
         <p class="scp-gate-sub">
-          Enter the shared PIN to open this chat.<br>
-          The same PIN will encrypt your replies.
+          Set any PIN — your messages will be encrypted with it.<br>
+          Share it with {peerFirst === '••••••' ? 'them' : peerFirst} so they can read your messages.
         </p>
       </div>
 
@@ -387,7 +379,7 @@
         on:click={submitGate}
         disabled={gateUnlocking || gatePin.length < 4}
       >
-        {gateUnlocking ? 'Checking…' : 'Open Chat'}
+        Set PIN &amp; Open
       </button>
     </div>
 
