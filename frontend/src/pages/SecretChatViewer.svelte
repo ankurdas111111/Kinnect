@@ -5,6 +5,7 @@
 <script>
   import { onMount, tick } from 'svelte';
   import { decryptMessage, encryptMessage } from '../lib/crypto.js';
+  import EmojiPicker from '../components/primitives/EmojiPicker.svelte';
 
   export let params = {};
   $: token = params.token || '';
@@ -25,6 +26,8 @@
   let replySent = false;
   let sending = false;
   let messagesEl;
+  let emojiOpen = false;
+  let emojiAnchor;
 
   // Per-message inline decrypt (messages locked by default after gate)
   let activeDecryptId = null;
@@ -365,6 +368,20 @@
       <!-- Compose -->
       <div class="scv-compose">
         <div class="scv-compose-inner">
+          <button
+            class="scv-emoji-btn"
+            bind:this={emojiAnchor}
+            on:click={() => emojiOpen = !emojiOpen}
+            aria-label="Emoji picker"
+            type="button"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+              <line x1="9" y1="9" x2="9.01" y2="9"/>
+              <line x1="15" y1="9" x2="15.01" y2="9"/>
+            </svg>
+          </button>
           <label class="scv-sr" for="scv-reply">Reply</label>
           <textarea
             id="scv-reply"
@@ -389,6 +406,13 @@
             {/if}
           </button>
         </div>
+        <EmojiPicker
+          open={emojiOpen}
+          anchor={emojiAnchor}
+          on:pick={(e) => { replyText += e.detail; }}
+          on:close={() => emojiOpen = false}
+        />
+
         {#if replyError}
           <p class="scv-reply-err" role="alert">{replyError}</p>
         {/if}
@@ -524,6 +548,8 @@
   /* Compose */
   .scv-compose { padding: 10px 14px 14px; border-top: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; gap: 7px; flex-shrink: 0; background: rgba(0,0,0,0.12); }
   .scv-compose-inner { display: flex; align-items: flex-end; gap: 8px; }
+  .scv-emoji-btn { width: 36px; height: 36px; min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; background: none; border: none; color: rgba(255,255,255,0.3); cursor: pointer; border-radius: 10px; flex-shrink: 0; transition: color 0.15s, background 0.15s; touch-action: manipulation; }
+  .scv-emoji-btn:hover { color: rgba(255,255,255,0.65); background: rgba(255,255,255,0.06); }
   .scv-compose-text { flex: 1; resize: none; padding: 10px 12px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.09); background: rgba(255,255,255,0.04); color: #e2e8f0; font-size: 14px; line-height: 1.5; outline: none; font-family: system-ui, sans-serif; -webkit-appearance: none; max-height: 120px; min-height: 44px; box-sizing: border-box; width: 100%; transition: border-color 0.15s; }
   .scv-compose-text:focus { border-color: rgba(255,255,255,0.18); }
   .scv-compose-text::placeholder { color: rgba(255,255,255,0.2); }

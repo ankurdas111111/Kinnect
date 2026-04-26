@@ -8,6 +8,7 @@
   import { otherUsers } from '../lib/stores/map.js';
   import { encryptMessage, decryptMessage } from '../lib/crypto.js';
   import { toasts } from '../lib/stores/toast.js';
+  import EmojiPicker from './primitives/EmojiPicker.svelte';
 
   export let peerId;
   export let peerName = 'Contact';
@@ -66,6 +67,8 @@
   let sending = false;
   let copyDone = false;
   let messagesEl;
+  let emojiOpen = false;
+  let emojiAnchor;
 
   $: chat = $secretChats.get(peerId) ?? { messages: [], locked: true, decryptedMessages: new Map() };
   $: myId = get(authUser)?.userId;
@@ -485,6 +488,21 @@
     <!-- ── Compose ─────────────────────────────────────────── -->
     <div class="scp-compose">
       <div class="scp-compose-inner">
+        <button
+          class="scp-emoji-btn"
+          bind:this={emojiAnchor}
+          on:click={() => emojiOpen = !emojiOpen}
+          aria-label="Emoji picker"
+          aria-expanded={emojiOpen}
+          type="button"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+            <line x1="9" y1="9" x2="9.01" y2="9"/>
+            <line x1="15" y1="9" x2="15.01" y2="9"/>
+          </svg>
+        </button>
         <label class="scp-sr" for="scp-compose-text">Secret message</label>
         <textarea
           id="scp-compose-text"
@@ -509,6 +527,13 @@
           {/if}
         </button>
       </div>
+
+      <EmojiPicker
+        open={emojiOpen}
+        anchor={emojiAnchor}
+        on:pick={(e) => { composeText += e.detail; }}
+        on:close={() => emojiOpen = false}
+      />
       <p class="scp-compose-hint">
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
         Encrypted with your session PIN · {peerFirst} needs the same PIN to read
@@ -1032,6 +1057,20 @@
     display: flex; align-items: flex-end;
     gap: 8px;
   }
+
+  .scp-emoji-btn {
+    width: 36px; height: 36px;
+    min-width: 44px; min-height: 44px;
+    display: flex; align-items: center; justify-content: center;
+    background: none; border: none;
+    color: rgba(255,255,255,0.3);
+    cursor: pointer;
+    border-radius: 10px;
+    flex-shrink: 0;
+    transition: color 0.15s, background 0.15s;
+    touch-action: manipulation;
+  }
+  .scp-emoji-btn:hover { color: rgba(255,255,255,0.65); background: rgba(255,255,255,0.06); }
 
   .scp-compose-text {
     flex: 1;
