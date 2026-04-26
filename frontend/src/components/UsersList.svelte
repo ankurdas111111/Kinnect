@@ -24,19 +24,23 @@
 
   $: isAdmin = $authUser && $authUser.role === 'admin';
 
-  // Sort: SOS first, then online, then by proximity, then offline
+  // Sort: SOS first, then online (with location) → online (no location) → offline
   $: userList = Array.from($otherUsers.values())
-    .filter(u => u.latitude != null && u.longitude != null)
     .sort((a, b) => {
       if (a.sos?.active && !b.sos?.active) return -1;
       if (!a.sos?.active && b.sos?.active) return 1;
       if (a.online !== false && b.online === false) return -1;
       if (a.online === false && b.online !== false) return 1;
-      // Sort online users by distance if we know our location
-      if ($myLocation && a.online !== false && b.online !== false) {
-        const da = calculateDistance($myLocation.latitude, $myLocation.longitude, a.latitude, a.longitude);
-        const db = calculateDistance($myLocation.latitude, $myLocation.longitude, b.latitude, b.longitude);
-        return da - db;
+      if (a.online !== false && b.online !== false) {
+        const aHasLoc = a.latitude != null && a.longitude != null;
+        const bHasLoc = b.latitude != null && b.longitude != null;
+        if (aHasLoc && !bHasLoc) return -1;
+        if (!aHasLoc && bHasLoc) return 1;
+        if ($myLocation && aHasLoc && bHasLoc) {
+          const da = calculateDistance($myLocation.latitude, $myLocation.longitude, a.latitude, a.longitude);
+          const db = calculateDistance($myLocation.latitude, $myLocation.longitude, b.latitude, b.longitude);
+          return da - db;
+        }
       }
       return 0;
     });
@@ -112,9 +116,14 @@
     if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; }
   }
 
-  function rowClick(socketId) {
+  function rowClick(user) {
     if (lpSuppressClick) { lpSuppressClick = false; return; }
-    locateUser(socketId);
+    if (user.latitude == null || user.longitude == null) {
+      // No location to show on map — open quick-action sheet so chat is still reachable
+      quickUser = user;
+      return;
+    }
+    locateUser(user.socketId);
   }
 
   function closeQuickActions() { quickUser = null; }
@@ -277,7 +286,7 @@
             class:user-offline={user.online === false}
             role="button"
             tabindex="0"
-            on:click={() => rowClick(user.socketId)}
+            on:click={() => rowClick(user)}
             on:keydown={(e) => onUserRowKeydown(e, user.socketId)}
             on:touchstart={onTouchStart}
             on:touchend={(e) => onTouchEnd(e, user.socketId)}
@@ -330,29 +339,35 @@
               </div>
               <div class="user-sub">
                 {#if user.online !== false}
-                  {@const atPlace = getAtPlace(user)}
-                  {@const actStatus = computeActivityStatus(user)}
-                  {#if atPlace}
-                    <!-- Named place (Feature 5) — replaces raw coords -->
-                    <span class="place-chip" aria-label="At {atPlace.name}">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                      at {atPlace.name}
+                  {#if user.latitude == null || user.longitude == null}
+                    <!-- Connected but not sharing location -->
+                    <span class="location-off-label">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="1" y1="1" x2="23" y2="23"/><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke-dasharray="3 3"/></svg>
+                      Location off
                     </span>
-                  {:else if $myLocation && user.latitude != null && user.longitude != null}
-                    <span class="distance-label">{formatDistance(calculateDistance($myLocation.latitude, $myLocation.longitude, user.latitude, user.longitude)) || 'Near'}</span>
-                  {/if}
-                  <!-- Activity status (Feature 6) -->
-                  {#if actStatus && actStatus.label !== 'Offline'}
-                    {#if atPlace || ($myLocation && user.latitude != null)}<span class="sep">·</span>{/if}
-                    <span class="activity-badge" style:color={actStatus.color} aria-label="{actStatus.label}">
-                      <span class="activity-badge-dot" style:background={actStatus.dotColor} aria-hidden="true"></span>
-                      {actStatus.label}
-                    </span>
-                  {/if}
-                  {#if user.accuracy != null && !atPlace}
-                    <span class="sep">·</span>
-                    <span class="acc-dot {getAccuracyClass(user.accuracy)}" aria-hidden="true"></span>
-                    <span class="acc-label {getAccuracyClass(user.accuracy)}" aria-label="GPS accuracy: {getAccuracyLabel(user.accuracy)}">{getAccuracyLabel(user.accuracy)}</span>
+                  {:else}
+                    {@const atPlace = getAtPlace(user)}
+                    {@const actStatus = computeActivityStatus(user)}
+                    {#if atPlace}
+                      <span class="place-chip" aria-label="At {atPlace.name}">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                        at {atPlace.name}
+                      </span>
+                    {:else if $myLocation}
+                      <span class="distance-label">{formatDistance(calculateDistance($myLocation.latitude, $myLocation.longitude, user.latitude, user.longitude)) || 'Near'}</span>
+                    {/if}
+                    {#if actStatus && actStatus.label !== 'Offline'}
+                      {#if atPlace || $myLocation}<span class="sep">·</span>{/if}
+                      <span class="activity-badge" style:color={actStatus.color} aria-label="{actStatus.label}">
+                        <span class="activity-badge-dot" style:background={actStatus.dotColor} aria-hidden="true"></span>
+                        {actStatus.label}
+                      </span>
+                    {/if}
+                    {#if user.accuracy != null && !atPlace}
+                      <span class="sep">·</span>
+                      <span class="acc-dot {getAccuracyClass(user.accuracy)}" aria-hidden="true"></span>
+                      <span class="acc-label {getAccuracyClass(user.accuracy)}" aria-label="GPS accuracy: {getAccuracyLabel(user.accuracy)}">{getAccuracyLabel(user.accuracy)}</span>
+                    {/if}
                   {/if}
                 {:else}
                   <span class="offline-label">{onlineStatus(user)}</span>
@@ -388,9 +403,11 @@
                   <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                 </button>
               {/if}
-              <span class="locate-icon" aria-hidden="true">
-                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 1.892.402 3.13 1.5 4.5L12 22l6.5-7.5c1.098-1.37 1.5-2.608 1.5-4.5a8 8 0 0 0-8-8z"/></svg>
-              </span>
+              {#if user.latitude != null && user.longitude != null}
+                <span class="locate-icon" aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 1.892.402 3.13 1.5 4.5L12 22l6.5-7.5c1.098-1.37 1.5-2.608 1.5-4.5a8 8 0 0 0-8-8z"/></svg>
+                </span>
+              {/if}
               {#if isAdmin}
                 <button class="btn btn-danger btn-sm" on:click|stopPropagation={() => deleteUser(user)} disabled={deletingUser === user.socketId}>×</button>
               {/if}
@@ -809,6 +826,15 @@
     color: var(--text-tertiary);
     font-style: italic;
     font-size: var(--text-xs);
+  }
+
+  .location-off-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    opacity: 0.65;
   }
 
   /* Named place chip (Feature 5) */
