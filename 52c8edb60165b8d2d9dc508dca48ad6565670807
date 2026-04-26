@@ -1,0 +1,4 @@
+frontend/src/components/UsersList.svelte
+  01a780c1-9bf9-4293-99ad-c513cfa4e8ab:2026-04-26T20:21:42.785Z 27,34-43,119,121-126,289,342-346,348-370,406-410,831-838
+---
+{"schema_version": "authorship/3.0.0", "base_commit_sha": "HEAD~1", "prompts": {"01a780c1-9bf9-4293-99ad-c513cfa4e8ab:2026-04-26T20:21:42.785Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 60, "overriden_lines": 0}}}
