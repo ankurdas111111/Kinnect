@@ -132,11 +132,8 @@
     if (gateUnlocking || gatePin.length < 4) return;
     gateError = '';
     gateUnlocking = true;
-
-    // Gate PIN only sets the session PIN for YOUR outgoing messages.
-    // Received messages from the other person use their own PIN —
-    // those are decrypted individually via inline decrypt, not at the gate.
-    // No validation here: any 4+ digit PIN opens the chat.
+    // No validation — gate PIN is purely YOUR encryption key for outgoing messages.
+    // Received messages are decrypted per-message with the SENDER's PIN.
     sessionPin = gatePin;
     gatePin = '';
     gateUnlocking = false;
@@ -348,8 +345,8 @@
       <div class="scp-gate-text">
         <p class="scp-gate-title">Secret Chat</p>
         <p class="scp-gate-sub">
-          Set any PIN — your messages will be encrypted with it.<br>
-          Share it with {peerFirst === '••••••' ? 'them' : peerFirst} so they can read your messages.
+          Your PIN encrypts your messages.<br>
+          Share it with {peerFirst === '••••••' ? 'them' : peerFirst} so they can read what you send.
         </p>
       </div>
 
