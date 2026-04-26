@@ -243,7 +243,11 @@
   $: peerFirst = gateOpen ? (peerName || 'Them').split(' ')[0] : '••••••';
 </script>
 
-<div class="scp" transition:fade={{ duration: 120 }}>
+<div class="scp-backdrop" transition:fade={{ duration: 180 }} on:click|self={onClose}>
+<div class="scp">
+  <!-- Mobile drag handle affordance -->
+  <div class="scp-drag-handle" aria-hidden="true"></div>
+
   <!-- ── Header ─────────────────────────────────────────────── -->
   <div class="scp-header">
     <div class="scp-header-lock" class:scp-header-lock--open={gateOpen}>
@@ -276,11 +280,18 @@
     </div>
 
     {#if gateOpen}
-      <button class="scp-icon-btn" on:click={shareLink} aria-label="Share invite link" title="Copy invite link">
+      <button
+        class="scp-share-pill"
+        class:scp-share-pill--copied={copyDone}
+        on:click={shareLink}
+        aria-label={copyDone ? 'Link copied' : 'Copy invite link'}
+      >
         {#if copyDone}
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>Copied!</span>
         {:else}
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          <span>Share</span>
         {/if}
       </button>
     {/if}
@@ -499,9 +510,31 @@
     </div>
   {/if}
 </div>
+</div>
 
 <style>
-  /* ── Shell ─────────────────────────────────────────────────── */
+  /* ── Backdrop / overlay shell ──────────────────────────────── */
+  .scp-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-modal, 5000);
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    /* Mobile: bottom-sheet pattern */
+  }
+  @media (max-width: 767px) {
+    .scp-backdrop {
+      align-items: flex-end;
+      padding: 0;
+    }
+  }
+
+  /* ── Panel shell ───────────────────────────────────────────── */
   .scp {
     display: flex;
     flex-direction: column;
@@ -514,8 +547,34 @@
     height: min(85dvh, 640px);
     box-shadow: 0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(129,140,248,0.07);
   }
-  @media (max-width: 480px) {
-    .scp { max-width: 100%; border-radius: 24px 24px 0 0; height: 90dvh; }
+  @media (max-width: 767px) {
+    .scp {
+      max-width: 100%;
+      border-radius: 20px 20px 0 0;
+      height: 88dvh;
+      /* Respect notch / home-bar on iOS */
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      animation: scp-slide-up 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
+    }
+  }
+
+  @keyframes scp-slide-up {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0);    }
+  }
+
+  /* ── Drag handle (mobile only) ────────────────────────────── */
+  .scp-drag-handle {
+    display: none;
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.18);
+    margin: 10px auto 4px;
+    flex-shrink: 0;
+  }
+  @media (max-width: 767px) {
+    .scp-drag-handle { display: block; }
   }
 
   /* ── Header ────────────────────────────────────────────────── */
@@ -600,7 +659,8 @@
   }
 
   .scp-icon-btn {
-    width: 32px; height: 32px;
+    width: 36px; height: 36px;
+    min-width: 44px; min-height: 44px;
     display: flex; align-items: center; justify-content: center;
     background: none; border: none;
     color: rgba(255,255,255,0.35);
@@ -608,8 +668,38 @@
     border-radius: 8px;
     transition: background 0.15s, color 0.15s;
     flex-shrink: 0;
+    touch-action: manipulation;
   }
   .scp-icon-btn:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.7); }
+
+  /* ── Share pill ─────────────────────────────────────────────── */
+  .scp-share-pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0 12px 0 9px;
+    height: 32px;
+    /* Ensure ≥44px touch area via margin compensation */
+    min-height: 44px;
+    border-radius: 20px;
+    border: 1px solid rgba(129,140,248,0.28);
+    background: rgba(129,140,248,0.09);
+    color: rgba(129,140,248,0.9);
+    font-size: 12px;
+    font-weight: 600;
+    font-family: system-ui, sans-serif;
+    cursor: pointer;
+    flex-shrink: 0;
+    white-space: nowrap;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    touch-action: manipulation;
+  }
+  .scp-share-pill:hover { background: rgba(129,140,248,0.16); border-color: rgba(129,140,248,0.45); }
+  .scp-share-pill--copied {
+    border-color: rgba(74,222,128,0.35);
+    background: rgba(74,222,128,0.09);
+    color: rgba(74,222,128,0.95);
+  }
 
   /* ── Gate ──────────────────────────────────────────────────── */
   .scp-gate {
@@ -691,6 +781,7 @@
     font-family: system-ui, sans-serif;
     min-height: 48px;
     transition: background 0.15s;
+    touch-action: manipulation;
   }
   .scp-primary-btn:hover:not(:disabled) { background: #818cf8; }
   .scp-primary-btn:disabled { opacity: 0.3; cursor: not-allowed; }
@@ -762,14 +853,19 @@
 
   .scp-relock-btn {
     position: absolute;
-    top: 7px; right: 8px;
+    top: 4px; right: 4px;
+    /* Visual size stays small; touch area expanded via padding (11px → 22+22=44px total) */
     width: 22px; height: 22px;
+    padding: 11px;
+    margin: -11px;
     display: flex; align-items: center; justify-content: center;
     background: none; border: none; cursor: pointer;
     color: rgba(255,255,255,0.18);
-    border-radius: 6px;
-    padding: 0;
+    border-radius: 8px;
     transition: color 0.15s, background 0.15s;
+    touch-action: manipulation;
+    /* Ensure bubble can fit the expanded hit-area */
+    box-sizing: content-box;
   }
   .scp-relock-btn:hover { color: rgba(129,140,248,0.7); background: rgba(129,140,248,0.08); }
 
@@ -788,8 +884,10 @@
     color: rgba(255,255,255,0.3);
     font-size: 13px;
     cursor: pointer;
+    min-height: 44px;
     transition: background 0.15s, border-color 0.15s;
     position: relative;
+    touch-action: manipulation;
   }
   .scp-bubble--locked:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.18); }
   .scp-bubble--locked-active { border-color: rgba(129,140,248,0.35); background: rgba(129,140,248,0.06); }
@@ -849,20 +947,23 @@
   .scp-inline-decrypt {
     display: flex;
     align-items: center;
-    gap: 7px;
-    flex-wrap: wrap;
-    margin-top: 2px;
+    gap: 8px;
+    flex-wrap: nowrap;
+    margin-top: 4px;
     padding: 8px 10px;
     background: rgba(129,140,248,0.06);
     border: 1px solid rgba(129,140,248,0.14);
     border-radius: 12px;
-    max-width: 260px;
+    /* Fill the message bubble width, never overflow */
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
   }
 
   .scp-inline-pin {
     flex: 1;
-    min-width: 90px;
-    padding: 7px 10px;
+    min-width: 0;
+    padding: 10px 10px;
     border-radius: 8px;
     border: 1px solid rgba(255,255,255,0.1);
     background: rgba(0,0,0,0.3);
@@ -874,12 +975,19 @@
     font-variant-numeric: tabular-nums;
     font-family: system-ui, monospace, sans-serif;
     -webkit-appearance: none;
+    /* 44px minimum touch height */
+    min-height: 44px;
     transition: border-color 0.15s;
+    touch-action: manipulation;
   }
   .scp-inline-pin:focus { border-color: rgba(129,140,248,0.5); }
+  /* Prevent iOS zoom on focus */
+  @media (max-width: 767px) {
+    .scp-inline-pin { font-size: 18px; }
+  }
 
   .scp-inline-btn {
-    padding: 7px 14px;
+    padding: 10px 16px;
     border-radius: 8px;
     border: none;
     background: rgba(129,140,248,0.75);
@@ -887,9 +995,12 @@
     font-size: 13px; font-weight: 600;
     cursor: pointer;
     font-family: system-ui, sans-serif;
-    min-height: 36px;
+    /* 44px touch target */
+    min-height: 44px;
+    flex-shrink: 0;
     transition: background 0.15s;
     white-space: nowrap;
+    touch-action: manipulation;
   }
   .scp-inline-btn:hover:not(:disabled) { background: #818cf8; }
   .scp-inline-btn:disabled { opacity: 0.3; cursor: not-allowed; }
@@ -934,6 +1045,10 @@
     max-height: 120px;
     overflow-y: auto;
   }
+  /* Prevent iOS from zooming in when textarea is focused */
+  @media (max-width: 767px) {
+    .scp-compose-text { font-size: 16px; }
+  }
   .scp-compose-text:focus { border-color: rgba(255,255,255,0.18); }
   .scp-compose-text::placeholder { color: rgba(255,255,255,0.2); }
 
@@ -947,6 +1062,7 @@
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
     transition: background 0.15s;
+    touch-action: manipulation;
   }
   .scp-send-btn:hover:not(:disabled) { background: #818cf8; }
   .scp-send-btn:disabled { opacity: 0.28; cursor: not-allowed; }

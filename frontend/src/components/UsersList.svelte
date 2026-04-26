@@ -881,7 +881,7 @@
     justify-content: center;
     background: none;
     border: none;
-    padding: 4px;
+    padding: 6px;
     border-radius: var(--radius-full);
     color: var(--text-tertiary);
     cursor: pointer;
@@ -889,10 +889,22 @@
     transition: opacity var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);
     -webkit-tap-highlight-color: transparent;
     flex-shrink: 0;
+    /* Expand tap target without affecting layout */
+    position: relative;
+  }
+  .secret-chat-icon::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
   }
   /* Always visible on touch devices (no hover state) */
   @media (hover: none) {
-    .secret-chat-icon { opacity: 1; }
+    .secret-chat-icon {
+      opacity: 1;
+      color: var(--primary-400, #818cf8);
+      padding: 8px;
+      background: rgba(99, 102, 241, 0.08);
+    }
   }
   .user-item-btn:hover .secret-chat-icon {
     opacity: 1;
