@@ -1,0 +1,18 @@
+frontend/index.html
+  71f21f98-5114-4141-8db6-cf6a724bc1e8:2026-04-26T21:57:14.860Z 29-34,39-42
+frontend/public/sw.js
+  71f21f98-5114-4141-8db6-cf6a724bc1e8:2026-04-26T21:57:14.860Z 1-5,7-14,16-27,29-33,35-36,38-57,59-72,74-81,83
+frontend/src/App.svelte
+  71f21f98-5114-4141-8db6-cf6a724bc1e8:2026-04-26T21:57:14.860Z 5,30-35,41,46
+frontend/src/components/Map.svelte
+  71f21f98-5114-4141-8db6-cf6a724bc1e8:2026-04-26T21:57:14.860Z 3-5,125-131,232-234
+frontend/src/components/SecretChatPanel.svelte
+  01a780c1-9bf9-4293-99ad-c513cfa4e8ab:2026-04-26T22:03:35.990Z 8,82-83,277-279,281,283
+frontend/src/lib/mapStyle.js
+  71f21f98-5114-4141-8db6-cf6a724bc1e8:2026-04-26T21:57:14.860Z 10-13
+frontend/src/pages/MainApp.svelte
+  71f21f98-5114-4141-8db6-cf6a724bc1e8:2026-04-26T21:57:14.860Z 4,144
+frontend/vite.config.js
+  71f21f98-5114-4141-8db6-cf6a724bc1e8:2026-04-26T21:57:14.860Z 9-33
+---
+{"schema_version": "authorship/3.0.0", "base_commit_sha": "HEAD~1", "prompts": {"71f21f98-5114-4141-8db6-cf6a724bc1e8:2026-04-26T21:57:14.860Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 10, "overriden_lines": 0}, "01a780c1-9bf9-4293-99ad-c513cfa4e8ab:2026-04-26T22:03:35.990Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 8, "overriden_lines": 0}}}
