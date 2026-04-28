@@ -1,0 +1,10 @@
+frontend/src/components/Map.svelte
+  2c9f326a-956b-466b-96e3-5c756151d9bf:2026-04-27T22:46:45.820Z 7,209-213,825-827,952-953,960-962,980-986
+frontend/src/components/Navbar.svelte
+  2c9f326a-956b-466b-96e3-5c756151d9bf:2026-04-27T22:42:23.525Z 87
+frontend/src/components/SharingPanel.svelte
+  2c9f326a-956b-466b-96e3-5c756151d9bf:2026-04-27T22:41:31.573Z 15,195,197,199-200,202-209,211-221,255-260,263,376-400,1161,1164-1165,1173-1174,1220-1224,1226-1238,1240-1245,1247-1254,1256-1262,1264-1269,1271-1289,1291-1296,1304-1305
+frontend/src/pages/MainApp.svelte
+  7c63b236-b9fa-48af-9a95-3fb30b58d8e0:2026-04-27T22:38:44.604Z 166-171,810-812,816,928-930,932,934,937,995-996,998,1048-1049,1239-1243,1250-1253,1258-1260,1262
+---
+{"schema_version": "authorship/3.0.0", "base_commit_sha": "HEAD~1", "prompts": {"2c9f326a-956b-466b-96e3-5c756151d9bf:2026-04-27T22:46:45.820Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 21, "overriden_lines": 0}, "2c9f326a-956b-466b-96e3-5c756151d9bf:2026-04-27T22:42:23.525Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 1, "overriden_lines": 0}, "2c9f326a-956b-466b-96e3-5c756151d9bf:2026-04-27T22:41:31.573Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 133, "overriden_lines": 0}, "7c63b236-b9fa-48af-9a95-3fb30b58d8e0:2026-04-27T22:38:44.604Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 34, "overriden_lines": 0}}}
