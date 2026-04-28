@@ -17,9 +17,6 @@ import (
 	"kinnect-v3/internal/db"
 	"kinnect-v3/internal/intelligence"
 	"kinnect-v3/internal/shared"
-
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 const (
@@ -37,27 +34,6 @@ const (
 // batches from many clients could spawn thousands of goroutines simultaneously.
 var dbWriteSem = make(chan struct{}, 64)
 
-// positionUpdatesTotal counts every accepted position update (post-cooldown, post-throttle).
-// Uses the get-or-register pattern so the binary can safely import both this package and
-// monitoring.NewMetrics() without panicking on duplicate prometheus registration.
-var positionUpdatesTotal = func() prometheus.Counter {
-	c := prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "position_updates_total",
-		Help: "Total number of position updates",
-	})
-	if err := prometheus.DefaultRegisterer.Register(c); err != nil {
-		if are, ok := err.(prometheus.AlreadyRegisteredError); ok {
-			return are.ExistingCollector.(prometheus.Counter)
-		}
-		// Non-duplicate error: fall back to a no-op via promauto on a fresh name.
-		// This should never happen in practice.
-		return promauto.NewCounter(prometheus.CounterOpts{
-			Name: "position_updates_total_ws",
-			Help: "Total number of position updates (fallback)",
-		})
-	}
-	return c
-}()
 
 // positionPayload is a lean struct for the userMoved broadcast.
 // It holds only the ~12 fields that change on each position update, avoiding the
@@ -258,7 +234,9 @@ func (h *Hub) handlePosition(c *Client, data json.RawMessage) {
 	checkBatteryAlerts(h, user)
 
 	// ── M-5: count every accepted position update ─────────────────────────────
-	positionUpdatesTotal.Inc()
+	if h.metrics != nil {
+		h.metrics.PositionUpdatesTotal.Inc()
+	}
 
 	// ── M-1: lean payload for userMoved — avoids ~25 nested-map allocations ──
 	// queuePositionBroadcast (and the downstream flushPositionBroadcasts) emits
