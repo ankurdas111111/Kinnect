@@ -1,0 +1,4 @@
+backend/internal/ws/auth_events.go
+  7c63b236-b9fa-48af-9a95-3fb30b58d8e0:2026-04-28T10:25:02.943Z 237-239
+---
+{"schema_version": "authorship/3.0.0", "base_commit_sha": "HEAD~1", "prompts": {"7c63b236-b9fa-48af-9a95-3fb30b58d8e0:2026-04-28T10:25:02.943Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 3, "overriden_lines": 0}}}
