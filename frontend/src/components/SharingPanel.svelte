@@ -12,6 +12,7 @@
   import { getUserColor } from '../lib/getUserColor.js';
   import CopyButton from './primitives/CopyButton.svelte';
   import ShareMyRide from './ShareMyRide.svelte';
+  import InviteSheet from './InviteSheet.svelte';
   import { rideShare } from '../lib/stores/rideShare.js';
 
   function locateContact(userId) {
@@ -191,8 +192,33 @@
     };
   });
 
-  // ── Quick Actions (Share My Ride + On My Way) ──────────────────
+  // ── Quick Actions (Share My Ride + On My Way + Invite Family) ──
   let rideShareOpen = false;
+  let inviteOpen = false;
+
+  // ── My Code share ──────────────────────────────────────────────
+  let myCodeCopied = false;
+
+  function copyMyCode() {
+    const code = $myShareCode || $authUser?.shareCode;
+    if (!code) return;
+    navigator.clipboard.writeText(code).then(() => {
+      myCodeCopied = true;
+      setTimeout(() => { myCodeCopied = false; }, 2500);
+    }).catch(() => {});
+  }
+
+  function shareMyCodeViaWA() {
+    const code = $myShareCode || $authUser?.shareCode;
+    if (!code) return;
+    const name = $authUser?.displayName?.split(' ')[0] ?? 'Me';
+    const url = getShareOrigin();
+    const text =
+      `Hey! Add me on Kinnect 📍\n` +
+      `Enter my code *${code}* in the app to see my live location.\n\n` +
+      `Download here: ${url}`;
+    window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank', 'noopener');
+  }
 
   function onMyWay() {
     const links = $myLiveLinks;
@@ -226,8 +252,15 @@
         </div>
         <span class="qa-label">On My Way</span>
       </button>
+      <button class="quick-action-card qa-invite" on:click={() => inviteOpen = true}>
+        <div class="qa-icon qa-icon-invite">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.016.5 3.914 1.37 5.582L0 24l6.618-1.342A11.954 11.954 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 0 1-5.013-1.375l-.36-.213-3.727.757.788-3.613-.234-.372A9.818 9.818 0 0 1 2.182 12C2.182 6.566 6.566 2.182 12 2.182c5.433 0 9.818 4.384 9.818 9.818 0 5.433-4.385 9.818-9.818 9.818z"/></svg>
+        </div>
+        <span class="qa-label">Invite Family</span>
+      </button>
     </div>
     <ShareMyRide bind:open={rideShareOpen} />
+    <InviteSheet bind:open={inviteOpen} />
 
     <!-- ── ROOMS ─────────────────────────────────────────────────── -->
     <div class="sharing-section">
@@ -339,6 +372,33 @@
           <span class="section-badge">{$myContacts.length}</span>
         {/if}
       </div>
+
+      <!-- My Code card -->
+      {#if $myShareCode || $authUser?.shareCode}
+        {@const code = $myShareCode || $authUser?.shareCode}
+        <div class="my-code-card">
+          <div class="my-code-left">
+            <span class="my-code-label">My Code</span>
+            <span class="my-code-value">{code}</span>
+          </div>
+          <div class="my-code-actions">
+            <button class="my-code-btn my-code-btn--copy" on:click={copyMyCode} aria-label="Copy my code">
+              {#if myCodeCopied}
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+                <span style="color:#4ade80">Copied</span>
+              {:else}
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                <span>Copy</span>
+              {/if}
+            </button>
+            <button class="my-code-btn my-code-btn--wa" on:click={shareMyCodeViaWA} aria-label="Share my code on WhatsApp">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.016.5 3.914 1.37 5.582L0 24l6.618-1.342A11.954 11.954 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 0 1-5.013-1.375l-.36-.213-3.727.757.788-3.613-.234-.372A9.818 9.818 0 0 1 2.182 12C2.182 6.566 6.566 2.182 12 2.182c5.433 0 9.818 4.384 9.818 9.818 0 5.433-4.385 9.818-9.818 9.818z"/></svg>
+              <span>WhatsApp</span>
+            </button>
+          </div>
+        </div>
+      {/if}
+
       <div class="rooms-create-row">
         <input class="input" bind:value={contactCode} placeholder="Paste their family code" on:keydown={e => e.key === 'Enter' && addContact()} />
         <button class="btn btn-primary btn-sm" on:click={addContact} disabled={loading.addContact}>{loading.addContact ? '…' : 'Add'}</button>
@@ -1098,11 +1158,11 @@
     max-width: 90px;
   }
 
-  /* ── Quick Actions (Share Ride / On My Way) ──────────────────── */
+  /* ── Quick Actions (Share Ride / On My Way / Invite) ─────────── */
   .quick-actions-row {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
     margin-bottom: 16px;
   }
 
@@ -1110,8 +1170,8 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
-    padding: 16px 12px;
+    gap: 6px;
+    padding: 14px 8px;
     background: var(--surface-inset);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-lg, 14px);
@@ -1157,12 +1217,92 @@
     color: var(--primary-500, #14b8a6);
   }
 
+  .qa-icon-invite {
+    background: linear-gradient(135deg, rgba(37,211,102,0.14), rgba(37,211,102,0.06));
+    border: 1px solid rgba(37,211,102,0.22);
+    color: #25d366;
+  }
+
+  /* ── My Code card ─────────────────────────────────────────────── */
+  .my-code-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 11px 14px;
+    margin-bottom: 8px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+  }
+
+  .my-code-left {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .my-code-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: rgba(255,255,255,0.3);
+    font-family: var(--font-display);
+  }
+
+  .my-code-value {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--text-primary, #e2e8f0);
+    letter-spacing: 0.12em;
+    font-family: var(--font-mono, monospace);
+  }
+
+  .my-code-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .my-code-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 11px;
+    min-height: 44px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.05);
+    color: rgba(255,255,255,0.55);
+    font-size: 11px;
+    font-weight: 600;
+    font-family: var(--font-display);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s;
+    touch-action: manipulation;
+  }
+  .my-code-btn:hover { background: rgba(255,255,255,0.09); }
+
+  .my-code-btn--wa {
+    border-color: rgba(37,211,102,0.25);
+    background: rgba(37,211,102,0.08);
+    color: #25d366;
+  }
+  .my-code-btn--wa:hover { background: rgba(37,211,102,0.14); }
+
   .qa-label {
     font-family: var(--font-display);
     font-size: var(--text-xs, 11px);
     font-weight: 700;
     color: var(--text-primary);
     letter-spacing: 0.01em;
+    text-align: center;
+    line-height: 1.25;
   }
 
   .qa-live-dot {

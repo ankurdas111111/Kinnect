@@ -4,17 +4,11 @@
   // does not block on the ~283 kB maplibre chunk at parse time.
   let maplibregl;
   import { otherUsers, myLocation, mySocketId, mySafetyStatus, focusUser, mapFlyTo, routeGeometry, navigationState } from '../lib/stores/map.js';
-  import { savedPlaces } from '../lib/stores/savedPlaces.js';
-  import { arrivalProjections } from '../lib/stores/arrivals.js';
-  import { trailData } from '../lib/stores/trail.js';
-  import { createMapIcon, createPersonMarker, getPresenceState, escapeAttr, calculateDistance, formatDistance, circleGeoJSON, createCustomPinIcon } from '../lib/tracking.js';
+  import { createMapIcon, createPersonMarker, getPresenceState, escapeAttr, calculateDistance, formatDistance, circleGeoJSON } from '../lib/tracking.js';
   import { animateMarkerTo, cancelAnimation, cancelAllAnimations } from '../lib/markerInterpolator.js';
   import { getUserColor } from '../lib/getUserColor.js';
   import { MAP_STYLE, RASTER_STYLE } from '../lib/mapStyle.js';
   import { debounce } from '../lib/debounce.js';
-  import { emitSyncPlace } from '../lib/socket.js';
-  import { apiDelete } from '../lib/api.js';
-  import CustomPinDialog from './CustomPinDialog.svelte';
 
   export let followMode = false;
 
@@ -202,15 +196,6 @@
       map.on('mouseenter', 'cluster-circles', () => { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', 'cluster-circles', () => { map.getCanvas().style.cursor = ''; });
 
-      // Click on empty map area → open add-pin dialog
-      map.on('click', (e) => {
-        // Skip if click landed on a person/pin marker or a cluster
-        if (e.originalEvent.target.closest('.maplibregl-marker')) return;
-        const features = map.queryRenderedFeatures(e.point, { layers: ['cluster-circles'] });
-        if (features.length > 0) return; // hit a cluster, skip
-        pendingPin = { lat: e.lngLat.lat, lng: e.lngLat.lng };
-        showPinDialog = true;
-      });
     }
 
     map = new maplibregl.Map({
@@ -221,8 +206,11 @@
       attributionControl: true
     });
 
-    map.addControl(new maplibregl.NavigationControl({ showCompass: false }),
-      isMobile ? 'bottom-right' : 'top-right');
+    // NavigationControl only on desktop — mobile users pinch-to-zoom naturally,
+    // and bottom-right on mobile conflicts with the MapFab cluster.
+    if (!isMobile) {
+      map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+    }
 
     map.on('dragstart', () => {
       // During navigation, let user pan but re-center on next GPS update
@@ -247,26 +235,6 @@
         } catch { /* style may not have named layers */ }
       }
       addCircleSources();
-      // Subscribe to trail data — draw/update dashed polylines for requested users
-      trailData.subscribe($trailData => {
-        if (!map.isStyleLoaded()) return;
-        for (const [userId, data] of $trailData) {
-          if (!Array.isArray(data.points) || data.points.length < 2) continue;
-          const sourceId = `trail-src-${userId}`;
-          const layerId = `trail-line-${userId}`;
-          const coords = data.points.map(p => [p.lng, p.lat]);
-          const geojson = { type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} };
-          if (map.getSource(sourceId)) {
-            map.getSource(sourceId).setData(geojson);
-          } else {
-            map.addSource(sourceId, { type: 'geojson', data: geojson });
-            map.addLayer({
-              id: layerId, type: 'line', source: sourceId,
-              paint: { 'line-color': '#818cf8', 'line-width': 2, 'line-opacity': 0.65, 'line-dasharray': [2, 2] }
-            });
-          }
-        }
-      });
     });
   });
 
@@ -277,10 +245,6 @@
     markers.clear();
     for (const p of markerPopups.values()) p.remove();
     markerPopups.clear();
-    for (const m of pinMarkers.values()) m.remove();
-    pinMarkers.clear();
-    for (const p of pinPopups.values()) p.remove();
-    pinPopups.clear();
     if (myMarker) myMarker.remove();
     if (myPopup) myPopup.remove();
     if (map) map.remove();
@@ -635,12 +599,6 @@
   let destMarker = null;
   let navActive = false;
 
-  // ── Custom location pins ────────────────────────────────────────────────────
-  let pinMarkers = new Map();        // placeId → maplibregl.Marker
-  let pinPopups = new Map();         // placeId → maplibregl.Popup
-  let showPinDialog = false;
-  let pendingPin = null;             // { lat, lng } awaiting dialog
-  let pendingPinMarker = null;       // maplibregl.Marker — preview dot while dialog is open
   let mapReady = false;
 
   $: if (map) {
@@ -700,93 +658,6 @@
     }
   }
 
-  // ── Render saved place pins from store ──────────────────────────────────────
-  $: if (map && mapReady && $savedPlaces) {
-    const places = $savedPlaces;
-
-    // Remove markers for deleted/missing pins
-    for (const [id, marker] of pinMarkers) {
-      if (!places.has(id)) {
-        marker.remove();
-        pinMarkers.delete(id);
-        const popup = pinPopups.get(id);
-        if (popup) { popup.remove(); pinPopups.delete(id); }
-      }
-    }
-
-    // Add markers for new pins
-    for (const [id, pin] of places) {
-      if (pinMarkers.has(id)) continue;
-      if (pin.latitude == null || pin.longitude == null) continue;
-
-      const el = createCustomPinIcon(pin.icon || 'pin', pin.name);
-
-      const visLabel = pin.visibility === 'universal' ? '👨‍👩‍👧 Family' : '🔒 Personal';
-      const popupHtml = `<div class="pu-wrap">
-        <div class="pu-hdr"><strong class="pu-name">${escapeAttr(pin.name)}</strong></div>
-        <div class="pu-grid">
-          <span class="pu-lbl">Visibility</span><span class="pu-val">${visLabel}</span>
-          <span class="pu-lbl">Position</span>
-          <span class="pu-val pu-mono">${Number(pin.latitude).toFixed(5)}, ${Number(pin.longitude).toFixed(5)}</span>
-        </div>
-        <div style="margin-top:8px;text-align:right;">
-          <button class="btn btn-sm btn-danger" data-pin-delete="${id}" style="font-size:11px;padding:4px 10px;">Remove</button>
-        </div>
-      </div>`;
-
-      const popup = new maplibregl.Popup({ offset: [0, -50], maxWidth: '220px', closeButton: true })
-        .setHTML(popupHtml);
-
-      const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
-        .setLngLat([pin.longitude, pin.latitude])
-        .setPopup(popup)
-        .addTo(map);
-
-      // Delegate delete-button clicks from inside the popup
-      popup.on('open', () => {
-        const btn = popup.getElement()?.querySelector(`[data-pin-delete="${id}"]`);
-        if (btn) {
-          btn.onclick = async () => {
-            popup.remove();
-            await apiDelete(`/api/places/${id}`);
-            const wasUniversal = pin.visibility === 'universal';
-            savedPlaces.update(m => { m.delete(id); return m; });
-            if (wasUniversal) emitSyncPlace('remove', { id, visibility: 'universal' });
-          };
-        }
-      });
-
-      pinMarkers.set(id, marker);
-      pinPopups.set(id, popup);
-    }
-  }
-
-  // ── Preview pin — visible marker while add-location dialog is open ───────
-  $: if (map) {
-    if (pendingPin) {
-      // Remove any old preview marker
-      if (pendingPinMarker) { pendingPinMarker.remove(); pendingPinMarker = null; }
-
-      // Build the preview element
-      const el = document.createElement('div');
-      el.className = 'pending-pin-marker';
-      el.innerHTML = `
-        <div class="pending-pin-pulse"></div>
-        <div class="pending-pin-dot">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 119.5 9 2.5 2.5 0 0112 11.5z"/>
-          </svg>
-        </div>
-        <div class="pending-pin-stem"></div>
-      `;
-      pendingPinMarker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
-        .setLngLat([pendingPin.lng, pendingPin.lat])
-        .addTo(map);
-    } else {
-      if (pendingPinMarker) { pendingPinMarker.remove(); pendingPinMarker = null; }
-    }
-  }
-
   $: if (map && $focusUser) {
     const sid = $focusUser;
     focusUser.set(null);
@@ -815,13 +686,6 @@
 
 <div class="map-container" bind:this={mapContainer}></div>
 
-{#if showPinDialog && pendingPin}
-  <CustomPinDialog
-    lat={pendingPin.lat}
-    lng={pendingPin.lng}
-    onClose={() => { showPinDialog = false; pendingPin = null; }}
-  />
-{/if}
 <!-- MERIDIAN: Map vignette — connects UI chrome to map visually -->
 <div class="map-vignette-top" aria-hidden="true"></div>
 <div class="map-vignette-bottom" aria-hidden="true"></div>
@@ -882,20 +746,6 @@
   </div>
 {/if}
 
-<!-- Arrival Intelligence — ETA chips for contacts heading to saved places -->
-{#if $arrivalProjections.size > 0}
-  <div class="arrival-chips-container" role="status" aria-label="Arrival projections">
-    {#each [...$arrivalProjections.values()] as proj (proj.userId)}
-      <div class="arrival-chip">
-        <span class="arrival-chip-icon">📍</span>
-        <span class="arrival-chip-body">
-          <span class="arrival-name">{proj.displayName}</span>
-          <span class="arrival-eta">~{proj.etaSeconds < 60 ? 'arriving' : `${Math.round(proj.etaSeconds / 60)}min`} to {proj.placeName}</span>
-        </span>
-      </div>
-    {/each}
-  </div>
-{/if}
 
 <style>
   .map-container {
@@ -972,6 +822,9 @@
     background: linear-gradient(to top, var(--surface-0) 0%, transparent 100%);
     opacity: 0.28;
   }
+  /* Fix #3: reduce vignette opacity in dark mode — gradient is already dark so it becomes too heavy */
+  :global([data-theme="dark"]) .map-vignette-top    { opacity: 0.18; }
+  :global([data-theme="dark"]) .map-vignette-bottom { opacity: 0.15; }
 
   :global(.map-pin) {
     cursor: pointer;
@@ -1096,16 +949,17 @@
   }
 
   /* ── Popup content classes (light + dark mode aware) ─────────────────── */
-  :global(.pu-wrap)  { min-width: 190px; font-size: 12px; line-height: 1.5; }
+  /* Fix #1: increased base font sizes for readability on mobile */
+  :global(.pu-wrap)  { min-width: 190px; font-size: 13px; line-height: 1.5; }
   :global(.pu-hdr)   { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
   :global(.pu-name)  { font-family: var(--font-display); font-size: 15px; font-weight: 700; letter-spacing: -0.01em; color: #0f172a; }
   :global(.pu-status) { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 600; }
   :global(.pu-dot)   { width: 7px; height: 7px; border-radius: 50%; background: currentColor; display: inline-block; }
   :global(.pu-online)  { color: #22c55e; }
   :global(.pu-offline) { color: #9ca3af; }
-  :global(.pu-grid)  { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 11px; }
-  :global(.pu-lbl)   { font-weight: 600; color: #64748b; }
-  :global(.pu-val)   { color: #1e293b; }
+  :global(.pu-grid)  { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 13px; }
+  :global(.pu-lbl)   { font-size: 12px; font-weight: 600; color: #64748b; }
+  :global(.pu-val)   { font-size: 13px; color: #1e293b; }
   :global(.pu-good)  { color: #22c55e; font-weight: 600; }
   :global(.pu-warn)  { color: #eab308; font-weight: 600; }
   :global(.pu-danger){ color: #ef4444; font-weight: 600; }
@@ -1122,6 +976,14 @@
   :global(.pu-feat-autoSos){ color: #f59e0b; }
   :global(.pu-feat-checkin){ color: #06b6d4; }
   :global(.pu-rooms) { margin-top: 5px; font-size: 10px; color: #64748b; }
+
+  /* Fix #1 continued: mobile-specific font size bump for popup text */
+  @media (max-width: 480px) {
+    :global(.pu-wrap) { font-size: 14px; }
+    :global(.pu-val)  { font-size: 14px; }
+    :global(.pu-lbl)  { font-size: 13px; }
+    :global(.pu-grid) { font-size: 14px; }
+  }
 
   /* Dark mode: text colours for popup */
   :global([data-theme="dark"] .pu-lbl) { color: rgba(255, 255, 255, 0.50); }
@@ -1228,50 +1090,6 @@
   @keyframes marker-pulse-ring {
     0%   { transform: scale(1);   opacity: 0.5; }
     100% { transform: scale(1.8); opacity: 0; }
-  }
-
-  /* ── Arrival Intelligence chips ──────────────────────────────────────────── */
-  .arrival-chips-container {
-    position: absolute;
-    bottom: calc(var(--bottom-tab-height, 56px) + 16px);
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 10;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    pointer-events: none;
-    max-width: 280px;
-    width: max-content;
-  }
-  .arrival-chip {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: rgba(17, 24, 39, 0.88);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(99, 102, 241, 0.4);
-    border-radius: 999px;
-    padding: 6px 14px 6px 10px;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
-    animation: chip-slide-up 0.25s ease;
-  }
-  @keyframes chip-slide-up {
-    from { opacity: 0; transform: translateY(8px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  .arrival-chip-icon { font-size: 15px; flex-shrink: 0; }
-  .arrival-chip-body { display: flex; flex-direction: column; gap: 1px; }
-  .arrival-name {
-    font-size: 12px;
-    font-weight: 700;
-    color: #f1f5f9;
-    line-height: 1.2;
-  }
-  .arrival-eta {
-    font-size: 11px;
-    color: #a5b4fc;
-    line-height: 1.2;
   }
 
   /* Navigation arrow pulse */

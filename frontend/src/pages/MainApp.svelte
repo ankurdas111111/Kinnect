@@ -163,6 +163,13 @@
   $: mobileTab = $uiShellStore.mobileTab;
   $: sheetOpen = $uiShellStore.sheetOpen;
 
+  // Fix #2: Reactive FAB bottom offset — lift SOS FAB above the BottomSheet
+  // when the sheet is open on mobile so the button is never obscured.
+  // The peek state reveals ~35vh of the sheet from the bottom; add that as clearance.
+  $: fabBottomOffset = (isMobile && sheetOpen)
+    ? `calc(var(--bottom-tab-height, 56px) + var(--safe-bottom, 0px) + var(--space-4) + min(35vh, 280px))`
+    : `calc(var(--bottom-tab-height, 56px) + var(--safe-bottom, 0px) + var(--space-4))`;
+
   // Wire SOS state to global CSS app-state for full-app red tint
   $: {
     if (typeof document !== 'undefined') {
@@ -800,10 +807,13 @@
     <!-- First-run Hub discovery coach mark (desktop only, shows once) -->
     <HubSpotlight />
 
-    <!-- SOS FAB — always visible bottom-left -->
+    <!-- SOS FAB — always visible bottom-left.
+         Fix #2: inline style overrides the CSS @media bottom value on mobile so the FAB
+         animates out of the way when the BottomSheet is at peek state. -->
     <button
       class="sos-fab"
       class:active={$mySosActive}
+      style={isMobile ? `bottom: ${fabBottomOffset}` : undefined}
       on:click={() => {
         if ($mySosActive) { socket.emit('cancelSOS'); }
         else { sosConfirmOpen = true; }
@@ -915,11 +925,16 @@
   }
   .page-nav-row::-webkit-scrollbar { display: none; }
 
+  /* Fix #1: raised touch target to 44px for iOS HIG compliance.
+     Before: display:inline-flex; padding:8px 12px; (no min-height → ~28-32px tall)
+     After:  display:flex; justify-content:center; min-height:44px; padding:8px 12px */
   .page-nav-btn {
-    display: inline-flex;
+    display: flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
     padding: 8px 12px;
+    min-height: 44px;
     border-radius: var(--radius-lg);
     background: rgba(255, 255, 255, 0.06);
     border: 1px solid rgba(255, 255, 255, 0.10);
@@ -977,7 +992,10 @@
       inset 0 -3px 6px rgba(0, 0, 0, 0.20);
     z-index: calc(var(--z-panel, 100) + 2);
     transform-style: preserve-3d;
+    /* Fix #2: bottom added to transition list so FAB slides smoothly when
+       sheet opens/closes. Before: only transform, box-shadow, background. */
     transition:
+      bottom 300ms ease,
       transform var(--duration-3d) var(--ease-3d-spring),
       box-shadow var(--duration-3d) var(--ease-3d-out),
       background 0.2s ease;
@@ -1027,6 +1045,8 @@
     100% { transform: scale(1.9); opacity: 0; }
   }
 
+  /* CSS baseline for mobile bottom — the inline style binding (fabBottomOffset)
+     overrides this reactively when isMobile && sheetOpen. */
   @media (max-width: 767px) {
     .sos-fab {
       bottom: calc(var(--bottom-tab-height, 56px) + var(--safe-bottom, 0px) + var(--space-4));
@@ -1216,19 +1236,30 @@
   .battery-skip-btn:hover { color: rgba(255, 255, 255, 0.70); }
 
   /* ── Place search overlay on map ─────────────────────────────────── */
+  /* Fix #3: wrapper changed from pointer-events:auto to pointer-events:none
+     so the map canvas under the empty areas around the search widget stays
+     interactive. Child content (.ps-wrap, .nav-hud) restores pointer-events.
+     Before: pointer-events: auto on wrapper (entire overlay ate touch events)
+     After:  pointer-events: none on wrapper; auto restored on direct children */
   .place-search-overlay {
     position: absolute;
     top: calc(var(--safe-top, 0px) + 52px);
     left: 50%;
     transform: translateX(-50%);
     z-index: 15;
+    pointer-events: none;
+  }
+  .place-search-overlay :global(.ps-wrap),
+  .place-search-overlay :global(.nav-hud) {
     pointer-events: auto;
   }
   @media (max-width: 767px) {
     .place-search-overlay {
-      /* Fixed so it escapes layout-map overflow:hidden */
+      /* Fixed so it escapes layout-map overflow:hidden.
+         Top is positioned BELOW the MobileTopBar which is safe-top + ~92px tall.
+         Using 108px (same as layout-map padding-top) + 8px breathing room. */
       position: fixed;
-      top: calc(var(--safe-top, 0px) + 10px);
+      top: calc(var(--safe-top, 0px) + 116px);
       left: 10px;
       right: 10px;
       transform: none;
