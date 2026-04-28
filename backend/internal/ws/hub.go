@@ -14,19 +14,20 @@ import (
 	"kinnect-v3/internal/cache"
 	"kinnect-v3/internal/config"
 	"kinnect-v3/internal/db"
+	"kinnect-v3/internal/monitoring"
 	"nhooyr.io/websocket"
 )
 
 const (
-	chanRegisterBuf  = 256
+	chanRegisterBuf   = 256
 	chanUnregisterBuf = 256
-	chanDispatchBuf  = 1024
-	chanBroadcastBuf = 512
-	offlineGrace24h  = 24 * 60 * 60 * 1000
-	offlineGrace48h  = 48 * 60 * 60 * 1000
-	offlineGrace5d   = 5 * 24 * 60 * 60 * 1000
-	offlineGrace10d  = 10 * 24 * 60 * 60 * 1000
-	offlineGrace30d  = 30 * 24 * 60 * 60 * 1000
+	chanDispatchBuf   = 1024
+	chanBroadcastBuf  = 2048 // H-4: raised from 512 to reduce drop rate
+	offlineGrace24h   = 24 * 60 * 60 * 1000
+	offlineGrace48h   = 48 * 60 * 60 * 1000
+	offlineGrace5d    = 5 * 24 * 60 * 60 * 1000
+	offlineGrace10d   = 10 * 24 * 60 * 60 * 1000
+	offlineGrace30d   = 30 * 24 * 60 * 60 * 1000
 )
 
 type dispatchMsg struct {
@@ -51,6 +52,7 @@ type Hub struct {
 	Cache    *cache.Cache
 	pool     *db.Pool
 	config   *config.Config
+	metrics  *monitoring.Metrics // M-5: optional Prometheus metrics; nil-safe
 	clients  map[string]*Client
 	handlers map[string]func(*Client, json.RawMessage) // built once in NewHub
 
@@ -105,6 +107,11 @@ func NewHub(c *cache.Cache, p *db.Pool, cfg *config.Config) *Hub {
 	return h
 }
 
+// SetMetrics wires Prometheus metrics into the hub (M-5). Call from main after NewHub.
+func (h *Hub) SetMetrics(m *monitoring.Metrics) {
+	h.metrics = m
+}
+
 // buildEventHandlers constructs the event dispatch table once at startup.
 func (h *Hub) buildEventHandlers() map[string]func(*Client, json.RawMessage) {
 	return map[string]func(*Client, json.RawMessage){
@@ -148,8 +155,6 @@ func (h *Hub) buildEventHandlers() map[string]func(*Client, json.RawMessage) {
 		"setAutoSos":           h.handleSetAutoSos,
 		"liveAckSOS":           h.handleLiveAckSOS,
 		"attest":               h.handleAttest,
-		"getRecentTrail":       h.handleGetRecentTrail,
-		"getHistory":           h.handleGetHistory,
 		"getNetworkGraph":      h.handleGetNetworkGraph,
 		"onMyWay":              h.handleOnMyWay,
 		"cancelOnMyWay":        h.handleCancelOnMyWay,
@@ -159,15 +164,14 @@ func (h *Hub) buildEventHandlers() map[string]func(*Client, json.RawMessage) {
 		"toggleCrowdMode":      h.handleToggleCrowdMode,
 		"setHeartbeat":         h.handleSetHeartbeat,
 		"setEmergencyPhones":   h.handleSetEmergencyPhones,
-		"startWalkWithMe":     h.handleStartWalkWithMe,
-		"endWalkWithMe":       h.handleEndWalkWithMe,
-		"sendSecretMsg":       h.handleSendSecretMsg,
-		"getSecretMsgs":       h.handleGetSecretMsgs,
-		"deleteSecretMsg":     h.handleDeleteSecretMsg,
+		"startWalkWithMe":      h.handleStartWalkWithMe,
+		"endWalkWithMe":        h.handleEndWalkWithMe,
+		"sendSecretMsg":        h.handleSendSecretMsg,
+		"getSecretMsgs":        h.handleGetSecretMsgs,
+		"deleteSecretMsg":      h.handleDeleteSecretMsg,
 		"markSecretMsgSeen":      h.handleMarkSecretMsgSeen,
 		"createSecretChatInvite": h.handleCreateSecretChatInvite,
 		"secretChatPresence":     h.handleSecretChatPresence,
-		"syncPlace":              h.handleSyncPlace,
 	}
 }
 
@@ -247,7 +251,8 @@ func (h *Hub) handleRegister(c *Client) {
 		}
 		restoredFromOffline = true
 	} else {
-		// 3. Create ActiveUser entry in cache
+		// 3. Create ActiveUser entry with defaults immediately so events can be
+		//    received while settings load in the background (H-1).
 		user := &cache.ActiveUser{
 			SocketID:           clientID,
 			UserID:             userID,
@@ -260,15 +265,23 @@ func (h *Hub) handleRegister(c *Client) {
 			BatteryAlertSentAt: make(map[int]int64),
 		}
 		user.Retention = &cache.Retention{Mode: "default", ClientID: clientID}
-		// Load persisted settings synchronously before SetActiveUser so that
-		// fields like HeartbeatEnabled and QuietHoursEnabled are fully populated
-		// before any other goroutine (cleanup, SanitizeUser) can observe the user.
-		h.loadUserSettings(user)
 		h.Cache.SetActiveUser(clientID, user)
 		h.Cache.SetUserIdToSocketId(userID, clientID)
 		if role == "admin" {
 			h.Cache.SetAdminClientId(clientID, true)
 		}
+
+		// H-1: load persisted settings in a goroutine so the hub dispatch loop
+		// is not blocked by DB latency. The user is already registered above and
+		// can receive events during the load.
+		go func() {
+			h.loadUserSettings(user)
+		}()
+	}
+
+	// M-5: track active WS connections
+	if h.metrics != nil {
+		h.metrics.WSConnectionsActive.Inc()
 	}
 
 	h.mu.Lock()
@@ -323,7 +336,6 @@ func (h *Hub) handleRegister(c *Client) {
 	h.emitMyGuardians(c, userID)
 	h.emitMyLiveLinks(c, userID)
 	h.emitPendingRequests(c, userID)
-	h.emitExistingPlaces(c, userID)
 }
 
 func (h *Hub) handleUnregister(c *Client) {
@@ -339,11 +351,15 @@ func (h *Hub) handleUnregister(c *Client) {
 		return
 	}
 
+	// M-5: decrement active WS connections
+	if h.metrics != nil {
+		h.metrics.WSConnectionsActive.Dec()
+	}
+
 	h.Cache.DeleteLastPositionAt(clientID)
 	h.Cache.DeleteLastDbSaveAt(user.UserID)
 	h.Cache.DeleteLastVisibleSet(clientID)
 	h.Cache.DeleteAdminClientId(clientID)
-	h.CloseZoneVisitsForUser(user.UserID)
 
 	// Guarantee last_* columns reflect the exact disconnect position (offline safety fix)
 	if user.Latitude != nil && user.Longitude != nil {
@@ -375,16 +391,22 @@ func (h *Hub) handleUnregister(c *Client) {
 	h.Cache.DeleteActiveUser(clientID)
 	h.Cache.DeleteUserIdToSocketId(user.UserID)
 
-	// Retention mode
+	// C-4: Retention mode — "forever" no longer stores nil expiresAt to avoid OOM.
+	// Instead it uses a 30-day expiry and sets RetentionForever=true on the entry.
 	var expiresAt *int64
 	mode := "default"
 	if user.Retention != nil {
 		mode = user.Retention.Mode
 	}
 	now := time.Now().UnixMilli()
+	retentionForever := false
 	switch mode {
 	case "forever":
-		expiresAt = nil
+		// C-4: use a finite expiry instead of nil to prevent OOM accumulation.
+		// The RetentionForever flag preserves the "stored forever" UI label.
+		t := now + offlineGrace30d
+		expiresAt = &t
+		retentionForever = true
 	case "48h":
 		t := now + offlineGrace48h
 		expiresAt = &t
@@ -403,7 +425,11 @@ func (h *Hub) handleUnregister(c *Client) {
 	}
 
 	user.Online = false
-	h.Cache.SetOfflineUser(user.UserID, &cache.OfflineEntry{User: user, ExpiresAt: expiresAt})
+	h.Cache.SetOfflineUser(user.UserID, &cache.OfflineEntry{
+		User:             user,
+		ExpiresAt:        expiresAt,
+		RetentionForever: retentionForever,
+	})
 
 	sanitized := h.Cache.SanitizeUser(user)
 	sanitized["online"] = false
@@ -530,11 +556,15 @@ func (h *Hub) SendToClient(clientID string, event string, data interface{}) {
 }
 
 // SendToClients sends an event to multiple clients.
+// H-4: drops to Warn (was Debug) and increments BroadcastDropped counter when channel is full.
 func (h *Hub) SendToClients(clientIDs []string, event string, data interface{}) {
 	select {
 	case h.broadcast <- &broadcastMsg{targetIDs: clientIDs, event: event, data: data}:
 	default:
-		slog.Debug("Broadcast channel full, dropping", "event", event)
+		slog.Warn("Broadcast channel full, dropping", "event", event, "targets", len(clientIDs))
+		if h.metrics != nil {
+			h.metrics.BroadcastDropped.Inc()
+		}
 	}
 }
 
@@ -609,6 +639,9 @@ func (h *Hub) loadUserSettings(user *cache.ActiveUser) {
 	defer cancel()
 	s, err := db.GetUserSettings(ctx, h.pool.DB, user.UserID)
 	if err != nil || s == nil {
+		if err != nil {
+			slog.Warn("loadUserSettings failed, using defaults", "userID", user.UserID, "error", err)
+		}
 		return // non-fatal: defaults are all zero-values
 	}
 	user.QuietHoursEnabled = s.QuietHoursEnabled

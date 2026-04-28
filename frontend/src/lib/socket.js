@@ -5,13 +5,10 @@ import { myContacts } from './stores/contacts.js';
 import { myGuardianData, canManage, pendingIncomingRequests } from './stores/guardians.js';
 import { banner, alertState, myLiveLinks, mySosActive, sosNarratives, activeSosUsers } from './stores/sos.js';
 import { adminOverview } from './stores/admin.js';
-import { privacyPause } from './stores/places.js';
 import { authUser } from './stores/auth.js';
 import { drainBuffer, hasBuffered } from './offlineBuffer.js';
 import { pulseMap } from './stores/pulses.js';
-import { arrivalProjections } from './stores/arrivals.js';
 import { networkGraph } from './stores/network.js';
-import { trailData } from './stores/trail.js';
 import { recordLatency } from './stores/latency.js';
 import { createRealtimeSocket } from './realtimeClient.js';
 import { notifySOS, notifyProximitySOS, notifyGuardianRequest, notifyBatteryLow, notifyHaventMoved } from './nativeNotifications.js';
@@ -19,8 +16,6 @@ import { rideShare } from './stores/rideShare.js';
 import { crowdMode } from './stores/crowdMode.js';
 import { bumpHubBadge } from './stores/hubBadge.js';
 import { addSecretMessage, setSecretMessages, removeSecretMessage, updateSecretMessageSeen, secretChatPresence } from './stores/secretChat.js';
-import { savedPlaces } from './stores/savedPlaces.js';
-import { apiGet } from './api.js';
 import { getShareOrigin } from './env.js';
 
 const storedClientId = localStorage.getItem('clientId');
@@ -32,9 +27,9 @@ export const socket = createRealtimeSocket({
   autoConnect: false,
   reconnection: true,
   reconnectionAttempts: 50,
-  reconnectionDelay: 200,
-  reconnectionDelayMax: 3000,
-  randomizationFactor: 0.3,
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 15000,
+  randomizationFactor: 0.5,
   timeout: 8000
 });
 
@@ -83,9 +78,7 @@ export function resetSocketState() {
   pulseMap.set(new Map());
   sosNarratives.set(new Map());
   activeSosUsers.set(new Map());
-  arrivalProjections.set(new Map());
   networkGraph.set(new Map());
-  trailData.set(new Map());
   myRooms.set([]);
   myContacts.set([]);
   myLiveLinks.set([]);
@@ -120,11 +113,6 @@ export function setupSocketHandlers() {
     connected = true;
     cancelReconnectBanner();
     setBanner({ type: null, text: null, actions: [] });
-    // Fetch saved places on every (re)connect so stale/offline-deleted places are removed.
-    const result = await apiGet('/api/places');
-    if (Array.isArray(result)) {
-      savedPlaces.set(new Map(result.map(p => [p.id, p])));
-    }
   });
 
   // Server tells us our assigned socket ID — use this for self-filtering
@@ -602,17 +590,6 @@ export function setupSocketHandlers() {
     ] }, 8000);
   });
 
-  // Arrival Intelligence — ETA projections to named saved places
-  socket.on('arrivalProjection', (data) => {
-    if (!data || !data.userId) return;
-    arrivalProjections.update(m => { m.set(data.userId, data); return m; });
-  });
-
-  socket.on('arrivalDismiss', (data) => {
-    if (!data || !data.userId) return;
-    arrivalProjections.update(m => { m.delete(data.userId); return m; });
-  });
-
   // Quiet Hours update
   socket.on('quietHoursUpdated', (data) => {
     if (!data) return;
@@ -626,11 +603,6 @@ export function setupSocketHandlers() {
     }
   });
 
-  // Privacy pause
-  socket.on('privacyPauseUpdate', (data) => {
-    if (data) privacyPause.set(data.pausedUntil || null);
-  });
-
   // ── Consumer feature events ──────────────────────────────────────────────────
 
   // Attest update — refresh lastAttestAt on the user in otherUsers map
@@ -639,15 +611,6 @@ export function setupSocketHandlers() {
     for (const [, u] of _localMap) {
       if (u.userId === data.userId) { u.lastAttestAt = data.at; _scheduleUsersFlush(); break; }
     }
-  });
-
-  // Trail data — store for Map.svelte to render polyline
-  socket.on('recentTrail', (data) => {
-    if (!data?.userId || !Array.isArray(data.points)) return;
-    trailData.update(m => { m.set(data.userId, data); return m; });
-  });
-  socket.on('trailError', (data) => {
-    setBanner({ type: 'info', text: data?.error || 'Route history not available right now', actions: [] }, 2000);
   });
 
   // Network graph
@@ -780,33 +743,6 @@ export function setupSocketHandlers() {
     });
   }
 
-  // ── Custom pins: real-time sync (places are loaded in the merged connect handler above) ──
-  socket.on('syncPlace', ({ action, placeId, userId, name, icon, latitude, longitude, visibility, roomCode }) => {
-    savedPlaces.update(m => {
-      if (action === 'add') {
-        m.set(placeId, { id: placeId, userId, name, icon, latitude, longitude, radiusM: 0, visibility: visibility || 'universal', roomCode: roomCode || '' });
-      } else if (action === 'remove') {
-        m.delete(placeId);
-      }
-      return m;
-    });
-  });
-
-  // Shared pins from contacts/rooms — sent by server on connect
-  socket.on('existingPlaces', (places) => {
-    if (!Array.isArray(places)) return;
-    savedPlaces.update(m => {
-      for (const p of places) {
-        m.set(p.placeId, {
-          id: p.placeId, userId: p.userId, name: p.name, icon: p.icon,
-          latitude: p.latitude, longitude: p.longitude, radiusM: 0,
-          visibility: p.visibility || 'universal', roomCode: p.roomCode || '',
-        });
-      }
-      return m;
-    });
-  });
-
   // All handlers registered -- now connect
   socket.connect();
 }
@@ -842,19 +778,5 @@ export function createSecretChatInvite(peerId) {
 
     socket.on('secretChatInviteCreated', handler);
     socket.emit('createSecretChatInvite', { peerId, nonce });
-  });
-}
-
-/** Broadcast a non-personal pin add/remove to the appropriate recipients. */
-export function emitSyncPlace(action, place) {
-  socket.emit('syncPlace', {
-    action,
-    placeId: place.id,
-    name: place.name || '',
-    icon: place.icon || 'pin',
-    latitude: place.latitude || 0,
-    longitude: place.longitude || 0,
-    visibility: place.visibility || 'universal',
-    roomCode: place.roomCode || '',
   });
 }

@@ -75,19 +75,6 @@ func InitDB(db *sql.DB) error {
 			UNIQUE(guardian_id, ward_id)
 		)`,
 
-		`CREATE TABLE IF NOT EXISTS position_history (
-			id          BIGSERIAL PRIMARY KEY,
-			user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-			latitude    DOUBLE PRECISION NOT NULL,
-			longitude   DOUBLE PRECISION NOT NULL,
-			speed       REAL,
-			accuracy    REAL,
-			recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-		)`,
-		`CREATE INDEX IF NOT EXISTS idx_pos_history_user_time ON position_history (user_id, recorded_at DESC)`,
-		// Drop redundant single-column index — the purge query uses a seq scan (runs once/day); saves ~120 MB
-		`DROP INDEX IF EXISTS idx_pos_history_recorded_at`,
-
 		`CREATE INDEX IF NOT EXISTS idx_contacts_contact_id ON contacts(contact_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_live_tokens_expires ON live_tokens(expires_at) WHERE expires_at IS NOT NULL`,
 		`CREATE INDEX IF NOT EXISTS idx_guardianships_ward ON guardianships(ward_id)`,
@@ -119,31 +106,6 @@ func InitDB(db *sql.DB) error {
 			vote         VARCHAR(10) NOT NULL,
 			UNIQUE(room_code, requester_id, voter_id)
 		)`,
-
-		// Saved places (server-backed for arrival intelligence & zone stories)
-		`CREATE TABLE IF NOT EXISTS saved_places (
-			id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			user_id    UUID REFERENCES users(id) ON DELETE CASCADE,
-			name       VARCHAR(100) NOT NULL,
-			icon       VARCHAR(20) DEFAULT 'pin',
-			latitude   DOUBLE PRECISION NOT NULL,
-			longitude  DOUBLE PRECISION NOT NULL,
-			radius_m   INTEGER DEFAULT 100,
-			created_at BIGINT NOT NULL
-		)`,
-		`CREATE INDEX IF NOT EXISTS idx_saved_places_user ON saved_places(user_id)`,
-
-		// Zone visits — who visited which saved place and for how long
-		`CREATE TABLE IF NOT EXISTS zone_visits (
-			id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			user_id        UUID REFERENCES users(id) ON DELETE CASCADE,
-			place_id       UUID REFERENCES saved_places(id) ON DELETE CASCADE,
-			arrived_at     TIMESTAMPTZ NOT NULL,
-			departed_at    TIMESTAMPTZ,
-			duration_seconds INTEGER
-		)`,
-		`CREATE INDEX IF NOT EXISTS idx_zone_visits_place_time ON zone_visits(place_id, arrived_at DESC)`,
-		`CREATE INDEX IF NOT EXISTS idx_zone_visits_user ON zone_visits(user_id, arrived_at DESC)`,
 
 		// Quiet Hours — server-enforced location coarsening for non-guardians
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS quiet_hours_enabled BOOLEAN DEFAULT false`,
@@ -177,27 +139,6 @@ func InitDB(db *sql.DB) error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_sharing_schedules_user ON sharing_schedules(user_id)`,
 
-		// movement_events — semantic location event log (replaces position_history long-term)
-		`CREATE TABLE IF NOT EXISTS movement_events (
-			id           BIGSERIAL PRIMARY KEY,
-			user_id      UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-			event_type   VARCHAR(25) NOT NULL,
-			lat          DOUBLE PRECISION,
-			lng          DOUBLE PRECISION,
-			speed_ms     REAL,
-			accuracy_m   REAL,
-			place_id     UUID REFERENCES saved_places(id) ON DELETE SET NULL,
-			place_name   VARCHAR(100),
-			motion_class VARCHAR(10),
-			metadata     JSONB DEFAULT '{}',
-			recorded_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-		)`,
-		`CREATE INDEX IF NOT EXISTS idx_movement_events_user_time
-			ON movement_events (user_id, recorded_at DESC)`,
-		`CREATE INDEX IF NOT EXISTS idx_movement_events_place_time
-			ON movement_events (place_id, recorded_at DESC)
-			WHERE place_id IS NOT NULL`,
-
 		// SOS watch tokens — persisted so they survive server restarts and can be queried for audit.
 		`CREATE TABLE IF NOT EXISTS sos_watch_tokens (
 			id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -225,10 +166,6 @@ func InitDB(db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_secret_messages_sender ON secret_messages(sender_id, created_at DESC)`,
 		// Migration guard: add seen_at to existing deployments that predate this column
 		`ALTER TABLE secret_messages ADD COLUMN IF NOT EXISTS seen_at TIMESTAMPTZ`,
-
-		// Custom pins: visibility scoping — 'personal' (owner only), 'universal' (all family), 'room' (specific room)
-		`ALTER TABLE saved_places ADD COLUMN IF NOT EXISTS visibility VARCHAR(10) DEFAULT 'personal'`,
-		`ALTER TABLE saved_places ADD COLUMN IF NOT EXISTS room_code VARCHAR(6)`,
 	}
 
 	for _, stmt := range statements {

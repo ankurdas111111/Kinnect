@@ -19,6 +19,9 @@ type Metrics struct {
 	WSMessagesSent      prometheus.Counter
 	WSMessageLatency    prometheus.Histogram
 
+	// Broadcast drop counter (H-4)
+	BroadcastDropped prometheus.Counter
+
 	// Position metrics
 	PositionUpdatesTotal prometheus.Counter
 	PositionQueueSize    prometheus.Gauge
@@ -83,6 +86,12 @@ func NewMetrics() *Metrics {
 			Name:    "ws_message_latency_ms",
 			Help:    "WebSocket message processing latency in milliseconds",
 			Buckets: []float64{1, 5, 10, 25, 50, 100, 250, 500},
+		}),
+
+		// Broadcast drop counter (H-4)
+		BroadcastDropped: promauto.NewCounter(prometheus.CounterOpts{
+			Name: "kinnect_broadcast_dropped_total",
+			Help: "WebSocket broadcast messages dropped due to full channel",
 		}),
 
 		// Position metrics

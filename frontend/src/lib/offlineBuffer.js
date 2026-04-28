@@ -15,9 +15,16 @@ const buffer = [];
  * Add a position payload to the offline buffer.
  * Evicts the oldest entry when full.
  *
+ * Stamps `recordedAt` (ms since epoch) on any position that carries neither
+ * a `timestamp` nor a `recordedAt` field so the backend's timestamp acceptance
+ * window check can use the original capture time rather than the replay time.
+ *
  * @param {object} pos  The same payload that would be sent to socket.emit('position', ...).
  */
 export function bufferPosition(pos) {
+  if (!pos.timestamp && !pos.recordedAt) {
+    pos = { ...pos, recordedAt: Date.now() };
+  }
   if (buffer.length >= MAX_BUFFER) buffer.shift();
   buffer.push(pos);
 }

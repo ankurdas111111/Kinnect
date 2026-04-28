@@ -95,7 +95,6 @@ func main() {
 	go hub.Run(ctx)
 	go hub.StartPositionPurger(ctx)
 	hub.StartCleanupRoutines(ctx)
-	go hub.StartArrivalMonitor(ctx)
 
 	// Start auth IP-limiter cleaner with a shutdown path.
 	api.StartAuthCleaner(ctx)

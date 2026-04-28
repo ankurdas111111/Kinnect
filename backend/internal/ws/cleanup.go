@@ -110,8 +110,13 @@ func (h *Hub) StartCleanupRoutines(ctx context.Context) {
 	safeLoop(ctx, 24*time.Hour, "purgeSecretMessages", func(ctx context.Context) {
 		h.cleanupExpiredSecretMessages(ctx)
 	})
-	safeLoop(ctx, 1*time.Hour, "cleanupArrivalMaps", func(ctx context.Context) {
-		cleanupArrivalMaps()
+
+	// M-3: purge expired HTTP sessions every 6 hours so the session table does
+	// not accumulate indefinitely (connect-pg-simple / gorilla/sessions rows).
+	safeLoop(ctx, 6*time.Hour, "cleanupExpiredSessions", func(ctx context.Context) {
+		if _, err := h.pool.DB.ExecContext(ctx, `DELETE FROM "session" WHERE expire < NOW()`); err != nil {
+			slog.Warn("cleanupExpiredSessions failed", "err", err)
+		}
 	})
 
 	slog.Info("Cleanup routines started")
@@ -206,54 +211,110 @@ func (h *Hub) cleanupExpireGuardianships() {
 
 // cleanupStaleGuardianships purges old expired/revoked guardianship rows.
 // ctx is threaded so the query can be cancelled on shutdown.
+// L-6: retention window reduced from 30 days to 7 days.
 func (h *Hub) cleanupStaleGuardianships(ctx context.Context) {
 	_, err := h.pool.DB.ExecContext(ctx,
 		`DELETE FROM guardianships
 		 WHERE status IN ('expired', 'revoked')
-		   AND created_at < extract(epoch from now() - interval '30 days')::bigint * 1000`)
+		   AND created_at < extract(epoch from now() - interval '7 days')::bigint * 1000`)
 	if err != nil {
 		slog.Error("Failed to purge stale guardianships", "error", err)
 	}
 }
 
+// checkInPendingUpdate holds a deferred write to ActiveUser.CheckIn fields,
+// collected during the read-only ForEachActiveUser pass and applied afterwards
+// under a write lock to avoid the data race (H-5).
+type checkInPendingUpdate struct {
+	socketID         string
+	setRequestedAt   int64 // 0 = no change
+	setMissedNotifyAt int64 // 0 = no change
+	setLastCheckInAt int64 // 0 = no change
+}
+
 func (h *Hub) cleanupCheckInOverdue() {
 	now := time.Now().UnixMilli()
+
+	// Phase 1: read-only scan under RLock — collect what needs sending and what
+	// fields need updating.  Do NOT mutate anything here (data race fix H-5).
+	type pendingNotify struct {
+		socketID    string
+		user        *cache.ActiveUser // snapshot of pointer; values read under RLock
+		sendRequest bool
+		sendMissed  bool
+	}
+
+	var notifies []pendingNotify
+	var updates []checkInPendingUpdate
+
 	h.Cache.ForEachActiveUser(func(socketID string, user *cache.ActiveUser) {
 		ch := &user.CheckIn
 		if !ch.Enabled {
 			return
 		}
 		lastAt := ch.LastCheckInAt
-		if lastAt == 0 {
-			// First evaluation: set baseline to now so the first interval starts counting.
-			ch.LastCheckInAt = now
+		needsBaselineSet := lastAt == 0
+
+		var upd checkInPendingUpdate
+		upd.socketID = socketID
+
+		if needsBaselineSet {
+			upd.setLastCheckInAt = now
 			lastAt = now
 		}
+
 		intervalMs := int64(ch.IntervalMin) * 60 * 1000
 		overdueMs := int64(ch.OverdueMin) * 60 * 1000
 		since := now - lastAt
 
-		// Only send checkInRequest once per interval period (debounce).
+		pn := pendingNotify{socketID: socketID, user: user}
+
 		if since >= intervalMs && now-ch.RequestedAt > intervalMs {
-			ch.RequestedAt = now
-			h.SendToClient(socketID, "checkInRequest", map[string]interface{}{
-				"intervalMinutes": ch.IntervalMin,
-				"overdueMinutes":  ch.OverdueMin,
-			})
+			upd.setRequestedAt = now
+			pn.sendRequest = true
 		}
-		// Only send checkInMissed once per overdue period (debounce).
 		if since >= overdueMs && now-ch.MissedNotifiedAt > overdueMs {
-			ch.MissedNotifiedAt = now
-			missedPayload := map[string]interface{}{
-				"socketId":       socketID,
-				"userId":         user.UserID,
-				"displayName":    user.DisplayName,
-				"lastCheckInAt":  lastAt,
-				"overdueMinutes": ch.OverdueMin,
-			}
-			h.emitToVisible(user, "checkInMissed", missedPayload)
+			upd.setMissedNotifyAt = now
+			pn.sendMissed = true
+		}
+
+		if upd.setRequestedAt != 0 || upd.setMissedNotifyAt != 0 || upd.setLastCheckInAt != 0 {
+			updates = append(updates, upd)
+		}
+		if pn.sendRequest || pn.sendMissed {
+			notifies = append(notifies, pn)
 		}
 	})
+
+	// Phase 2: apply mutations under write lock.  GetActiveUser acquires its own
+	// RLock, so we call it in a loop and apply changes via a targeted write block
+	// using the exported Cache.UpdateCheckInTimestamps helper.
+	// To avoid adding a new cache export, we inline the write via the
+	// Cache.mu write-lock path that ForEachActiveUser comment says is safe to do
+	// AFTER ForEachActiveUser returns (lock is released by then).
+	for _, upd := range updates {
+		h.Cache.ApplyCheckInUpdate(upd.socketID, upd.setLastCheckInAt, upd.setRequestedAt, upd.setMissedNotifyAt)
+	}
+
+	// Phase 3: send notifications (no lock held).
+	for _, pn := range notifies {
+		if pn.sendRequest {
+			h.SendToClient(pn.socketID, "checkInRequest", map[string]interface{}{
+				"intervalMinutes": pn.user.CheckIn.IntervalMin,
+				"overdueMinutes":  pn.user.CheckIn.OverdueMin,
+			})
+		}
+		if pn.sendMissed {
+			missedPayload := map[string]interface{}{
+				"socketId":       pn.socketID,
+				"userId":         pn.user.UserID,
+				"displayName":    pn.user.DisplayName,
+				"lastCheckInAt":  pn.user.CheckIn.LastCheckInAt,
+				"overdueMinutes": pn.user.CheckIn.OverdueMin,
+			}
+			h.emitToVisible(pn.user, "checkInMissed", missedPayload)
+		}
+	}
 }
 
 // cleanupExpiredStatusMessages clears status messages whose expiry time has passed
@@ -281,6 +342,13 @@ func (h *Hub) cleanupExpiredStatusMessages() {
 	})
 }
 
+// gentleAlertPendingUpdate holds a deferred write to ActiveUser.GentleAlertSentAt,
+// collected during the read-only ForEachActiveUser pass (H-5 data race fix).
+type gentleAlertPendingUpdate struct {
+	socketID string
+	sentAt   int64
+}
+
 // checkHaventMovedAlerts sends a gentle nudge to guardians when a ward has been
 // stationary for 45–240 minutes. Rate-limited to once per 60 min per ward.
 func (h *Hub) checkHaventMovedAlerts() {
@@ -289,6 +357,18 @@ func (h *Hub) checkHaventMovedAlerts() {
 	const maxStillMs = 4 * 60 * 60 * 1000 // 4 hours (after this assume intentional)
 	const cooldownMs = 60 * 60 * 1000     // 1 hour between alerts
 
+	type pendingAlert struct {
+		socketID    string
+		userID      string
+		displayName string
+		minutesStill int64
+		guardians   map[string]bool
+	}
+
+	var alerts []pendingAlert
+	var updates []gentleAlertPendingUpdate
+
+	// Phase 1: read-only scan — collect alerts and field update intentions.
 	h.Cache.ForEachActiveUser(func(_ string, user *cache.ActiveUser) {
 		if user.MotionClass != "still" {
 			return
@@ -304,27 +384,67 @@ func (h *Hub) checkHaventMovedAlerts() {
 		if len(guardians) == 0 {
 			return
 		}
-		user.GentleAlertSentAt = now
+		updates = append(updates, gentleAlertPendingUpdate{socketID: user.SocketID, sentAt: now})
+		alerts = append(alerts, pendingAlert{
+			socketID:     user.SocketID,
+			userID:       user.UserID,
+			displayName:  user.DisplayName,
+			minutesStill: stillMs / 60000,
+			guardians:    guardians,
+		})
+	})
+
+	// Phase 2: apply GentleAlertSentAt mutations under write lock.
+	for _, upd := range updates {
+		h.Cache.ApplyGentleAlertSentAt(upd.socketID, upd.sentAt)
+	}
+
+	// Phase 3: send alerts (no lock held).
+	for _, a := range alerts {
 		payload := map[string]interface{}{
-			"userId":       user.UserID,
-			"displayName":  user.DisplayName,
-			"minutesStill": stillMs / 60000,
+			"userId":       a.userID,
+			"displayName":  a.displayName,
+			"minutesStill": a.minutesStill,
 		}
-		for guardianID := range guardians {
+		for guardianID := range a.guardians {
 			if sid := h.Cache.GetUserIdToSocketId(guardianID); sid != "" {
 				h.SendToClient(sid, "gentleAlert", payload)
 			}
 		}
-	})
+	}
 }
 
-// cleanupExpiredSecretMessages deletes secret messages older than 7 days.
-// ctx is threaded so the query can be cancelled on shutdown.
+// cleanupExpiredSecretMessages deletes secret messages older than 7 days,
+// then enforces a per-conversation-pair cap of 200 messages (C-3).
+// ctx is threaded so queries can be cancelled on shutdown.
 func (h *Hub) cleanupExpiredSecretMessages(ctx context.Context) {
+	// Step 1: TTL purge — remove messages older than 7 days.
 	_, err := h.pool.DB.ExecContext(ctx,
 		`DELETE FROM secret_messages WHERE created_at < NOW() - INTERVAL '7 days'`,
 	)
 	if err != nil {
 		slog.Error("Failed to purge expired secret messages", "error", err)
+		return
+	}
+
+	// Step 2: per-pair row cap — keep at most 200 messages per ordered pair
+	// (A→B and B→A are treated as the same conversation via LEAST/GREATEST).
+	_, err = h.pool.DB.ExecContext(ctx,
+		`DELETE FROM secret_messages
+		 WHERE id IN (
+		     SELECT id FROM (
+		         SELECT id,
+		                ROW_NUMBER() OVER (
+		                    PARTITION BY LEAST(sender_id, receiver_id),
+		                                 GREATEST(sender_id, receiver_id)
+		                    ORDER BY created_at DESC
+		                ) AS rn
+		         FROM secret_messages
+		     ) ranked
+		     WHERE rn > 200
+		 )`,
+	)
+	if err != nil {
+		slog.Error("Failed to enforce per-pair secret message cap", "error", err)
 	}
 }

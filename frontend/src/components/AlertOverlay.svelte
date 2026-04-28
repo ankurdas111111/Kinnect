@@ -402,12 +402,17 @@
   }
   .med-card-chevron.open { transform: rotate(180deg); }
 
+  /* Fix #1: constrain med-card-body height so it scrolls on short iPhones (667px + notch).
+     100dvh accounts for iOS browser chrome; safe-area insets cover the notch and home indicator. */
   .med-card-body {
     display: flex;
     flex-direction: column;
     gap: 1px;
     background: rgba(239, 68, 68, 0.08);
     border-top: 1px solid rgba(239, 68, 68, 0.15);
+    max-height: calc(100dvh - 160px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .med-row {

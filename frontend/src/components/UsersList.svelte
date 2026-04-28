@@ -10,7 +10,6 @@
   import { haptics } from '../lib/haptics.js';
   import VirtualList from './primitives/VirtualList.svelte';
   import KinnectNexus from './primitives/KinnectNexus.svelte';
-  import { savedPlaces } from '../lib/stores/places.js';
   import { computeActivityStatus, formatActivityAge } from '../lib/activityStatus.js';
 
   function locateUser(socketId) {
@@ -186,19 +185,6 @@
     return 'Low';
   }
 
-  // Named place lookup — returns the first saved place the user is within (Feature 5)
-  function getAtPlace(user) {
-    const lat = user.latitude ?? user.lat;
-    const lng = user.longitude ?? user.lng;
-    if (lat == null || lng == null || !$savedPlaces?.length) return null;
-    for (const place of $savedPlaces) {
-      if (place.lat == null || place.lng == null || !place.radiusM) continue;
-      const distM = calculateDistance(lat, lng, place.lat, place.lng);
-      if (distM <= place.radiusM) return place;
-    }
-    return null;
-  }
-
   function getAccuracyClass(acc) {
     if (acc == null) return '';
     if (acc <= 15) return 'acc-high';
@@ -346,24 +332,18 @@
                       Location off
                     </span>
                   {:else}
-                    {@const atPlace = getAtPlace(user)}
                     {@const actStatus = computeActivityStatus(user)}
-                    {#if atPlace}
-                      <span class="place-chip" aria-label="At {atPlace.name}">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                        at {atPlace.name}
-                      </span>
-                    {:else if $myLocation}
+                    {#if $myLocation}
                       <span class="distance-label">{formatDistance(calculateDistance($myLocation.latitude, $myLocation.longitude, user.latitude, user.longitude)) || 'Near'}</span>
                     {/if}
                     {#if actStatus && actStatus.label !== 'Offline'}
-                      {#if atPlace || $myLocation}<span class="sep">·</span>{/if}
+                      {#if $myLocation}<span class="sep">·</span>{/if}
                       <span class="activity-badge" style:color={actStatus.color} aria-label="{actStatus.label}">
                         <span class="activity-badge-dot" style:background={actStatus.dotColor} aria-hidden="true"></span>
                         {actStatus.label}
                       </span>
                     {/if}
-                    {#if user.accuracy != null && !atPlace}
+                    {#if user.accuracy != null}
                       <span class="sep">·</span>
                       <span class="acc-dot {getAccuracyClass(user.accuracy)}" aria-hidden="true"></span>
                       <span class="acc-label {getAccuracyClass(user.accuracy)}" aria-label="GPS accuracy: {getAccuracyLabel(user.accuracy)}">{getAccuracyLabel(user.accuracy)}</span>
@@ -837,18 +817,7 @@
     opacity: 0.65;
   }
 
-  /* Named place chip (Feature 5) */
-  .place-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    font-size: var(--text-xs, 11px);
-    font-weight: 700;
-    color: var(--primary-600, #4f46e5);
-    letter-spacing: 0.01em;
-  }
-
-  /* Activity status badge (Feature 6) */
+  /* Activity status badge */
   .activity-badge {
     display: inline-flex;
     align-items: center;

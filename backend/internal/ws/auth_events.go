@@ -17,6 +17,9 @@ import (
 	"kinnect-v3/internal/db"
 	"kinnect-v3/internal/intelligence"
 	"kinnect-v3/internal/shared"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 const (
@@ -33,6 +36,47 @@ const (
 // spawned by position update handlers. Without this limit, a spike of 200-item
 // batches from many clients could spawn thousands of goroutines simultaneously.
 var dbWriteSem = make(chan struct{}, 64)
+
+// positionUpdatesTotal counts every accepted position update (post-cooldown, post-throttle).
+// Uses the get-or-register pattern so the binary can safely import both this package and
+// monitoring.NewMetrics() without panicking on duplicate prometheus registration.
+var positionUpdatesTotal = func() prometheus.Counter {
+	c := prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "position_updates_total",
+		Help: "Total number of position updates",
+	})
+	if err := prometheus.DefaultRegisterer.Register(c); err != nil {
+		if are, ok := err.(prometheus.AlreadyRegisteredError); ok {
+			return are.ExistingCollector.(prometheus.Counter)
+		}
+		// Non-duplicate error: fall back to a no-op via promauto on a fresh name.
+		// This should never happen in practice.
+		return promauto.NewCounter(prometheus.CounterOpts{
+			Name: "position_updates_total_ws",
+			Help: "Total number of position updates (fallback)",
+		})
+	}
+	return c
+}()
+
+// positionPayload is a lean struct for the userMoved broadcast.
+// It holds only the ~12 fields that change on each position update, avoiding the
+// ~25 nested-map allocations that SanitizeUser produces on every ~20 Hz broadcast.
+// Other events (existingUsers, userUpdate, userOffline) continue to use SanitizeUser.
+type positionPayload struct {
+	SocketID    string   `json:"socketId"`
+	UserID      string   `json:"userId"`
+	Lat         *float64 `json:"lat"`
+	Lng         *float64 `json:"lng"`
+	Speed       float64  `json:"speed"`
+	LastUpdate  int64    `json:"lastUpdate"`
+	BatteryPct  *int     `json:"batteryPct"`
+	Online      bool     `json:"online"`
+	MotionClass string   `json:"motionClass"`
+	SafetyScore float64  `json:"safetyScore"`
+	ActivityCtx string   `json:"activityContext"`
+	SOSActive   bool     `json:"sosActive"`
+}
 
 // motionClass derives a motion class string from speed in km/h.
 // Frontend Kalman filter emits speed in km/h (browser raw m/s × 3.6).
@@ -145,8 +189,6 @@ func (h *Hub) handlePosition(c *Client, data json.RawMessage) {
 
 	// ── Motion class ─────────────────────────────────────────────────────────
 	newClass := motionClass(pos.Speed)
-	classChanged := newClass != user.MotionClass
-	prevClass := user.MotionClass
 	user.MotionClass = newClass
 
 	// ── Movement phase (intelligence label) ──────────────────────────────────
@@ -185,33 +227,13 @@ func (h *Hub) handlePosition(c *Client, data json.RawMessage) {
 		user.SafetyScore = sc.Total
 	}
 
-	// ── Meaningful movement threshold ────────────────────────────────────────
-	var accPtr *float64
-	if pos.Accuracy != nil {
-		a := *pos.Accuracy
-		accPtr = &a
-	}
-
 	if shouldWritePositionToDB(user, pos.Latitude, pos.Longitude, pos.Speed) {
 		user.LastDBLat = pos.Latitude
 		user.LastDBLng = pos.Longitude
 		user.LastDBAt = now
 
-		// Only write semantic transition events — raw waypoints removed to cut storage.
-		// Plain movement is already captured by trip_start/trip_end/arrival/departure.
-		evType := ""
-		if classChanged && prevClass == "still" && newClass != "still" {
-			evType = "trip_start"
-		} else if classChanged && prevClass != "still" && newClass == "still" {
-			evType = "trip_end"
-		} else if classChanged {
-			evType = "motion_class_change"
-		}
-
 		lat, lng, spd := pos.Latitude, pos.Longitude, pos.Speed
 		uid := user.UserID
-		mc := newClass
-		pc := prevClass
 
 		// Non-blocking acquire: drop the write under extreme load rather than
 		// blocking the hub's dispatch goroutine or spawning unbounded goroutines.
@@ -220,20 +242,6 @@ func (h *Hub) handlePosition(c *Client, data json.RawMessage) {
 			go func() {
 				defer func() { <-dbWriteSem }()
 				bCtx := context.Background()
-				// movement_events: semantic transitions only (no raw waypoints)
-				if evType != "" {
-					spdF := spd
-					_ = db.InsertMovementEvent(bCtx, h.pool.DB, db.MovementEventRow{
-						UserID:      uid,
-						EventType:   evType,
-						Lat:         &lat,
-						Lng:         &lng,
-						SpeedMs:     &spdF,
-						AccuracyM:   accPtr,
-						MotionClass: mc,
-						Metadata:    map[string]interface{}{"prevClass": pc},
-					})
-				}
 				// users.last_* snapshot
 				speedStr := fmt.Sprintf("%.2f", spd)
 				_ = db.UpdateUserLocation(bCtx, h.pool.DB, uid, lat, lng, speedStr, now)
@@ -249,14 +257,36 @@ func (h *Hub) handlePosition(c *Client, data json.RawMessage) {
 	// ── Battery proxy alerts ──────────────────────────────────────────────────
 	checkBatteryAlerts(h, user)
 
-	sanitized := h.Cache.SanitizeUser(user)
-	sanitized["online"] = true
-	h.queuePositionBroadcast(user, sanitized)
+	// ── M-5: count every accepted position update ─────────────────────────────
+	positionUpdatesTotal.Inc()
 
-	// Emit liveUpdate to live:token groups
+	// ── M-1: lean payload for userMoved — avoids ~25 nested-map allocations ──
+	// queuePositionBroadcast (and the downstream flushPositionBroadcasts) emits
+	// "userMoved"; only position-volatile fields are needed there.
+	lean := map[string]interface{}{
+		"socketId":        user.SocketID,
+		"userId":          user.UserID,
+		"lat":             user.Latitude,
+		"lng":             user.Longitude,
+		"speed":           user.Speed,
+		"lastUpdate":      user.LastUpdate,
+		"batteryPct":      user.BatteryPct,
+		"online":          true,
+		"motionClass":     user.MotionClass,
+		"safetyScore":     user.SafetyScore,
+		"activityContext": user.ActivityContext,
+		"sosActive":       user.SOS.Active,
+	}
+	h.queuePositionBroadcast(user, lean)
+
+	// liveUpdate viewers need the full snapshot (displayName, rooms, geofence, etc.)
 	tokens := h.Cache.GetLiveTokensForUser(user.UserID)
-	for token := range tokens {
-		h.SendToGroup("live:"+token, "liveUpdate", map[string]interface{}{"user": sanitized})
+	if len(tokens) > 0 {
+		sanitized := h.Cache.SanitizeUser(user)
+		sanitized["online"] = true
+		for token := range tokens {
+			h.SendToGroup("live:"+token, "liveUpdate", map[string]interface{}{"user": sanitized})
+		}
 	}
 
 	h.runAutoRules(user)
@@ -274,8 +304,12 @@ func (h *Hub) handlePositionBatch(c *Client, data json.RawMessage) {
 	if err := json.Unmarshal(data, &batch); err != nil || len(batch) == 0 {
 		return
 	}
-	if len(batch) > 200 {
-		batch = batch[:200]
+	// M-2: cap at 20 to prevent blocking the hub dispatch goroutine for >100ms.
+	// Keep the most-recent 20 items (tail) so the final broadcast reflects the
+	// latest GPS fixes from the offline period.
+	if len(batch) > 20 {
+		slog.Debug("positionBatch truncated", "original", len(batch), "kept", 20)
+		batch = batch[len(batch)-20:]
 	}
 
 	user := h.Cache.GetActiveUser(c.ID())
@@ -302,8 +336,10 @@ func (h *Hub) handlePositionBatch(c *Client, data json.RawMessage) {
 		now := time.Now().UnixMilli()
 		if pos.Timestamp != nil {
 			ts := *pos.Timestamp
-			// Accept only timestamps in the past and within the last hour.
-			if ts > 0 && ts <= now && now-ts <= 3600000 {
+			// Accept timestamps in the past and within the last 24 hours so that
+			// positions buffered during flights / long offline periods are replayed
+			// with their original GPS timestamps (L-3).
+			if ts > 0 && ts <= now && now-ts <= 86400000 {
 				now = ts
 			}
 		}
@@ -1687,19 +1723,8 @@ func (h *Hub) handleRevokeGuardian(c *Client, data json.RawMessage) {
 
 // ── Consumer product features ──────────────────────────────────────────────────
 
-// computeActivityContext derives a human-readable activity string from motion class
-// and arrival state (inside a saved place). No DB call — uses in-memory state.
+// computeActivityContext derives a human-readable activity string from motion class.
 func computeActivityContext(userID, mClass string) string {
-	arrival.mu.Lock()
-	defer arrival.mu.Unlock()
-	for pid, inside := range arrival.insidePlaces[userID] {
-		if inside {
-			if name := arrival.placeNames[pid]; name != "" {
-				return "At " + name
-			}
-			return "At a saved place"
-		}
-	}
 	switch mClass {
 	case "walk":
 		return "Walking"

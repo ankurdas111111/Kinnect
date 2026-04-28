@@ -31,7 +31,6 @@ func NewRouter(cfg *config.Config, pool *db.Pool, c *cache.Cache, store *auth.Se
 	}
 	adminHandler := &AdminHandler{db: pool.DB, cache: c}
 	metricsHandler := NewMetricsHandler(hub)
-	placesHandler := &PlacesHandler{db: pool.DB}
 	geocodeHandler := NewGeoHandler()
 
 	// API routes
@@ -57,12 +56,6 @@ func NewRouter(cfg *config.Config, pool *db.Pool, c *cache.Cache, store *auth.Se
 
 	// Geocoding proxy (Nominatim, rate-limited, cached)
 	mux.Handle("GET /api/geocode", http.HandlerFunc(geocodeHandler.ReverseGeocode))
-
-	// Saved places API
-	mux.Handle("GET /api/places", RequireAuth(http.HandlerFunc(placesHandler.ListPlaces)))
-	mux.Handle("POST /api/places", RequireAuth(CsrfMiddleware(http.HandlerFunc(placesHandler.CreatePlace))))
-	mux.Handle("DELETE /api/places/{placeId}", RequireAuth(CsrfMiddleware(http.HandlerFunc(placesHandler.DeletePlace))))
-	mux.Handle("GET /api/places/{placeId}/story", RequireAuth(http.HandlerFunc(placesHandler.GetZoneStory)))
 
 	// WebSocket upgrade endpoint with connection limiting
 	mux.HandleFunc("GET /ws", func(w http.ResponseWriter, r *http.Request) {

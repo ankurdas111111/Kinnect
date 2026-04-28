@@ -18,8 +18,6 @@
     '/register': Register,
     '/monitoring': Monitoring,
     '/emergency': EmergencyProfile,
-    '/activity': wrap({ asyncComponent: () => import('./pages/ActivityFeed.svelte') }),
-    '/replay': wrap({ asyncComponent: () => import('./pages/RoutePlayback.svelte') }),
     '/checkins': wrap({ asyncComponent: () => import('./pages/CheckinSchedule.svelte') }),
     '/add-contact/:code': wrap({ asyncComponent: () => import('./pages/AddContact.svelte') }),
     '/live/:token': wrap({ asyncComponent: () => import('./pages/LiveViewer.svelte') }),

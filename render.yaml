@@ -15,4 +15,5 @@ services:
         value: "https://kinnect-z7wf.onrender.com"
     healthCheckPath: /health
     healthCheckInterval: 30
+    healthCheckTimeout: 60
     autoDeploy: true

@@ -28,11 +28,18 @@ type ExpiredGuardianship struct {
 
 // CollectExpiredOfflineUsers finds offline users past expiry and removes them.
 // Returns the list for emitting userDisconnect. Caller must emit after.
+//
+// C-4: the previous `ExpiresAt == nil` skip is removed. After the C-4 fix in
+// hub.go, all entries — including "forever" retention — carry a finite ExpiresAt
+// (30 days). The RetentionForever flag on the entry preserves the UI label without
+// requiring nil, so the time-based check here is now sufficient for all entries.
 func (c *Cache) CollectExpiredOfflineUsers(now int64) []ExpiredOfflineUser {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	var out []ExpiredOfflineUser
 	for userID, entry := range c.OfflineUsers {
+		// Skip entries that have not yet expired.
+		// NOTE: ExpiresAt should never be nil after the C-4 fix, but guard defensively.
 		if entry.ExpiresAt == nil || *entry.ExpiresAt > now {
 			continue
 		}

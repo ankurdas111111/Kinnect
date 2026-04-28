@@ -132,6 +132,9 @@
     grid-column: 1;
     /* Base 108px accounts for topbar content height; safe-top adds notch/Dynamic Island offset */
     padding-top: calc(var(--safe-top, 0px) + 108px);
+    /* Bottom padding ensures the tab bar (56px) and safe area never obscure map content */
+    padding-bottom: calc(var(--bottom-tab-height, 56px) + 8px);
+    transition: padding-bottom 300ms ease;
   }
 
   .layout-tabs {

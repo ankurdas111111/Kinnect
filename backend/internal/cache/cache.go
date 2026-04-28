@@ -177,10 +177,17 @@ type WatchTokenEntry struct {
 }
 
 // OfflineEntry holds an offline user with expiry.
+// C-4: RetentionForever preserves the "stored forever" UI label without requiring
+// a nil ExpiresAt (which caused OOM by preventing the cleanup goroutine from evicting entries).
 type OfflineEntry struct {
-	User     *ActiveUser
-	ExpiresAt *int64
+	User             *ActiveUser
+	ExpiresAt        *int64
+	RetentionForever bool
 }
+
+// maxOfflineUsers is the maximum number of offline entries retained in RAM.
+// When this cap is exceeded, the entry with the earliest ExpiresAt is evicted. (C-4)
+const maxOfflineUsers = 500
 
 // PushSubscription holds a Web Push subscription for a user.
 type PushSubscription struct {
@@ -227,8 +234,15 @@ type Cache struct {
 	// Secret chat invite tokens (ephemeral, in-memory only)
 	SecretChatInvites map[string]*SecretChatInvite
 
+	// M-6: CacheSize TTL fields — avoids holding RLock while iterating all nested maps.
+	cachedSize   int64
+	cachedSizeAt time.Time
+
 	// Lazy loading
 	lazyLoader *LazyLoader
+
+	// M-5: optional cache-miss callback. Set via SetMetricsHook to avoid import cycle.
+	onCacheMiss func()
 }
 
 // SecretChatInvite is an ephemeral token linking to a secret chat conversation.
@@ -281,6 +295,14 @@ func New() *Cache {
 		SecretChatInvites:   make(map[string]*SecretChatInvite),
 		lazyLoader:          nil, // Set via SetLazyLoader
 	}
+}
+
+// SetMetricsHook wires a callback invoked on every lazy-load cache miss (M-5).
+// Use a closure over *monitoring.Metrics to avoid an import cycle.
+func (c *Cache) SetMetricsHook(onMiss func()) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.onCacheMiss = onMiss
 }
 
 // Init populates the cache from LoadAllResult.
@@ -484,6 +506,13 @@ func (c *Cache) GetDisplayName(userID string) string {
 	c.mu.RUnlock()
 
 	if !ok {
+		// M-5: count cache misses for Prometheus.
+		c.mu.RLock()
+		onMiss := c.onCacheMiss
+		c.mu.RUnlock()
+		if onMiss != nil {
+			onMiss()
+		}
 		// Try lazy loading if not in cache
 		u = c.LoadUserCacheEntry(userID)
 		if u == nil {
@@ -523,12 +552,20 @@ func (c *Cache) GetUserRooms(userID string) []string {
 }
 
 // GetVisibleSet returns the set of user IDs visible to the given user (rooms, contacts both ways).
-// Uses VisibilityCache when available; otherwise computes and caches.
+// H-2: double-checked locking — hot path uses RLock on cache hit; write lock only on miss.
 func (c *Cache) GetVisibleSet(userID string) map[string]bool {
+	// Hot path: check under read lock.
+	c.mu.RLock()
+	if cached, ok := c.VisibilityCache[userID]; ok && len(cached) > 0 {
+		result := cached
+		c.mu.RUnlock()
+		return result
+	}
+	c.mu.RUnlock()
+
+	// Cache miss: acquire write lock, recheck, then compute.
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	// KR-006: delegate to the single locked implementation so guardian visibility
-	// is included here too (previously this function omitted guardians).
 	return c.getVisibleSetLocked(userID)
 }
 
@@ -627,15 +664,43 @@ func (c *Cache) IsGuardianOf(guardianID, wardID string) bool {
 
 // GetVisibleSocketIDs returns socket IDs of users who can see targetUser (for emitToVisible).
 // Includes admins. Excludes targetUser's own socket.
+// H-2: double-checked locking — hot path uses RLock when visibility is already cached.
 func (c *Cache) GetVisibleSocketIDs(targetUser *ActiveUser) []string {
+	userID := targetUser.UserID
+
+	// Hot path: try read lock first.
+	c.mu.RLock()
+	if cached, ok := c.VisibilityCache[userID]; ok && len(cached) > 0 {
+		var out []string
+		seen := make(map[string]bool)
+		for uid := range cached {
+			if uid == userID {
+				continue
+			}
+			if sid, ok := c.UserIdToSocketId[uid]; ok && sid != targetUser.SocketID {
+				out = append(out, sid)
+				seen[sid] = true
+			}
+		}
+		for sid := range c.AdminClientIds {
+			if sid != targetUser.SocketID && !seen[sid] {
+				out = append(out, sid)
+			}
+		}
+		c.mu.RUnlock()
+		return out
+	}
+	c.mu.RUnlock()
+
+	// Cache miss: acquire write lock, compute visibility (getVisibleSetLocked caches it).
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	visibleSet := c.getVisibleSetLocked(targetUser.UserID)
+	visibleSet := c.getVisibleSetLocked(userID)
 	var out []string
 	seen := make(map[string]bool)
 	for uid := range visibleSet {
-		if uid == targetUser.UserID {
+		if uid == userID {
 			continue
 		}
 		if sid, ok := c.UserIdToSocketId[uid]; ok && sid != targetUser.SocketID {
@@ -878,6 +943,8 @@ func (c *Cache) GetOfflineUser(userID string) *OfflineEntry {
 }
 
 // SetOfflineUser adds or updates an offline user entry.
+// C-4: enforces a cap of maxOfflineUsers (500). When at cap, evicts the entry with
+// the earliest ExpiresAt before inserting to prevent OOM on 512 MB hosts.
 func (c *Cache) SetOfflineUser(userID string, entry *OfflineEntry) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -885,9 +952,47 @@ func (c *Cache) SetOfflineUser(userID string, entry *OfflineEntry) {
 	if old := c.OfflineUsers[userID]; old != nil && old.User != nil {
 		delete(c.OfflineBySocketID, old.User.SocketID)
 	}
+
+	// C-4: evict if cap is reached and this is a new slot (not a replacement).
+	_, alreadyExists := c.OfflineUsers[userID]
+	if !alreadyExists && len(c.OfflineUsers) >= maxOfflineUsers {
+		c.evictEarliestOfflineUserLocked()
+	}
+
 	c.OfflineUsers[userID] = entry
 	if entry != nil && entry.User != nil {
 		c.OfflineBySocketID[entry.User.SocketID] = userID
+	}
+}
+
+// evictEarliestOfflineUserLocked removes the offline entry with the smallest ExpiresAt.
+// Must be called with c.mu held.
+func (c *Cache) evictEarliestOfflineUserLocked() {
+	var earliestUID string
+	var earliestExp int64
+	first := true
+	for uid, e := range c.OfflineUsers {
+		if e.ExpiresAt == nil {
+			// Nil ExpiresAt should not occur after the C-4 fix, but guard defensively.
+			if first {
+				earliestUID = uid
+				first = false
+			}
+			continue
+		}
+		if first || *e.ExpiresAt < earliestExp {
+			earliestUID = uid
+			earliestExp = *e.ExpiresAt
+			first = false
+		}
+	}
+	if earliestUID != "" {
+		if old := c.OfflineUsers[earliestUID]; old != nil && old.User != nil {
+			delete(c.OfflineBySocketID, old.User.SocketID)
+		}
+		delete(c.OfflineUsers, earliestUID)
+		slog.Warn("OfflineUsers cap reached, evicted earliest entry",
+			"evictedUserID", earliestUID, "cap", maxOfflineUsers)
 	}
 }
 
@@ -1164,14 +1269,32 @@ func (c *Cache) UpdateUserProfile(userID, firstName, lastName, email, mobile str
 }
 
 // CacheSize returns an estimated size of the cache in bytes.
+// M-6: result is TTL-cached for 60 seconds — avoids holding a write lock while
+// iterating all nested maps on every Prometheus scrape.
 func (c *Cache) CacheSize() int64 {
+	const ttl = 60 * time.Second
+
+	// Fast path: return cached value under read lock if still fresh.
 	c.mu.RLock()
-	defer c.mu.RUnlock()
+	if time.Since(c.cachedSizeAt) < ttl {
+		v := c.cachedSize
+		c.mu.RUnlock()
+		return v
+	}
+	c.mu.RUnlock()
+
+	// Stale: acquire write lock, double-check, then recompute.
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if time.Since(c.cachedSizeAt) < ttl {
+		// Another goroutine refreshed while we waited for the write lock.
+		return c.cachedSize
+	}
 
 	var size int64
 	const ptrSize = 8
 
-	// Estimate for maps (key + value + overhead per entry)
 	mapOverhead := int64(48)
 	entryOverhead := int64(24)
 
@@ -1210,7 +1333,7 @@ func (c *Cache) CacheSize() int64 {
 	// ActiveUsers (largest contributor)
 	size += mapOverhead
 	for _, user := range c.ActiveUsers {
-		userSize := int64(ptrSize * 20) // Various fields
+		userSize := int64(ptrSize * 20)
 		userSize += int64(len(user.SocketID) + len(user.UserID) + len(user.DisplayName) + len(user.Role))
 		if user.Retention != nil {
 			userSize += int64(len(user.Retention.ClientID))
@@ -1248,6 +1371,8 @@ func (c *Cache) CacheSize() int64 {
 
 	size += mapOverhead + int64(len(c.AdminClientIds))*(entryOverhead+ptrSize)
 
+	c.cachedSize = size
+	c.cachedSizeAt = time.Now()
 	return size
 }
 
@@ -1328,6 +1453,37 @@ func (c *Cache) DeleteSecretChatInvite(token string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	delete(c.SecretChatInvites, token)
+}
+
+// ApplyCheckInUpdate sets check-in timestamps on an active user under a write lock.
+// Parameters with value 0 are skipped ("don't update" convention used by cleanup.go).
+func (c *Cache) ApplyCheckInUpdate(socketID string, setLastCheckInAt, setRequestedAt, setMissedNotifyAt int64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	user, ok := c.ActiveUsers[socketID]
+	if !ok {
+		return
+	}
+	if setLastCheckInAt != 0 {
+		user.CheckIn.LastCheckInAt = setLastCheckInAt
+	}
+	if setRequestedAt != 0 {
+		user.CheckIn.RequestedAt = setRequestedAt
+	}
+	if setMissedNotifyAt != 0 {
+		user.CheckIn.MissedNotifiedAt = setMissedNotifyAt
+	}
+}
+
+// ApplyGentleAlertSentAt sets GentleAlertSentAt on an active user under a write lock.
+func (c *Cache) ApplyGentleAlertSentAt(socketID string, sentAt int64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	user, ok := c.ActiveUsers[socketID]
+	if !ok {
+		return
+	}
+	user.GentleAlertSentAt = sentAt
 }
 
 // CollectExpiredSecretChatInvites removes and returns all expired invite tokens.

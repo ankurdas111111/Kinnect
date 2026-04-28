@@ -3,7 +3,6 @@
   import FreshnessChip from './primitives/FreshnessChip.svelte';
   import TiltCard from './primitives/TiltCard.svelte';
   import { focusUser, myLocation } from '../lib/stores/map.js';
-  import { savedPlaces } from '../lib/stores/places.js';
   import { sosNarratives } from '../lib/stores/sos.js';
   import { calculateDistance, formatDistance } from '../lib/tracking.js';
   import { computeActivityStatus, formatActivityAge } from '../lib/activityStatus.js';
@@ -18,21 +17,9 @@
     ? (user.displayName || '').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?'
     : '?';
 
-  // ── Activity status (Feature 6) ──────────────────────────────────────────
+  // ── Activity status ──────────────────────────────────────────────────────
   $: activityStatus = computeActivityStatus(user);
   $: activityAge    = formatActivityAge(user?.lastSeen);
-
-  // ── Named place detection (Feature 5) ───────────────────────────────────
-  // Check if user is within the radius of any family saved place
-  $: atPlace = (() => {
-    if (!user?.lat || !user?.lng || !$savedPlaces?.length) return null;
-    for (const place of $savedPlaces) {
-      if (place.lat == null || place.lng == null || !place.radiusM) continue;
-      const distM = calculateDistance(user.lat, user.lng, place.lat, place.lng);
-      if (distM <= place.radiusM) return place;
-    }
-    return null;
-  })();
 
   // ── Distance from me ─────────────────────────────────────────────────────
   $: distanceText = (user?.lat != null && user?.lng != null && $myLocation)
@@ -53,21 +40,9 @@
 
   function copyCoords() {
     if (!user?.lat || !user?.lng) return;
-    const text = atPlace
-      ? `${user.displayName} is at ${atPlace.name} (${user.lat.toFixed(6)}, ${user.lng.toFixed(6)})`
-      : `${user.lat.toFixed(6)}, ${user.lng.toFixed(6)}`;
+    const text = `${user.lat.toFixed(6)}, ${user.lng.toFixed(6)}`;
     navigator.clipboard?.writeText(text).catch(() => {});
   }
-
-  // Place icon map (matches the icon field from saved places)
-  const PLACE_ICONS = {
-    home:     'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
-    school:   null, // uses book icon
-    work:     null, // uses briefcase
-    gym:      null,
-    hospital: null,
-    default:  null,
-  };
 </script>
 
 {#if user}
@@ -134,16 +109,6 @@
       </div>
     {/if}
 
-    <!-- Named place banner (Feature 5) -->
-    {#if atPlace}
-      <div class="place-banner" aria-label="Current location: {atPlace.name}">
-        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
-        </svg>
-        at {atPlace.name}
-      </div>
-    {/if}
-
     <!-- Avatar + name row -->
     <div class="card-header">
       <div
@@ -159,7 +124,7 @@
       <div class="name-block">
         <span class="display-name">{user.displayName || 'Unknown'}</span>
 
-        <!-- Activity status line (Feature 6) -->
+        <!-- Activity status line -->
         {#if activityStatus}
           <span
             class="activity-status"
@@ -189,28 +154,14 @@
     <!-- Stat grid -->
     {#if user.lat && user.lng}
       <div class="stat-grid">
-        {#if atPlace}
-          <!-- When at a named place, show the place prominently instead of raw coords -->
-          <div class="stat stat-place" style:--place-color={color}>
-            <span class="stat-label">Location</span>
-            <span class="stat-value stat-value-place">{atPlace.name}</span>
-          </div>
-          {#if distanceText}
-            <div class="stat">
-              <span class="stat-label">Distance</span>
-              <span class="stat-value">{distanceText}</span>
-            </div>
-          {/if}
-        {:else}
-          <div class="stat">
-            <span class="stat-label">Latitude</span>
-            <span class="stat-value">{user.lat.toFixed(5)}°</span>
-          </div>
-          <div class="stat">
-            <span class="stat-label">Longitude</span>
-            <span class="stat-value">{user.lng.toFixed(5)}°</span>
-          </div>
-        {/if}
+        <div class="stat">
+          <span class="stat-label">Latitude</span>
+          <span class="stat-value">{user.lat.toFixed(5)}°</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Longitude</span>
+          <span class="stat-value">{user.lng.toFixed(5)}°</span>
+        </div>
 
         {#if user.accuracy != null}
           <div class="stat">
@@ -219,7 +170,7 @@
           </div>
         {/if}
 
-        {#if !atPlace && distanceText}
+        {#if distanceText}
           <div class="stat">
             <span class="stat-label">Distance</span>
             <span class="stat-value">{distanceText}</span>
@@ -399,20 +350,6 @@
     text-transform: uppercase;
   }
 
-  /* ── Named place banner (Feature 5) ─────────────────────────────────────── */
-  .place-banner {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 7px 14px;
-    background: rgba(99, 102, 241, 0.08);
-    border-bottom: 1px solid rgba(99, 102, 241, 0.15);
-    color: var(--primary-600, #4f46e5);
-    font-size: var(--text-xs, 11px);
-    font-weight: 700;
-    letter-spacing: 0.03em;
-  }
-
   /* ── Card header ─────────────────────────────────────────────────────────── */
   .card-header {
     display: flex;
@@ -492,7 +429,7 @@
     line-height: 1.2;
   }
 
-  /* ── Activity status line (Feature 6) ──────────────────────────────────── */
+  /* ── Activity status line ───────────────────────────────────────────────── */
   .activity-status {
     display: flex;
     align-items: center;
@@ -541,12 +478,6 @@
       0 1px 0 rgba(255, 255, 255, 0.08);
   }
 
-  /* Named place stat spans both columns */
-  .stat-place {
-    grid-column: 1 / -1;
-    background: rgba(99, 102, 241, 0.04);
-  }
-
   .stat-label {
     font-size: 10px;
     font-weight: 600;
@@ -560,12 +491,6 @@
     font-weight: 600;
     color: var(--text-primary);
     font-variant-numeric: tabular-nums;
-  }
-
-  /* Place name value is slightly larger and colored */
-  .stat-value-place {
-    font-size: 15px;
-    color: var(--primary-600, #4f46e5);
   }
 
   /* ── Actions ─────────────────────────────────────────────────────────────── */

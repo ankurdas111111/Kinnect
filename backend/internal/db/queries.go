@@ -7,8 +7,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/lib/pq"
 )
 
 // LoadAll loads all persistent data from the DB in parallel.
@@ -374,32 +372,82 @@ func coalesceStr(s, def string) string {
 	return def
 }
 
-// GetPlacesForUsers loads saved_places for a slice of user IDs in a single query.
-// Returns a map from userID → []SavedPlace.
-func GetPlacesForUsers(ctx context.Context, database *sql.DB, userIDs []string) (map[string][]SavedPlace, error) {
-	if len(userIDs) == 0 {
-		return map[string][]SavedPlace{}, nil
-	}
-	// ANY($1) with a single array bind parameter allows the query planner to
-	// cache the plan regardless of how many user IDs are passed.
-	rows, err := database.QueryContext(ctx,
-		`SELECT id, name, latitude, longitude, radius_m, user_id FROM saved_places WHERE user_id = ANY($1)`,
-		pq.Array(userIDs),
-	)
+// GetUserSettings loads the persisted per-user settings from the users table.
+// Returns nil, nil if the user is not found (non-fatal: caller should use zero defaults).
+func GetUserSettings(ctx context.Context, database *sql.DB, userID string) (*UserSettings, error) {
+	var qhEnabled, hbEnabled *bool
+	var qhStart, qhEnd, hbDeadline, ePhone1, ePhone2 *string
+	var hbLastSignal *int64
+
+	err := database.QueryRowContext(ctx,
+		`SELECT quiet_hours_enabled, quiet_hours_start::text, quiet_hours_end::text,
+		        heartbeat_enabled, heartbeat_deadline::text, heartbeat_last_signal,
+		        emergency_phone_1, emergency_phone_2
+		   FROM users WHERE id = $1`, userID).
+		Scan(&qhEnabled, &qhStart, &qhEnd, &hbEnabled, &hbDeadline, &hbLastSignal, &ePhone1, &ePhone2)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
 		return nil, err
 	}
-	defer rows.Close()
-	result := make(map[string][]SavedPlace, len(userIDs))
-	for rows.Next() {
-		var p SavedPlace
-		var uid string
-		if err := rows.Scan(&p.ID, &p.Name, &p.Lat, &p.Lng, &p.RadiusM, &uid); err != nil {
-			return nil, err
-		}
-		result[uid] = append(result[uid], p)
+
+	s := &UserSettings{}
+	if qhEnabled != nil {
+		s.QuietHoursEnabled = *qhEnabled
 	}
-	return result, rows.Err()
+	if qhStart != nil && len(*qhStart) >= 5 {
+		s.QuietHoursStart = (*qhStart)[:5]
+	}
+	if qhEnd != nil && len(*qhEnd) >= 5 {
+		s.QuietHoursEnd = (*qhEnd)[:5]
+	}
+	if hbEnabled != nil {
+		s.HeartbeatEnabled = *hbEnabled
+	}
+	if hbDeadline != nil && len(*hbDeadline) >= 5 {
+		s.HeartbeatDeadline = (*hbDeadline)[:5]
+	}
+	if hbLastSignal != nil {
+		s.HeartbeatLastSignal = *hbLastSignal
+	}
+	if ePhone1 != nil {
+		s.EmergencyPhone1 = *ePhone1
+	}
+	if ePhone2 != nil {
+		s.EmergencyPhone2 = *ePhone2
+	}
+	return s, nil
+}
+
+// UpdateUserProfile updates first_name, last_name, email and mobile for a user.
+// Email and mobile may be empty strings to clear them.
+func UpdateUserProfile(ctx context.Context, db *sql.DB, userID, firstName, lastName, email, mobile string) error {
+	var em, mo interface{}
+	if email != "" {
+		em = email
+	}
+	if mobile != "" {
+		mo = mobile
+	}
+	_, err := db.ExecContext(ctx,
+		`UPDATE users SET first_name=$1, last_name=$2, email=$3, mobile=$4 WHERE id=$5`,
+		firstName, lastName, em, mo, userID)
+	return err
+}
+
+// UpdateUserPassword updates the password hash for a user.
+func UpdateUserPassword(ctx context.Context, db *sql.DB, userID, newHash string) error {
+	_, err := db.ExecContext(ctx,
+		`UPDATE users SET password_hash=$1 WHERE id=$2`,
+		newHash, userID)
+	return err
+}
+
+// DeleteUser removes the user and their session row.
+func DeleteUser(ctx context.Context, db *sql.DB, userID string) error {
+	_, err := db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, userID)
+	return err
 }
 
 // GetUserByID loads a single user from the database by ID (for lazy loading)

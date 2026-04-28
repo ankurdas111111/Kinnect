@@ -197,36 +197,11 @@ func (h *Hub) endTrip(user *cache.ActiveUser) {
 	user.TripActive = false
 	user.TripVehicleStart = 0
 
-	if user.Latitude == nil || user.Longitude == nil {
-		return
-	}
-	lat, lng := *user.Latitude, *user.Longitude
-
-	// Check if the stop location is near a saved place
-	places := h.loadUserPlaces(context.Background(), user.UserID)
-	var arrivedPlace string
-	for _, p := range places {
-		dist := haversine(lat, lng, p.Lat, p.Lng)
-		if dist <= p.RadiusM {
-			arrivedPlace = p.Name
-			break
-		}
-	}
-
-	if arrivedPlace != "" {
-		slog.Info("Trip ended — arrived at saved place", "user", user.DisplayName, "place", arrivedPlace)
-		h.emitToVisible(user, "tripArrived", map[string]interface{}{
-			"userId":      user.UserID,
-			"displayName": user.DisplayName,
-			"placeName":   arrivedPlace,
-		})
-	} else {
-		slog.Info("Trip ended — stopped at unknown location", "user", user.DisplayName)
-		h.emitToVisible(user, "tripStoppedNew", map[string]interface{}{
-			"userId":      user.UserID,
-			"displayName": user.DisplayName,
-		})
-	}
+	slog.Info("Trip ended", "user", user.DisplayName)
+	h.emitToVisible(user, "tripStoppedNew", map[string]interface{}{
+		"userId":      user.UserID,
+		"displayName": user.DisplayName,
+	})
 }
 
 // haversine returns the distance in meters between two lat/lng points.

@@ -166,8 +166,13 @@
 
 {#if open}
   <div class="sheet-backdrop" class:visible={snapState !== 'closed'} on:click={onBackdropClick} aria-hidden="true"></div>
+  <!-- Fix #2: expose snap state as CSS classes so child components and CSS
+       can conditionally control overflow behaviour at each snap position. -->
   <div
     class="sheet"
+    class:is-peek={snapState === 'peek'}
+    class:is-half={snapState === 'half'}
+    class:is-full={snapState === 'full'}
     bind:this={sheetEl}
     tabindex="-1"
     style="transform: translateY({translateY}px)"
@@ -300,6 +305,19 @@
     padding: 0 var(--space-4) var(--space-4);
     /* Safe area + bottom tab bar height so content isn't hidden behind the tab bar */
     padding-bottom: calc(var(--space-4) + var(--safe-bottom, 0px) + var(--bottom-tab-height, 56px));
+  }
+
+  /* Fix #2: In peek state (~35% visible = ~230px on 667px), clip the body so
+     partially visible content does not look broken or overflow the sheet edge. */
+  .sheet.is-peek .sheet-body {
+    overflow: hidden;
+  }
+
+  /* Ensure sheet body remains scrollable at half and full snap positions. */
+  .sheet.is-half .sheet-body,
+  .sheet.is-full .sheet-body {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   @media (min-width: 768px) {

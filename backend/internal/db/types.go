@@ -57,15 +57,6 @@ type RoomAdminRequestEntry struct {
 	Denials   map[string]bool // voterId -> true
 }
 
-// SavedPlace mirrors a row from the saved_places table.
-type SavedPlace struct {
-	ID      string
-	Name    string
-	Lat     float64
-	Lng     float64
-	RadiusM float64
-}
-
 // UserSettings holds persisted per-user settings loaded on connection.
 type UserSettings struct {
 	QuietHoursEnabled  bool

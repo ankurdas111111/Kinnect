@@ -5,19 +5,21 @@ import (
 	"log/slog"
 	"time"
 
-	"kinnect-v3/internal/db"
 )
 
 const (
-	purgeInterval         = 24 * time.Hour
+	// purgeInterval: 6h instead of 24h so the purge fires multiple times per
+	// Render spin-up window (Render free tier restarts every ~15 min of inactivity).
+	// A 24h window would allow unbounded row accumulation between restarts.
+	purgeInterval         = 6 * time.Hour
 	positionRetentionDays = 7
 	movementRetentionDays = 7 // was 30 — semantic events only, 7 days is enough
 )
 
-// StartPositionPurger runs daily:
+// StartPositionPurger runs every 6 hours:
 //   - Drains any remaining position_history rows (dual-write stopped; table empties naturally)
-//   - Purges movement_events older than 7 days
-//   - Purges zone_visits older than 7 days
+//   - Purges movement_events older than 7 days + per-user row cap (500)
+//   - Purges zone_visits older than 7 days + per-place row cap (200)
 //   - Purges expired sos_watch_tokens
 //   - Runs VACUUM ANALYZE on the heavy time-series tables (non-blocking, updates planner stats)
 func (h *Hub) StartPositionPurger(ctx context.Context) {
@@ -37,22 +39,6 @@ func (h *Hub) StartPositionPurger(ctx context.Context) {
 }
 
 func (h *Hub) runPurge(ctx context.Context) {
-	// Drain legacy position_history (dual-write removed; rows expire naturally over 7 days)
-	if err := db.PurgePositionHistory(ctx, h.pool.DB, positionRetentionDays); err != nil {
-		slog.Error("Failed to purge position_history", "error", err)
-	}
-
-	// Movement events — keep 7 days of semantic transitions
-	if err := db.PurgeMovementEvents(ctx, h.pool.DB, movementRetentionDays); err != nil {
-		slog.Warn("Failed to purge movement_events", "error", err)
-	}
-
-	// Zone visits — 7-day retention
-	if _, err := h.pool.DB.ExecContext(ctx,
-		`DELETE FROM zone_visits WHERE arrived_at < NOW() - INTERVAL '7 days'`); err != nil {
-		slog.Warn("Failed to purge zone_visits", "error", err)
-	}
-
 	// SOS watch tokens — delete expired rows (no previous purge existed)
 	if _, err := h.pool.DB.ExecContext(ctx,
 		`DELETE FROM sos_watch_tokens WHERE expires_at < $1`, time.Now().UnixMilli()); err != nil {
