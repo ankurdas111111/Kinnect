@@ -172,6 +172,19 @@ func (h *Hub) buildEventHandlers() map[string]func(*Client, json.RawMessage) {
 		"markSecretMsgSeen":      h.handleMarkSecretMsgSeen,
 		"createSecretChatInvite": h.handleCreateSecretChatInvite,
 		"secretChatPresence":     h.handleSecretChatPresence,
+		// New features
+		"iAmSafe":              h.handleIAmSafe,
+		"setMeetingPoint":      h.handleSetMeetingPoint,
+		"clearMeetingPoint":    h.handleClearMeetingPoint,
+		"setSpeedAlert":        h.handleSetSpeedAlert,
+		"getGeofenceLog":       h.handleGetGeofenceLog,
+		"setProximityAlert":    h.handleSetProximityAlert,
+		"removeProximityAlert": h.handleRemoveProximityAlert,
+		"listProximityAlerts":  h.handleListProximityAlerts,
+		"postRoomNote":         h.handlePostRoomNote,
+		"deleteRoomNote":       h.handleDeleteRoomNote,
+		"getRoomNotes":         h.handleGetRoomNotes,
+		"getDailyActivity":     h.handleGetDailyActivity,
 	}
 }
 
@@ -652,4 +665,6 @@ func (h *Hub) loadUserSettings(user *cache.ActiveUser) {
 	user.HeartbeatLastSignal = s.HeartbeatLastSignal
 	user.EmergencyPhone1 = s.EmergencyPhone1
 	user.EmergencyPhone2 = s.EmergencyPhone2
+	// F5: load speed alert threshold
+	user.SpeedAlertThresholdMs = s.SpeedAlertThresholdMs
 }

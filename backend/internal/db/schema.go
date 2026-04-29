@@ -166,6 +166,76 @@ func InitDB(db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_secret_messages_sender ON secret_messages(sender_id, created_at DESC)`,
 		// Migration guard: add seen_at to existing deployments that predate this column
 		`ALTER TABLE secret_messages ADD COLUMN IF NOT EXISTS seen_at TIMESTAMPTZ`,
+
+		// F3: Meeting point columns on rooms
+		`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS meeting_lat    DOUBLE PRECISION`,
+		`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS meeting_lng    DOUBLE PRECISION`,
+		`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS meeting_label  VARCHAR(80)`,
+		`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS meeting_set_by UUID REFERENCES users(id) ON DELETE SET NULL`,
+		`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS meeting_set_at BIGINT`,
+
+		// F5: Speed alert threshold on users (m/s; NULL = disabled)
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS speed_alert_threshold_ms DOUBLE PRECISION`,
+
+		// F4: Saved places
+		`CREATE TABLE IF NOT EXISTS saved_places (
+			id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			name       VARCHAR(80) NOT NULL,
+			icon       VARCHAR(20),
+			latitude   DOUBLE PRECISION NOT NULL,
+			longitude  DOUBLE PRECISION NOT NULL,
+			radius_m   DOUBLE PRECISION NOT NULL DEFAULT 100,
+			created_at BIGINT NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_saved_places_user ON saved_places(user_id)`,
+
+		// F6: Geofence event log
+		`CREATE TABLE IF NOT EXISTS geofence_events (
+			id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			fence_name VARCHAR(80) NOT NULL DEFAULT '',
+			event_type VARCHAR(10) NOT NULL,
+			lat        DOUBLE PRECISION NOT NULL,
+			lng        DOUBLE PRECISION NOT NULL,
+			ts         BIGINT NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_geofence_events_user_ts ON geofence_events(user_id, ts DESC)`,
+
+		// F7: Proximity alerts
+		`CREATE TABLE IF NOT EXISTS proximity_alerts (
+			id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			owner_id          UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			target_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			radius_m          INT NOT NULL DEFAULT 500,
+			enabled           BOOLEAN NOT NULL DEFAULT true,
+			last_triggered_at BIGINT NOT NULL DEFAULT 0,
+			created_at        BIGINT NOT NULL,
+			UNIQUE(owner_id, target_id)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_proximity_alerts_owner  ON proximity_alerts(owner_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_proximity_alerts_target ON proximity_alerts(target_id)`,
+
+		// F8: Room bulletin board
+		`CREATE TABLE IF NOT EXISTS room_notes (
+			id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			room_id    UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+			author_id  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			body       VARCHAR(200) NOT NULL,
+			created_at BIGINT NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_room_notes_room ON room_notes(room_id, created_at DESC)`,
+
+		// F9: Daily activity summary
+		`CREATE TABLE IF NOT EXISTS daily_activity (
+			user_id        UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			date           DATE NOT NULL,
+			distance_m     INT NOT NULL DEFAULT 0,
+			active_minutes INT NOT NULL DEFAULT 0,
+			updated_at     BIGINT NOT NULL,
+			PRIMARY KEY (user_id, date)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_daily_activity_user ON daily_activity(user_id, date DESC)`,
 	}
 
 	for _, stmt := range statements {

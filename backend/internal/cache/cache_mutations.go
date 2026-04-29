@@ -665,3 +665,81 @@ func (c *Cache) BuildAdminOverviewPayload() map[string]interface{} {
 		"usersList": users, "roomsList": rooms, "guardianships": guardianships,
 	}
 }
+
+// ── F4: Saved places cache mutations ─────────────────────────────────────────
+
+// SetSavedPlacesForUser replaces all saved places for a user in the cache.
+func (c *Cache) SetSavedPlacesForUser(userID string, places []db.SavedPlaceEntry) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.SavedPlaces == nil {
+		c.SavedPlaces = make(map[string][]db.SavedPlaceEntry)
+	}
+	c.SavedPlaces[userID] = places
+}
+
+// AddSavedPlace appends a single saved place for a user.
+func (c *Cache) AddSavedPlace(userID string, p db.SavedPlaceEntry) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.SavedPlaces == nil {
+		c.SavedPlaces = make(map[string][]db.SavedPlaceEntry)
+	}
+	c.SavedPlaces[userID] = append(c.SavedPlaces[userID], p)
+}
+
+// RemoveSavedPlace removes a saved place by ID for a user.
+func (c *Cache) RemoveSavedPlace(userID, placeID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	places := c.SavedPlaces[userID]
+	filtered := places[:0]
+	for _, p := range places {
+		if p.ID != placeID {
+			filtered = append(filtered, p)
+		}
+	}
+	if len(filtered) == 0 {
+		delete(c.SavedPlaces, userID)
+	} else {
+		c.SavedPlaces[userID] = filtered
+	}
+}
+
+// ── F7: Proximity alert cache mutations ──────────────────────────────────────
+
+// UpsertProximityAlert adds or updates a proximity alert in the cache (keyed by targetID).
+func (c *Cache) UpsertProximityAlert(a *db.ProximityAlertEntry) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.ProximityAlerts == nil {
+		c.ProximityAlerts = make(map[string][]*db.ProximityAlertEntry)
+	}
+	alerts := c.ProximityAlerts[a.TargetID]
+	for i, existing := range alerts {
+		if existing.OwnerID == a.OwnerID {
+			alerts[i] = a
+			c.ProximityAlerts[a.TargetID] = alerts
+			return
+		}
+	}
+	c.ProximityAlerts[a.TargetID] = append(alerts, a)
+}
+
+// RemoveProximityAlert removes a proximity alert by ownerID+targetID from the cache.
+func (c *Cache) RemoveProximityAlert(ownerID, targetID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	alerts := c.ProximityAlerts[targetID]
+	filtered := alerts[:0]
+	for _, a := range alerts {
+		if a.OwnerID != ownerID {
+			filtered = append(filtered, a)
+		}
+	}
+	if len(filtered) == 0 {
+		delete(c.ProximityAlerts, targetID)
+	} else {
+		c.ProximityAlerts[targetID] = filtered
+	}
+}

@@ -1,16 +1,19 @@
 package ws
 
 import (
+	"context"
+	"log/slog"
 	"math"
 	"strings"
 	"time"
 
 	"kinnect-v3/internal/cache"
+	"kinnect-v3/internal/db"
 	"kinnect-v3/internal/shared"
 )
 
 const (
-	batchIntervalMs = 40
+	batchIntervalMs  = 40
 	maxPositionQueue = 500
 )
 
@@ -33,9 +36,9 @@ func (h *Hub) emitMyRooms(c *Client, userID string) {
 				roleExpiresAt = memberRole.ExpiresAt
 			}
 			members = append(members, map[string]interface{}{
-				"userId":       mid,
-				"displayName":  h.Cache.GetDisplayName(mid),
-				"roomRole":     memberRoomRole,
+				"userId":        mid,
+				"displayName":   h.Cache.GetDisplayName(mid),
+				"roomRole":      memberRoomRole,
 				"roleExpiresAt": roleExpiresAt,
 			})
 		}
@@ -210,6 +213,7 @@ func (h *Hub) parseExpiresIn(exp string) *int64 {
 }
 
 // runAutoRules runs geofence, no-move, hard-stop auto-SOS rules.
+// F6: geofence entry/exit events are logged here via InsertGeofenceEvent.
 func (h *Hub) runAutoRules(user *cache.ActiveUser) {
 	if !user.AutoSOS.Enabled {
 		return
@@ -236,20 +240,58 @@ func (h *Hub) runAutoRules(user *cache.ActiveUser) {
 		}
 	}
 
-	// Geofence: only trigger SOS on inside→outside transition (requires confirmed prior inside state).
+	// Geofence: track inside/outside transitions.
+	// Both entry and exit are logged via F6 InsertGeofenceEvent (fence_name = "").
+	// Exit from inside also triggers AutoSOS if configured.
 	if user.AutoSOS.Geofence && user.Geofence.Enabled && user.Geofence.CenterLat != nil && user.Geofence.CenterLng != nil {
 		if user.Latitude != nil && user.Longitude != nil {
 			dist := shared.HaversineM(*user.Geofence.CenterLat, *user.Geofence.CenterLng, *user.Latitude, *user.Longitude)
 			isInside := dist <= user.Geofence.RadiusM
-			if isInside {
+
+			if isInside && (user.Geofence.WasInside == nil || !*user.Geofence.WasInside) {
+				// outside→inside transition: log entry
 				t := true
 				user.Geofence.WasInside = &t
-			} else if user.Geofence.WasInside != nil && *user.Geofence.WasInside && !user.SOS.Active {
-				// Confirmed transition: was inside, now outside.
+				uid := user.UserID
+				lat, lng := *user.Latitude, *user.Longitude
+				ts := now
+				select {
+				case dbWriteSem <- struct{}{}:
+					go func() {
+						defer func() { <-dbWriteSem }()
+						if err := db.InsertGeofenceEvent(context.Background(), h.pool.DB, uid, "", "entry", lat, lng, ts); err != nil {
+							slog.Warn("InsertGeofenceEvent entry failed", "userId", uid, "error", err)
+						}
+					}()
+				default:
+					slog.Warn("dbWriteSem full, dropping geofence entry log", "userId", uid)
+				}
+			} else if !isInside && user.Geofence.WasInside != nil && *user.Geofence.WasInside {
+				// inside→outside transition: log exit + optionally trigger SOS
 				f := false
 				user.Geofence.WasInside = &f
-				reason := "Left geofence area"
-				h.setSos(user, true, reason, "", "auto")
+				uid := user.UserID
+				lat, lng := *user.Latitude, *user.Longitude
+				ts := now
+				select {
+				case dbWriteSem <- struct{}{}:
+					go func() {
+						defer func() { <-dbWriteSem }()
+						if err := db.InsertGeofenceEvent(context.Background(), h.pool.DB, uid, "", "exit", lat, lng, ts); err != nil {
+							slog.Warn("InsertGeofenceEvent exit failed", "userId", uid, "error", err)
+						}
+					}()
+				default:
+					slog.Warn("dbWriteSem full, dropping geofence exit log", "userId", uid)
+				}
+				if !user.SOS.Active {
+					reason := "Left geofence area"
+					h.setSos(user, true, reason, "", "auto")
+				}
+			} else if isInside {
+				// Confirm inside state (no transition — just keep WasInside = true)
+				t := true
+				user.Geofence.WasInside = &t
 			}
 		}
 	}

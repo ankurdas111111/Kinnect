@@ -22,6 +22,8 @@ func LoadAll(ctx context.Context, db *sql.DB) (*LoadAllResult, error) {
 		liveTokens       map[string]*LiveTokenEntry
 		guardianships    map[string]map[string]*GuardianshipEntry
 		roomAdminReqs    map[string][]*RoomAdminRequestEntry
+		savedPlaces      map[string][]SavedPlaceEntry
+		proximityAlerts  map[string][]*ProximityAlertEntry
 		loadErr          error
 	)
 
@@ -100,8 +102,11 @@ func LoadAll(ctx context.Context, db *sql.DB) (*LoadAllResult, error) {
 		rm := make(map[string]*RoomEntry)
 		rmr := make(map[string]map[string]*RoomMemberRole)
 
+		// F3: include meeting point columns (all nullable)
 		roomRows, err := db.QueryContext(ctx,
-			`SELECT id, code, name, created_by, created_at FROM rooms`)
+			`SELECT id, code, name, created_by, created_at,
+			        meeting_lat, meeting_lng, meeting_label, meeting_set_by, meeting_set_at
+			 FROM rooms`)
 		if err != nil {
 			setErr(err)
 			return
@@ -109,18 +114,40 @@ func LoadAll(ctx context.Context, db *sql.DB) (*LoadAllResult, error) {
 		for roomRows.Next() {
 			var dbId, code, name, createdBy string
 			var ca int64
-			if err := roomRows.Scan(&dbId, &code, &name, &createdBy, &ca); err != nil {
+			var mLat, mLng sql.NullFloat64
+			var mLabel, mSetBy sql.NullString
+			var mSetAt sql.NullInt64
+			if err := roomRows.Scan(&dbId, &code, &name, &createdBy, &ca,
+				&mLat, &mLng, &mLabel, &mSetBy, &mSetAt); err != nil {
 				roomRows.Close()
 				setErr(err)
 				return
 			}
-			rm[code] = &RoomEntry{
+			re := &RoomEntry{
 				DbID:      dbId,
 				Name:      name,
 				Members:   make(map[string]bool),
 				CreatedBy: createdBy,
 				CreatedAt: ca,
 			}
+			if mLat.Valid {
+				v := mLat.Float64
+				re.MeetingLat = &v
+			}
+			if mLng.Valid {
+				v := mLng.Float64
+				re.MeetingLng = &v
+			}
+			if mLabel.Valid {
+				re.MeetingLabel = mLabel.String
+			}
+			if mSetBy.Valid {
+				re.MeetingSetBy = mSetBy.String
+			}
+			if mSetAt.Valid {
+				re.MeetingSetAt = mSetAt.Int64
+			}
+			rm[code] = re
 		}
 		roomRows.Close()
 
@@ -316,6 +343,59 @@ func LoadAll(ctx context.Context, db *sql.DB) (*LoadAllResult, error) {
 		roomAdminReqs = rar
 	}()
 
+	// F4: Load saved places
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		rows, err := db.QueryContext(ctx,
+			`SELECT id, user_id, name, COALESCE(icon,''), latitude, longitude, radius_m, created_at
+			 FROM saved_places`)
+		if err != nil {
+			// Table may not exist yet on first startup before schema migration runs.
+			slog.Warn("LoadAll: saved_places query failed (table may not exist yet)", "error", err)
+			savedPlaces = make(map[string][]SavedPlaceEntry)
+			return
+		}
+		defer rows.Close()
+		sp := make(map[string][]SavedPlaceEntry)
+		for rows.Next() {
+			var e SavedPlaceEntry
+			if err := rows.Scan(&e.ID, &e.UserID, &e.Name, &e.Icon, &e.Latitude, &e.Longitude, &e.RadiusM, &e.CreatedAt); err != nil {
+				setErr(err)
+				return
+			}
+			sp[e.UserID] = append(sp[e.UserID], e)
+		}
+		slog.Info("LoadAll: saved_places loaded", "users", len(sp))
+		savedPlaces = sp
+	}()
+
+	// F7: Load proximity alerts (enabled only; keyed by target_id)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		rows, err := db.QueryContext(ctx,
+			`SELECT id, owner_id, target_id, radius_m, enabled, last_triggered_at, created_at
+			 FROM proximity_alerts WHERE enabled = true`)
+		if err != nil {
+			slog.Warn("LoadAll: proximity_alerts query failed (table may not exist yet)", "error", err)
+			proximityAlerts = make(map[string][]*ProximityAlertEntry)
+			return
+		}
+		defer rows.Close()
+		pa := make(map[string][]*ProximityAlertEntry)
+		for rows.Next() {
+			e := &ProximityAlertEntry{}
+			if err := rows.Scan(&e.ID, &e.OwnerID, &e.TargetID, &e.RadiusM, &e.Enabled, &e.LastTriggeredAt, &e.CreatedAt); err != nil {
+				setErr(err)
+				return
+			}
+			pa[e.TargetID] = append(pa[e.TargetID], e)
+		}
+		slog.Info("LoadAll: proximity_alerts loaded", "targets", len(pa))
+		proximityAlerts = pa
+	}()
+
 	wg.Wait()
 	if loadErr != nil {
 		return nil, loadErr
@@ -332,6 +412,8 @@ func LoadAll(ctx context.Context, db *sql.DB) (*LoadAllResult, error) {
 		LiveTokens:        liveTokens,
 		Guardianships:     guardianships,
 		RoomAdminRequests: roomAdminReqs,
+		SavedPlaces:       savedPlaces,
+		ProximityAlerts:   proximityAlerts,
 	}, nil
 }
 
@@ -378,13 +460,14 @@ func GetUserSettings(ctx context.Context, database *sql.DB, userID string) (*Use
 	var qhEnabled, hbEnabled *bool
 	var qhStart, qhEnd, hbDeadline, ePhone1, ePhone2 *string
 	var hbLastSignal *int64
+	var speedAlertMs sql.NullFloat64
 
 	err := database.QueryRowContext(ctx,
 		`SELECT quiet_hours_enabled, quiet_hours_start::text, quiet_hours_end::text,
 		        heartbeat_enabled, heartbeat_deadline::text, heartbeat_last_signal,
-		        emergency_phone_1, emergency_phone_2
+		        emergency_phone_1, emergency_phone_2, speed_alert_threshold_ms
 		   FROM users WHERE id = $1`, userID).
-		Scan(&qhEnabled, &qhStart, &qhEnd, &hbEnabled, &hbDeadline, &hbLastSignal, &ePhone1, &ePhone2)
+		Scan(&qhEnabled, &qhStart, &qhEnd, &hbEnabled, &hbDeadline, &hbLastSignal, &ePhone1, &ePhone2, &speedAlertMs)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -416,6 +499,9 @@ func GetUserSettings(ctx context.Context, database *sql.DB, userID string) (*Use
 	}
 	if ePhone2 != nil {
 		s.EmergencyPhone2 = *ePhone2
+	}
+	if speedAlertMs.Valid {
+		s.SpeedAlertThresholdMs = speedAlertMs.Float64
 	}
 	return s, nil
 }

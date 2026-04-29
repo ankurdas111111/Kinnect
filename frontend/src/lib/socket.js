@@ -1,6 +1,6 @@
 import { get } from 'svelte/store';
 import { otherUsers, mySocketId, myLocation, mySafetyStatus } from './stores/map.js';
-import { myRooms, myShareCode, myContactInfo } from './stores/rooms.js';
+import { myRooms, myShareCode, myContactInfo, roomNotes } from './stores/rooms.js';
 import { myContacts } from './stores/contacts.js';
 import { myGuardianData, canManage, pendingIncomingRequests } from './stores/guardians.js';
 import { banner, alertState, myLiveLinks, mySosActive, sosNarratives, activeSosUsers } from './stores/sos.js';
@@ -17,6 +17,8 @@ import { crowdMode } from './stores/crowdMode.js';
 import { bumpHubBadge } from './stores/hubBadge.js';
 import { addSecretMessage, setSecretMessages, removeSecretMessage, updateSecretMessageSeen, secretChatPresence } from './stores/secretChat.js';
 import { getShareOrigin } from './env.js';
+import { geofenceLog, proximityAlerts } from './stores/places.js';
+import { dailyActivity } from './stores/activity.js';
 
 const storedClientId = localStorage.getItem('clientId');
 const clientId = storedClientId || (crypto && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + '-' + Math.random().toString(16).slice(2));
@@ -582,12 +584,22 @@ export function setupSocketHandlers() {
     setBanner({ type: 'info', text: `${data.targetName || 'Someone'} ${action} ${data.placeName || 'a place'}`, actions: [] }, 5000);
   });
 
-  // Speed alerts
+  // ── F5: Speed alert — guardian receives when ward exceeds threshold ────────────
+  // Go sends: { userId, displayName, speedMs, thresholdMs, lat, lng, at }
   socket.on('speedAlert', (data) => {
     if (!data) return;
-    setBanner({ type: 'sos', text: `${data.targetName || 'Someone'} is going ${Math.round(data.speed)} km/h (limit: ${Math.round(data.threshold)})`, actions: [
+    const speedKmh = data.speedMs != null ? Math.round(data.speedMs * 3.6) : '?';
+    const limitKmh = data.thresholdMs != null ? Math.round(data.thresholdMs * 3.6) : '?';
+    setBanner({ type: 'sos', text: `${data.displayName || 'Someone'} is going ${speedKmh} km/h (limit: ${limitKmh} km/h)`, actions: [
       { label: 'OK', kind: 'btn-secondary', onClick: () => setBanner({ type: null, text: null, actions: [] }) }
     ] }, 8000);
+  });
+
+  // F5: Speed alert configuration ack from server
+  socket.on('speedAlertSet', (data) => {
+    if (!data) return;
+    const kmh = data.thresholdMs ? Math.round(data.thresholdMs * 3.6) : 0;
+    setBanner({ type: 'info', text: kmh > 0 ? `Speed alert set at ${kmh} km/h` : 'Speed alert disabled', actions: [] }, 3000);
   });
 
   // Quiet Hours update
@@ -729,6 +741,114 @@ export function setupSocketHandlers() {
     // Handled by EmergencyProfile page directly
   });
 
+  // ── F2: I'm Safe broadcast ─────────────────────────────────────────
+  socket.on('iAmSafe', (data) => {
+    if (!data?.displayName) return;
+    setBanner({ type: 'info', text: `${data.displayName} is safe`, actions: [] }, 5000);
+  });
+
+  // ── F3: Meeting point updated ──────────────────────────────────────
+  socket.on('meetingPointUpdated', (data) => {
+    if (!data?.roomCode) return;
+    myRooms.update(rooms => rooms.map(r => {
+      if (r.code !== data.roomCode) return r;
+      if (data.lat != null && data.lng != null) {
+        return { ...r, meetingPoint: { lat: data.lat, lng: data.lng, label: data.label || '', setBy: data.setBy || '', setAt: data.setAt || 0 } };
+      }
+      // cleared
+      const { meetingPoint: _mp, ...rest } = r;
+      return rest;
+    }));
+  });
+
+  // ── F6: Geofence event log ─────────────────────────────────────────
+  socket.on('geofenceLog', (data) => {
+    if (!data?.events) return;
+    geofenceLog.set(data.events);
+  });
+
+  // ── F7: Proximity alerts ───────────────────────────────────────────
+  socket.on('proximityAlert', (data) => {
+    if (!data?.targetName) return;
+    const dist = data.distanceM != null ? `${Math.round(data.distanceM)}m` : 'nearby';
+    setBanner({
+      type: 'info',
+      text: `${data.targetName} is ${dist} away`,
+      actions: [
+        { label: 'OK', kind: 'btn-secondary', onClick: () => setBanner({ type: null, text: null, actions: [] }) }
+      ]
+    }, 10000);
+    notifyProximitySOS(data.distanceM != null ? data.distanceM / 1000 : 1).catch(() => {});
+  });
+
+  socket.on('proximityAlerts', (data) => {
+    if (!Array.isArray(data?.alerts)) return;
+    proximityAlerts.set(data.alerts);
+  });
+
+  socket.on('proximityAlertSet', (data) => {
+    if (!data) return;
+    proximityAlerts.update(list => {
+      const idx = list.findIndex(a => a.targetUserId === data.targetUserId);
+      if (idx >= 0) {
+        const next = [...list];
+        next[idx] = data;
+        return next;
+      }
+      return [...list, data];
+    });
+    setBanner({ type: 'info', text: 'Proximity alert saved', actions: [] }, 2000);
+  });
+
+  socket.on('proximityAlertRemoved', (data) => {
+    if (!data?.targetUserId) return;
+    proximityAlerts.update(list => list.filter(a => a.targetUserId !== data.targetUserId));
+    setBanner({ type: 'info', text: 'Proximity alert removed', actions: [] }, 2000);
+  });
+
+  // ── F8: Room bulletin board ────────────────────────────────────────
+  socket.on('roomNotes', (data) => {
+    if (!data?.roomCode) return;
+    roomNotes.update(m => {
+      const nm = new Map(m);
+      nm.set(data.roomCode, data.notes || []);
+      return nm;
+    });
+  });
+
+  // Go sends note fields flat on the payload (id, roomCode, authorId, authorName, body, createdAt).
+  // Extract the note object without roomCode and prepend it to the room's list.
+  socket.on('roomNoteAdded', (data) => {
+    if (!data?.roomCode || !data?.id) return;
+    const { roomCode, ...note } = data;
+    roomNotes.update(m => {
+      const nm = new Map(m);
+      const existing = nm.get(roomCode) || [];
+      nm.set(roomCode, [note, ...existing].slice(0, 20));
+      return nm;
+    });
+  });
+
+  socket.on('roomNoteDeleted', (data) => {
+    if (!data?.noteId || !data?.roomCode) return;
+    roomNotes.update(m => {
+      const nm = new Map(m);
+      const existing = nm.get(data.roomCode) || [];
+      nm.set(data.roomCode, existing.filter(n => n.id !== data.noteId));
+      return nm;
+    });
+  });
+
+  // ── F9: Daily activity summary ─────────────────────────────────────
+  socket.on('dailyActivity', (data) => {
+    if (!data?.userId) return;
+    dailyActivity.update(m => {
+      const nm = new Map(m);
+      nm.set(data.userId, data.days || []);
+      return nm;
+    });
+  });
+
   // Network online/offline detection for immediate UX feedback
   if (typeof window !== 'undefined') {
     window.addEventListener('offline', () => {
@@ -779,4 +899,59 @@ export function createSecretChatInvite(peerId) {
     socket.on('secretChatInviteCreated', handler);
     socket.emit('createSecretChatInvite', { peerId, nonce });
   });
+}
+
+// ── F2: I'm Safe emit ──────────────────────────────────────────────────────
+export function emitIAmSafe() {
+  socket.emit('iAmSafe', {});
+}
+
+// ── F3: Meeting point emits ────────────────────────────────────────────────
+export function emitSetMeetingPoint(roomCode, lat, lng, label) {
+  socket.emit('setMeetingPoint', { roomCode, lat, lng, label: label || '' });
+}
+
+export function emitClearMeetingPoint(roomCode) {
+  socket.emit('clearMeetingPoint', { roomCode });
+}
+
+// ── F5: Speed alert emit ───────────────────────────────────────────────────
+export function emitSetSpeedAlert(thresholdKmh) {
+  socket.emit('setSpeedAlert', { thresholdKmh });
+}
+
+// ── F6: Geofence log emit ──────────────────────────────────────────────────
+export function emitGetGeofenceLog() {
+  socket.emit('getGeofenceLog', {});
+}
+
+// ── F7: Proximity alert emits ──────────────────────────────────────────────
+export function emitSetProximityAlert(targetUserId, radiusM) {
+  socket.emit('setProximityAlert', { targetUserId, radiusM });
+}
+
+export function emitRemoveProximityAlert(targetUserId) {
+  socket.emit('removeProximityAlert', { targetUserId });
+}
+
+export function emitListProximityAlerts() {
+  socket.emit('listProximityAlerts', {});
+}
+
+// ── F8: Room bulletin board emits ──────────────────────────────────────────
+export function emitPostRoomNote(roomCode, body) {
+  socket.emit('postRoomNote', { roomCode, body });
+}
+
+export function emitDeleteRoomNote(noteId, roomCode) {
+  socket.emit('deleteRoomNote', { noteId, roomCode });
+}
+
+export function emitGetRoomNotes(roomCode) {
+  socket.emit('getRoomNotes', { roomCode });
+}
+
+// ── F9: Daily activity emit ────────────────────────────────────────────────
+export function emitGetDailyActivity(userId) {
+  socket.emit('getDailyActivity', userId ? { userId } : {});
 }

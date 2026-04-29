@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
@@ -10,11 +11,12 @@ import (
 	"time"
 
 	"kinnect-v3/internal/cache"
+	"kinnect-v3/internal/db"
 	"kinnect-v3/internal/shared"
 )
 
 const (
-	sosTokenBytes   = 16
+	sosTokenBytes    = 16
 	sosWatchExpiryMs = 24 * 60 * 60 * 1000
 )
 
@@ -438,6 +440,34 @@ func (h *Hub) handleLiveAckSOS(c *Client, data json.RawMessage) {
 	target.SOS.Acks = append(target.SOS.Acks, cache.SosAckEntry{By: ackLabel})
 	h.emitSosUpdate(target)
 	h.emitWatch(target)
+}
+
+// handleGetGeofenceLog returns the last 50 geofence entry/exit events for the caller. (F6)
+func (h *Hub) handleGetGeofenceLog(c *Client, _ json.RawMessage) {
+	if !c.CheckRateLimit("getGeofenceLog", 20) {
+		return
+	}
+	user := h.Cache.GetActiveUser(c.ID())
+	if user == nil {
+		return
+	}
+	rows, err := db.GetGeofenceEvents(context.Background(), h.pool.DB, user.UserID, 50)
+	if err != nil {
+		c.Send("geofenceLog", map[string]interface{}{"events": []interface{}{}})
+		return
+	}
+	events := make([]map[string]interface{}, 0, len(rows))
+	for _, r := range rows {
+		events = append(events, map[string]interface{}{
+			"id":        r.ID,
+			"fenceName": r.FenceName,
+			"eventType": r.EventType,
+			"lat":       r.Lat,
+			"lng":       r.Lng,
+			"ts":        r.Ts,
+		})
+	}
+	c.Send("geofenceLog", map[string]interface{}{"events": events})
 }
 
 func toInt(v interface{}) (int, bool) {

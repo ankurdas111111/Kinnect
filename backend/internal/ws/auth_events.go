@@ -34,7 +34,6 @@ const (
 // batches from many clients could spawn thousands of goroutines simultaneously.
 var dbWriteSem = make(chan struct{}, 64)
 
-
 // positionPayload is a lean struct for the userMoved broadcast.
 // It holds only the ~12 fields that change on each position update, avoiding the
 // ~25 nested-map allocations that SanitizeUser produces on every ~20 Hz broadcast.
@@ -127,12 +126,23 @@ func (h *Hub) handlePosition(c *Client, data json.RawMessage) {
 	h.Cache.SetLastPositionAt(clientID, now)
 
 	m := toMap(data)
+
+	// ── F1: Battery level ─────────────────────────────────────────────────────
+	// Read battery from the same position payload — avoids a round-trip profileUpdate.
+	// handleProfileUpdate still works for dedicated battery-only updates.
+	user := h.Cache.GetActiveUser(clientID)
+	if user != nil {
+		if v, ok := m["batteryPct"].(float64); ok && v >= 0 && v <= 100 {
+			pct := int(v)
+			user.BatteryPct = &pct
+		}
+	}
+
 	pos := shared.ValidatePosition(m)
 	if pos == nil {
 		return
 	}
 
-	user := h.Cache.GetActiveUser(clientID)
 	if user == nil {
 		return
 	}
@@ -178,6 +188,31 @@ func (h *Hub) handlePosition(c *Client, data json.RawMessage) {
 	// ── Journey Shield — trip detection ──────────────────────────────────────
 	h.EvaluateTrip(user)
 
+	// ── F5: Speed alert — notify guardians when ward exceeds threshold ────────
+	// Threshold is in m/s (stored as speed_alert_threshold_ms in DB/cache).
+	// pos.Speed is the Kalman-filtered speed in km/h from the frontend.
+	// Convert pos.Speed (km/h) → m/s for comparison.
+	if user.SpeedAlertThresholdMs > 0 && user.Latitude != nil && user.Longitude != nil {
+		speedMs := pos.Speed / 3.6
+		const speedAlertCooldownMs = 60_000 // rate-limit to once per minute
+		if speedMs > user.SpeedAlertThresholdMs && now-user.LastSpeedAlertAt > speedAlertCooldownMs {
+			user.LastSpeedAlertAt = now
+			guardianSIDs := h.Cache.GetGuardianSocketIDs(user.UserID)
+			if len(guardianSIDs) > 0 {
+				payload := map[string]interface{}{
+					"userId":      user.UserID,
+					"displayName": user.DisplayName,
+					"speedMs":     speedMs,
+					"thresholdMs": user.SpeedAlertThresholdMs,
+					"lat":         user.Latitude,
+					"lng":         user.Longitude,
+					"at":          now,
+				}
+				h.SendToClients(guardianSIDs, "speedAlert", payload)
+			}
+		}
+	}
+
 	// ── Safety score (recomputed on every position update) ───────────────────
 	{
 		checkInOverdueAt := int64(0)
@@ -204,6 +239,8 @@ func (h *Hub) handlePosition(c *Client, data json.RawMessage) {
 	}
 
 	if shouldWritePositionToDB(user, pos.Latitude, pos.Longitude, pos.Speed) {
+		// F9: capture old DB position BEFORE updating, so distDelta is meaningful.
+		oldLat, oldLng := user.LastDBLat, user.LastDBLng
 		user.LastDBLat = pos.Latitude
 		user.LastDBLng = pos.Longitude
 		user.LastDBAt = now
@@ -211,19 +248,81 @@ func (h *Hub) handlePosition(c *Client, data json.RawMessage) {
 		lat, lng, spd := pos.Latitude, pos.Longitude, pos.Speed
 		uid := user.UserID
 
+		// ── F9: daily activity counters ───────────────────────────────────────
+		// Compute distance delta and whether this minute is new (for active-minutes).
+		// Guard oldLat==0: first-ever DB write has no previous position, so distance
+		// must be 0 rather than a spurious haversine from (0,0) to current position.
+		distDelta := 0
+		if oldLat != 0 {
+			distDelta = int(shared.HaversineM(oldLat, oldLng, lat, lng))
+		}
+		addMinute := false
+		nowMin := now / 60000
+		if user.LastActiveMinuteAt == 0 || nowMin != user.LastActiveMinuteAt/60000 {
+			addMinute = true
+			user.LastActiveMinuteAt = now
+		}
+
 		// Non-blocking acquire: drop the write under extreme load rather than
 		// blocking the hub's dispatch goroutine or spawning unbounded goroutines.
 		select {
 		case dbWriteSem <- struct{}{}:
-			go func() {
+			go func(distM int, addMin bool) {
 				defer func() { <-dbWriteSem }()
 				bCtx := context.Background()
 				// users.last_* snapshot
 				speedStr := fmt.Sprintf("%.2f", spd)
 				_ = db.UpdateUserLocation(bCtx, h.pool.DB, uid, lat, lng, speedStr, now)
-			}()
+				// F9: upsert daily activity
+				if err := db.UpsertDailyActivity(bCtx, h.pool.DB, uid, distM, addMin, now); err != nil {
+					slog.Warn("UpsertDailyActivity failed", "userId", uid, "error", err)
+				}
+			}(distDelta, addMinute)
 		default:
 			slog.Warn("dbWriteSem full, skipping position DB write", "userId", uid)
+		}
+	}
+
+	// ── F7: Proximity alerts — check if any owner set an alert for this user ──
+	// Iterate over alerts that target user.UserID; alert ownerIDs when within radius.
+	if user.Latitude != nil && user.Longitude != nil {
+		alerts := h.Cache.GetProximityAlertsForTarget(user.UserID)
+		for _, alert := range alerts {
+			if !alert.Enabled {
+				continue
+			}
+			const proxCooldownMs = 60_000 // alert at most once per minute per pair
+			if now-alert.LastTriggeredAt < proxCooldownMs {
+				continue
+			}
+			ownerSID := h.Cache.GetUserIdToSocketId(alert.OwnerID)
+			if ownerSID == "" {
+				continue
+			}
+			ownerUser := h.Cache.GetActiveUser(ownerSID)
+			if ownerUser == nil || ownerUser.Latitude == nil || ownerUser.Longitude == nil {
+				continue
+			}
+			dist := shared.HaversineM(*ownerUser.Latitude, *ownerUser.Longitude, *user.Latitude, *user.Longitude)
+			if dist > float64(alert.RadiusM) {
+				continue
+			}
+			// Within radius — fire alert
+			alert.LastTriggeredAt = now
+			h.SendToClient(ownerSID, "proximityAlert", map[string]interface{}{
+				"targetUserId":   user.UserID,
+				"targetName":     user.DisplayName,
+				"distanceM":      int(math.Round(dist)),
+				"radiusM":        alert.RadiusM,
+				"lat":            user.Latitude,
+				"lng":            user.Longitude,
+				"at":             now,
+			})
+			// Persist last triggered async
+			alertID := alert.ID
+			go func() {
+				_ = db.UpdateProximityAlertTriggered(context.Background(), h.pool.DB, alertID, now)
+			}()
 		}
 	}
 
@@ -943,6 +1042,172 @@ func (h *Hub) handleSendPulse(c *Client, data json.RawMessage) {
 		"expiresAt":   expiresAt,
 	}
 	h.emitToVisibleAndSelf(user, "pulseReceived", payload)
+}
+
+// handleIAmSafe broadcasts an "I'm safe" signal to all visible users and guardians. (F2)
+// Ephemeral — no DB write. Rate-limited to 10/min.
+func (h *Hub) handleIAmSafe(c *Client, _ json.RawMessage) {
+	if !c.CheckRateLimit("iAmSafe", 10) {
+		return
+	}
+	user := h.Cache.GetActiveUser(c.ID())
+	if user == nil {
+		return
+	}
+	payload := map[string]interface{}{
+		"userId":      user.UserID,
+		"displayName": user.DisplayName,
+		"lat":         user.Latitude,
+		"lng":         user.Longitude,
+		"at":          time.Now().UnixMilli(),
+	}
+	h.emitToVisibleAndSelf(user, "iAmSafe", payload)
+}
+
+// handleSetMeetingPoint sets a meeting point pin for all members of a room. (F3)
+// Payload: { roomCode, lat, lng, label }
+func (h *Hub) handleSetMeetingPoint(c *Client, data json.RawMessage) {
+	if !c.CheckRateLimit("setMeetingPoint", 20) {
+		return
+	}
+	user := h.Cache.GetActiveUser(c.ID())
+	if user == nil {
+		return
+	}
+	m := toMap(data)
+	if m == nil {
+		return
+	}
+	roomCode, _ := m["roomCode"].(string)
+	roomCode = strings.TrimSpace(strings.ToUpper(roomCode))
+	if roomCode == "" {
+		return
+	}
+	room := h.Cache.GetRoom(roomCode)
+	if room == nil || !room.Members[user.UserID] {
+		c.Send("roomError", map[string]interface{}{"message": "Not a member of that room"})
+		return
+	}
+	lat, latOK := m["lat"].(float64)
+	lng, lngOK := m["lng"].(float64)
+	if !latOK || !lngOK {
+		return
+	}
+	label := ""
+	if v, ok := m["label"].(string); ok {
+		label = shared.SanitizeString(v, 80)
+	}
+	now := time.Now().UnixMilli()
+
+	// Update in-memory cache
+	room.MeetingLat = &lat
+	room.MeetingLng = &lng
+	room.MeetingLabel = label
+	room.MeetingSetBy = user.UserID
+	room.MeetingSetAt = now
+
+	// Persist to DB async
+	go func() {
+		if err := db.SetRoomMeetingPoint(context.Background(), h.pool.DB, roomCode, lat, lng, label, user.UserID, now); err != nil {
+			slog.Warn("SetRoomMeetingPoint failed", "roomCode", roomCode, "error", err)
+		}
+	}()
+
+	// Broadcast to all online room members
+	payload := map[string]interface{}{
+		"roomCode":  roomCode,
+		"lat":       lat,
+		"lng":       lng,
+		"label":     label,
+		"setBy":     user.UserID,
+		"setByName": user.DisplayName,
+		"setAt":     now,
+	}
+	for mid := range room.Members {
+		if cli := h.GetClientByUserID(mid); cli != nil {
+			h.SendToClient(cli.ID(), "meetingPointUpdated", payload)
+		}
+	}
+}
+
+// handleClearMeetingPoint removes the meeting point pin from a room. (F3)
+// Payload: { roomCode }
+func (h *Hub) handleClearMeetingPoint(c *Client, data json.RawMessage) {
+	if !c.CheckRateLimit("clearMeetingPoint", 20) {
+		return
+	}
+	user := h.Cache.GetActiveUser(c.ID())
+	if user == nil {
+		return
+	}
+	m := toMap(data)
+	if m == nil {
+		return
+	}
+	roomCode, _ := m["roomCode"].(string)
+	roomCode = strings.TrimSpace(strings.ToUpper(roomCode))
+	if roomCode == "" {
+		return
+	}
+	room := h.Cache.GetRoom(roomCode)
+	if room == nil || !room.Members[user.UserID] {
+		return
+	}
+
+	// Clear in-memory cache
+	room.MeetingLat = nil
+	room.MeetingLng = nil
+	room.MeetingLabel = ""
+	room.MeetingSetBy = ""
+	room.MeetingSetAt = 0
+
+	// Persist to DB async
+	go func() {
+		if err := db.ClearRoomMeetingPoint(context.Background(), h.pool.DB, roomCode); err != nil {
+			slog.Warn("ClearRoomMeetingPoint failed", "roomCode", roomCode, "error", err)
+		}
+	}()
+
+	payload := map[string]interface{}{"roomCode": roomCode, "cleared": true}
+	for mid := range room.Members {
+		if cli := h.GetClientByUserID(mid); cli != nil {
+			h.SendToClient(cli.ID(), "meetingPointUpdated", payload)
+		}
+	}
+}
+
+// handleSetSpeedAlert sets or clears the speed alert threshold for the caller. (F5)
+// Payload: { thresholdKmh: float64 } — value in km/h from the frontend; 0 or absent = disable.
+// The threshold is converted to m/s internally and stored as speed_alert_threshold_ms.
+func (h *Hub) handleSetSpeedAlert(c *Client, data json.RawMessage) {
+	if !c.CheckRateLimit("setSpeedAlert", 10) {
+		return
+	}
+	user := h.Cache.GetActiveUser(c.ID())
+	if user == nil {
+		return
+	}
+	m := toMap(data)
+	threshold := float64(0)
+	if v, ok := m["thresholdKmh"].(float64); ok && v > 0 {
+		threshold = v / 3.6 // convert km/h → m/s for internal storage
+	}
+	user.SpeedAlertThresholdMs = threshold
+
+	// Persist to DB async
+	go func() {
+		_, err := h.pool.DB.ExecContext(context.Background(),
+			`UPDATE users SET speed_alert_threshold_ms=$1 WHERE id=$2`,
+			threshold, user.UserID)
+		if err != nil {
+			slog.Warn("handleSetSpeedAlert: DB persist failed", "userId", user.UserID, "error", err)
+		}
+	}()
+
+	c.Send("speedAlertSet", map[string]interface{}{
+		"thresholdMs": threshold,
+		"enabled":     threshold > 0,
+	})
 }
 
 // handleQuietHoursUpdate sets or clears the user's quiet hours window.
@@ -2039,8 +2304,8 @@ func (h *Hub) checkCrowdMode(mover *cache.ActiveUser) {
 
 		distM := int(math.Round(dist))
 		h.SendToClient(p.user.SocketID, "crowdAlert", map[string]interface{}{
-			"fromName":    mover.DisplayName,
-			"distanceM":   distM,
+			"fromName":        mover.DisplayName,
+			"distanceM":       distM,
 			"groupSizePeople": len(peers),
 		})
 	}

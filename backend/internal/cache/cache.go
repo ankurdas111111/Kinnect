@@ -2,6 +2,7 @@ package cache
 
 import (
 	"log/slog"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -167,6 +168,13 @@ type ActiveUser struct {
 	Rooms              []string
 	Online             bool
 	ForceDelete        bool
+
+	// F5: Speed alert threshold (m/s; 0 = disabled)
+	SpeedAlertThresholdMs float64
+	LastSpeedAlertAt      int64 // unix ms; rate-limit guard
+
+	// F9: Daily activity — debounce active-minute counting
+	LastActiveMinuteAt int64 // unix ms; ephemeral
 }
 
 // WatchTokenEntry holds watch token state.
@@ -210,6 +218,12 @@ type Cache struct {
 	Contacts        map[string]map[string]bool
 	LiveTokens      map[string]*db.LiveTokenEntry
 	Guardianships   map[string]map[string]*db.GuardianshipEntry
+
+	// F4: Saved places (userID -> places)
+	SavedPlaces map[string][]db.SavedPlaceEntry
+
+	// F7: Proximity alerts (targetUserID -> alerts)
+	ProximityAlerts map[string][]*db.ProximityAlertEntry
 
 	// Reverse indexes for O(1) lookups
 	WardToGuardians  map[string]map[string]bool // wardID -> set of guardianIDs
@@ -276,6 +290,8 @@ func New() *Cache {
 		Contacts:          make(map[string]map[string]bool),
 		LiveTokens:        make(map[string]*db.LiveTokenEntry),
 		Guardianships:     make(map[string]map[string]*db.GuardianshipEntry),
+		SavedPlaces:       make(map[string][]db.SavedPlaceEntry),
+		ProximityAlerts:   make(map[string][]*db.ProximityAlertEntry),
 		WardToGuardians:   make(map[string]map[string]bool),
 		OfflineBySocketID: make(map[string]string),
 		WatchTokens:       make(map[string]*WatchTokenEntry),
@@ -355,6 +371,18 @@ func (c *Cache) Init(result *db.LoadAllResult) {
 		c.Guardianships = make(map[string]map[string]*db.GuardianshipEntry)
 	}
 
+	// F4: saved places
+	c.SavedPlaces = result.SavedPlaces
+	if c.SavedPlaces == nil {
+		c.SavedPlaces = make(map[string][]db.SavedPlaceEntry)
+	}
+
+	// F7: proximity alerts
+	c.ProximityAlerts = result.ProximityAlerts
+	if c.ProximityAlerts == nil {
+		c.ProximityAlerts = make(map[string][]*db.ProximityAlertEntry)
+	}
+
 	// Build WardToGuardians reverse index from loaded guardianships
 	c.WardToGuardians = make(map[string]map[string]bool)
 	for guardianID, wards := range c.Guardianships {
@@ -402,7 +430,60 @@ func (c *Cache) Init(result *db.LoadAllResult) {
 		"rooms", len(c.Rooms),
 		"contacts", len(c.Contacts),
 		"live_tokens", len(c.LiveTokens),
-		"guardianships", len(c.Guardianships))
+		"guardianships", len(c.Guardianships),
+		"saved_places_users", len(c.SavedPlaces),
+		"proximity_alert_targets", len(c.ProximityAlerts))
+}
+
+// haversineM returns distance in metres between two lat/lng points.
+// Inlined here to avoid importing ws package (would create a cycle).
+func haversineM(lat1, lng1, lat2, lng2 float64) float64 {
+	const R = 6371000.0
+	dLat := (lat2 - lat1) * math.Pi / 180
+	dLng := (lng2 - lng1) * math.Pi / 180
+	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
+		math.Cos(lat1*math.Pi/180)*math.Cos(lat2*math.Pi/180)*
+			math.Sin(dLng/2)*math.Sin(dLng/2)
+	return R * 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+}
+
+// inferLocationLabel returns the name of the first saved place the user is currently
+// within, or "" if none match. Must be called with c.mu RLock held (or any lock).
+func (c *Cache) inferLocationLabel(userID string, lat, lng *float64) string {
+	if lat == nil || lng == nil {
+		return ""
+	}
+	places := c.SavedPlaces[userID]
+	for _, p := range places {
+		if haversineM(*lat, *lng, p.Latitude, p.Longitude) <= p.RadiusM {
+			return p.Name
+		}
+	}
+	return ""
+}
+
+// GetGuardianSocketIDs returns socket IDs of all active guardians watching wardID. (F5)
+func (c *Cache) GetGuardianSocketIDs(wardID string) []string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	guardianIDs := c.WardToGuardians[wardID]
+	if len(guardianIDs) == 0 {
+		return nil
+	}
+	var out []string
+	for gID := range guardianIDs {
+		if sid := c.UserIdToSocketId[gID]; sid != "" {
+			out = append(out, sid)
+		}
+	}
+	return out
+}
+
+// GetProximityAlertsForTarget returns all enabled proximity alerts targeting a user. (F7)
+func (c *Cache) GetProximityAlertsForTarget(targetID string) []*db.ProximityAlertEntry {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.ProximityAlerts[targetID]
 }
 
 // GetUserIDByEmail returns user ID for an email (case-insensitive).
@@ -765,6 +846,10 @@ func (c *Cache) getVisibleSetLocked(userID string) map[string]bool {
 // SanitizeUser produces a map suitable for JSON emission to clients.
 // Always returns a fresh map; callers may safely mutate it.
 func (c *Cache) SanitizeUser(user *ActiveUser) map[string]interface{} {
+	c.mu.RLock()
+	locationLabel := c.inferLocationLabel(user.UserID, user.Latitude, user.Longitude)
+	c.mu.RUnlock()
+
 	result := map[string]interface{}{
 		"socketId":        user.SocketID,
 		"userId":          user.UserID,
@@ -786,6 +871,7 @@ func (c *Cache) SanitizeUser(user *ActiveUser) map[string]interface{} {
 		"lastAttestAt":    user.LastAttestAt,
 		"activityContext": user.ActivityContext,
 		"statusMessage":   user.StatusMessage,
+		"locationLabel":   locationLabel, // F4
 		"rideShare": map[string]interface{}{
 			"active":  user.RideShareActive,
 			"vehicle": user.RideShareVehicle,
@@ -1173,11 +1259,13 @@ func (c *Cache) getDisplayNameLocked(userID string) string {
 
 // sanitizeUserLocked assumes c.mu is held. Returns a new map.
 func (c *Cache) sanitizeUserLocked(user *ActiveUser) map[string]interface{} {
+	locationLabel := c.inferLocationLabel(user.UserID, user.Latitude, user.Longitude)
 	return map[string]interface{}{
 		"socketId": user.SocketID, "userId": user.UserID, "displayName": user.DisplayName,
 		"role": user.Role, "latitude": user.Latitude, "longitude": user.Longitude,
 		"speed": user.Speed, "lastUpdate": user.LastUpdate, "formattedTime": user.FormattedTime,
 		"batteryPct": user.BatteryPct, "deviceType": user.DeviceType, "connectionQuality": user.ConnectionQuality,
+		"locationLabel": locationLabel,
 		"sos": map[string]interface{}{"active": user.SOS.Active, "at": user.SOS.At, "reason": user.SOS.Reason, "type": user.SOS.Type},
 		"geofence": map[string]interface{}{"enabled": user.Geofence.Enabled, "centerLat": user.Geofence.CenterLat, "centerLng": user.Geofence.CenterLng, "radiusM": user.Geofence.RadiusM},
 		"autoSos": map[string]interface{}{"enabled": user.AutoSOS.Enabled, "noMoveMinutes": user.AutoSOS.NoMoveMinutes, "hardStopMinutes": user.AutoSOS.HardStopMin, "geofence": user.AutoSOS.Geofence},
@@ -1329,6 +1417,12 @@ func (c *Cache) CacheSize() int64 {
 	for _, gships := range c.Guardianships {
 		size += mapOverhead + int64(len(gships))*(entryOverhead+ptrSize*2+128)
 	}
+
+	// SavedPlaces
+	size += mapOverhead + int64(len(c.SavedPlaces))*(entryOverhead+ptrSize*2+256)
+
+	// ProximityAlerts
+	size += mapOverhead + int64(len(c.ProximityAlerts))*(entryOverhead+ptrSize*2+128)
 
 	// ActiveUsers (largest contributor)
 	size += mapOverhead

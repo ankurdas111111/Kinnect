@@ -84,11 +84,11 @@
 
   // Saved places for quick destination pick
   let savedPlaces = [];
-  import API_BASE from '../lib/env.js';
+  import { apiGet } from '../lib/api.js';
   async function loadPlaces() {
     try {
-      const res = await fetch(`${API_BASE}/api/places`, { credentials: 'include' });
-      if (res.ok) savedPlaces = await res.json();
+      const data = await apiGet('/api/places');
+      if (Array.isArray(data)) savedPlaces = data;
     } catch { /* ignore */ }
   }
   loadPlaces();

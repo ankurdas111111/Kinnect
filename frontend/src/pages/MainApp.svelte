@@ -125,6 +125,32 @@
   let lastRawLng = null;
   let geoPermission = 'unknown';
   let _wakeLock = null;
+
+  // F1: Battery level cache — read every 30s max; use synchronously in position payloads
+  let _cachedBatteryPct = null;
+  let _batteryReadAt = 0;
+
+  async function _refreshBattery() {
+    const now = Date.now();
+    if (_cachedBatteryPct !== null && now - _batteryReadAt < 30000) return;
+    try {
+      const { Device } = await import(/* @vite-ignore */ '@capacitor/device');
+      const info = await Device.getBatteryInfo();
+      if (info && typeof info.batteryLevel === 'number') {
+        _cachedBatteryPct = Math.round(info.batteryLevel * 100);
+        _batteryReadAt = now;
+        return;
+      }
+    } catch (_) {}
+    try {
+      const bat = await navigator.getBattery?.();
+      if (bat) {
+        _cachedBatteryPct = Math.round(bat.level * 100);
+        _batteryReadAt = now;
+      }
+    } catch (_) {}
+  }
+
   const gpsFilter = new GPSKalmanFilter({ Q: 3, R: 10 });
   const speedFilter = new VelocityKalmanFilter({ Q: 2, R: 25 });
 
@@ -280,7 +306,9 @@
     if (lastAcceptedFix && accuracy > 500) {
       if (lastEmittedFix && now - lastEmitAt >= 30000) {
         lastEmitAt = now;
-        const stalePayload = { latitude: lastEmittedFix.latitude, longitude: lastEmittedFix.longitude, speed: 0, formattedTime: new Date().toLocaleTimeString(), accuracy, timestamp: now };
+        // F1: include cached battery level in stale heartbeat
+        _refreshBattery().catch(() => {});
+        const stalePayload = { latitude: lastEmittedFix.latitude, longitude: lastEmittedFix.longitude, speed: 0, formattedTime: new Date().toLocaleTimeString(), accuracy, timestamp: now, batteryPct: _cachedBatteryPct };
         if (socket.connected) {
           socket.emit('position', stalePayload);
           setBufferedCount(bufferSize());
@@ -374,7 +402,9 @@
     if (shouldEmit) {
       lastEmittedFix = { latitude, longitude };
       lastEmitAt = now;
-      const payload = { latitude, longitude, speed, formattedTime, accuracy, timestamp: now };
+      // F1: refresh battery cache async (fire-and-forget); use cached value synchronously
+      _refreshBattery().catch(() => {});
+      const payload = { latitude, longitude, speed, formattedTime, accuracy, timestamp: now, batteryPct: _cachedBatteryPct };
       if (socket.connected) {
         socket.emit('position', payload);
         setBufferedCount(bufferSize());
@@ -422,9 +452,6 @@
           banner.set({ type: 'info', text: msg, actions: [] });
           stopTracking();
           return;
-        }
-        if (!lastAcceptedFix) {
-          banner.set({ type: 'info', text: "Getting your location... this may take a moment.", actions: [] });
         }
       }
     );

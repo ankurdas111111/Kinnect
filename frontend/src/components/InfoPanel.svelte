@@ -2,7 +2,7 @@
   import { createEventDispatcher } from 'svelte';
   import { myLocation, tracking, walkDestination } from '../lib/stores/map.js';
   import { authUser } from '../lib/stores/auth.js';
-  import { myShareCode, myContactInfo } from '../lib/stores/rooms.js';
+  import { myShareCode, myContactInfo, myRooms, roomNotes } from '../lib/stores/rooms.js';
   import { socket } from '../lib/socket.js';
   import { banner, mySosActive, myLiveLinks } from '../lib/stores/sos.js';
   import { myGuardianData, pendingIncomingRequests } from '../lib/stores/guardians.js';
@@ -15,6 +15,17 @@
   import WalkWithMe from './WalkWithMe.svelte';
   import { rideShare } from '../lib/stores/rideShare.js';
   import { crowdMode } from '../lib/stores/crowdMode.js';
+  import { geofenceLog, proximityAlerts } from '../lib/stores/places.js';
+  import { dailyActivity } from '../lib/stores/activity.js';
+  import {
+    emitIAmSafe,
+    emitSetMeetingPoint, emitClearMeetingPoint,
+    emitSetSpeedAlert,
+    emitGetGeofenceLog,
+    emitSetProximityAlert, emitRemoveProximityAlert, emitListProximityAlerts,
+    emitPostRoomNote, emitDeleteRoomNote, emitGetRoomNotes,
+    emitGetDailyActivity
+  } from '../lib/socket.js';
 
   export let embedded = false;
   let statsOpen = false;
@@ -174,6 +185,130 @@
   $: accLabel = $trackingMetrics.lastAccuracy != null
     ? ($trackingMetrics.lastAccuracy <= 15 ? 'Sharp' : $trackingMetrics.lastAccuracy <= 50 ? 'Decent' : 'Rough') + ` ±${$trackingMetrics.lastAccuracy}m`
     : $tracking ? 'Getting location...' : 'Tap Track to start';
+
+  // ── F5: Speed alert ────────────────────────────────────────────────────────
+  let speedAlertKmh = '';
+
+  function saveSpeedAlert() {
+    const val = parseFloat(speedAlertKmh);
+    if (isNaN(val) || val < 0) return;
+    emitSetSpeedAlert(val);
+  }
+
+  function clearSpeedAlert() {
+    speedAlertKmh = '';
+    emitSetSpeedAlert(0);
+  }
+
+  // ── F6: Geofence log ───────────────────────────────────────────────────────
+  let geofenceLogOpen = false;
+
+  function toggleGeofenceLog() {
+    geofenceLogOpen = !geofenceLogOpen;
+    if (geofenceLogOpen) emitGetGeofenceLog();
+  }
+
+  function formatGeofenceTs(ts) {
+    if (!ts) return '';
+    return new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+
+  // ── F7: Proximity alerts ───────────────────────────────────────────────────
+  let proximitySection = false;
+  let proximityTargetId = '';
+  let proximityRadiusM = '500';
+
+  function openProximitySection() {
+    proximitySection = true;
+    emitListProximityAlerts();
+  }
+
+  function saveProximityAlert() {
+    const r = parseInt(proximityRadiusM, 10);
+    if (!proximityTargetId || isNaN(r) || r <= 0) return;
+    emitSetProximityAlert(proximityTargetId, r);
+    proximityTargetId = '';
+    proximityRadiusM = '500';
+  }
+
+  // ── F8: Room bulletin board ────────────────────────────────────────────────
+  let openBoardRoom = null;
+  let noteDraft = '';
+
+  function toggleBoard(roomCode) {
+    if (openBoardRoom === roomCode) {
+      openBoardRoom = null;
+    } else {
+      openBoardRoom = roomCode;
+      emitGetRoomNotes(roomCode);
+    }
+  }
+
+  function postNote(roomCode) {
+    const body = noteDraft.trim();
+    if (!body || body.length > 200) return;
+    emitPostRoomNote(roomCode, body);
+    noteDraft = '';
+  }
+
+  function deleteNote(noteId, roomCode) {
+    emitDeleteRoomNote(noteId, roomCode);
+  }
+
+  function formatNoteTs(ts) {
+    if (!ts) return '';
+    return new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+
+  // ── F9: Daily activity ─────────────────────────────────────────────────────
+  let activityOpen = false;
+  $: myUserId = $authUser?.userId;
+
+  function toggleActivity() {
+    activityOpen = !activityOpen;
+    if (activityOpen && myUserId) emitGetDailyActivity(myUserId);
+  }
+
+  $: myActivityDays = myUserId ? ($dailyActivity.get(myUserId) || []) : [];
+
+  function formatActivityDate(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+
+  // ── F3: Meeting point ──────────────────────────────────────────────────────
+  let meetingRoomCode = null;
+  let meetingLat = '';
+  let meetingLng = '';
+  let meetingLabel = '';
+
+  function openMeetingPointEditor(roomCode) {
+    meetingRoomCode = meetingRoomCode === roomCode ? null : roomCode;
+    meetingLat = '';
+    meetingLng = '';
+    meetingLabel = '';
+  }
+
+  function saveMeetingPoint() {
+    const lat = parseFloat(meetingLat);
+    const lng = parseFloat(meetingLng);
+    if (!meetingRoomCode || isNaN(lat) || isNaN(lng)) return;
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return;
+    emitSetMeetingPoint(meetingRoomCode, lat, lng, meetingLabel);
+    meetingRoomCode = null;
+  }
+
+  function clearMeetingPoint(roomCode) {
+    emitClearMeetingPoint(roomCode);
+  }
+
+  // ── F2: I'm Safe ───────────────────────────────────────────────────────────
+  function iAmSafe() {
+    emitIAmSafe();
+    banner.set({ type: 'info', text: 'You broadcast: I\'m safe.', actions: [] });
+    setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 2000);
+  }
 </script>
 
 <!-- ═══════════════════════════════════════════════════════════════════════
@@ -274,6 +409,11 @@
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
           I'm OK
         </button>
+        <!-- F2: I'm Safe broadcast -->
+        <button class="ok-action-btn ok-action-btn--safe" on:click={iAmSafe} aria-label="Broadcast I am safe to everyone who can see you">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          I'm Safe
+        </button>
       </div>
       <div class="safety-actions" style="margin-top:6px;">
         {#if onMyWayActive}
@@ -289,7 +429,7 @@
         {/if}
         <button class="ok-action-btn" on:click={attest} aria-label="Confirm your location is genuine" title="Confirm your location is real">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          I'm Safe
+          Verify Location
         </button>
       </div>
       <div class="safety-actions" style="margin-top:6px;">
@@ -306,6 +446,110 @@
           Walk With Me
         </button>
       </div>
+    </div>
+
+    <!-- ── F5: SPEED ALERT CONFIG ─────────────────────────────────────── -->
+    <div class="feature-section">
+      <span class="card-eyebrow">Speed Alert</span>
+      <div class="feature-row">
+        <input
+          class="feature-input"
+          type="number"
+          min="0"
+          max="300"
+          placeholder="km/h (0 = off)"
+          bind:value={speedAlertKmh}
+          aria-label="Speed alert threshold in km/h"
+        />
+        <button class="btn btn-primary btn-sm" on:click={saveSpeedAlert} disabled={speedAlertKmh === ''}>Set</button>
+        <button class="btn btn-ghost btn-sm" on:click={clearSpeedAlert}>Off</button>
+      </div>
+    </div>
+
+    <!-- ── F6: GEOFENCE LOG ───────────────────────────────────────────── -->
+    <div class="feature-section">
+      <button class="collapsible-header" on:click={toggleGeofenceLog} aria-expanded={geofenceLogOpen}>
+        <span class="card-eyebrow" style="margin:0">Geofence Log</span>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true" style="transform: rotate({geofenceLogOpen ? 180 : 0}deg); transition: transform 200ms"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      {#if geofenceLogOpen}
+        <div class="log-list">
+          {#if $geofenceLog.length === 0}
+            <p class="empty-hint">No geofence events yet.</p>
+          {:else}
+            {#each $geofenceLog as ev}
+              <div class="log-item" class:log-entry={ev.eventType === 'entry'} class:log-exit={ev.eventType === 'exit'}>
+                <span class="log-badge">{ev.eventType === 'entry' ? 'In' : 'Out'}</span>
+                <span class="log-name">{ev.fenceName || 'Geofence'}</span>
+                <span class="log-time">{formatGeofenceTs(ev.ts)}</span>
+              </div>
+            {/each}
+          {/if}
+        </div>
+      {/if}
+    </div>
+
+    <!-- ── F7: PROXIMITY ALERTS ───────────────────────────────────────── -->
+    <div class="feature-section">
+      <button class="collapsible-header" on:click={openProximitySection} aria-expanded={proximitySection}>
+        <span class="card-eyebrow" style="margin:0">Proximity Alerts</span>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true" style="transform: rotate({proximitySection ? 180 : 0}deg); transition: transform 200ms"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      {#if proximitySection}
+        <div class="feature-row" style="margin-top:6px;">
+          <input
+            class="feature-input"
+            type="text"
+            placeholder="Contact user ID"
+            bind:value={proximityTargetId}
+            aria-label="Target user ID for proximity alert"
+          />
+          <input
+            class="feature-input feature-input--sm"
+            type="number"
+            min="50"
+            max="50000"
+            placeholder="Radius (m)"
+            bind:value={proximityRadiusM}
+            aria-label="Alert radius in metres"
+          />
+          <button class="btn btn-primary btn-sm" on:click={saveProximityAlert}>Add</button>
+        </div>
+        {#if $proximityAlerts.length > 0}
+          <div class="alert-list">
+            {#each $proximityAlerts as a}
+              <div class="alert-item">
+                <span class="alert-name">{a.targetName || a.targetUserId}</span>
+                <span class="alert-radius">{a.radiusM}m</span>
+                <button class="btn btn-danger btn-xs" on:click={() => emitRemoveProximityAlert(a.targetUserId)} aria-label="Remove proximity alert for {a.targetName || a.targetUserId}">Remove</button>
+              </div>
+            {/each}
+          </div>
+        {/if}
+      {/if}
+    </div>
+
+    <!-- ── F9: DAILY ACTIVITY SUMMARY ────────────────────────────────── -->
+    <div class="feature-section">
+      <button class="collapsible-header" on:click={toggleActivity} aria-expanded={activityOpen}>
+        <span class="card-eyebrow" style="margin:0">Activity</span>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true" style="transform: rotate({activityOpen ? 180 : 0}deg); transition: transform 200ms"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      {#if activityOpen}
+        <div class="activity-list">
+          {#if myActivityDays.length === 0}
+            <p class="empty-hint">No activity data yet.</p>
+          {:else}
+            {#each myActivityDays as day}
+              <div class="activity-row">
+                <span class="activity-date">{formatActivityDate(day.date)}</span>
+                <span class="activity-stat">{(day.distanceM / 1000).toFixed(1)} km</span>
+                <span class="activity-stat">{day.activeMinutes} min</span>
+              </div>
+            {/each}
+          {/if}
+        </div>
+      {/if}
     </div>
 
     <!-- ── AMBIENT STATUS MESSAGE ─────────────────────────────────── -->
@@ -333,6 +577,82 @@
         <button class="btn btn-ghost btn-sm" on:click={clearStatusMessage}>Clear</button>
       </div>
     </div>
+
+    <!-- ── F3: MEETING POINT PER ROOM ────────────────────────────────── -->
+    {#if $myRooms.length > 0}
+      <div class="feature-section">
+        <span class="card-eyebrow">Meeting Points</span>
+        {#each $myRooms as room}
+          <div class="room-meeting-row">
+            <div class="room-meeting-header">
+              <span class="room-name">{room.name || room.code}</span>
+              {#if room.meetingPoint}
+                <span class="meeting-set-badge">Set</span>
+                <button class="btn btn-ghost btn-xs" on:click={() => clearMeetingPoint(room.code)} aria-label="Clear meeting point for {room.name || room.code}">Clear</button>
+              {/if}
+              <button class="btn btn-secondary btn-xs" on:click={() => openMeetingPointEditor(room.code)} aria-label="Set meeting point for {room.name || room.code}">
+                {meetingRoomCode === room.code ? 'Cancel' : 'Set'}
+              </button>
+            </div>
+            {#if room.meetingPoint}
+              <p class="meeting-point-info">{room.meetingPoint.label || 'Meeting point'} — {room.meetingPoint.lat.toFixed(4)}, {room.meetingPoint.lng.toFixed(4)}</p>
+            {/if}
+            {#if meetingRoomCode === room.code}
+              <div class="meeting-point-form">
+                <input class="feature-input" type="number" placeholder="Latitude" bind:value={meetingLat} step="0.0001" aria-label="Meeting point latitude" />
+                <input class="feature-input" type="number" placeholder="Longitude" bind:value={meetingLng} step="0.0001" aria-label="Meeting point longitude" />
+                <input class="feature-input" type="text" maxlength="80" placeholder="Label (optional)" bind:value={meetingLabel} aria-label="Meeting point label" />
+                <button class="btn btn-primary btn-sm" on:click={saveMeetingPoint}>Save</button>
+              </div>
+            {/if}
+          </div>
+        {/each}
+      </div>
+    {/if}
+
+    <!-- ── F8: ROOM BULLETIN BOARD ───────────────────────────────────── -->
+    {#if $myRooms.length > 0}
+      <div class="feature-section">
+        <span class="card-eyebrow">Bulletin Board</span>
+        {#each $myRooms as room}
+          <div class="board-room">
+            <button class="collapsible-header" on:click={() => toggleBoard(room.code)} aria-expanded={openBoardRoom === room.code}>
+              <span class="room-name">{room.name || room.code}</span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true" style="transform: rotate({openBoardRoom === room.code ? 180 : 0}deg); transition: transform 200ms"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            {#if openBoardRoom === room.code}
+              <div class="board-content">
+                <div class="board-compose">
+                  <input
+                    class="feature-input"
+                    type="text"
+                    maxlength="200"
+                    placeholder="Post a note..."
+                    bind:value={noteDraft}
+                    aria-label="Write a note for {room.name || room.code}"
+                  />
+                  <button class="btn btn-primary btn-sm" on:click={() => postNote(room.code)} disabled={!noteDraft.trim()}>Post</button>
+                </div>
+                {#each ($roomNotes.get(room.code) || []) as note}
+                  <div class="board-note">
+                    <div class="note-meta">
+                      <span class="note-author">{note.authorName || 'Unknown'}</span>
+                      <span class="note-time">{formatNoteTs(note.createdAt)}</span>
+                      {#if note.authorId === myUserId}
+                        <button class="btn-note-delete" on:click={() => deleteNote(note.id, room.code)} aria-label="Delete note">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                      {/if}
+                    </div>
+                    <p class="note-body">{note.body}</p>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/each}
+      </div>
+    {/if}
 
     <!-- ── GUARDIAN NETWORK ──────────────────────────────────────────── -->
     {#if $myGuardianData.asGuardian.length > 0 || $myGuardianData.asWard.length > 0}
@@ -523,6 +843,11 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
             I'm OK
           </button>
+          <!-- F2: I'm Safe broadcast -->
+          <button class="ok-action-btn ok-action-btn--safe" on:click={iAmSafe} aria-label="Broadcast I am safe to everyone who can see you">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            I'm Safe
+          </button>
         </div>
         <div class="safety-actions" style="margin-top:6px;">
           {#if onMyWayActive}
@@ -553,6 +878,110 @@
         </div>
       </div>
 
+      <!-- F5: SPEED ALERT CONFIG -->
+      <div class="feature-section">
+        <span class="card-eyebrow">Speed Alert</span>
+        <div class="feature-row">
+          <input
+            class="feature-input"
+            type="number"
+            min="0"
+            max="300"
+            placeholder="km/h (0 = off)"
+            bind:value={speedAlertKmh}
+            aria-label="Speed alert threshold in km/h"
+          />
+          <button class="btn btn-primary btn-sm" on:click={saveSpeedAlert} disabled={speedAlertKmh === ''}>Set</button>
+          <button class="btn btn-ghost btn-sm" on:click={clearSpeedAlert}>Off</button>
+        </div>
+      </div>
+
+      <!-- F6: GEOFENCE LOG -->
+      <div class="feature-section">
+        <button class="collapsible-header" on:click={toggleGeofenceLog} aria-expanded={geofenceLogOpen}>
+          <span class="card-eyebrow" style="margin:0">Geofence Log</span>
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true" style="transform: rotate({geofenceLogOpen ? 180 : 0}deg); transition: transform 200ms"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        {#if geofenceLogOpen}
+          <div class="log-list">
+            {#if $geofenceLog.length === 0}
+              <p class="empty-hint">No geofence events yet.</p>
+            {:else}
+              {#each $geofenceLog as ev}
+                <div class="log-item" class:log-entry={ev.eventType === 'entry'} class:log-exit={ev.eventType === 'exit'}>
+                  <span class="log-badge">{ev.eventType === 'entry' ? 'In' : 'Out'}</span>
+                  <span class="log-name">{ev.fenceName || 'Geofence'}</span>
+                  <span class="log-time">{formatGeofenceTs(ev.ts)}</span>
+                </div>
+              {/each}
+            {/if}
+          </div>
+        {/if}
+      </div>
+
+      <!-- F7: PROXIMITY ALERTS -->
+      <div class="feature-section">
+        <button class="collapsible-header" on:click={openProximitySection} aria-expanded={proximitySection}>
+          <span class="card-eyebrow" style="margin:0">Proximity Alerts</span>
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true" style="transform: rotate({proximitySection ? 180 : 0}deg); transition: transform 200ms"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        {#if proximitySection}
+          <div class="feature-row" style="margin-top:6px;">
+            <input
+              class="feature-input"
+              type="text"
+              placeholder="Contact user ID"
+              bind:value={proximityTargetId}
+              aria-label="Target user ID for proximity alert"
+            />
+            <input
+              class="feature-input feature-input--sm"
+              type="number"
+              min="50"
+              max="50000"
+              placeholder="Radius (m)"
+              bind:value={proximityRadiusM}
+              aria-label="Alert radius in metres"
+            />
+            <button class="btn btn-primary btn-sm" on:click={saveProximityAlert}>Add</button>
+          </div>
+          {#if $proximityAlerts.length > 0}
+            <div class="alert-list">
+              {#each $proximityAlerts as a}
+                <div class="alert-item">
+                  <span class="alert-name">{a.targetName || a.targetUserId}</span>
+                  <span class="alert-radius">{a.radiusM}m</span>
+                  <button class="btn btn-danger btn-xs" on:click={() => emitRemoveProximityAlert(a.targetUserId)} aria-label="Remove proximity alert for {a.targetName || a.targetUserId}">Remove</button>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        {/if}
+      </div>
+
+      <!-- F9: DAILY ACTIVITY SUMMARY -->
+      <div class="feature-section">
+        <button class="collapsible-header" on:click={toggleActivity} aria-expanded={activityOpen}>
+          <span class="card-eyebrow" style="margin:0">Activity</span>
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true" style="transform: rotate({activityOpen ? 180 : 0}deg); transition: transform 200ms"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        {#if activityOpen}
+          <div class="activity-list">
+            {#if myActivityDays.length === 0}
+              <p class="empty-hint">No activity data yet.</p>
+            {:else}
+              {#each myActivityDays as day}
+                <div class="activity-row">
+                  <span class="activity-date">{formatActivityDate(day.date)}</span>
+                  <span class="activity-stat">{(day.distanceM / 1000).toFixed(1)} km</span>
+                  <span class="activity-stat">{day.activeMinutes} min</span>
+                </div>
+              {/each}
+            {/if}
+          </div>
+        {/if}
+      </div>
+
       <!-- AMBIENT STATUS MESSAGE -->
       <div class="status-msg-zone">
         <span class="card-eyebrow">My Status</span>
@@ -578,6 +1007,82 @@
           <button class="btn btn-ghost btn-sm" on:click={clearStatusMessage}>Clear</button>
         </div>
       </div>
+
+      <!-- F3: MEETING POINT PER ROOM -->
+      {#if $myRooms.length > 0}
+        <div class="feature-section">
+          <span class="card-eyebrow">Meeting Points</span>
+          {#each $myRooms as room}
+            <div class="room-meeting-row">
+              <div class="room-meeting-header">
+                <span class="room-name">{room.name || room.code}</span>
+                {#if room.meetingPoint}
+                  <span class="meeting-set-badge">Set</span>
+                  <button class="btn btn-ghost btn-xs" on:click={() => clearMeetingPoint(room.code)} aria-label="Clear meeting point for {room.name || room.code}">Clear</button>
+                {/if}
+                <button class="btn btn-secondary btn-xs" on:click={() => openMeetingPointEditor(room.code)} aria-label="Set meeting point for {room.name || room.code}">
+                  {meetingRoomCode === room.code ? 'Cancel' : 'Set'}
+                </button>
+              </div>
+              {#if room.meetingPoint}
+                <p class="meeting-point-info">{room.meetingPoint.label || 'Meeting point'} — {room.meetingPoint.lat.toFixed(4)}, {room.meetingPoint.lng.toFixed(4)}</p>
+              {/if}
+              {#if meetingRoomCode === room.code}
+                <div class="meeting-point-form">
+                  <input class="feature-input" type="number" placeholder="Latitude" bind:value={meetingLat} step="0.0001" aria-label="Meeting point latitude" />
+                  <input class="feature-input" type="number" placeholder="Longitude" bind:value={meetingLng} step="0.0001" aria-label="Meeting point longitude" />
+                  <input class="feature-input" type="text" maxlength="80" placeholder="Label (optional)" bind:value={meetingLabel} aria-label="Meeting point label" />
+                  <button class="btn btn-primary btn-sm" on:click={saveMeetingPoint}>Save</button>
+                </div>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      {/if}
+
+      <!-- F8: ROOM BULLETIN BOARD -->
+      {#if $myRooms.length > 0}
+        <div class="feature-section">
+          <span class="card-eyebrow">Bulletin Board</span>
+          {#each $myRooms as room}
+            <div class="board-room">
+              <button class="collapsible-header" on:click={() => toggleBoard(room.code)} aria-expanded={openBoardRoom === room.code}>
+                <span class="room-name">{room.name || room.code}</span>
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true" style="transform: rotate({openBoardRoom === room.code ? 180 : 0}deg); transition: transform 200ms"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              {#if openBoardRoom === room.code}
+                <div class="board-content">
+                  <div class="board-compose">
+                    <input
+                      class="feature-input"
+                      type="text"
+                      maxlength="200"
+                      placeholder="Post a note..."
+                      bind:value={noteDraft}
+                      aria-label="Write a note for {room.name || room.code}"
+                    />
+                    <button class="btn btn-primary btn-sm" on:click={() => postNote(room.code)} disabled={!noteDraft.trim()}>Post</button>
+                  </div>
+                  {#each ($roomNotes.get(room.code) || []) as note}
+                    <div class="board-note">
+                      <div class="note-meta">
+                        <span class="note-author">{note.authorName || 'Unknown'}</span>
+                        <span class="note-time">{formatNoteTs(note.createdAt)}</span>
+                        {#if note.authorId === myUserId}
+                          <button class="btn-note-delete" on:click={() => deleteNote(note.id, room.code)} aria-label="Delete note">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                          </button>
+                        {/if}
+                      </div>
+                      <p class="note-body">{note.body}</p>
+                    </div>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      {/if}
 
       <!-- GUARDIAN NETWORK -->
       {#if $myGuardianData.asGuardian.length > 0 || $myGuardianData.asWard.length > 0}
@@ -980,7 +1485,7 @@
 
   .safety-actions {
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr auto auto;
     gap: var(--space-2);
     align-items: stretch;
   }
@@ -1031,7 +1536,7 @@
     color: var(--danger-500);
   }
 
-  /* I'm OK secondary action */
+  /* I'm OK / secondary action buttons */
   .ok-action-btn {
     display: flex;
     flex-direction: column;
@@ -1070,6 +1575,15 @@
   }
   .ok-action-btn--crowd:hover {
     background: rgba(245, 158, 11, 0.18);
+  }
+  /* F2: I'm Safe button — teal/green variant */
+  .ok-action-btn--safe {
+    background: rgba(6, 182, 212, 0.10);
+    border-color: rgba(6, 182, 212, 0.24);
+    color: var(--cyan-500, #06b6d4);
+  }
+  .ok-action-btn--safe:hover {
+    background: rgba(6, 182, 212, 0.18);
   }
 
   /* ── Ambient Status Message ──────────────────────────────────────── */
@@ -1315,4 +1829,308 @@
     color: rgba(255,255,255,0.4); cursor: pointer;
   }
   .wwm-close:hover { background: rgba(255,255,255,0.12); }
+
+  /* ── Feature sections (F3, F5, F6, F7, F8, F9) ───────────────────── */
+  .feature-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    background: var(--surface-1);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-xl);
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .collapsible-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    width: 100%;
+    min-height: 44px;
+    color: var(--text-primary);
+  }
+  .collapsible-header:hover { opacity: 0.8; }
+
+  .feature-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .feature-input {
+    flex: 1;
+    min-width: 80px;
+    font-size: var(--text-sm);
+    padding: 7px 10px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-3);
+    color: var(--text-primary);
+  }
+
+  .feature-input--sm {
+    flex: 0 0 90px;
+  }
+
+  /* F6: geofence log */
+  .log-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 180px;
+    overflow-y: auto;
+  }
+
+  .log-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 8px;
+    border-radius: var(--radius-md);
+    font-size: var(--text-xs);
+    background: var(--surface-inset);
+    border: 1px solid var(--border-subtle);
+  }
+
+  .log-badge {
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: var(--radius-full);
+    flex-shrink: 0;
+  }
+
+  .log-entry .log-badge {
+    background: rgba(16, 185, 129, 0.14);
+    color: var(--success-500);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+  }
+
+  .log-exit .log-badge {
+    background: rgba(239, 68, 68, 0.12);
+    color: var(--danger-500);
+    border: 1px solid rgba(239, 68, 68, 0.22);
+  }
+
+  .log-name {
+    flex: 1;
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .log-time {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    flex-shrink: 0;
+  }
+
+  /* F7: proximity alerts */
+  .alert-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .alert-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    background: var(--surface-inset);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    font-size: var(--text-xs);
+  }
+
+  .alert-name {
+    flex: 1;
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .alert-radius {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-tertiary);
+    flex-shrink: 0;
+  }
+
+  /* F8: bulletin board */
+  .board-room {
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  .board-content {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .board-compose {
+    display: flex;
+    gap: 6px;
+  }
+
+  .board-note {
+    padding: 8px 10px;
+    background: var(--surface-inset);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-subtle);
+  }
+
+  .note-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+
+  .note-author {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--primary-400);
+  }
+
+  .note-time {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    flex: 1;
+  }
+
+  .btn-note-delete {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: var(--radius-sm);
+    background: none;
+    border: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    transition: color 120ms, background 120ms;
+  }
+  .btn-note-delete:hover {
+    color: var(--danger-500);
+    background: rgba(239, 68, 68, 0.10);
+  }
+
+  .note-body {
+    font-size: var(--text-sm);
+    color: var(--text-primary);
+    margin: 0;
+    line-height: 1.4;
+    word-break: break-word;
+  }
+
+  /* F3: meeting point */
+  .room-meeting-row {
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .room-meeting-row:last-child { border-bottom: none; }
+
+  .room-meeting-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    min-height: 44px;
+  }
+
+  .room-name {
+    flex: 1;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+
+  .meeting-set-badge {
+    font-size: 9px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 2px 6px;
+    border-radius: var(--radius-full);
+    background: rgba(16, 185, 129, 0.14);
+    color: var(--success-500);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+  }
+
+  .meeting-point-info {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin: 2px 0 4px;
+    font-family: var(--font-mono);
+  }
+
+  .meeting-point-form {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  /* F9: activity summary */
+  .activity-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .activity-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 8px;
+    background: var(--surface-inset);
+    border-radius: var(--radius-md);
+    font-size: var(--text-xs);
+  }
+
+  .activity-date {
+    flex: 1;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .activity-stat {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--primary-400);
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .empty-hint {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    text-align: center;
+    padding: 8px 0;
+    margin: 0;
+  }
 </style>

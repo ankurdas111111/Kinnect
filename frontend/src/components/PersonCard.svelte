@@ -136,6 +136,14 @@
           </span>
         {/if}
 
+        <!-- F4: Location label badge — shown when backend infers a named place -->
+        {#if user.locationLabel}
+          <span class="location-label-badge" aria-label="Currently at {user.locationLabel}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            {user.locationLabel}
+          </span>
+        {/if}
+
         <FreshnessChip
           lastSeenMs={user.lastSeen}
           accuracy={user.accuracy}
@@ -446,6 +454,25 @@
     height: 6px;
     border-radius: 50%;
     flex-shrink: 0;
+  }
+
+  /* ── F4: Location label badge ──────────────────────────────────────────── */
+  .location-label-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--primary-400, #818cf8);
+    background: rgba(99, 102, 241, 0.10);
+    border: 1px solid rgba(99, 102, 241, 0.20);
+    border-radius: var(--radius-full, 9999px);
+    padding: 2px 7px;
+    line-height: 1.3;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .close-btn {

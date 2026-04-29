@@ -9,6 +9,8 @@
   import { getUserColor } from '../lib/getUserColor.js';
   import { MAP_STYLE, RASTER_STYLE } from '../lib/mapStyle.js';
   import { debounce } from '../lib/debounce.js';
+  // F3: meeting point markers
+  import { myRooms } from '../lib/stores/rooms.js';
 
   export let followMode = false;
 
@@ -21,6 +23,8 @@
   let myMarker = null;
   let myPopup = null;
   let hasSetView = false;
+  // F3: roomCode → maplibregl.Marker
+  let meetingMarkers = new Map();
 
   /** Creates a Google Maps-style blue navigation arrow marker */
   function createNavArrow() {
@@ -112,6 +116,20 @@
     } else {
       src.setData({ type: 'FeatureCollection', features: [] });
     }
+  }
+
+  // F3: create a green flag-style meeting point marker element
+  function createMeetingPointEl(label) {
+    const el = document.createElement('div');
+    el.style.cssText = 'display:flex;flex-direction:column;align-items:center;cursor:pointer;';
+    const safeLabel = (label || 'Meet here').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    el.innerHTML = `
+      <div style="background:linear-gradient(135deg,#10b981,#059669);width:34px;height:34px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 14px rgba(16,185,129,0.55);display:flex;align-items:center;justify-content:center;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M4 15V5l5 3 3-4 3 4 5-3v10"/><line x1="4" y1="22" x2="4" y2="15" stroke="#fff" stroke-width="2"/></svg>
+      </div>
+      <div style="background:rgba(16,185,129,0.92);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;margin-top:3px;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 6px rgba(0,0,0,0.18);">${safeLabel}</div>
+      <div style="width:2px;height:7px;background:#10b981;margin-top:1px;border-radius:0 0 2px 2px;opacity:0.7;"></div>`;
+    return el;
   }
 
   const debouncedCheckMobile = debounce(checkMobile, 80);
@@ -247,6 +265,9 @@
     markerPopups.clear();
     if (myMarker) myMarker.remove();
     if (myPopup) myPopup.remove();
+    // F3: clean up meeting point markers
+    for (const m of meetingMarkers.values()) m.remove();
+    meetingMarkers.clear();
     if (map) map.remove();
     if (typeof window !== 'undefined') window.removeEventListener('resize', debouncedCheckMobile);
   });
@@ -678,6 +699,36 @@
           setTimeout(() => m.togglePopup(), 900);
           break;
         }
+      }
+    }
+  }
+
+  // ── F3: Meeting point markers — one green flag per room that has a meeting point ──
+  $: if (map && maplibregl) {
+    const rooms = $myRooms;
+    const currentCodes = new Set(rooms.filter(r => r.meetingPoint).map(r => r.code));
+
+    // Remove markers for rooms that no longer have a meeting point
+    for (const [code, m] of meetingMarkers) {
+      if (!currentCodes.has(code)) {
+        m.remove();
+        meetingMarkers.delete(code);
+      }
+    }
+
+    // Add or update markers for rooms with a meeting point
+    for (const room of rooms) {
+      if (!room.meetingPoint) continue;
+      const mp = room.meetingPoint;
+      const lngLat = [mp.lng, mp.lat];
+      if (meetingMarkers.has(room.code)) {
+        meetingMarkers.get(room.code).setLngLat(lngLat);
+      } else {
+        const el = createMeetingPointEl(mp.label || room.name || room.code);
+        const m = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+          .setLngLat(lngLat)
+          .addTo(map);
+        meetingMarkers.set(room.code, m);
       }
     }
   }

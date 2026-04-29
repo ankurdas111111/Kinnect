@@ -332,3 +332,267 @@ func nullStr(p *string) interface{} {
 	}
 	return nil
 }
+
+// ── F3: Meeting point ────────────────────────────────────────────────────────
+
+// SetRoomMeetingPoint upserts the meeting point on a room identified by code.
+func SetRoomMeetingPoint(ctx context.Context, db *sql.DB, roomCode string, lat, lng float64, label, setByUserID string, setAt int64) error {
+	_, err := db.ExecContext(ctx,
+		`UPDATE rooms SET meeting_lat=$1, meeting_lng=$2, meeting_label=$3, meeting_set_by=$4, meeting_set_at=$5
+		 WHERE code=$6`,
+		lat, lng, label, setByUserID, setAt, roomCode)
+	return err
+}
+
+// ClearRoomMeetingPoint removes the meeting point from a room.
+func ClearRoomMeetingPoint(ctx context.Context, db *sql.DB, roomCode string) error {
+	_, err := db.ExecContext(ctx,
+		`UPDATE rooms SET meeting_lat=NULL, meeting_lng=NULL, meeting_label=NULL, meeting_set_by=NULL, meeting_set_at=NULL
+		 WHERE code=$1`, roomCode)
+	return err
+}
+
+// ── F6: Geofence event log ───────────────────────────────────────────────────
+
+// InsertGeofenceEvent records a geofence entry or exit event.
+func InsertGeofenceEvent(ctx context.Context, db *sql.DB, userID, fenceName, eventType string, lat, lng float64, ts int64) error {
+	_, err := db.ExecContext(ctx,
+		`INSERT INTO geofence_events (user_id, fence_name, event_type, lat, lng, ts)
+		 VALUES ($1, $2, $3, $4, $5, $6)`,
+		userID, fenceName, eventType, lat, lng, ts)
+	return err
+}
+
+// GetGeofenceEvents returns the most recent geofence events for a user.
+func GetGeofenceEvents(ctx context.Context, db *sql.DB, userID string, limit int) ([]GeofenceEventRow, error) {
+	rows, err := db.QueryContext(ctx,
+		`SELECT id, fence_name, event_type, lat, lng, ts
+		 FROM geofence_events WHERE user_id=$1
+		 ORDER BY ts DESC LIMIT $2`,
+		userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []GeofenceEventRow
+	for rows.Next() {
+		var r GeofenceEventRow
+		if err := rows.Scan(&r.ID, &r.FenceName, &r.EventType, &r.Lat, &r.Lng, &r.Ts); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// ── F7: Proximity alerts ─────────────────────────────────────────────────────
+
+// UpsertProximityAlert inserts or updates a proximity alert and returns it.
+func UpsertProximityAlert(ctx context.Context, db *sql.DB, ownerID, targetID string, radiusM int, createdAt int64) (*ProximityAlertEntry, error) {
+	var id string
+	err := db.QueryRowContext(ctx,
+		`INSERT INTO proximity_alerts (owner_id, target_id, radius_m, enabled, last_triggered_at, created_at)
+		 VALUES ($1, $2, $3, true, 0, $4)
+		 ON CONFLICT (owner_id, target_id) DO UPDATE
+		   SET radius_m = EXCLUDED.radius_m, enabled = true
+		 RETURNING id`,
+		ownerID, targetID, radiusM, createdAt).Scan(&id)
+	if err != nil {
+		return nil, err
+	}
+	return &ProximityAlertEntry{
+		ID:              id,
+		OwnerID:         ownerID,
+		TargetID:        targetID,
+		RadiusM:         radiusM,
+		Enabled:         true,
+		LastTriggeredAt: 0,
+		CreatedAt:       createdAt,
+	}, nil
+}
+
+// DeleteProximityAlert removes a proximity alert by owner+target.
+func DeleteProximityAlert(ctx context.Context, db *sql.DB, ownerID, targetID string) error {
+	_, err := db.ExecContext(ctx,
+		`DELETE FROM proximity_alerts WHERE owner_id=$1 AND target_id=$2`,
+		ownerID, targetID)
+	return err
+}
+
+// GetProximityAlertsForOwner returns all proximity alerts owned by a user.
+func GetProximityAlertsForOwner(ctx context.Context, db *sql.DB, ownerID string) ([]*ProximityAlertEntry, error) {
+	rows, err := db.QueryContext(ctx,
+		`SELECT id, owner_id, target_id, radius_m, enabled, last_triggered_at, created_at
+		 FROM proximity_alerts WHERE owner_id=$1`,
+		ownerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*ProximityAlertEntry
+	for rows.Next() {
+		e := &ProximityAlertEntry{}
+		if err := rows.Scan(&e.ID, &e.OwnerID, &e.TargetID, &e.RadiusM, &e.Enabled, &e.LastTriggeredAt, &e.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
+// UpdateProximityAlertTriggered records the last triggered timestamp on an alert.
+func UpdateProximityAlertTriggered(ctx context.Context, db *sql.DB, id string, ts int64) error {
+	_, err := db.ExecContext(ctx,
+		`UPDATE proximity_alerts SET last_triggered_at=$1 WHERE id=$2`,
+		ts, id)
+	return err
+}
+
+// ── F8: Room bulletin board ──────────────────────────────────────────────────
+
+// InsertRoomNote inserts a new note and returns its ID.
+func InsertRoomNote(ctx context.Context, db *sql.DB, roomID, authorID, body string, createdAt int64) (string, error) {
+	var id string
+	err := db.QueryRowContext(ctx,
+		`INSERT INTO room_notes (room_id, author_id, body, created_at)
+		 VALUES ($1, $2, $3, $4) RETURNING id`,
+		roomID, authorID, body, createdAt).Scan(&id)
+	return id, err
+}
+
+// EnforceRoomNoteCap deletes rows beyond 20 for a given room (oldest first).
+func EnforceRoomNoteCap(ctx context.Context, db *sql.DB, roomID string) error {
+	_, err := db.ExecContext(ctx,
+		`DELETE FROM room_notes WHERE id IN (
+			SELECT id FROM (
+				SELECT id, ROW_NUMBER() OVER (ORDER BY created_at DESC) AS rn
+				FROM room_notes WHERE room_id = $1
+			) t WHERE rn > 20
+		)`, roomID)
+	return err
+}
+
+// DeleteRoomNote deletes a note if the requester is the author.
+func DeleteRoomNote(ctx context.Context, db *sql.DB, noteID, requesterID string) error {
+	_, err := db.ExecContext(ctx,
+		`DELETE FROM room_notes WHERE id=$1 AND author_id=$2`,
+		noteID, requesterID)
+	return err
+}
+
+// GetRoomNotes returns the most recent 20 notes for a room with author names.
+func GetRoomNotes(ctx context.Context, db *sql.DB, roomID string) ([]RoomNoteRow, error) {
+	rows, err := db.QueryContext(ctx,
+		`SELECT n.id, n.room_id, n.author_id,
+		        COALESCE(u.first_name||' '||u.last_name, 'Unknown'),
+		        n.body, n.created_at
+		 FROM room_notes n
+		 LEFT JOIN users u ON u.id = n.author_id
+		 WHERE n.room_id = $1
+		 ORDER BY n.created_at DESC
+		 LIMIT 20`,
+		roomID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []RoomNoteRow
+	for rows.Next() {
+		var r RoomNoteRow
+		if err := rows.Scan(&r.ID, &r.RoomID, &r.AuthorID, &r.AuthorName, &r.Body, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// ── F9: Daily activity summary ───────────────────────────────────────────────
+
+// UpsertDailyActivity upserts daily distance and active-minute counters for a user.
+func UpsertDailyActivity(ctx context.Context, db *sql.DB, userID string, distanceDeltaM int, addActiveMinute bool, now int64) error {
+	activeMinDelta := 0
+	if addActiveMinute {
+		activeMinDelta = 1
+	}
+	_, err := db.ExecContext(ctx,
+		`INSERT INTO daily_activity (user_id, date, distance_m, active_minutes, updated_at)
+		 VALUES ($1, CURRENT_DATE, $2, $3, $4)
+		 ON CONFLICT (user_id, date) DO UPDATE
+		   SET distance_m     = daily_activity.distance_m + EXCLUDED.distance_m,
+		       active_minutes = daily_activity.active_minutes + EXCLUDED.active_minutes,
+		       updated_at     = EXCLUDED.updated_at`,
+		userID, distanceDeltaM, activeMinDelta, now)
+	return err
+}
+
+// GetDailyActivity returns the last N days of activity for a user.
+func GetDailyActivity(ctx context.Context, db *sql.DB, userID string, days int) ([]DailyActivityRow, error) {
+	rows, err := db.QueryContext(ctx,
+		`SELECT date::text, distance_m, active_minutes, updated_at
+		 FROM daily_activity
+		 WHERE user_id=$1 AND date >= CURRENT_DATE - ($2 - 1) * INTERVAL '1 day'
+		 ORDER BY date DESC`,
+		userID, days)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []DailyActivityRow
+	for rows.Next() {
+		var r DailyActivityRow
+		if err := rows.Scan(&r.Date, &r.DistanceM, &r.ActiveMinutes, &r.UpdatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// ── F4: Saved places CRUD ────────────────────────────────────────────────────
+
+// InsertSavedPlace inserts a new saved place and returns its ID.
+func InsertSavedPlace(ctx context.Context, db *sql.DB, userID, name, icon string, lat, lng, radiusM float64, createdAt int64) (string, error) {
+	var id string
+	err := db.QueryRowContext(ctx,
+		`INSERT INTO saved_places (user_id, name, icon, latitude, longitude, radius_m, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+		userID, name, nullIfEmpty(icon), lat, lng, radiusM, createdAt).Scan(&id)
+	return id, err
+}
+
+// DeleteSavedPlace deletes a saved place by ID restricted to the owner.
+func DeleteSavedPlace(ctx context.Context, db *sql.DB, placeID, userID string) error {
+	_, err := db.ExecContext(ctx,
+		`DELETE FROM saved_places WHERE id=$1 AND user_id=$2`,
+		placeID, userID)
+	return err
+}
+
+// GetSavedPlacesForUser returns all saved places for a user.
+func GetSavedPlacesForUser(ctx context.Context, db *sql.DB, userID string) ([]SavedPlaceEntry, error) {
+	rows, err := db.QueryContext(ctx,
+		`SELECT id, user_id, name, COALESCE(icon,''), latitude, longitude, radius_m, created_at
+		 FROM saved_places WHERE user_id=$1 ORDER BY created_at ASC`,
+		userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []SavedPlaceEntry
+	for rows.Next() {
+		var e SavedPlaceEntry
+		if err := rows.Scan(&e.ID, &e.UserID, &e.Name, &e.Icon, &e.Latitude, &e.Longitude, &e.RadiusM, &e.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
+func nullIfEmpty(s string) interface{} {
+	if s == "" {
+		return nil
+	}
+	return s
+}

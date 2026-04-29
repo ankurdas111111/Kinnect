@@ -23,6 +23,13 @@ type RoomEntry struct {
 	Members   map[string]bool // userId -> true
 	CreatedBy string
 	CreatedAt int64
+
+	// F3: meeting point
+	MeetingLat   *float64
+	MeetingLng   *float64
+	MeetingLabel string
+	MeetingSetBy string // userID
+	MeetingSetAt int64
 }
 
 // RoomMemberRole holds role and expiry for a room member.
@@ -67,18 +74,72 @@ type UserSettings struct {
 	HeartbeatLastSignal int64
 	EmergencyPhone1    string
 	EmergencyPhone2    string
+	SpeedAlertThresholdMs float64 // F5: 0 = disabled
+}
+
+// SavedPlaceEntry holds a saved place for a user (F4).
+type SavedPlaceEntry struct {
+	ID        string
+	UserID    string
+	Name      string
+	Icon      string
+	Latitude  float64
+	Longitude float64
+	RadiusM   float64
+	CreatedAt int64
+}
+
+// ProximityAlertEntry holds a proximity alert configuration (F7).
+type ProximityAlertEntry struct {
+	ID              string
+	OwnerID         string
+	TargetID        string
+	RadiusM         int
+	Enabled         bool
+	LastTriggeredAt int64  // unix ms; mutated at runtime, not reloaded from DB
+	CreatedAt       int64
+}
+
+// GeofenceEventRow holds a single geofence entry/exit event (F6).
+type GeofenceEventRow struct {
+	ID        string
+	FenceName string
+	EventType string // "entry" | "exit"
+	Lat       float64
+	Lng       float64
+	Ts        int64
+}
+
+// RoomNoteRow holds a room bulletin board note (F8).
+type RoomNoteRow struct {
+	ID         string
+	RoomID     string
+	AuthorID   string
+	AuthorName string // JOIN with users
+	Body       string
+	CreatedAt  int64
+}
+
+// DailyActivityRow holds daily activity summary data (F9).
+type DailyActivityRow struct {
+	Date          string // "YYYY-MM-DD"
+	DistanceM     int
+	ActiveMinutes int
+	UpdatedAt     int64
 }
 
 // LoadAllResult contains all data loaded from DB for cache init.
 type LoadAllResult struct {
-	UsersCache       map[string]*UserCacheEntry
-	ShareCodes       map[string]string
-	EmailIndex       map[string]string
-	MobileIndex      map[string]string
-	Rooms            map[string]*RoomEntry
-	RoomMemberRoles  map[string]map[string]*RoomMemberRole // roomCode -> userId -> role
-	Contacts         map[string]map[string]bool            // ownerId -> contactId -> true
-	LiveTokens       map[string]*LiveTokenEntry
-	Guardianships    map[string]map[string]*GuardianshipEntry // guardianId -> wardId -> entry
-	RoomAdminRequests map[string][]*RoomAdminRequestEntry    // key (roomCode:roomAdmin) -> requests
+	UsersCache        map[string]*UserCacheEntry
+	ShareCodes        map[string]string
+	EmailIndex        map[string]string
+	MobileIndex       map[string]string
+	Rooms             map[string]*RoomEntry
+	RoomMemberRoles   map[string]map[string]*RoomMemberRole // roomCode -> userId -> role
+	Contacts          map[string]map[string]bool            // ownerId -> contactId -> true
+	LiveTokens        map[string]*LiveTokenEntry
+	Guardianships     map[string]map[string]*GuardianshipEntry // guardianId -> wardId -> entry
+	RoomAdminRequests map[string][]*RoomAdminRequestEntry      // key (roomCode:roomAdmin) -> requests
+	SavedPlaces       map[string][]SavedPlaceEntry             // userID -> []entry (F4)
+	ProximityAlerts   map[string][]*ProximityAlertEntry        // targetUserID -> []alert (F7)
 }
