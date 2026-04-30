@@ -1823,10 +1823,11 @@
   }
   .wwm-close {
     position: absolute; top: 12px; right: 12px; z-index: 2;
-    width: 32px; height: 32px; border-radius: 50%;
+    width: 44px; height: 44px; border-radius: 50%;
     background: rgba(255,255,255,0.06); border: none;
     display: flex; align-items: center; justify-content: center;
     color: rgba(255,255,255,0.4); cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
   }
   .wwm-close:hover { background: rgba(255,255,255,0.12); }
 
@@ -1871,6 +1872,12 @@
     border: 1px solid var(--border-subtle);
     background: var(--surface-3);
     color: var(--text-primary);
+  }
+  @media (max-width: 767px) {
+    .feature-input {
+      min-height: 44px;
+      font-size: var(--text-base);
+    }
   }
 
   .feature-input--sm {
@@ -1985,6 +1992,10 @@
   .board-compose {
     display: flex;
     gap: 6px;
+    flex-wrap: wrap;
+  }
+  .board-compose .feature-input {
+    min-width: 120px;
   }
 
   .board-note {
@@ -2017,8 +2028,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 20px;
-    height: 20px;
+    width: 32px;
+    height: 32px;
     border-radius: var(--radius-sm);
     background: none;
     border: none;
@@ -2027,6 +2038,13 @@
     padding: 0;
     flex-shrink: 0;
     transition: color 120ms, background 120ms;
+    -webkit-tap-highlight-color: transparent;
+  }
+  @media (max-width: 767px) {
+    .btn-note-delete {
+      width: 44px;
+      height: 44px;
+    }
   }
   .btn-note-delete:hover {
     color: var(--danger-500);
