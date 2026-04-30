@@ -1,0 +1,4 @@
+frontend/src/components/InfoPanel.svelte
+  fd14947d-5dff-4098-852d-f70e7c11322d:2026-04-30T09:28:55.641Z 1826,1830,1876-1881,1995-1998,2031-2032,2041-2047
+---
+{"schema_version": "authorship/3.0.0", "base_commit_sha": "HEAD~1", "prompts": {"fd14947d-5dff-4098-852d-f70e7c11322d:2026-04-30T09:28:55.641Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 21, "overriden_lines": 0}}}
