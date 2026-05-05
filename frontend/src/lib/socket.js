@@ -20,6 +20,8 @@ import { addSecretMessage, setSecretMessages, removeSecretMessage, updateSecretM
 import { getShareOrigin } from './env.js';
 import { geofenceLog, proximityAlerts } from './stores/places.js';
 import { dailyActivity } from './stores/activity.js';
+import { recentTrailResult } from './stores/trail.js';
+import { arrivalProjections } from './stores/arrivals.js';
 
 const storedClientId = localStorage.getItem('clientId');
 const clientId = storedClientId || (crypto && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + '-' + Math.random().toString(16).slice(2));
@@ -855,6 +857,29 @@ export function setupSocketHandlers() {
     });
   });
 
+  // ── F10: Trail playback ────────────────────────────────────────────
+  socket.on('recentTrailData', (data) => {
+    if (!data) return;
+    recentTrailResult.set({ ok: true, ...data });
+  });
+  socket.on('trailError', (data) => {
+    recentTrailResult.set({ ok: false, error: data?.error || 'Could not load trail' });
+  });
+
+  // ── Arrival ETA projections ────────────────────────────────────────
+  socket.on('arrivalProjection', (data) => {
+    if (!data?.userId) return;
+    arrivalProjections.update(m => {
+      const nm = new Map(m);
+      if (data.etaSeconds != null) {
+        nm.set(data.userId, data);
+      } else {
+        nm.delete(data.userId); // cleared — user is no longer moving toward a place
+      }
+      return nm;
+    });
+  });
+
   // Network online/offline detection for immediate UX feedback
   if (typeof window !== 'undefined') {
     window.addEventListener('offline', () => {
@@ -960,4 +985,9 @@ export function emitGetRoomNotes(roomCode) {
 // ── F9: Daily activity emit ────────────────────────────────────────────────
 export function emitGetDailyActivity(userId) {
   socket.emit('getDailyActivity', userId ? { userId } : {});
+}
+
+// ── F10: Trail emit ────────────────────────────────────────────────────────
+export function emitGetRecentTrail(targetUserId, windowMinutes) {
+  socket.emit('getRecentTrail', { targetUserId, windowMinutes: windowMinutes || 60 });
 }

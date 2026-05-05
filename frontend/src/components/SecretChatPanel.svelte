@@ -1,6 +1,5 @@
 <script>
-  import { get } from 'svelte/store';
-  import { onMount, onDestroy, tick } from 'svelte';
+  import { onMount, onDestroy, tick, afterUpdate } from 'svelte';
   import { fade } from 'svelte/transition';
   import { socket, markSecretMsgSeen, createSecretChatInvite } from '../lib/socket.js';
   import { authUser } from '../lib/stores/auth.js';
@@ -100,7 +99,7 @@
   }
 
   $: chat = $secretChats.get(peerId) ?? { messages: [], locked: true, decryptedMessages: new Map() };
-  $: myId = get(authUser)?.userId;
+  $: myId = $authUser?.userId;
   $: sortedMsgs = [...chat.messages].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
   // Message grouping — consecutive messages from same sender within 2 min
@@ -202,8 +201,6 @@
     } finally {
       sending = false;
     }
-    await tick();
-    scrollToBottom();
   }
 
   function handleComposeKeydown(e) {
@@ -213,6 +210,16 @@
   function scrollToBottom() {
     if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
   }
+
+  // Auto-scroll to bottom whenever a new message arrives (sent ACK or received).
+  // afterUpdate fires after every DOM update, so the new message is already rendered.
+  let _prevSortedLength = 0;
+  afterUpdate(() => {
+    if (gateOpen && sortedMsgs.length > _prevSortedLength) {
+      _prevSortedLength = sortedMsgs.length;
+      scrollToBottom();
+    }
+  });
 
   async function shareLink() {
     try {

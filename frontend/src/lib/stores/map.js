@@ -5,7 +5,6 @@ export const myLocation = writable(null);
 export const mySocketId = writable(null);
 export const tracking = writable(false);
 export const selectedUsers = writable([]);
-export const geofenceCircles = writable(new Map());
 export const mySafetyStatus = writable({
   geofence: { enabled: false, centerLat: null, centerLng: null, radiusM: 0 },
   autoSos: { enabled: false, noMoveMinutes: 5, hardStopMinutes: 2, geofence: false },

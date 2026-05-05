@@ -4,14 +4,47 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"math"
+	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"kinnect-v3/internal/cache"
 	"kinnect-v3/internal/db"
 	"kinnect-v3/internal/shared"
 )
+
+// sendTwilioSMS fires a single SMS via the Twilio Messages REST API.
+// Silently logs and returns on error so a misconfigured key never crashes the relay.
+func sendTwilioSMS(accountSID, authToken, from, to, body string) {
+	apiURL := "https://api.twilio.com/2010-04-01/Accounts/" + accountSID + "/Messages.json"
+	form := url.Values{}
+	form.Set("To", to)
+	form.Set("From", from)
+	form.Set("Body", body)
+	req, err := http.NewRequest(http.MethodPost, apiURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		slog.Warn("Panic Relay: failed to build Twilio request", "error", err)
+		return
+	}
+	req.SetBasicAuth(accountSID, authToken)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		slog.Warn("Panic Relay: Twilio HTTP error", "to", to, "error", err)
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		b, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		slog.Warn("Panic Relay: Twilio rejected SMS", "to", to, "status", resp.StatusCode, "body", string(b))
+		return
+	}
+	slog.Info("Panic Relay: SMS sent via Twilio", "to", to)
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // HEARTBEAT CHECK — daily "sign of life" wellness pulse
@@ -295,13 +328,13 @@ func (h *Hub) StartPanicRelayTimer(user *cache.ActiveUser) {
 			phones = append(phones, current.EmergencyPhone2)
 		}
 
+		cfg := h.config
 		for _, phone := range phones {
 			slog.Info("Panic Relay: sending SMS", "to", phone, "user", displayName)
-			// TODO: integrate real SMS provider (Twilio/MSG91)
-			// For now, log the intent. When SMS provider is configured,
-			// call: sms.Send(phone, msg)
-			_ = msg
-			_ = phone
+			if cfg.TwilioAccountSID != "" && cfg.TwilioAuthToken != "" && cfg.TwilioFromNumber != "" {
+				p := phone
+				go sendTwilioSMS(cfg.TwilioAccountSID, cfg.TwilioAuthToken, cfg.TwilioFromNumber, p, msg)
+			}
 		}
 
 		// Notify the user that SMS was sent

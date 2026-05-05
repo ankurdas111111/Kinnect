@@ -175,6 +175,9 @@ type ActiveUser struct {
 
 	// F9: Daily activity — debounce active-minute counting
 	LastActiveMinuteAt int64 // unix ms; ephemeral
+
+	// Arrival projection — rate-limit guard (broadcast at most every 30s per user)
+	LastArrivalProjectionAt int64 // unix ms; ephemeral
 }
 
 // WatchTokenEntry holds watch token state.
@@ -445,6 +448,19 @@ func haversineM(lat1, lng1, lat2, lng2 float64) float64 {
 		math.Cos(lat1*math.Pi/180)*math.Cos(lat2*math.Pi/180)*
 			math.Sin(dLng/2)*math.Sin(dLng/2)
 	return R * 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+}
+
+// GetSavedPlaces returns a copy of the saved places slice for userID (thread-safe).
+func (c *Cache) GetSavedPlaces(userID string) []db.SavedPlaceEntry {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	places := c.SavedPlaces[userID]
+	if len(places) == 0 {
+		return nil
+	}
+	out := make([]db.SavedPlaceEntry, len(places))
+	copy(out, places)
+	return out
 }
 
 // inferLocationLabel returns the name of the first saved place the user is currently

@@ -236,6 +236,17 @@ func InitDB(db *sql.DB) error {
 			PRIMARY KEY (user_id, date)
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_daily_activity_user ON daily_activity(user_id, date DESC)`,
+
+		// F10: Position history — throttled trail points for route replay and arrival ETA
+		`CREATE TABLE IF NOT EXISTS position_history (
+			id      BIGSERIAL PRIMARY KEY,
+			user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			lat     DOUBLE PRECISION NOT NULL,
+			lng     DOUBLE PRECISION NOT NULL,
+			speed   DOUBLE PRECISION,
+			ts      BIGINT NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_position_history_user_ts ON position_history(user_id, ts DESC)`,
 	}
 
 	for _, stmt := range statements {

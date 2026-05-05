@@ -167,12 +167,34 @@ func (h *Hub) handleDeleteSecretMsg(c *Client, data json.RawMessage) {
 		return
 	}
 
+	// Fetch receiver_id before deleting so we can notify them after.
+	var receiverID string
+	_ = h.pool.DB.QueryRowContext(context.Background(),
+		`SELECT receiver_id FROM secret_messages WHERE id = $1 AND sender_id = $2`,
+		p.ID, user.UserID,
+	).Scan(&receiverID)
+
 	// Only allow deleting own messages (WHERE sender_id = user).
-	h.pool.DB.ExecContext(context.Background(),
+	result, err := h.pool.DB.ExecContext(context.Background(),
 		`DELETE FROM secret_messages WHERE id = $1 AND sender_id = $2`,
 		p.ID, user.UserID,
 	)
+	if err != nil {
+		return
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return // not owner or already gone
+	}
+
 	c.Send("secretMsgDeleted", map[string]interface{}{"id": p.ID})
+
+	// Notify the receiver so their view updates immediately.
+	if receiverID != "" {
+		if receiverSocketID := h.Cache.GetUserIdToSocketId(receiverID); receiverSocketID != "" {
+			h.SendToClient(receiverSocketID, "secretMsgDeleted", map[string]interface{}{"id": p.ID})
+		}
+	}
 }
 
 // handleMarkSecretMsgSeen marks a message as seen when the receiver successfully decrypts it.

@@ -12,6 +12,17 @@
   import VirtualList from './primitives/VirtualList.svelte';
   import KinnectNexus from './primitives/KinnectNexus.svelte';
   import { computeActivityStatus, formatActivityAge } from '../lib/activityStatus.js';
+  import { arrivalProjections } from '../lib/stores/arrivals.js';
+
+  function formatEta(seconds) {
+    if (!seconds || seconds <= 0) return null;
+    if (seconds < 60) return '< 1 min';
+    const m = Math.round(seconds / 60);
+    if (m < 60) return `~${m} min`;
+    const h = Math.floor(m / 60);
+    const rem = m % 60;
+    return rem > 0 ? `~${h}h ${rem}m` : `~${h}h`;
+  }
 
   function locateUser(socketId) {
     haptics.tap();
@@ -454,6 +465,16 @@
                       <span class="sep">·</span>
                       <span class="acc-dot {getAccuracyClass(user.accuracy)}" aria-hidden="true"></span>
                       <span class="acc-label {getAccuracyClass(user.accuracy)}" aria-label="GPS accuracy: {getAccuracyLabel(user.accuracy)}">{getAccuracyLabel(user.accuracy)}</span>
+                    {/if}
+                    {#if user.userId && $arrivalProjections.has(user.userId)}
+                      {@const proj = $arrivalProjections.get(user.userId)}
+                      {#if proj?.etaSeconds && proj?.placeName}
+                        <span class="sep">·</span>
+                        <span class="eta-chip" title="Heading to {proj.placeName}">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="5 12 12 5 19 12"/><polyline points="5 19 12 12 19 19"/></svg>
+                          {proj.placeName} {formatEta(proj.etaSeconds)}
+                        </span>
+                      {/if}
                     {/if}
                   {/if}
                 {:else}
@@ -1083,6 +1104,20 @@
   .acc-good.acc-dot { background: var(--warning-500); }
   .acc-low   { color: var(--danger-400); }
   .acc-low.acc-dot { background: var(--danger-400); }
+
+  .eta-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: #d97706;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 120px;
+  }
+  :global([data-theme="dark"]) .eta-chip { color: #fcd34d; }
 
   /* ── Actions column ─────────────────────────────────────────────────────── */
   .user-actions {

@@ -47,6 +47,23 @@ func (h *Hub) runPurge(ctx context.Context) {
 		slog.Warn("Failed to purge sos_watch_tokens", "error", err)
 	}
 
+	// ── F10: Position history — 7-day age purge + 500-row per-user cap ───────
+	sevenDaysMs := time.Now().Add(-7 * 24 * time.Hour).UnixMilli()
+	if _, err := h.pool.DB.ExecContext(ctx,
+		`DELETE FROM position_history WHERE ts < $1`, sevenDaysMs); err != nil {
+		slog.Warn("Failed to purge position_history by age", "error", err)
+	}
+	if _, err := h.pool.DB.ExecContext(ctx, `
+		DELETE FROM position_history
+		WHERE id IN (
+			SELECT id FROM (
+				SELECT id, ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY ts DESC) AS rn
+				FROM position_history
+			) ranked WHERE rn > 500
+		)`); err != nil {
+		slog.Warn("Failed to purge position_history by cap", "error", err)
+	}
+
 	// ── F6: Geofence event log ─────────────────────────────────────────────────
 	// Delete rows older than 30 days.
 	thirtyDaysMs := time.Now().Add(-30 * 24 * time.Hour).UnixMilli()

@@ -277,6 +277,12 @@ func (h *Hub) handlePosition(c *Client, data json.RawMessage) {
 				if err := db.UpsertDailyActivity(bCtx, h.pool.DB, uid, distM, addMin, now); err != nil {
 					slog.Warn("UpsertDailyActivity failed", "userId", uid, "error", err)
 				}
+				// F10: append position_history row for trail replay
+				if _, err := h.pool.DB.ExecContext(bCtx,
+					`INSERT INTO position_history(user_id,lat,lng,speed,ts) VALUES($1,$2,$3,$4,$5)`,
+					uid, lat, lng, spd, now); err != nil {
+					slog.Warn("position_history insert failed", "userId", uid, "error", err)
+				}
 			}(distDelta, addMinute)
 		default:
 			slog.Warn("dbWriteSem full, skipping position DB write", "userId", uid)
@@ -323,6 +329,55 @@ func (h *Hub) handlePosition(c *Client, data json.RawMessage) {
 			go func() {
 				_ = db.UpdateProximityAlertTriggered(context.Background(), h.pool.DB, alertID, now)
 			}()
+		}
+	}
+
+	// ── Arrival projection — ETA to nearest saved place within 5 km ─────────
+	// Emits arrivalProjection to visible users at most every 30 s.
+	// Sends etaSeconds=null when user enters the place radius (arrival).
+	if user.Latitude != nil && user.Longitude != nil {
+		const arrivalCooldownMs = 30_000
+		if now-user.LastArrivalProjectionAt >= arrivalCooldownMs {
+			places := h.Cache.GetSavedPlaces(user.UserID)
+			if len(places) > 0 {
+				var bestIdx int = -1
+				var bestDist float64
+				for i, p := range places {
+					d := shared.HaversineM(*user.Latitude, *user.Longitude, p.Latitude, p.Longitude)
+					if d < 5000 && (bestIdx < 0 || d < bestDist) {
+						bestIdx = i
+						bestDist = d
+					}
+				}
+				if bestIdx >= 0 {
+					p := places[bestIdx]
+					user.LastArrivalProjectionAt = now
+					visibleSIDs := h.Cache.GetVisibleSocketIDs(user)
+					if len(visibleSIDs) > 0 {
+						if bestDist <= p.RadiusM {
+							// User has arrived — clear projection
+							h.SendToClients(visibleSIDs, "arrivalProjection", map[string]interface{}{
+								"userId": user.UserID,
+							})
+						} else if user.Speed > 1.5 {
+							// User is moving toward place — compute ETA
+							speedMs := user.Speed / 3.6
+							etaSec := int(bestDist / speedMs)
+							if etaSec > 0 && etaSec < 7200 {
+								h.SendToClients(visibleSIDs, "arrivalProjection", map[string]interface{}{
+									"userId":      user.UserID,
+									"displayName": user.DisplayName,
+									"placeId":     p.ID,
+									"placeName":   p.Name,
+									"distanceM":   int(math.Round(bestDist)),
+									"etaSeconds":  etaSec,
+									"at":          now,
+								})
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 

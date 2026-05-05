@@ -102,6 +102,21 @@
     pinError = '';
     unlocking = true;
 
+    // Validate PIN by attempting to decrypt the first owner-side message.
+    // Without this check, any 4+ digit PIN would silently pass the gate and
+    // replies would be encrypted with the wrong PIN.
+    const firstOwnerMsg = rawMessages.find(m => m.fromOwner);
+    if (firstOwnerMsg) {
+      try {
+        await decryptMessage(firstOwnerMsg.ciphertext, firstOwnerMsg.iv, firstOwnerMsg.salt, pin);
+      } catch {
+        pinError = 'Incorrect PIN';
+        unlocking = false;
+        pinDigits = [];
+        return;
+      }
+    }
+
     const results = rawMessages.map(m => ({
       id: m.createdAt + Math.random(),
       body: null,

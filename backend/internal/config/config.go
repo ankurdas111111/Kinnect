@@ -21,6 +21,11 @@ type Config struct {
 	VAPIDPublicKey  string
 	VAPIDPrivateKey string
 	VAPIDSubject    string // mailto: or https: URL
+
+	// Twilio SMS — optional; panic relay SMS disabled if empty.
+	TwilioAccountSID string
+	TwilioAuthToken  string
+	TwilioFromNumber string // E.164 format, e.g. +15551234567
 }
 
 const (
@@ -104,6 +109,9 @@ func Load() (*Config, error) {
 		VAPIDPublicKey:     os.Getenv("VAPID_PUBLIC_KEY"),
 		VAPIDPrivateKey:    os.Getenv("VAPID_PRIVATE_KEY"),
 		VAPIDSubject:       os.Getenv("VAPID_SUBJECT"),
+		TwilioAccountSID:   os.Getenv("TWILIO_ACCOUNT_SID"),
+		TwilioAuthToken:    os.Getenv("TWILIO_AUTH_TOKEN"),
+		TwilioFromNumber:   os.Getenv("TWILIO_FROM_NUMBER"),
 	}, nil
 }
 

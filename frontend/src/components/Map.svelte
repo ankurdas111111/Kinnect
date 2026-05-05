@@ -4,6 +4,8 @@
   // does not block on the ~283 kB maplibre chunk at parse time.
   let maplibregl;
   import { otherUsers, myLocation, mySocketId, mySafetyStatus, focusUser, mapFlyTo, routeGeometry, navigationState, mapTappedUser, mapChatRequest } from '../lib/stores/map.js';
+  import { recentTrailResult } from '../lib/stores/trail.js';
+  import { emitGetRecentTrail } from '../lib/socket.js';
   import { haptics } from '../lib/haptics.js';
   import { createMapIcon, createPersonMarker, getPresenceState, escapeAttr, calculateDistance, formatDistance, circleGeoJSON } from '../lib/tracking.js';
   import { animateMarkerTo, cancelAnimation, cancelAllAnimations } from '../lib/markerInterpolator.js';
@@ -232,17 +234,23 @@
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
     }
 
-    // Delegated handler for chat buttons inside desktop marker popups.
+    // Delegated handler for action buttons inside desktop marker popups.
     // Uses capture phase so it intercepts before MapLibre's own click handling.
     mapContainer.addEventListener('click', (e) => {
-      const btn = e.target.closest('.pu-chat-btn');
-      if (!btn) return;
-      e.stopPropagation();
-      const userId = btn.dataset.userid;
-      const name = btn.dataset.name;
-      if (userId) {
-        haptics.tap?.();
-        mapChatRequest.set({ id: userId, name });
+      const chatBtn = e.target.closest('.pu-chat-btn');
+      if (chatBtn) {
+        e.stopPropagation();
+        const userId = chatBtn.dataset.userid;
+        const name = chatBtn.dataset.name;
+        if (userId) { haptics.tap?.(); mapChatRequest.set({ id: userId, name }); }
+        return;
+      }
+      const trailBtn = e.target.closest('.pu-trail-btn');
+      if (trailBtn) {
+        e.stopPropagation();
+        const userId = trailBtn.dataset.userid;
+        if (userId) { haptics.tap?.(); requestTrailForUser(userId); }
+        return;
       }
     }, true);
 
@@ -460,7 +468,10 @@
     if (badges.length) html += `<div class="pu-badges">${badges.join('')}</div>`;
     if (user.rooms && user.rooms.length > 0) html += `<div class="pu-rooms"><span class="pu-lbl">Rooms:</span> ${user.rooms.map(r => s(r)).join(', ')}</div>`;
     if (user.userId) {
-      html += `<div class="pu-actions"><button class="pu-chat-btn" data-userid="${escapeAttr(user.userId)}" data-name="${name}"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Chat</button></div>`;
+      html += `<div class="pu-actions">`;
+      html += `<button class="pu-chat-btn" data-userid="${escapeAttr(user.userId)}" data-name="${name}"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Chat</button>`;
+      html += `<button class="pu-trail-btn" data-userid="${escapeAttr(user.userId)}"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> Trail</button>`;
+      html += `</div>`;
     }
     html += `</div>`;
     return html;
@@ -692,6 +703,54 @@
       if (map.getLayer('directions-route-glow')) map.removeLayer('directions-route-glow');
       if (map.getSource('directions-route')) map.removeSource('directions-route');
     }
+  }
+
+  // ── Trail playback layer — draw breadcrumb path for a user ──────────
+  let activeTrailUserId = null; // userId whose trail is shown (or null)
+
+  $: if (map && $recentTrailResult) {
+    const res = $recentTrailResult;
+    if (!res.ok || !res.points?.length) {
+      // Clear on error or empty
+      if (map.getLayer('trail-line')) map.removeLayer('trail-line');
+      if (map.getLayer('trail-glow')) map.removeLayer('trail-glow');
+      if (map.getSource('trail-route')) map.removeSource('trail-route');
+      activeTrailUserId = null;
+    } else {
+      activeTrailUserId = res.targetUserId;
+      const coords = res.points.map(p => [p.lng, p.lat]);
+      const geojson = { type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} };
+      if (map.getSource('trail-route')) {
+        map.getSource('trail-route').setData(geojson);
+      } else {
+        map.addSource('trail-route', { type: 'geojson', data: geojson });
+        map.addLayer({ id: 'trail-glow', type: 'line', source: 'trail-route',
+          paint: { 'line-color': '#f59e0b', 'line-width': 10, 'line-opacity': 0.15, 'line-blur': 4 } });
+        map.addLayer({ id: 'trail-line', type: 'line', source: 'trail-route',
+          paint: { 'line-color': '#fbbf24', 'line-width': 3, 'line-opacity': 0.82, 'line-dasharray': [2, 1.5] },
+          layout: { 'line-cap': 'round', 'line-join': 'round' } });
+      }
+      // Fit to trail bounds
+      if (coords.length > 1) {
+        const bounds = coords.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(coords[0], coords[0]));
+        map.fitBounds(bounds, { padding: 80, duration: 700, maxZoom: 17 });
+      }
+    }
+  }
+
+  function clearTrail() {
+    if (!map) return;
+    if (map.getLayer('trail-line')) map.removeLayer('trail-line');
+    if (map.getLayer('trail-glow')) map.removeLayer('trail-glow');
+    if (map.getSource('trail-route')) map.removeSource('trail-route');
+    activeTrailUserId = null;
+    recentTrailResult.set(null);
+  }
+
+  function requestTrailForUser(userId) {
+    clearTrail();
+    activeTrailUserId = userId;
+    emitGetRecentTrail(userId, 60);
   }
 
   // ── Navigation mode — follow user + destination marker + fit bounds ──
@@ -1108,6 +1167,10 @@
   :global(.pu-actions) { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,0.08); }
   :global(.pu-chat-btn) { display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 8px; background: rgba(99,102,241,0.10); border: 1px solid rgba(99,102,241,0.22); color: #6366f1; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 120ms; }
   :global(.pu-chat-btn:hover) { background: rgba(99,102,241,0.18); }
+  :global(.pu-trail-btn) { display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 8px; background: rgba(245,158,11,0.10); border: 1px solid rgba(245,158,11,0.22); color: #d97706; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 120ms; }
+  :global(.pu-trail-btn:hover) { background: rgba(245,158,11,0.18); }
+  :global([data-theme="dark"] .pu-trail-btn) { background: rgba(252,211,77,0.10); border-color: rgba(252,211,77,0.22); color: #fcd34d; }
+  :global([data-theme="dark"] .pu-trail-btn:hover) { background: rgba(252,211,77,0.18); }
 
   /* Fix #1 continued: mobile-specific font size bump for popup text */
   @media (max-width: 480px) {

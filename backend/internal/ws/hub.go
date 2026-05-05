@@ -185,6 +185,7 @@ func (h *Hub) buildEventHandlers() map[string]func(*Client, json.RawMessage) {
 		"deleteRoomNote":       h.handleDeleteRoomNote,
 		"getRoomNotes":         h.handleGetRoomNotes,
 		"getDailyActivity":     h.handleGetDailyActivity,
+		"getRecentTrail":       h.handleGetRecentTrail,
 	}
 }
 
