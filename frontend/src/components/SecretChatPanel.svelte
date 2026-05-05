@@ -15,37 +15,37 @@
   export let peerName = 'Contact';
   export let onClose = () => {};
 
-  // Session PIN — set once at gate, used for ALL outgoing messages
+  // Session PIN — entered via PIN pad at gate, used for ALL outgoing messages
   let sessionPin = '';
-  let gatePin = '';
+  let pinDigits = [];        // replaces gatePin — visual PIN pad state
   let gateError = '';
   let gateUnlocking = false;
-  let gateOpen = false; // true once PIN accepted
+  let gateOpen = false;
+
+  // Derived gate PIN string
+  $: gatePin = pinDigits.join('');
 
   // Per-message inline decryption
-  let activeDecryptId = null;       // msgId currently showing inline PIN input
-  let inlinePins = {};              // msgId → typed value
-  let inlineErrors = {};            // msgId → error string
-  let inlineUnlocking = {};         // msgId → boolean
+  let activeDecryptId = null;
+  let inlinePins = {};
+  let inlineErrors = {};
+  let inlineUnlocking = {};
 
-  // Re-lock state — messages can be locked again after reading
-  let lockedSet = new Set();        // msgId → manually re-locked
-  let lockCountdowns = {};          // msgId → seconds remaining before auto-lock
-  let lockIntervals = {};           // msgId → setInterval handle
+  // Re-lock state
+  let lockedSet = new Set();
+  let lockCountdowns = {};
+  let lockIntervals = {};
 
   const AUTO_LOCK_SECS = 30;
 
   function relockMsg(msgId) {
-    // Clear any running countdown
     if (lockIntervals[msgId]) {
       clearInterval(lockIntervals[msgId]);
       delete lockIntervals[msgId];
     }
     delete lockCountdowns[msgId];
     lockCountdowns = { ...lockCountdowns };
-    // Add to locked set — triggers re-render to locked bubble
     lockedSet = new Set([...lockedSet, msgId]);
-    // Reset inline state so PIN input is fresh next time
     inlinePins = { ...inlinePins, [msgId]: '' };
     inlineErrors = { ...inlineErrors, [msgId]: '' };
     activeDecryptId = null;
@@ -64,6 +64,17 @@
     }, 1000);
   }
 
+  // ── PIN pad helpers ──────────────────────────────────────────
+  function addPinDigit(d) {
+    if (pinDigits.length >= 8 || gateUnlocking) return;
+    pinDigits = [...pinDigits, d];
+  }
+
+  function removePinDigit() {
+    if (!pinDigits.length) return;
+    pinDigits = pinDigits.slice(0, -1);
+  }
+
   let composeText = '';
   let sending = false;
   let copyDone = false;
@@ -76,11 +87,9 @@
 
   function restoreFromPanic() {
     panicMode = false;
-    // Re-lock everything — force PIN re-entry
     gateOpen = false;
     sessionPin = '';
-    gatePin = '';
-    // Clear all auto-lock timers and decrypted state
+    pinDigits = [];
     for (const id of Object.keys(lockIntervals)) clearInterval(lockIntervals[id]);
     lockIntervals = {};
     lockCountdowns = {};
@@ -94,16 +103,23 @@
   $: myId = get(authUser)?.userId;
   $: sortedMsgs = [...chat.messages].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
-  // Unread = received messages where seenAt is null
+  // Message grouping — consecutive messages from same sender within 2 min
+  $: groupedMsgs = sortedMsgs.map((msg, i) => {
+    const prev = sortedMsgs[i - 1];
+    const next = sortedMsgs[i + 1];
+    const GAP = 2 * 60 * 1000;
+    const samePrev = prev && prev.senderId === msg.senderId &&
+      new Date(msg.createdAt) - new Date(prev.createdAt) < GAP;
+    const sameNext = next && next.senderId === msg.senderId &&
+      new Date(next.createdAt) - new Date(msg.createdAt) < GAP;
+    return { ...msg, groupFirst: !samePrev, groupLast: !sameNext };
+  });
+
   $: unreadCount = sortedMsgs.filter(m => m.senderId !== myId && !m.seenAt).length;
 
-
-  // Peer presence — chat-specific (did they open THIS chat)
   $: peerPresence = $secretChatPresence.get(peerId) ?? null;
   $: peerChatOpen = peerPresence?.open ?? false;
   $: peerLastOpenedAt = (peerPresence && !peerPresence.open) ? peerPresence.at : null;
-
-  // General online status — is this peer connected to Kinnect at all?
   $: peerKinnectOnline = Array.from($otherUsers.values()).some(u => u.userId === peerId && u.online !== false);
 
   function emitPresence(open) {
@@ -120,24 +136,16 @@
     lockSecretChat(peerId);
     sessionPin = '';
     gateOpen = false;
-    // Clear all running auto-lock timers
     for (const id of Object.values(lockIntervals)) clearInterval(id);
   });
 
   // ── Gate ──────────────────────────────────────────────────────
-  function gatePinInput(e) {
-    gatePin = e.target.value.replace(/\D/g, '');
-  }
-
   async function submitGate() {
-    if (gateUnlocking || gatePin.length < 4) return;
+    if (gateUnlocking || pinDigits.length < 4) return;
     gateError = '';
     gateUnlocking = true;
-
-    // Gate PIN = your encryption key for outgoing messages only.
-    // Received messages are always locked — tap each one to enter PIN and read.
-    sessionPin = gatePin;
-    gatePin = '';
+    sessionPin = pinDigits.join('');
+    pinDigits = [];
     gateUnlocking = false;
     gateOpen = true;
     await tick();
@@ -170,10 +178,8 @@
       storeDecrypted(peerId, msg.id, plain);
       markSecretMsgSeen(msg.id);
       activeDecryptId = null;
-      // Remove from lockedSet if it was manually re-locked before
       lockedSet.delete(msg.id);
       lockedSet = new Set(lockedSet);
-      // Start auto-lock countdown
       startAutoLock(msg.id);
     } catch {
       inlineErrors = { ...inlineErrors, [msg.id]: 'Wrong PIN' };
@@ -251,13 +257,11 @@
 
   function getMsgDisplay(msg, locked, decryptedMsgs) {
     if (msg.senderId === myId) return { isOwn: true, plain: null };
-    // If manually or auto re-locked, treat as still locked
     if (locked.has(msg.id)) return { isOwn: false, plain: null };
     const plain = decryptedMsgs.get(msg.id);
     return { isOwn: false, plain: plain ?? null };
   }
 
-  // Peer's first name only (after gate unlocked)
   $: peerFirst = gateOpen ? (peerName || 'Them').split(' ')[0] : '••••••';
 
   const GIF_RE = /^\[gif:(https?:\/\/[^\]]+)\]$/;
@@ -274,7 +278,7 @@
 
 <div class="scp-backdrop" transition:fade={{ duration: 180 }} on:click|self={onClose}>
 <div class="scp">
-  <!-- Mobile drag handle affordance -->
+  <!-- Mobile drag handle -->
   <div class="scp-drag-handle" aria-hidden="true"></div>
 
   <!-- ── Header ─────────────────────────────────────────────── -->
@@ -312,8 +316,8 @@
 
     {#if gateOpen}
       <button
-        class="scp-share-pill"
-        class:scp-share-pill--copied={copyDone}
+        class="scp-invite-pill"
+        class:scp-invite-pill--copied={copyDone}
         on:click={shareLink}
         aria-label={copyDone ? 'Link copied' : 'Copy invite link'}
       >
@@ -322,7 +326,7 @@
           <span>Copied!</span>
         {:else}
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-          <span>Share</span>
+          <span>Invite</span>
         {/if}
       </button>
     {/if}
@@ -347,82 +351,121 @@
       <div class="scp-gate-text">
         <p class="scp-gate-title">Secret Chat</p>
         <p class="scp-gate-sub">
-          Your PIN encrypts your messages.<br>
-          Tap any received message to enter a PIN and read it.
+          Your PIN encrypts messages you send.<br>
+          Enter the sender's PIN to read received messages.
         </p>
       </div>
 
-      <label class="scp-sr" for="scp-gate-pin">Chat PIN</label>
-      <input
-        id="scp-gate-pin"
-        class="scp-pin-input"
-        type="tel"
-        inputmode="numeric"
-        pattern="[0-9]*"
-        maxlength="8"
-        placeholder="• • • •"
-        bind:value={gatePin}
-        on:input={gatePinInput}
-        on:keydown={(e) => e.key === 'Enter' && submitGate()}
-        disabled={gateUnlocking}
-        autocomplete="off"
-        autofocus
-      />
+      <!-- PIN dot indicators -->
+      <div class="scp-pin-dots" aria-live="polite" aria-label="{pinDigits.length} digit{pinDigits.length === 1 ? '' : 's'} entered">
+        {#each {length: Math.max(4, pinDigits.length)} as _, i}
+          <div class="scp-pin-dot" class:scp-pin-dot--filled={i < pinDigits.length}></div>
+        {/each}
+      </div>
 
       {#if gateError}
         <p class="scp-gate-error" role="alert">{gateError}</p>
       {/if}
 
+      <!-- Number pad -->
+      <div class="scp-numpad" role="group" aria-label="PIN keypad">
+        {#each [1,2,3,4,5,6,7,8,9] as d}
+          <button
+            class="scp-numpad-key"
+            on:click={() => addPinDigit(String(d))}
+            type="button"
+            disabled={gateUnlocking}
+            aria-label={String(d)}
+          >{d}</button>
+        {/each}
+        <!-- row 4 -->
+        <div class="scp-numpad-spacer" aria-hidden="true"></div>
+        <button
+          class="scp-numpad-key"
+          on:click={() => addPinDigit('0')}
+          type="button"
+          disabled={gateUnlocking}
+          aria-label="0"
+        >0</button>
+        <button
+          class="scp-numpad-key scp-numpad-key--back"
+          on:click={removePinDigit}
+          type="button"
+          disabled={gateUnlocking || pinDigits.length === 0}
+          aria-label="Backspace"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/>
+            <line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/>
+          </svg>
+        </button>
+      </div>
+
       <button
         class="scp-primary-btn"
         on:click={submitGate}
-        disabled={gateUnlocking || gatePin.length < 4}
+        disabled={gateUnlocking || pinDigits.length < 4}
       >
-        Set PIN &amp; Open
+        {gateUnlocking ? '…' : 'Open Chat'}
       </button>
     </div>
 
   {:else}
     <!-- ── Messages ──────────────────────────────────────────── -->
     <div class="scp-msgs" bind:this={messagesEl}>
-      {#if sortedMsgs.length === 0}
+      {#if groupedMsgs.length === 0}
         <div class="scp-empty">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-          </svg>
+          <div class="scp-empty-ring" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+          </div>
           <p>No messages yet</p>
-          <span>Send the first secret message</span>
+          <span>Messages are end-to-end encrypted</span>
         </div>
       {/if}
 
-      {#each sortedMsgs as msg (msg.id)}
+      {#each groupedMsgs as msg (msg.id)}
         {@const d = getMsgDisplay(msg, lockedSet, chat.decryptedMessages)}
         {@const unread = isUnread(msg)}
         {@const decrypted = !d.isOwn && d.plain !== null}
         {@const showInline = activeDecryptId === msg.id}
 
-        <div class="scp-msg" class:scp-msg--own={d.isOwn} class:scp-msg--their={!d.isOwn}>
+        <div
+          class="scp-msg"
+          class:scp-msg--own={d.isOwn}
+          class:scp-msg--their={!d.isOwn}
+          class:scp-msg--group-cont={!msg.groupLast}
+        >
 
           {#if d.isOwn}
             <!-- Sent: always opaque -->
-            <div class="scp-bubble scp-bubble--own">
+            <div
+              class="scp-bubble scp-bubble--own"
+              class:scp-bubble--grp-notfirst={!msg.groupFirst}
+            >
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
               <span>Encrypted</span>
             </div>
-            <div class="scp-meta scp-meta--own">
-              <span class="scp-time">{clockTime(msg.createdAt)}</span>
-              <span class="scp-tick" class:scp-tick--seen={msg.seenAt} title={msg.seenAt ? `Read ${clockTime(msg.seenAt)}` : 'Sent'}>
-                {#if msg.seenAt}
-                  <svg width="14" height="8" viewBox="0 0 18 10" fill="none" stroke="#53bdeb" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-label="Read"><polyline points="1 5 5 9 13 1"/><polyline points="7 9 15 1"/></svg>
-                {:else}
-                  <svg width="10" height="8" viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-label="Sent"><polyline points="1 5 5 9 11 1"/></svg>
-                {/if}
-              </span>
-            </div>
+            {#if msg.groupLast}
+              <div class="scp-meta scp-meta--own">
+                <span class="scp-time">{clockTime(msg.createdAt)}</span>
+                <span class="scp-tick" class:scp-tick--seen={msg.seenAt} title={msg.seenAt ? `Read ${clockTime(msg.seenAt)}` : 'Sent'}>
+                  {#if msg.seenAt}
+                    <svg width="14" height="8" viewBox="0 0 18 10" fill="none" stroke="#53bdeb" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-label="Read"><polyline points="1 5 5 9 13 1"/><polyline points="7 9 15 1"/></svg>
+                  {:else}
+                    <svg width="10" height="8" viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-label="Sent"><polyline points="1 5 5 9 11 1"/></svg>
+                  {/if}
+                </span>
+              </div>
+            {/if}
 
           {:else if decrypted}
             <!-- Received + decrypted -->
-            <div class="scp-bubble scp-bubble--their scp-bubble--decrypted">
+            <div
+              class="scp-bubble scp-bubble--their scp-bubble--decrypted"
+              class:scp-bubble--grp-notfirst={!msg.groupFirst}
+            >
               {#if parseGif(d.plain)}
                 <img src={parseGif(d.plain)} class="msg-sticker" alt="sticker" loading="lazy" />
               {:else}
@@ -437,22 +480,25 @@
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
               </button>
             </div>
-            <div class="scp-meta scp-meta--their">
-              {#if lockCountdowns[msg.id] != null}
-                <span class="scp-countdown">Locks in {lockCountdowns[msg.id]}s</span>
-              {:else if unread}
-                <span class="scp-unread-dot" aria-label="Unread"></span>
-                <span class="scp-time scp-time--unread">{timeAgo(msg.createdAt)}</span>
-              {:else}
-                <span class="scp-time">{clockTime(msg.createdAt)}</span>
-              {/if}
-            </div>
+            {#if msg.groupLast}
+              <div class="scp-meta scp-meta--their">
+                {#if lockCountdowns[msg.id] != null}
+                  <span class="scp-countdown">Locks in {lockCountdowns[msg.id]}s</span>
+                {:else if unread}
+                  <span class="scp-unread-dot" aria-label="Unread"></span>
+                  <span class="scp-time scp-time--unread">{timeAgo(msg.createdAt)}</span>
+                {:else}
+                  <span class="scp-time">{clockTime(msg.createdAt)}</span>
+                {/if}
+              </div>
+            {/if}
 
           {:else}
             <!-- Received + locked -->
             <button
               class="scp-bubble scp-bubble--locked"
               class:scp-bubble--locked-active={showInline}
+              class:scp-bubble--grp-notfirst={!msg.groupFirst}
               on:click={() => toggleInline(msg.id)}
               aria-expanded={showInline}
               aria-label="Tap to enter PIN and decrypt"
@@ -498,14 +544,16 @@
               </div>
             {/if}
 
-            <div class="scp-meta scp-meta--their">
-              {#if unread}
-                <span class="scp-unread-dot" aria-label="Unread"></span>
-                <span class="scp-time scp-time--unread">{timeAgo(msg.createdAt)}</span>
-              {:else}
-                <span class="scp-time">{clockTime(msg.createdAt)}</span>
-              {/if}
-            </div>
+            {#if msg.groupLast}
+              <div class="scp-meta scp-meta--their">
+                {#if unread}
+                  <span class="scp-unread-dot" aria-label="Unread"></span>
+                  <span class="scp-time scp-time--unread">{timeAgo(msg.createdAt)}</span>
+                {:else}
+                  <span class="scp-time">{clockTime(msg.createdAt)}</span>
+                {/if}
+              </div>
+            {/if}
           {/if}
         </div>
       {/each}
@@ -514,12 +562,12 @@
     <!-- ── Compose ─────────────────────────────────────────── -->
     <div class="scp-compose">
       <div class="scp-compose-inner">
-        <!-- Panic / blank button -->
+        <!-- Panic / blank button — subtle icon -->
         <button
-          class="scp-compose-icon-btn"
+          class="scp-compose-icon-btn scp-compose-icon-btn--panic"
           on:click={() => panicMode = true}
           aria-label="Blank screen"
-          title="Blank screen (tap screen to restore)"
+          title="Blank screen (tap to restore)"
           type="button"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -530,7 +578,7 @@
         </button>
 
         <button
-          class="scp-emoji-btn"
+          class="scp-compose-icon-btn"
           bind:this={emojiAnchor}
           on:click={() => { emojiOpen = !emojiOpen; stickerOpen = false; }}
           aria-label="Emoji picker"
@@ -545,7 +593,7 @@
           </svg>
         </button>
 
-        <!-- Sticker button -->
+        <!-- Sticker button — distinct star icon -->
         <button
           class="scp-compose-icon-btn"
           bind:this={stickerAnchor}
@@ -556,11 +604,7 @@
           type="button"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M8 13s1.5 2 4 2 4-2 4-2"/>
-            <line x1="9" y1="9" x2="9.01" y2="9"/>
-            <line x1="15" y1="9" x2="15.01" y2="9"/>
-            <path d="M12 2v2M12 20v2M2 12h2M20 12h2"/>
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
           </svg>
         </button>
 
@@ -603,7 +647,7 @@
       />
       <p class="scp-compose-hint">
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        Encrypted with your session PIN · {peerFirst} needs the same PIN to read
+        End-to-end encrypted
       </p>
     </div>
   {/if}
@@ -623,7 +667,6 @@
     align-items: center;
     justify-content: center;
     padding: 16px;
-    /* Mobile: bottom-sheet pattern */
   }
   @media (max-width: 767px) {
     .scp-backdrop {
@@ -650,7 +693,6 @@
       max-width: 100%;
       border-radius: 20px 20px 0 0;
       height: 88dvh;
-      /* Respect notch / home-bar on iOS */
       padding-bottom: env(safe-area-inset-bottom, 0px);
       animation: scp-slide-up 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
     }
@@ -661,11 +703,10 @@
     to   { transform: translateY(0);    }
   }
 
-  /* ── Drag handle (mobile only) ────────────────────────────── */
+  /* ── Drag handle ──────────────────────────────────────────── */
   .scp-drag-handle {
     display: none;
-    width: 36px;
-    height: 4px;
+    width: 36px; height: 4px;
     border-radius: 2px;
     background: rgba(255,255,255,0.18);
     margin: 10px auto 4px;
@@ -688,8 +729,7 @@
 
   .scp-header-lock {
     color: rgba(255,255,255,0.2);
-    display: flex;
-    align-items: center;
+    display: flex; align-items: center;
     flex-shrink: 0;
     transition: color 0.3s;
   }
@@ -698,43 +738,32 @@
   .scp-header-info { flex: 1; min-width: 0; }
 
   .scp-header-name-row {
-    display: flex;
-    align-items: center;
-    gap: 7px;
+    display: flex; align-items: center; gap: 7px;
   }
 
   .scp-header-name {
-    font-size: 14px;
-    font-weight: 600;
+    font-size: 14px; font-weight: 600;
     color: #e2e8f0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     font-family: system-ui, sans-serif;
     transition: opacity 0.25s;
   }
   .scp-header-name--hidden { opacity: 0.35; letter-spacing: 0.15em; }
 
   .scp-unread-badge {
-    min-width: 18px;
-    height: 18px;
+    min-width: 18px; height: 18px;
     padding: 0 5px;
     border-radius: 9px;
     background: #818cf8;
     color: #fff;
-    font-size: 10px;
-    font-weight: 700;
+    font-size: 10px; font-weight: 700;
     font-family: system-ui, sans-serif;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
   }
 
   .scp-header-sub {
-    display: flex;
-    align-items: center;
-    gap: 5px;
+    display: flex; align-items: center; gap: 5px;
     margin-top: 2px;
   }
 
@@ -770,21 +799,17 @@
   }
   .scp-icon-btn:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.7); }
 
-  /* ── Share pill ─────────────────────────────────────────────── */
-  .scp-share-pill {
-    display: flex;
-    align-items: center;
-    gap: 5px;
+  /* ── Invite pill ────────────────────────────────────────────── */
+  .scp-invite-pill {
+    display: flex; align-items: center; gap: 5px;
     padding: 0 12px 0 9px;
     height: 32px;
-    /* Ensure ≥44px touch area via margin compensation */
     min-height: 44px;
     border-radius: 20px;
     border: 1px solid rgba(129,140,248,0.28);
     background: rgba(129,140,248,0.09);
     color: rgba(129,140,248,0.9);
-    font-size: 12px;
-    font-weight: 600;
+    font-size: 12px; font-weight: 600;
     font-family: system-ui, sans-serif;
     cursor: pointer;
     flex-shrink: 0;
@@ -792,8 +817,8 @@
     transition: background 0.15s, border-color 0.15s, color 0.15s;
     touch-action: manipulation;
   }
-  .scp-share-pill:hover { background: rgba(129,140,248,0.16); border-color: rgba(129,140,248,0.45); }
-  .scp-share-pill--copied {
+  .scp-invite-pill:hover { background: rgba(129,140,248,0.16); border-color: rgba(129,140,248,0.45); }
+  .scp-invite-pill--copied {
     border-color: rgba(74,222,128,0.35);
     background: rgba(74,222,128,0.09);
     color: rgba(74,222,128,0.95);
@@ -806,9 +831,10 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 16px;
-    padding: 32px 28px;
+    gap: 20px;
+    padding: 24px 28px 32px;
     text-align: center;
+    background: radial-gradient(ellipse at 50% 30%, rgba(129,140,248,0.05) 0%, transparent 70%);
   }
 
   .scp-gate-ring {
@@ -818,7 +844,6 @@
     border: 1px solid rgba(129,140,248,0.18);
     display: flex; align-items: center; justify-content: center;
     color: rgba(129,140,248,0.7);
-    margin-bottom: 4px;
   }
 
   .scp-gate-text { display: flex; flex-direction: column; gap: 8px; }
@@ -838,26 +863,77 @@
     font-family: system-ui, sans-serif;
   }
 
-  .scp-pin-input {
-    width: 100%; max-width: 220px;
-    padding: 14px 16px;
-    border-radius: 14px;
-    border: 1px solid rgba(255,255,255,0.1);
-    background: rgba(255,255,255,0.04);
-    color: #e2e8f0;
-    font-size: 24px;
-    letter-spacing: 0.35em;
-    text-align: center;
-    outline: none;
-    font-variant-numeric: tabular-nums;
-    font-family: system-ui, monospace, sans-serif;
-    box-sizing: border-box;
-    transition: border-color 0.15s, box-shadow 0.15s;
-    -webkit-appearance: none;
+  /* ── PIN dot indicators ─────────────────────────────────────── */
+  .scp-pin-dots {
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+    height: 20px;
+    align-items: center;
   }
-  .scp-pin-input:focus {
-    border-color: rgba(129,140,248,0.5);
-    box-shadow: 0 0 0 3px rgba(129,140,248,0.1);
+
+  .scp-pin-dot {
+    width: 13px; height: 13px;
+    border-radius: 50%;
+    border: 2px solid rgba(129,140,248,0.3);
+    background: transparent;
+    transition: background 0.12s, border-color 0.12s, transform 0.1s;
+    flex-shrink: 0;
+  }
+
+  .scp-pin-dot--filled {
+    background: rgba(129,140,248,0.85);
+    border-color: rgba(129,140,248,0.85);
+    transform: scale(1.1);
+  }
+
+  /* ── Number pad ─────────────────────────────────────────────── */
+  .scp-numpad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    width: 100%;
+    max-width: 240px;
+  }
+
+  .scp-numpad-spacer { height: 52px; }
+
+  .scp-numpad-key {
+    height: 52px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.07);
+    background: rgba(255,255,255,0.05);
+    color: #e2e8f0;
+    font-size: 20px;
+    font-weight: 400;
+    cursor: pointer;
+    font-family: system-ui, sans-serif;
+    transition: background 0.1s, transform 0.08s;
+    touch-action: manipulation;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .scp-numpad-key:hover:not(:disabled) {
+    background: rgba(255,255,255,0.09);
+  }
+  .scp-numpad-key:active:not(:disabled) {
+    background: rgba(129,140,248,0.18);
+    transform: scale(0.94);
+  }
+  .scp-numpad-key:disabled { opacity: 0.25; cursor: not-allowed; }
+
+  .scp-numpad-key--back {
+    background: transparent;
+    border-color: transparent;
+    color: rgba(255,255,255,0.45);
+    font-size: 14px;
+  }
+  .scp-numpad-key--back:hover:not(:disabled) {
+    background: rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.7);
   }
 
   .scp-gate-error {
@@ -868,7 +944,7 @@
   }
 
   .scp-primary-btn {
-    width: 100%; max-width: 220px;
+    width: 100%; max-width: 240px;
     padding: 13px;
     border-radius: 13px;
     border: none;
@@ -878,7 +954,7 @@
     cursor: pointer;
     font-family: system-ui, sans-serif;
     min-height: 48px;
-    transition: background 0.15s;
+    transition: background 0.15s, opacity 0.15s;
     touch-action: manipulation;
   }
   .scp-primary-btn:hover:not(:disabled) { background: #818cf8; }
@@ -901,20 +977,30 @@
     flex: 1;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    gap: 8px;
-    color: rgba(255,255,255,0.18);
+    gap: 12px;
     padding: 40px 0;
     text-align: center;
   }
+
+  .scp-empty-ring {
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    background: rgba(129,140,248,0.07);
+    border: 1px solid rgba(129,140,248,0.14);
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(129,140,248,0.45);
+  }
+
   .scp-empty p { margin: 0; font-size: 14px; color: rgba(255,255,255,0.28); font-family: system-ui, sans-serif; }
-  .scp-empty span { font-size: 12px; font-family: system-ui, sans-serif; }
+  .scp-empty span { font-size: 12px; color: rgba(255,255,255,0.18); font-family: system-ui, sans-serif; }
 
   .scp-msg {
     display: flex; flex-direction: column;
     max-width: 78%;
-    gap: 3px;
+    gap: 2px;
     margin-bottom: 4px;
   }
+  .scp-msg--group-cont { margin-bottom: 1px; }
   .scp-msg--own { align-self: flex-end; align-items: flex-end; }
   .scp-msg--their { align-self: flex-start; align-items: flex-start; }
 
@@ -935,6 +1021,10 @@
     color: rgba(129,140,248,0.65);
     font-size: 12px; font-weight: 500;
   }
+  /* Grouped own: reduce top-right corner */
+  .scp-bubble--own.scp-bubble--grp-notfirst {
+    border-top-right-radius: 4px;
+  }
 
   .scp-bubble--their {
     background: rgba(255,255,255,0.07);
@@ -943,26 +1033,28 @@
     color: #e2e8f0;
     word-break: break-word;
   }
+  /* Grouped their: reduce top-left corner */
+  .scp-bubble--their.scp-bubble--grp-notfirst,
+  .scp-bubble--locked.scp-bubble--grp-notfirst {
+    border-top-left-radius: 4px;
+  }
 
   .scp-bubble--decrypted {
     position: relative;
-    padding-right: 30px; /* room for lock button */
+    padding-right: 30px;
   }
 
   .scp-relock-btn {
     position: absolute;
     top: 4px; right: 4px;
-    /* Visual size stays small; touch area expanded via padding (11px → 22+22=44px total) */
     width: 22px; height: 22px;
-    padding: 11px;
-    margin: -11px;
+    padding: 11px; margin: -11px;
     display: flex; align-items: center; justify-content: center;
     background: none; border: none; cursor: pointer;
     color: rgba(255,255,255,0.18);
     border-radius: 8px;
     transition: color 0.15s, background 0.15s;
     touch-action: manipulation;
-    /* Ensure bubble can fit the expanded hit-area */
     box-sizing: content-box;
   }
   .scp-relock-btn:hover { color: rgba(129,140,248,0.7); background: rgba(129,140,248,0.08); }
@@ -998,7 +1090,6 @@
     white-space: nowrap;
   }
 
-  /* Glowing pulse dot on locked unread bubbles */
   .scp-pulse {
     width: 7px; height: 7px;
     border-radius: 50%;
@@ -1010,7 +1101,6 @@
 
   .scp-body { margin: 0; }
 
-  /* Meta row (time + ticks) */
   .scp-meta {
     display: flex; align-items: center; gap: 4px;
     padding: 0 2px;
@@ -1028,7 +1118,6 @@
     font-weight: 500;
   }
 
-  /* Small dot beside time for unread decrypted messages */
   .scp-unread-dot {
     width: 5px; height: 5px;
     border-radius: 50%;
@@ -1043,24 +1132,19 @@
 
   /* ── Inline decrypt ────────────────────────────────────────── */
   .scp-inline-decrypt {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    display: flex; align-items: center; gap: 8px;
     flex-wrap: nowrap;
     margin-top: 4px;
     padding: 8px 10px;
     background: rgba(129,140,248,0.06);
     border: 1px solid rgba(129,140,248,0.14);
     border-radius: 12px;
-    /* Fill the message bubble width, never overflow */
-    width: 100%;
-    max-width: 100%;
+    width: 100%; max-width: 100%;
     box-sizing: border-box;
   }
 
   .scp-inline-pin {
-    flex: 1;
-    min-width: 0;
+    flex: 1; min-width: 0;
     padding: 10px 10px;
     border-radius: 8px;
     border: 1px solid rgba(255,255,255,0.1);
@@ -1073,13 +1157,11 @@
     font-variant-numeric: tabular-nums;
     font-family: system-ui, monospace, sans-serif;
     -webkit-appearance: none;
-    /* 44px minimum touch height */
     min-height: 44px;
     transition: border-color 0.15s;
     touch-action: manipulation;
   }
   .scp-inline-pin:focus { border-color: rgba(129,140,248,0.5); }
-  /* Prevent iOS zoom on focus */
   @media (max-width: 767px) {
     .scp-inline-pin { font-size: 18px; }
   }
@@ -1093,7 +1175,6 @@
     font-size: 13px; font-weight: 600;
     cursor: pointer;
     font-family: system-ui, sans-serif;
-    /* 44px touch target */
     min-height: 44px;
     flex-shrink: 0;
     transition: background 0.15s;
@@ -1121,8 +1202,7 @@
   }
 
   .scp-compose-inner {
-    display: flex; align-items: flex-end;
-    gap: 8px;
+    display: flex; align-items: flex-end; gap: 8px;
   }
 
   /* Panic overlay */
@@ -1133,20 +1213,6 @@
     z-index: 99999;
     cursor: default;
   }
-
-  .scp-emoji-btn {
-    width: 36px; height: 36px;
-    min-width: 44px; min-height: 44px;
-    display: flex; align-items: center; justify-content: center;
-    background: none; border: none;
-    color: rgba(255,255,255,0.3);
-    cursor: pointer;
-    border-radius: 10px;
-    flex-shrink: 0;
-    transition: color 0.15s, background 0.15s;
-    touch-action: manipulation;
-  }
-  .scp-emoji-btn:hover { color: rgba(255,255,255,0.65); background: rgba(255,255,255,0.06); }
 
   .scp-compose-icon-btn {
     width: 36px; height: 36px;
@@ -1162,9 +1228,12 @@
   }
   .scp-compose-icon-btn:hover { color: rgba(255,255,255,0.65); background: rgba(255,255,255,0.06); }
 
+  /* Panic button extra subtle */
+  .scp-compose-icon-btn--panic { color: rgba(255,255,255,0.18); }
+  .scp-compose-icon-btn--panic:hover { color: rgba(248,113,113,0.6); background: rgba(248,113,113,0.06); }
+
   :global(.msg-sticker) {
-    max-width: 120px;
-    max-height: 120px;
+    max-width: 120px; max-height: 120px;
     border-radius: 8px;
     display: block;
   }
@@ -1177,8 +1246,7 @@
     border: 1px solid rgba(255,255,255,0.09);
     background: rgba(255,255,255,0.04);
     color: #e2e8f0;
-    font-size: 14px;
-    line-height: 1.5;
+    font-size: 14px; line-height: 1.5;
     outline: none;
     font-family: system-ui, sans-serif;
     transition: border-color 0.15s;
@@ -1187,7 +1255,6 @@
     max-height: 120px;
     overflow-y: auto;
   }
-  /* Prevent iOS from zooming in when textarea is focused */
   @media (max-width: 767px) {
     .scp-compose-text { font-size: 16px; }
   }

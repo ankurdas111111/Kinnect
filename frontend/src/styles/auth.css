@@ -7,7 +7,7 @@
 :root {
   --auth-page-bg: #070c0f;
   --auth-page-text: #ffffff;
-  --auth-page-text-muted: rgba(255, 255, 255, 0.50);
+  --auth-page-text-muted: rgba(255, 255, 255, 0.62);
   --auth-card-bg: rgba(8, 14, 24, 0.65);
   --auth-input-bg: rgba(255, 255, 255, 0.06);
   --auth-input-text: #ffffff;
@@ -79,9 +79,9 @@
   border-radius: 50%;
   background: radial-gradient(
     circle at center,
-    rgba(20, 184, 166, 0.13) 0%,
-    rgba(13, 148, 136, 0.09) 35%,
-    rgba(16, 185, 129, 0.04) 60%,
+    rgba(20, 184, 166, 0.20) 0%,
+    rgba(13, 148, 136, 0.14) 35%,
+    rgba(16, 185, 129, 0.07) 60%,
     transparent 75%
   );
   top: -200px;
@@ -321,7 +321,8 @@
     transform 300ms var(--ease-out);
 }
 
-.auth-card:hover {
+/* Only lift when not actively filling a form — prevents jarring motion mid-type */
+.auth-card:hover:not(:focus-within) {
   box-shadow:
     0 40px 100px rgba(0, 0, 0, 0.55),
     0 16px 32px rgba(0, 0, 0, 0.35),
@@ -337,17 +338,19 @@
   content: '';
   position: absolute;
   top: 0;
-  left: 10%;
-  right: 10%;
-  height: 1px;
+  left: 8%;
+  right: 8%;
+  height: 2px;
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(20, 184, 166, 0.70) 30%,
-    rgba(13, 148, 136, 0.55) 60%,
+    rgba(20, 184, 166, 0.90) 25%,
+    rgba(16, 185, 129, 0.80) 50%,
+    rgba(13, 148, 136, 0.70) 75%,
     transparent 100%
   );
-  border-radius: 0 0 2px 2px;
+  border-radius: 0 0 3px 3px;
+  box-shadow: 0 0 12px rgba(20, 184, 166, 0.50), 0 0 4px rgba(20, 184, 166, 0.30);
 }
 
 @media (max-width: 480px) {
@@ -507,11 +510,12 @@
 
 .auth-toggle-btn.active {
   color: #ffffff;
-  background: rgba(20, 184, 166, 0.28);
+  background: rgba(20, 184, 166, 0.38);
+  border: 1px solid rgba(20, 184, 166, 0.45);
   box-shadow:
-    0 2px 8px rgba(20, 184, 166, 0.22),
+    0 2px 12px rgba(20, 184, 166, 0.30),
     0 1px 3px rgba(0, 0, 0, 0.20),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
 .auth-toggle-btn:not(.active):hover {
@@ -564,7 +568,7 @@
   border-radius: var(--radius-md);
   background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-700) 100%);
   color: #ffffff;
-  font-family: var(--font-sans);
+  font-family: var(--font-display);
   font-size: var(--text-base);
   font-weight: 700;
   letter-spacing: 0.01em;
@@ -581,6 +585,28 @@
     transform 200ms var(--ease-out),
     box-shadow 200ms var(--ease-out);
   min-height: 48px;
+}
+
+/* Shimmer sweep — slides right on hover */
+.auth-submit::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(
+    105deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.18) 50%,
+    transparent 80%
+  );
+  transition: left 450ms var(--ease-out);
+  pointer-events: none;
+}
+
+.auth-submit:hover::after {
+  left: 150%;
 }
 
 .auth-submit:hover {

@@ -188,7 +188,7 @@
     bottom: calc(52px + var(--space-4, 16px) * 2 + 4px);
     z-index: calc(var(--z-panel, 100) + 1);
     width: min(300px, calc(100vw - 96px));
-    border-radius: 18px;
+    border-radius: var(--radius-xl);
     overflow: hidden;
     /* urgent red glass */
     background: rgba(10, 4, 4, 0.88);
@@ -199,6 +199,31 @@
       inset 0 1px 0 rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(24px) saturate(1.4);
     -webkit-backdrop-filter: blur(24px) saturate(1.4);
+    animation: sf-mount-glow 1.2s var(--ease-out) both;
+  }
+
+  @keyframes sf-mount-glow {
+    0%   {
+      box-shadow:
+        0 0 0 0 rgba(239, 68, 68, 0),
+        0 8px 32px rgba(239, 68, 68, 0.22),
+        0 2px 8px rgba(0, 0, 0, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+    30%  {
+      box-shadow:
+        0 0 0 6px rgba(239, 68, 68, 0.18),
+        0 8px 48px rgba(239, 68, 68, 0.50),
+        0 2px 8px rgba(0, 0, 0, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+    100% {
+      box-shadow:
+        0 0 0 0 rgba(239, 68, 68, 0),
+        0 8px 32px rgba(239, 68, 68, 0.22),
+        0 2px 8px rgba(0, 0, 0, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
   }
 
   /* Mobile: shift higher (above bottom tab + SOS FAB) */
@@ -231,7 +256,7 @@
     cursor: pointer;
     text-align: left;
     -webkit-tap-highlight-color: transparent;
-    transition: background 150ms ease;
+    transition: background var(--duration-fast) var(--ease-out);
   }
   .sf-pill:hover { background: rgba(239, 68, 68, 0.14); }
 
@@ -308,7 +333,7 @@
     color: rgba(255, 255, 255, 0.35);
     display: flex;
     align-items: center;
-    transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+    transition: transform var(--duration-normal) var(--ease-spring);
   }
   .sf-chevron-open { transform: rotate(180deg); }
 
@@ -447,7 +472,9 @@
     font-weight: 700;
     text-decoration: none;
     white-space: nowrap;
-    transition: background 150ms ease, transform 100ms ease;
+    transition:
+      background var(--duration-fast) var(--ease-out),
+      transform var(--duration-fast) var(--ease-spring);
     -webkit-tap-highlight-color: transparent;
   }
   .sf-call-btn:hover {

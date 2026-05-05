@@ -14,7 +14,11 @@
   // 'loading' | 'gate' | 'messages' | 'error'
   let state = 'loading';
   let errorMsg = '';
-  let pin = '';
+
+  // PIN pad state
+  let pinDigits = [];
+  $: pin = pinDigits.join('');
+
   let pinError = '';
   let rawMessages = [];
   let decrypted = [];
@@ -35,9 +39,8 @@
 
   function restoreFromPanic() {
     panicMode = false;
-    // Re-lock to gate — PIN required again
     state = 'gate';
-    pin = '';
+    pinDigits = [];
     pinError = '';
     gatePin = '';
     decrypted = [];
@@ -50,7 +53,18 @@
     lockCountdowns = {};
   }
 
-  // Per-message inline decrypt (messages locked by default after gate)
+  // PIN pad helpers
+  function addPinDigit(d) {
+    if (pinDigits.length >= 8 || unlocking) return;
+    pinDigits = [...pinDigits, d];
+  }
+
+  function removePinDigit() {
+    if (!pinDigits.length) return;
+    pinDigits = pinDigits.slice(0, -1);
+  }
+
+  // Per-message inline decrypt
   let activeDecryptId = null;
   let inlinePins = {};
   let inlineErrors = {};
@@ -88,25 +102,35 @@
     pinError = '';
     unlocking = true;
 
-    // Gate PIN = reply encryption key only.
-    // All received messages stay locked — tap each one to enter PIN and read.
-    const results = [];
-    for (const m of rawMessages) {
-      if (!m.fromOwner) {
-        results.push({ id: m.createdAt + Math.random(), body: null, own: true, createdAt: m.createdAt });
-      } else {
-        results.push({ id: m.createdAt + Math.random(), body: null, own: false, createdAt: m.createdAt, raw: m });
-      }
-    }
+    const results = rawMessages.map(m => ({
+      id: m.createdAt + Math.random(),
+      body: null,
+      own: !m.fromOwner,
+      createdAt: m.createdAt,
+      raw: m.fromOwner ? m : null,
+    }));
     decrypted = results;
     gatePin = pin;
+    pinDigits = [];
     unlocking = false;
     state = 'messages';
     await tick();
     if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 
-  // ── Per-message inline decrypt (mirrors SecretChatPanel) ──────────
+  // Message grouping for decrypted list
+  $: groupedDecrypted = decrypted.map((msg, i) => {
+    const prev = decrypted[i - 1];
+    const next = decrypted[i + 1];
+    const GAP = 2 * 60 * 1000;
+    const samePrev = prev && prev.own === msg.own &&
+      new Date(msg.createdAt) - new Date(prev.createdAt) < GAP;
+    const sameNext = next && next.own === msg.own &&
+      new Date(next.createdAt) - new Date(msg.createdAt) < GAP;
+    return { ...msg, groupFirst: !samePrev, groupLast: !sameNext };
+  });
+
+  // ── Per-message inline decrypt ────────────────────────────────
   function toggleInline(id) {
     activeDecryptId = activeDecryptId === id ? null : id;
     inlinePins = { ...inlinePins, [id]: '' };
@@ -160,7 +184,7 @@
     decrypted = decrypted.map(m => m.id === id ? { ...m, body: null } : m);
   }
 
-  // ── Reply (uses gate PIN) ─────────────────────────────────────────
+  // ── Reply ─────────────────────────────────────────────────────
   async function sendReply() {
     if (sending || !replyText.trim() || gatePin.length < 4) return;
     replyError = '';
@@ -189,9 +213,7 @@
     }
   }
 
-  function handlePinKeydown(e) { if (e.key === 'Enter') unlock(); }
   function handleReplyKeydown(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply(); } }
-  function digitsOnly(e) { pin = e.target.value.replace(/\D/g, ''); }
 
   function clockTime(ts) {
     if (!ts) return '';
@@ -238,36 +260,74 @@
       <p class="scv-err-txt">{errorMsg}</p>
     </div>
 
-  <!-- ── Gate — decoy: looks like a generic access screen ────────── -->
+  <!-- ── Gate — deliberately neutral, no chat references ─────────── -->
   {:else if state === 'gate'}
     <div class="scv-gate">
-      <div class="scv-gate-icon" aria-hidden="true">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
-        </svg>
+      <!-- Subtle ambient glow -->
+      <div class="scv-gate-glow" aria-hidden="true"></div>
+
+      <div class="scv-gate-content">
+        <div class="scv-gate-icon" aria-hidden="true">
+          <!-- Neutral: key/access icon, no "chat" hint -->
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+          </svg>
+        </div>
+
+        <p class="scv-gate-label">Enter access code</p>
+
+        <!-- PIN dot indicators -->
+        <div class="scv-pin-dots" aria-live="polite" aria-label="{pinDigits.length} digit{pinDigits.length === 1 ? '' : 's'} entered">
+          {#each {length: Math.max(4, pinDigits.length)} as _, i}
+            <div class="scv-pin-dot" class:scv-pin-dot--filled={i < pinDigits.length}></div>
+          {/each}
+        </div>
+
+        {#if pinError}
+          <p class="scv-gate-err" role="alert">{pinError}</p>
+        {/if}
+
+        <!-- Number pad -->
+        <div class="scv-numpad" role="group" aria-label="PIN keypad">
+          {#each [1,2,3,4,5,6,7,8,9] as d}
+            <button
+              class="scv-numpad-key"
+              on:click={() => addPinDigit(String(d))}
+              type="button"
+              disabled={unlocking}
+              aria-label={String(d)}
+            >{d}</button>
+          {/each}
+          <div class="scv-numpad-spacer" aria-hidden="true"></div>
+          <button
+            class="scv-numpad-key"
+            on:click={() => addPinDigit('0')}
+            type="button"
+            disabled={unlocking}
+            aria-label="0"
+          >0</button>
+          <button
+            class="scv-numpad-key scv-numpad-key--back"
+            on:click={removePinDigit}
+            type="button"
+            disabled={unlocking || pinDigits.length === 0}
+            aria-label="Backspace"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/>
+              <line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/>
+            </svg>
+          </button>
+        </div>
+
+        <button
+          class="scv-gate-btn"
+          on:click={unlock}
+          disabled={unlocking || pin.length < 4}
+        >
+          {unlocking ? '…' : 'Continue'}
+        </button>
       </div>
-      <label class="scv-sr" for="scv-pin">Access code</label>
-      <input
-        id="scv-pin"
-        class="scv-gate-pin"
-        type="tel"
-        inputmode="numeric"
-        pattern="[0-9]*"
-        maxlength="8"
-        placeholder="• • • •"
-        bind:value={pin}
-        on:input={digitsOnly}
-        on:keydown={handlePinKeydown}
-        disabled={unlocking}
-        autocomplete="off"
-        autofocus
-      />
-      {#if pinError}
-        <p class="scv-gate-err" role="alert">{pinError}</p>
-      {/if}
-      <button class="scv-gate-btn" on:click={unlock} disabled={unlocking || pin.length < 4}>
-        {unlocking ? '…' : 'Continue'}
-      </button>
     </div>
 
   <!-- ── Messages ─────────────────────────────────────────────────── -->
@@ -284,34 +344,63 @@
           <span class="scv-header-sub">End-to-end encrypted</span>
         </div>
         <span class="scv-e2e-badge">E2E</span>
+        <!-- Quick panic from header -->
+        <button
+          class="scv-header-panic"
+          on:click={() => panicMode = true}
+          aria-label="Blank screen"
+          title="Blank screen"
+          type="button"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+            <line x1="1" y1="1" x2="23" y2="23"/>
+          </svg>
+        </button>
       </div>
 
       <div class="scv-msgs" bind:this={messagesEl}>
-        {#if decrypted.length === 0}
+        {#if groupedDecrypted.length === 0}
           <div class="scv-empty">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <div class="scv-empty-ring" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+            </div>
             <p>No messages yet</p>
             <span>Send a reply below</span>
           </div>
         {/if}
 
-        {#each decrypted as msg (msg.id)}
+        {#each groupedDecrypted as msg (msg.id)}
           {@const showInline = activeDecryptId === msg.id}
           {@const isDecrypted = !msg.own && msg.body !== null && !lockedSet.has(msg.id)}
 
-          <div class="scv-msg" class:scv-msg--own={msg.own} class:scv-msg--their={!msg.own}>
+          <div
+            class="scv-msg"
+            class:scv-msg--own={msg.own}
+            class:scv-msg--their={!msg.own}
+            class:scv-msg--group-cont={!msg.groupLast}
+          >
 
             {#if msg.own}
-              <!-- Sent reply — opaque, can't decrypt own -->
-              <div class="scv-bubble scv-bubble--own">
+              <div
+                class="scv-bubble scv-bubble--own"
+                class:scv-bubble--grp-notfirst={!msg.groupFirst}
+              >
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                 <span>Sent · encrypted</span>
               </div>
-              <span class="scv-time">{clockTime(msg.createdAt)}</span>
+              {#if msg.groupLast}
+                <span class="scv-time">{clockTime(msg.createdAt)}</span>
+              {/if}
 
             {:else if isDecrypted}
-              <!-- Received + decrypted -->
-              <div class="scv-bubble scv-bubble--their scv-bubble--decrypted">
+              <div
+                class="scv-bubble scv-bubble--their scv-bubble--decrypted"
+                class:scv-bubble--grp-notfirst={!msg.groupFirst}
+              >
                 {#if parseGif(msg.body)}
                   <img src={parseGif(msg.body)} class="msg-sticker" alt="sticker" loading="lazy" />
                 {:else}
@@ -321,19 +410,21 @@
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                 </button>
               </div>
-              <div class="scv-meta">
-                {#if lockCountdowns[msg.id] != null}
-                  <span class="scv-countdown">Locks in {lockCountdowns[msg.id]}s</span>
-                {:else}
-                  <span class="scv-time">{clockTime(msg.createdAt)}</span>
-                {/if}
-              </div>
+              {#if msg.groupLast}
+                <div class="scv-meta">
+                  {#if lockCountdowns[msg.id] != null}
+                    <span class="scv-countdown">Locks in {lockCountdowns[msg.id]}s</span>
+                  {:else}
+                    <span class="scv-time">{clockTime(msg.createdAt)}</span>
+                  {/if}
+                </div>
+              {/if}
 
             {:else}
-              <!-- Received + locked -->
               <button
                 class="scv-bubble scv-bubble--locked"
                 class:scv-bubble--locked-active={showInline}
+                class:scv-bubble--grp-notfirst={!msg.groupFirst}
                 on:click={() => toggleInline(msg.id)}
                 aria-expanded={showInline}
                 aria-label="Tap to enter PIN and decrypt"
@@ -353,7 +444,7 @@
                     inputmode="numeric"
                     pattern="[0-9]*"
                     maxlength="8"
-                    placeholder="PIN"
+                    placeholder="Sender's PIN"
                     value={inlinePins[msg.id] ?? ''}
                     on:input={(e) => inlinePinInput(e, msg.id)}
                     on:keydown={(e) => e.key === 'Enter' && decryptOne(msg)}
@@ -374,7 +465,9 @@
                 </div>
               {/if}
 
-              <span class="scv-time">{clockTime(msg.createdAt)}</span>
+              {#if msg.groupLast}
+                <span class="scv-time">{clockTime(msg.createdAt)}</span>
+              {/if}
             {/if}
           </div>
         {/each}
@@ -390,23 +483,8 @@
       <!-- Compose -->
       <div class="scv-compose">
         <div class="scv-compose-inner">
-          <!-- Panic / blank button -->
           <button
             class="scv-compose-icon-btn"
-            on:click={() => panicMode = true}
-            aria-label="Blank screen"
-            title="Blank screen (tap screen to restore)"
-            type="button"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-              <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-              <line x1="1" y1="1" x2="23" y2="23"/>
-            </svg>
-          </button>
-
-          <button
-            class="scv-emoji-btn"
             bind:this={emojiAnchor}
             on:click={() => { emojiOpen = !emojiOpen; stickerOpen = false; }}
             aria-label="Emoji picker"
@@ -420,7 +498,7 @@
             </svg>
           </button>
 
-          <!-- Sticker button -->
+          <!-- Sticker button — distinct star icon -->
           <button
             class="scv-compose-icon-btn"
             bind:this={stickerAnchor}
@@ -431,11 +509,7 @@
             type="button"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="10"/>
-              <path d="M8 13s1.5 2 4 2 4-2 4-2"/>
-              <line x1="9" y1="9" x2="9.01" y2="9"/>
-              <line x1="15" y1="9" x2="15.01" y2="9"/>
-              <path d="M12 2v2M12 20v2M2 12h2M20 12h2"/>
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
             </svg>
           </button>
 
@@ -481,7 +555,7 @@
         {/if}
         <p class="scv-compose-hint">
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          Encrypted with your PIN · share PIN separately
+          End-to-end encrypted
         </p>
       </div>
     </div>
@@ -495,7 +569,6 @@
     align-items: center;
     justify-content: center;
     background: #0d0d14;
-    padding: 16px;
     box-sizing: border-box;
     font-family: system-ui, sans-serif;
   }
@@ -506,90 +579,250 @@
   .scv-icon-ring--err { width: 52px; height: 52px; border-radius: 50%; background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.2); display: flex; align-items: center; justify-content: center; color: #f87171; }
   .scv-err-txt { color: rgba(255,255,255,0.45); font-size: 14px; text-align: center; margin: 0; max-width: 240px; }
 
-  /* ── Gate — deliberately neutral, no chat hints ────────────────── */
+  /* ── Gate — full-screen, atmospheric, deliberately neutral ─────── */
   .scv-gate {
+    position: relative;
+    width: 100%;
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  /* Subtle ambient glow — makes page feel intentional, not broken */
+  .scv-gate-glow {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 40% at 50% 35%, rgba(129,140,248,0.06) 0%, transparent 70%),
+      radial-gradient(ellipse 40% 30% at 70% 70%, rgba(99,102,241,0.04) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  .scv-gate-content {
+    position: relative;
+    z-index: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 16px;
+    gap: 20px;
     width: 100%;
     max-width: 280px;
+    padding: 32px 16px;
   }
+
   .scv-gate-icon {
-    width: 52px; height: 52px;
+    width: 56px; height: 56px;
     border-radius: 50%;
     background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.09);
     display: flex; align-items: center; justify-content: center;
-    color: rgba(255,255,255,0.2);
-    margin-bottom: 8px;
+    color: rgba(255,255,255,0.25);
   }
-  .scv-gate-pin {
+
+  .scv-gate-label {
+    margin: 0;
+    font-size: 13px;
+    color: rgba(255,255,255,0.3);
+    letter-spacing: 0.04em;
+    font-family: system-ui, sans-serif;
+  }
+
+  /* ── PIN dots (viewer) ──────────────────────────────────────────── */
+  .scv-pin-dots {
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+    height: 20px;
+    align-items: center;
+  }
+
+  .scv-pin-dot {
+    width: 13px; height: 13px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.18);
+    background: transparent;
+    transition: background 0.12s, border-color 0.12s, transform 0.1s;
+    flex-shrink: 0;
+  }
+
+  .scv-pin-dot--filled {
+    background: rgba(255,255,255,0.5);
+    border-color: rgba(255,255,255,0.5);
+    transform: scale(1.1);
+  }
+
+  /* ── Number pad (viewer) ────────────────────────────────────────── */
+  .scv-numpad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
     width: 100%;
-    padding: 14px 16px;
-    border-radius: 14px;
-    border: 1px solid rgba(255,255,255,0.1);
-    background: rgba(255,255,255,0.04);
-    color: #e2e8f0;
-    font-size: 26px;
-    letter-spacing: 0.35em;
-    text-align: center;
-    outline: none;
-    font-variant-numeric: tabular-nums;
-    font-family: system-ui, monospace, sans-serif;
-    box-sizing: border-box;
-    -webkit-appearance: none;
-    transition: border-color 0.15s;
+    max-width: 240px;
   }
-  .scv-gate-pin:focus { border-color: rgba(129,140,248,0.4); }
+
+  .scv-numpad-spacer { height: 52px; }
+
+  .scv-numpad-key {
+    height: 52px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.07);
+    background: rgba(255,255,255,0.04);
+    color: rgba(255,255,255,0.7);
+    font-size: 20px;
+    font-weight: 400;
+    cursor: pointer;
+    font-family: system-ui, sans-serif;
+    transition: background 0.1s, transform 0.08s;
+    touch-action: manipulation;
+    display: flex; align-items: center; justify-content: center;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .scv-numpad-key:hover:not(:disabled) { background: rgba(255,255,255,0.08); }
+  .scv-numpad-key:active:not(:disabled) { background: rgba(255,255,255,0.12); transform: scale(0.94); }
+  .scv-numpad-key:disabled { opacity: 0.25; cursor: not-allowed; }
+
+  .scv-numpad-key--back {
+    background: transparent;
+    border-color: transparent;
+    color: rgba(255,255,255,0.35);
+  }
+  .scv-numpad-key--back:hover:not(:disabled) { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.6); }
+
   .scv-gate-err { color: #f87171; font-size: 12px; margin: 0; }
+
   .scv-gate-btn {
     width: 100%;
     padding: 13px;
     border-radius: 13px;
-    border: none;
-    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.06);
     color: rgba(255,255,255,0.6);
     font-size: 14px; font-weight: 500;
     cursor: pointer;
     min-height: 48px;
-    transition: background 0.15s, color 0.15s;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
     touch-action: manipulation;
   }
-  .scv-gate-btn:hover:not(:disabled) { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.85); }
+  .scv-gate-btn:hover:not(:disabled) { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.85); border-color: rgba(255,255,255,0.18); }
   .scv-gate-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
   /* ── Messages view ─────────────────────────────────────────────── */
   .scv-view { width: 100%; max-width: 500px; height: 100dvh; display: flex; flex-direction: column; background: #0d0d14; }
 
-  .scv-header { display: flex; align-items: center; gap: 10px; padding: 13px 16px; background: rgba(255,255,255,0.025); border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0; }
+  .scv-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 13px 12px 13px 16px;
+    background: rgba(255,255,255,0.025);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    flex-shrink: 0;
+  }
   .scv-header-lock { color: rgba(129,140,248,0.65); display: flex; align-items: center; flex-shrink: 0; }
   .scv-header-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   .scv-header-title { font-size: 14px; font-weight: 600; color: #e2e8f0; }
   .scv-header-sub { font-size: 11px; color: rgba(255,255,255,0.35); }
   .scv-e2e-badge { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(129,140,248,0.6); background: rgba(129,140,248,0.08); border: 1px solid rgba(129,140,248,0.15); padding: 2px 7px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; }
 
+  .scv-header-panic {
+    width: 36px; height: 36px;
+    min-width: 44px; min-height: 44px;
+    display: flex; align-items: center; justify-content: center;
+    background: none; border: none;
+    color: rgba(255,255,255,0.18);
+    cursor: pointer;
+    border-radius: 8px;
+    flex-shrink: 0;
+    transition: color 0.15s, background 0.15s;
+    touch-action: manipulation;
+  }
+  .scv-header-panic:hover { color: rgba(248,113,113,0.55); background: rgba(248,113,113,0.06); }
+
   .scv-msgs { flex: 1; overflow-y: auto; padding: 14px 14px 10px; display: flex; flex-direction: column; gap: 4px; overscroll-behavior: contain; }
   .scv-msgs::-webkit-scrollbar { width: 3px; }
   .scv-msgs::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
 
-  .scv-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: rgba(255,255,255,0.18); padding: 40px 0; text-align: center; }
-  .scv-empty p { margin: 0; font-size: 14px; color: rgba(255,255,255,0.28); }
-  .scv-empty span { font-size: 12px; }
+  .scv-empty {
+    flex: 1;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 12px;
+    padding: 40px 0;
+    text-align: center;
+  }
 
-  .scv-msg { display: flex; flex-direction: column; max-width: 78%; gap: 3px; margin-bottom: 4px; }
+  .scv-empty-ring {
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    background: rgba(129,140,248,0.07);
+    border: 1px solid rgba(129,140,248,0.14);
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(129,140,248,0.45);
+  }
+
+  .scv-empty p { margin: 0; font-size: 14px; color: rgba(255,255,255,0.28); }
+  .scv-empty span { font-size: 12px; color: rgba(255,255,255,0.18); }
+
+  /* ── Message rows ──────────────────────────────────────────────── */
+  .scv-msg { display: flex; flex-direction: column; max-width: 78%; gap: 2px; margin-bottom: 4px; }
+  .scv-msg--group-cont { margin-bottom: 1px; }
   .scv-msg--own { align-self: flex-end; align-items: flex-end; }
   .scv-msg--their { align-self: flex-start; align-items: flex-start; }
 
   .scv-bubble { padding: 9px 13px; border-radius: 16px; font-size: 14px; line-height: 1.55; }
-  .scv-bubble--own { display: flex; align-items: center; gap: 7px; background: rgba(129,140,248,0.13); border: 1px solid rgba(129,140,248,0.18); border-bottom-right-radius: 4px; color: rgba(129,140,248,0.65); font-size: 12px; font-weight: 500; }
-  .scv-bubble--their { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.06); border-bottom-left-radius: 4px; color: #e2e8f0; word-break: break-word; }
+  .scv-bubble--own {
+    display: flex; align-items: center; gap: 7px;
+    background: rgba(129,140,248,0.13);
+    border: 1px solid rgba(129,140,248,0.18);
+    border-bottom-right-radius: 4px;
+    color: rgba(129,140,248,0.65);
+    font-size: 12px; font-weight: 500;
+  }
+  .scv-bubble--own.scv-bubble--grp-notfirst { border-top-right-radius: 4px; }
+
+  .scv-bubble--their {
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-bottom-left-radius: 4px;
+    color: #e2e8f0;
+    word-break: break-word;
+  }
+  .scv-bubble--their.scv-bubble--grp-notfirst,
+  .scv-bubble--locked.scv-bubble--grp-notfirst {
+    border-top-left-radius: 4px;
+  }
+
   .scv-bubble--decrypted { position: relative; padding-right: 30px; }
-  .scv-bubble--locked { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.04); border: 1px dashed rgba(255,255,255,0.1); border-bottom-left-radius: 4px; color: rgba(255,255,255,0.3); font-size: 13px; cursor: pointer; min-height: 44px; position: relative; touch-action: manipulation; transition: background 0.15s, border-color 0.15s; }
+
+  .scv-bubble--locked {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,0.04);
+    border: 1px dashed rgba(255,255,255,0.1);
+    border-bottom-left-radius: 4px;
+    color: rgba(255,255,255,0.3);
+    font-size: 13px;
+    cursor: pointer;
+    min-height: 44px;
+    position: relative;
+    touch-action: manipulation;
+    transition: background 0.15s, border-color 0.15s;
+  }
   .scv-bubble--locked:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.18); }
   .scv-bubble--locked-active { border-color: rgba(129,140,248,0.35); background: rgba(129,140,248,0.06); }
 
-  .scv-relock-btn { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; padding: 11px; margin: -11px; display: flex; align-items: center; justify-content: center; background: none; border: none; cursor: pointer; color: rgba(255,255,255,0.18); border-radius: 8px; touch-action: manipulation; box-sizing: content-box; }
+  .scv-relock-btn {
+    position: absolute; top: 4px; right: 4px;
+    width: 22px; height: 22px;
+    padding: 11px; margin: -11px;
+    display: flex; align-items: center; justify-content: center;
+    background: none; border: none; cursor: pointer;
+    color: rgba(255,255,255,0.18);
+    border-radius: 8px;
+    touch-action: manipulation;
+    box-sizing: content-box;
+    transition: color 0.15s;
+  }
   .scv-relock-btn:hover { color: rgba(129,140,248,0.7); }
 
   .scv-body { margin: 0; }
@@ -599,47 +832,126 @@
   .scv-countdown { font-size: 10px; color: rgba(129,140,248,0.5); font-variant-numeric: tabular-nums; padding: 0 2px; }
 
   /* Inline decrypt */
-  .scv-inline-decrypt { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; margin-top: 4px; padding: 8px 10px; background: rgba(129,140,248,0.06); border: 1px solid rgba(129,140,248,0.14); border-radius: 12px; width: 100%; max-width: 100%; box-sizing: border-box; }
-  .scv-inline-pin { flex: 1; min-width: 0; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.3); color: #e2e8f0; font-size: 16px; letter-spacing: 0.25em; text-align: center; outline: none; -webkit-appearance: none; min-height: 44px; touch-action: manipulation; }
+  .scv-inline-decrypt {
+    display: flex; align-items: center; gap: 8px; flex-wrap: nowrap;
+    margin-top: 4px;
+    padding: 8px 10px;
+    background: rgba(129,140,248,0.06);
+    border: 1px solid rgba(129,140,248,0.14);
+    border-radius: 12px;
+    width: 100%; max-width: 100%;
+    box-sizing: border-box;
+  }
+  .scv-inline-pin {
+    flex: 1; min-width: 0;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(0,0,0,0.3);
+    color: #e2e8f0;
+    font-size: 16px;
+    letter-spacing: 0.25em;
+    text-align: center;
+    outline: none;
+    -webkit-appearance: none;
+    min-height: 44px;
+    touch-action: manipulation;
+    transition: border-color 0.15s;
+  }
   .scv-inline-pin:focus { border-color: rgba(129,140,248,0.5); }
-  .scv-inline-btn { padding: 10px 16px; border-radius: 8px; border: none; background: rgba(129,140,248,0.75); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; min-height: 44px; flex-shrink: 0; white-space: nowrap; touch-action: manipulation; }
+  @media (max-width: 767px) { .scv-inline-pin { font-size: 18px; } }
+  .scv-inline-btn {
+    padding: 10px 16px;
+    border-radius: 8px; border: none;
+    background: rgba(129,140,248,0.75);
+    color: #fff;
+    font-size: 13px; font-weight: 600;
+    cursor: pointer;
+    min-height: 44px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    touch-action: manipulation;
+    transition: background 0.15s;
+  }
+  .scv-inline-btn:hover:not(:disabled) { background: #818cf8; }
   .scv-inline-btn:disabled { opacity: 0.3; cursor: not-allowed; }
   .scv-inline-err { font-size: 11px; color: #f87171; width: 100%; }
 
   .scv-sent-notice { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #4ade80; align-self: center; margin-top: 4px; }
 
   /* Compose */
-  .scv-compose { padding: 10px 14px 14px; border-top: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; gap: 7px; flex-shrink: 0; background: rgba(0,0,0,0.12); }
+  .scv-compose {
+    padding: 10px 14px 14px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    display: flex; flex-direction: column;
+    gap: 7px;
+    flex-shrink: 0;
+    background: rgba(0,0,0,0.12);
+    padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  }
   .scv-compose-inner { display: flex; align-items: flex-end; gap: 8px; }
-  .scv-emoji-btn { width: 36px; height: 36px; min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; background: none; border: none; color: rgba(255,255,255,0.3); cursor: pointer; border-radius: 10px; flex-shrink: 0; transition: color 0.15s, background 0.15s; touch-action: manipulation; }
-  .scv-emoji-btn:hover { color: rgba(255,255,255,0.65); background: rgba(255,255,255,0.06); }
-  .scv-compose-text { flex: 1; resize: none; padding: 10px 12px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.09); background: rgba(255,255,255,0.04); color: #e2e8f0; font-size: 14px; line-height: 1.5; outline: none; font-family: system-ui, sans-serif; -webkit-appearance: none; max-height: 120px; min-height: 44px; box-sizing: border-box; width: 100%; transition: border-color 0.15s; }
+
+  .scv-compose-icon-btn {
+    width: 36px; height: 36px;
+    min-width: 44px; min-height: 44px;
+    display: flex; align-items: center; justify-content: center;
+    background: none; border: none;
+    color: rgba(255,255,255,0.3);
+    cursor: pointer;
+    border-radius: 10px;
+    flex-shrink: 0;
+    transition: color 0.15s, background 0.15s;
+    touch-action: manipulation;
+  }
+  .scv-compose-icon-btn:hover { color: rgba(255,255,255,0.65); background: rgba(255,255,255,0.06); }
+
+  .scv-compose-text {
+    flex: 1; resize: none;
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.09);
+    background: rgba(255,255,255,0.04);
+    color: #e2e8f0;
+    font-size: 14px; line-height: 1.5;
+    outline: none;
+    font-family: system-ui, sans-serif;
+    -webkit-appearance: none;
+    max-height: 120px; min-height: 44px;
+    box-sizing: border-box; width: 100%;
+    transition: border-color 0.15s;
+  }
   .scv-compose-text:focus { border-color: rgba(255,255,255,0.18); }
   .scv-compose-text::placeholder { color: rgba(255,255,255,0.2); }
   @media (max-width: 767px) { .scv-compose-text { font-size: 16px; } }
-  .scv-send-btn { width: 44px; height: 44px; border-radius: 13px; border: none; background: rgba(129,140,248,0.8); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.15s; touch-action: manipulation; }
+
+  .scv-send-btn {
+    width: 44px; height: 44px;
+    border-radius: 13px; border: none;
+    background: rgba(129,140,248,0.8);
+    color: #fff;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.15s;
+    touch-action: manipulation;
+  }
   .scv-send-btn:hover:not(:disabled) { background: #818cf8; }
   .scv-send-btn:disabled { opacity: 0.28; cursor: not-allowed; }
   .scv-send-ring { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.25); border-top-color: #fff; border-radius: 50%; animation: scv-spin 0.8s linear infinite; }
+
   .scv-compose-hint { display: flex; align-items: center; gap: 5px; margin: 0; font-size: 10px; color: rgba(255,255,255,0.18); }
   .scv-reply-err { margin: 0; font-size: 12px; color: #f87171; }
 
   /* Panic overlay */
   .scv-panic {
-    position: fixed;
-    inset: 0;
+    position: fixed; inset: 0;
     background: #fff;
     z-index: 99999;
     cursor: default;
   }
 
-  /* Compose icon buttons (panic, sticker) */
-  .scv-compose-icon-btn { width: 36px; height: 36px; min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; background: none; border: none; color: rgba(255,255,255,0.3); cursor: pointer; border-radius: 10px; flex-shrink: 0; transition: color 0.15s, background 0.15s; touch-action: manipulation; }
-  .scv-compose-icon-btn:hover { color: rgba(255,255,255,0.65); background: rgba(255,255,255,0.06); }
-
   :global(.msg-sticker) { max-width: 120px; max-height: 120px; border-radius: 8px; display: block; }
 
-  /* Utils */
   .scv-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
   @keyframes scv-spin { to { transform: rotate(360deg); } }
 </style>

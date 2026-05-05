@@ -6,6 +6,7 @@
   import { authUser } from '../lib/stores/auth.js';
   import { socket } from '../lib/socket.js';
   import { banner } from '../lib/stores/sos.js';
+  import { secretChats } from '../lib/stores/secretChat.js';
   import { formatTimestamp, escHtml, calculateDistance, formatDistance } from '../lib/tracking.js';
   import { haptics } from '../lib/haptics.js';
   import VirtualList from './primitives/VirtualList.svelte';
@@ -76,11 +77,15 @@
     swipeStartY = e.touches[0].clientY;
   }
 
-  function onTouchEnd(e, socketId) {
+  function onTouchEnd(e, user) {
     const dx = e.changedTouches[0].clientX - swipeStartX;
     const dy = Math.abs(e.changedTouches[0].clientY - swipeStartY);
     if (dx > 60 && dy < 30) {
-      locateUser(socketId);
+      locateUser(user.socketId);
+    } else if (dx < -60 && dy < 30 && user.userId) {
+      // Swipe-left — covert fast path to chat (no visual indicator by design)
+      haptics.tap?.();
+      dispatch('secretChat', { id: user.userId, name: user.displayName });
     }
   }
 
@@ -100,7 +105,7 @@
       quickUser = user;
       lpSuppressClick = true;
       haptics.confirm?.();
-    }, 480);
+    }, 250);
   }
 
   function rowPM(e) {
@@ -118,7 +123,7 @@
   function rowClick(user) {
     if (lpSuppressClick) { lpSuppressClick = false; return; }
     if (user.latitude == null || user.longitude == null) {
-      // No location to show on map — open quick-action sheet so chat is still reachable
+      // No location — open action sheet for available options (chat accessible via avatar tap)
       quickUser = user;
       return;
     }
@@ -228,6 +233,27 @@
     if (acc <= 50) return 'acc-good';
     return 'acc-low';
   }
+
+  // ── Recent chats strip ───────────────────────────────────────────────────
+  $: _userById = new Map(
+    userList.filter(u => u.userId).map(u => [u.userId, u])
+  );
+  $: recentChatPeers = (() => {
+    const out = [];
+    for (const [peerId, chat] of $secretChats) {
+      if (!chat.messages || !chat.messages.length) continue;
+      const u = _userById.get(peerId);
+      if (!u) continue;
+      out.push({
+        id: peerId,
+        name: u.displayName || '?',
+        user: u,
+        latestAt: chat.messages[0]?.createdAt || 0,
+        hasUnread: chat.messages.some(m => !m.seenAt && m.senderId === peerId),
+      });
+    }
+    return out.sort((a, b) => new Date(b.latestAt) - new Date(a.latestAt)).slice(0, 6);
+  })();
 </script>
 
 <div class="panel-shell panel-right panel-base" class:embedded-view={embedded} transition:fly={{ x: 400, duration: 250, easing: cubicOut }}>
@@ -260,6 +286,31 @@
       </div>
     {/if}
 
+    <!-- Recent chats strip — quick-access avatars for ongoing conversations -->
+    {#if recentChatPeers.length > 0}
+      <div class="recent-chats-strip" aria-label="Recent chats">
+        <span class="recent-label">Chats</span>
+        <div class="recent-scroll" role="list">
+          {#each recentChatPeers as peer (peer.id)}
+            <button
+              class="recent-avatar-btn"
+              on:click={() => dispatch('secretChat', { id: peer.id, name: peer.name })}
+              aria-label="Chat with {peer.name}{peer.hasUnread ? ', unread messages' : ''}"
+              role="listitem"
+            >
+              <div class="recent-avatar" style="{getAvatarStyle(peer.name)}">
+                {(peer.name || '?')[0].toUpperCase()}
+                {#if peer.hasUnread}
+                  <span class="recent-unread" aria-hidden="true"></span>
+                {/if}
+              </div>
+              <span class="recent-name">{peer.name.split(' ')[0]}</span>
+            </button>
+          {/each}
+        </div>
+      </div>
+    {/if}
+
     <!-- Section label -->
     {#if $myLocation || userList.length > 0}
       <div class="people-section-header">
@@ -285,7 +336,7 @@
         <div class="user-meta">
           <div class="user-name-row">
             <strong class="user-name">{$authUser?.displayName || 'You'}</strong>
-            <span class="you-badge">
+            <span class="you-badge animate-live-badge">
               <span class="you-badge-dot" aria-hidden="true"></span>
               Live
             </span>
@@ -320,9 +371,9 @@
       </div>
     {:else}
       <div class="vlist-region">
-        <VirtualList items={userList} itemHeight={76} let:item={user}>
+        <VirtualList items={userList} itemHeight={88} let:item={user}>
           <div
-            class="user-item user-item-btn"
+            class="user-item user-item-btn stagger-item animate-slide-up"
             class:user-sos={user.sos?.active}
             class:user-offline={user.online === false}
             role="button"
@@ -330,7 +381,7 @@
             on:click={() => rowClick(user)}
             on:keydown={(e) => onUserRowKeydown(e, user.socketId)}
             on:touchstart={onTouchStart}
-            on:touchend={(e) => onTouchEnd(e, user.socketId)}
+            on:touchend={(e) => onTouchEnd(e, user)}
             on:pointerdown={(e) => rowPD(e, user)}
             on:pointermove={rowPM}
             on:pointerup={rowPU}
@@ -343,6 +394,7 @@
                 class="presence-ring"
                 class:ring-sos={user.sos?.active}
                 class:ring-offline={user.online === false}
+                class:ring-online={user.online !== false && !user.sos?.active}
                 style={user.online !== false && !user.sos?.active ? getPresenceRingStyle(user) : ''}
                 aria-hidden="true"
               ></span>
@@ -428,16 +480,6 @@
                   {user.batteryPct}%
                 </span>
               {/if}
-              {#if user.userId}
-                <button
-                  class="secret-chat-icon"
-                  title="Secret Chat"
-                  aria-label="Open secret chat with {user.displayName}"
-                  on:click|stopPropagation={() => dispatch('secretChat', { id: user.userId, name: user.displayName })}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                </button>
-              {/if}
               {#if user.latitude != null && user.longitude != null}
                 <span class="locate-icon" aria-hidden="true">
                   <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 1.892.402 3.13 1.5 4.5L12 22l6.5-7.5c1.098-1.37 1.5-2.608 1.5-4.5a8 8 0 0 0-8-8z"/></svg>
@@ -496,21 +538,21 @@
           <span>Locate on Map</span>
         </button>
 
+        {#if quickUser.userId}
+          <button class="qa-action-btn" on:click={() => { dispatch('secretChat', { id: quickUser.userId, name: quickUser.displayName }); quickUser = null; }}>
+            <div class="qa-action-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            </div>
+            <span>Chat</span>
+          </button>
+        {/if}
+
         <button class="qa-action-btn" on:click={qaCopy} disabled={!quickUser.latitude}>
           <div class="qa-action-icon">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           </div>
           <span>Copy Coordinates</span>
         </button>
-
-        {#if quickUser.userId}
-          <button class="qa-action-btn" on:click={() => { dispatch('secretChat', { id: quickUser.userId, name: quickUser.displayName }); quickUser = null; }}>
-            <div class="qa-action-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            </div>
-            <span>Secret Chat</span>
-          </button>
-        {/if}
       </div>
 
       <button class="qa-cancel-btn" on:click={closeQuickActions}>Cancel</button>
@@ -519,6 +561,101 @@
 </div>
 
 <style>
+  /* ── Recent chats strip ─────────────────────────────────────────────────── */
+  .recent-chats-strip {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-4) var(--space-2);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .recent-label {
+    font-family: var(--font-display);
+    font-size: var(--text-2xs);
+    font-weight: 700;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    flex-shrink: 0;
+  }
+
+  .recent-scroll {
+    display: flex;
+    gap: var(--space-3);
+    overflow-x: auto;
+    overflow-y: visible;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    flex: 1;
+    padding: 4px 0;
+  }
+
+  .recent-scroll::-webkit-scrollbar { display: none; }
+
+  .recent-avatar-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    min-width: 44px;
+    -webkit-tap-highlight-color: transparent;
+    flex-shrink: 0;
+  }
+
+  .recent-avatar-btn:active { transform: scale(0.88); transition: transform 80ms; }
+
+  .recent-avatar {
+    position: relative;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 700;
+    font-family: var(--font-display);
+    border: 2px solid rgba(255,255,255,0.08);
+    transition: border-color 120ms;
+  }
+
+  :global([data-theme="light"]) .recent-avatar {
+    border-color: rgba(0,0,0,0.06);
+  }
+
+  .recent-avatar-btn:hover .recent-avatar {
+    border-color: rgba(20,184,166,0.4);
+  }
+
+  .recent-unread {
+    position: absolute;
+    top: -1px;
+    right: -1px;
+    width: 9px;
+    height: 9px;
+    background: var(--danger-500);
+    border-radius: 50%;
+    border: 2px solid var(--surface-base);
+    box-shadow: 0 0 4px rgba(239,68,68,0.5);
+  }
+
+  .recent-name {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    max-width: 44px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: center;
+    line-height: 1;
+  }
+
   /* ── Pull-to-refresh indicator ─────────────────────────────────────────── */
   .pull-indicator {
     display: flex;
@@ -622,19 +759,25 @@
 
   .user-item-btn:active {
     background: var(--surface-active);
-    transform: scale(0.985);
+    transform: scale(0.96);
     transition-duration: 60ms;
   }
 
-  /* SOS — urgent red left accent, no border */
+  /* SOS — urgent red left accent + gradient sweep for readability */
   .user-sos {
-    background: rgba(239, 68, 68, 0.06);
+    background:
+      linear-gradient(90deg, rgba(239, 68, 68, 0.14) 0%, rgba(239, 68, 68, 0.06) 40%, transparent 80%),
+      rgba(239, 68, 68, 0.10);
     box-shadow: inset 3px 0 0 var(--danger-500);
   }
-  .user-sos:hover { background: rgba(239, 68, 68, 0.10); }
+  .user-sos:hover {
+    background:
+      linear-gradient(90deg, rgba(239, 68, 68, 0.20) 0%, rgba(239, 68, 68, 0.10) 40%, transparent 80%),
+      rgba(239, 68, 68, 0.12);
+  }
 
-  /* Offline — filter + opacity, not just opacity */
-  .user-offline {
+  /* Offline — dim only the avatar; name/sub stay legible */
+  .user-offline .user-avatar {
     opacity: 0.50;
   }
 
@@ -699,6 +842,16 @@
   /* Offline presence ring — muted */
   .presence-ring.ring-offline {
     box-shadow: 0 0 0 2px rgba(107, 114, 128, 0.30);
+  }
+
+  /* Online presence ring — gentle scale breathe (no box-shadow conflict with inline style) */
+  .presence-ring.ring-online {
+    animation: ring-scale-breathe 2.8s ease-in-out infinite;
+  }
+
+  @keyframes ring-scale-breathe {
+    0%, 100% { transform: scale(1);    opacity: 0.85; }
+    50%       { transform: scale(1.07); opacity: 1;    }
   }
 
   /* Self: pulsing live ring */
@@ -948,51 +1101,6 @@
   .user-item-btn:hover .locate-icon {
     color: var(--primary-400);
     transform: scale(1.15);
-  }
-
-  /* Secret chat icon button — hidden until row hover on desktop */
-  .secret-chat-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: none;
-    border: none;
-    padding: 6px;
-    border-radius: var(--radius-full);
-    color: var(--text-tertiary);
-    cursor: pointer;
-    opacity: 0;
-    transition: opacity var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);
-    -webkit-tap-highlight-color: transparent;
-    flex-shrink: 0;
-    /* Expand tap target without affecting layout */
-    position: relative;
-  }
-  .secret-chat-icon::after {
-    content: '';
-    position: absolute;
-    inset: -6px;
-  }
-  /* Always visible on touch devices (no hover state) */
-  @media (hover: none) {
-    .secret-chat-icon {
-      opacity: 1;
-      color: var(--primary-400, #818cf8);
-      padding: 8px;
-      background: rgba(99, 102, 241, 0.08);
-    }
-  }
-  .user-item-btn:hover .secret-chat-icon {
-    opacity: 1;
-    color: var(--primary-400, #818cf8);
-  }
-  .secret-chat-icon:hover {
-    background: rgba(99, 102, 241, 0.14);
-    color: var(--primary-300, #a5b4fc);
-  }
-  .secret-chat-icon:active {
-    transform: scale(0.88);
-    transition-duration: 60ms;
   }
 
   /* Battery chip — icon + percentage */

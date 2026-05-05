@@ -5,7 +5,7 @@
   import { socket, setupSocketHandlers, cancelReconnectBanner, setBanner as socketSetBanner } from '../lib/socket.js';
   import { banner, mySosActive } from '../lib/stores/sos.js';
   import { pendingIncomingRequests } from '../lib/stores/guardians.js';
-  import { otherUsers, mySocketId, myLocation, tracking, focusUser, mapFlyTo, routeGeometry, walkDestination } from '../lib/stores/map.js';
+  import { otherUsers, mySocketId, myLocation, tracking, focusUser, mapFlyTo, routeGeometry, walkDestination, mapChatRequest } from '../lib/stores/map.js';
 
   import AppLayout from '../components/layout/AppLayout.svelte';
   import Sidebar from '../components/layout/Sidebar.svelte';
@@ -72,6 +72,9 @@
     }
   }
   let secretChatPeer = null; // { id: string, name: string }
+
+  // Map popup "Chat" button → open chat panel directly without going via action sheet
+  $: if ($mapChatRequest) { secretChatPeer = $mapChatRequest; mapChatRequest.set(null); }
 
   /**
    * Detect Android device manufacturer from the WebView UA string.

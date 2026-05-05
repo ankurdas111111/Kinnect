@@ -111,8 +111,9 @@
   --space-1-5: 6px;
   --space-2:  8px;
   --space-2-5: 10px;
-  --space-3:  12px;
-  --space-4:  16px;
+  --space-3:   12px;
+  --space-3-5: 14px;
+  --space-4:   16px;
   --space-5:  20px;
   --space-6:  24px;
   --space-8:  32px;
@@ -121,8 +122,10 @@
   --space-16: 64px;
 
   /* ── Border Radius ──────────────────────────────────────────────────── */
-  --radius-sm:   6px;
-  --radius-md:   10px;
+  --radius-xs:  4px;
+  --radius-sm:  6px;
+  --radius-sm2: 8px;
+  --radius-md:  10px;
   --radius-lg:   14px;
   --radius-xl:   20px;
   --radius-2xl:  24px;
@@ -1090,12 +1093,12 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
   background: var(--surface-1);
 }
 
-/* Icon button */
+/* Icon button — 44px minimum meets WCAG 2.5.5 touch target */
 .btn-icon {
   padding: var(--space-2);
   border-radius: var(--radius-md);
-  min-width: 36px;
-  min-height: 36px;
+  min-width: 44px;
+  min-height: 44px;
 }
 .btn-icon svg {
   width: 18px;
@@ -1754,6 +1757,42 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
 .animate-presence     { animation: presence-breathe 3s ease-in-out infinite; }
 .animate-live-glow    { animation: live-glow-pulse 2.5s ease-in-out infinite; }
 .animate-signal-ring  { animation: signal-ring-out 1.4s ease-out infinite; }
+
+/* ── Engagement animations — retention / delight ────────────────────────── */
+
+/* User joins the list — avatar-spring-pop with glow trail */
+@keyframes user-join {
+  0%   { transform: scale(0.55) translateY(8px); opacity: 0; filter: blur(4px); }
+  55%  { transform: scale(1.12) translateY(-3px); opacity: 1; filter: blur(0); }
+  75%  { transform: scale(0.96) translateY(1px); }
+  100% { transform: scale(1) translateY(0); }
+}
+.animate-user-join {
+  animation: user-join 420ms var(--ease-spring) both;
+}
+
+/* Coordinate / stat cell flash when a location update arrives */
+@keyframes coord-flash {
+  0%   { background: rgba(20, 184, 166, 0.22); }
+  60%  { background: rgba(20, 184, 166, 0.08); }
+  100% { background: transparent; }
+}
+.animate-coord-flash {
+  animation: coord-flash 800ms var(--ease-out);
+}
+
+/* Live tracking badge — ambient glow breathe so "Live" never looks static */
+@keyframes live-badge-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.20), 0 0 10px rgba(16, 185, 129, 0.14);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.10), 0 0 20px rgba(16, 185, 129, 0.28);
+  }
+}
+.animate-live-badge {
+  animation: live-badge-pulse 2.2s ease-in-out infinite;
+}
 
 
 /* ═══════════════════════════════════════════════════════════════════════════

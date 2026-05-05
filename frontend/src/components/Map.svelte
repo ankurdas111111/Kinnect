@@ -3,7 +3,7 @@
   // maplibregl is loaded dynamically inside onMount so the main bundle
   // does not block on the ~283 kB maplibre chunk at parse time.
   let maplibregl;
-  import { otherUsers, myLocation, mySocketId, mySafetyStatus, focusUser, mapFlyTo, routeGeometry, navigationState, mapTappedUser } from '../lib/stores/map.js';
+  import { otherUsers, myLocation, mySocketId, mySafetyStatus, focusUser, mapFlyTo, routeGeometry, navigationState, mapTappedUser, mapChatRequest } from '../lib/stores/map.js';
   import { haptics } from '../lib/haptics.js';
   import { createMapIcon, createPersonMarker, getPresenceState, escapeAttr, calculateDistance, formatDistance, circleGeoJSON } from '../lib/tracking.js';
   import { animateMarkerTo, cancelAnimation, cancelAllAnimations } from '../lib/markerInterpolator.js';
@@ -232,6 +232,20 @@
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
     }
 
+    // Delegated handler for chat buttons inside desktop marker popups.
+    // Uses capture phase so it intercepts before MapLibre's own click handling.
+    mapContainer.addEventListener('click', (e) => {
+      const btn = e.target.closest('.pu-chat-btn');
+      if (!btn) return;
+      e.stopPropagation();
+      const userId = btn.dataset.userid;
+      const name = btn.dataset.name;
+      if (userId) {
+        haptics.tap?.();
+        mapChatRequest.set({ id: userId, name });
+      }
+    }, true);
+
     map.on('dragstart', () => {
       // During navigation, let user pan but re-center on next GPS update
       if (!navActive) followMode = false;
@@ -445,6 +459,9 @@
     }
     if (badges.length) html += `<div class="pu-badges">${badges.join('')}</div>`;
     if (user.rooms && user.rooms.length > 0) html += `<div class="pu-rooms"><span class="pu-lbl">Rooms:</span> ${user.rooms.map(r => s(r)).join(', ')}</div>`;
+    if (user.userId) {
+      html += `<div class="pu-actions"><button class="pu-chat-btn" data-userid="${escapeAttr(user.userId)}" data-name="${name}"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Chat</button></div>`;
+    }
     html += `</div>`;
     return html;
   }
@@ -1088,6 +1105,9 @@
   :global(.pu-feat-autoSos){ color: #f59e0b; }
   :global(.pu-feat-checkin){ color: #06b6d4; }
   :global(.pu-rooms) { margin-top: 5px; font-size: 10px; color: #64748b; }
+  :global(.pu-actions) { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,0.08); }
+  :global(.pu-chat-btn) { display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 8px; background: rgba(99,102,241,0.10); border: 1px solid rgba(99,102,241,0.22); color: #6366f1; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 120ms; }
+  :global(.pu-chat-btn:hover) { background: rgba(99,102,241,0.18); }
 
   /* Fix #1 continued: mobile-specific font size bump for popup text */
   @media (max-width: 480px) {

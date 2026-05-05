@@ -43,6 +43,19 @@
     const text = `${user.lat.toFixed(6)}, ${user.lng.toFixed(6)}`;
     navigator.clipboard?.writeText(text).catch(() => {});
   }
+
+  // Flash stat cells when coordinates update
+  let coordFlash = false;
+  let _prevLat = null;
+  let _prevLng = null;
+  $: if (user?.lat !== _prevLat || user?.lng !== _prevLng) {
+    if (_prevLat !== null) {
+      coordFlash = true;
+      setTimeout(() => { coordFlash = false; }, 850);
+    }
+    _prevLat = user?.lat ?? null;
+    _prevLng = user?.lng ?? null;
+  }
 </script>
 
 {#if user}
@@ -114,6 +127,7 @@
       <div
         class="avatar"
         class:avatar-sos={user.sos?.active}
+        class:avatar-live={user.online && !user.sos?.active}
         class:avatar-offline={!user.online}
         style="background:{colorLight};border-color:{color}"
         aria-hidden="true"
@@ -162,11 +176,11 @@
     <!-- Stat grid -->
     {#if user.lat && user.lng}
       <div class="stat-grid">
-        <div class="stat">
+        <div class="stat" class:animate-coord-flash={coordFlash}>
           <span class="stat-label">Latitude</span>
           <span class="stat-value">{user.lat.toFixed(5)}°</span>
         </div>
-        <div class="stat">
+        <div class="stat" class:animate-coord-flash={coordFlash}>
           <span class="stat-label">Longitude</span>
           <span class="stat-value">{user.lng.toFixed(5)}°</span>
         </div>
@@ -228,9 +242,9 @@
     isolation: isolate;
     transform-style: preserve-3d;
     transition:
-      box-shadow var(--duration-3d, 250ms) ease,
-      border-color 0.3s ease,
-      transform var(--duration-3d, 250ms) cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow var(--duration-3d, 250ms) var(--ease-out),
+      border-color var(--duration-normal) var(--ease-out),
+      transform var(--duration-3d, 250ms) var(--ease-spring);
   }
 
   /* ── Inline emergency card ─────────────────────────────────────────────── */
@@ -329,7 +343,8 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 4px 8px;
+    padding: 10px 12px;
+    min-height: 44px;
     border-radius: 7px;
     background: rgba(16, 185, 129, 0.12);
     border: 1px solid rgba(16, 185, 129, 0.28);
@@ -338,7 +353,7 @@
     font-weight: 700;
     text-decoration: none;
     white-space: nowrap;
-    transition: background 120ms ease;
+    transition: background var(--duration-fast) var(--ease-out);
     -webkit-tap-highlight-color: transparent;
   }
   .ec-call:hover { background: rgba(16, 185, 129, 0.22); }
@@ -356,14 +371,19 @@
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
+    animation: sos-breathe 2s ease-in-out infinite;
+  }
+  @keyframes sos-breathe {
+    0%, 100% { background: rgba(239, 68, 68, 0.12); }
+    50%       { background: rgba(239, 68, 68, 0.22); }
   }
 
   /* ── Card header ─────────────────────────────────────────────────────────── */
   .card-header {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 14px 14px 10px;
+    gap: var(--space-2-5);
+    padding: var(--space-3-5) var(--space-3-5) var(--space-2-5);
   }
 
   .avatar {
@@ -381,35 +401,36 @@
       0 4px 12px rgba(0, 0, 0, 0.15),
       inset 0 2px 4px rgba(255, 255, 255, 0.15),
       inset 0 -2px 4px rgba(0, 0, 0, 0.10);
-    transition: box-shadow 0.3s, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition:
+      box-shadow var(--duration-normal) var(--ease-out),
+      transform var(--duration-normal) var(--ease-spring);
   }
   .avatar:hover {
     transform: perspective(400px) translateZ(4px) scale(1.05);
   }
 
-  .avatar-sos::after {
-    animation: sos-ring 1.2s ease-out infinite;
+  /* SOS: expanding shadow ring — doesn't cover initials */
+  .avatar-sos {
+    animation: sos-shadow-pulse 1.1s ease-out infinite;
+  }
+  @keyframes sos-shadow-pulse {
+    0%   { box-shadow: 0 4px 12px rgba(0,0,0,0.15), inset 0 2px 4px rgba(255,255,255,0.15), 0 0 0 0 rgba(239,68,68,0.55); }
+    70%  { box-shadow: 0 4px 12px rgba(0,0,0,0.15), inset 0 2px 4px rgba(255,255,255,0.15), 0 0 0 14px rgba(239,68,68,0); }
+    100% { box-shadow: 0 4px 12px rgba(0,0,0,0.15), inset 0 2px 4px rgba(255,255,255,0.15), 0 0 0 0 rgba(239,68,68,0); }
+  }
+
+  /* Online: slow breathing glow — Heartbeat Halo */
+  .avatar-live {
+    animation: heartbeat-halo var(--pulse-duration, 1.5s) ease-in-out infinite;
+  }
+  @keyframes heartbeat-halo {
+    0%, 100% { box-shadow: 0 4px 12px rgba(0,0,0,0.15), inset 0 2px 4px rgba(255,255,255,0.15), 0 0 0 rgba(16,185,129,0); }
+    50%       { box-shadow: 0 4px 12px rgba(0,0,0,0.15), inset 0 2px 4px rgba(255,255,255,0.15), 0 0 14px rgba(16,185,129,0.45); }
   }
 
   .avatar-offline {
     opacity: 0.5;
     filter: grayscale(0.6);
-  }
-
-  .avatar::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    background: rgba(239, 68, 68, 0.45);
-    transform: scale(1);
-    opacity: 0;
-    pointer-events: none;
-    will-change: transform, opacity;
-  }
-  @keyframes sos-ring {
-    0%   { transform: scale(1);   opacity: 0.6; }
-    100% { transform: scale(1.9); opacity: 0; }
   }
 
   .avatar-initials {
@@ -463,9 +484,9 @@
     gap: 3px;
     font-size: 10px;
     font-weight: 600;
-    color: var(--primary-400, #818cf8);
-    background: rgba(99, 102, 241, 0.10);
-    border: 1px solid rgba(99, 102, 241, 0.20);
+    color: var(--primary-500, #14b8a6);
+    background: rgba(20, 184, 166, 0.10);
+    border: 1px solid rgba(20, 184, 166, 0.22);
     border-radius: var(--radius-full, 9999px);
     padding: 2px 7px;
     line-height: 1.3;
@@ -481,6 +502,13 @@
     height: 28px;
     min-width: 28px;
     min-height: 28px;
+    position: relative;
+  }
+  /* Expand hit area to 44px without affecting layout */
+  .close-btn::before {
+    content: '';
+    position: absolute;
+    inset: -8px;
   }
 
   /* ── Stat grid ───────────────────────────────────────────────────────────── */
@@ -498,7 +526,7 @@
     flex-direction: column;
     gap: 2px;
     padding: 10px 14px;
-    background: var(--glass-1, rgba(255,255,255,0.85));
+    background: var(--surface-1);
     /* 3D inset stat cells */
     box-shadow:
       inset 0 1px 3px rgba(0, 0, 0, 0.04),

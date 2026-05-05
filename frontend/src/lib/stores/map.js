@@ -49,3 +49,9 @@ export const navigationState = writable({ active: false });
  * Automatically reset to null after consumption.
  */
 export const mapTappedUser = writable(null);
+
+/**
+ * Set to { id: string, name: string } to open a secret chat directly from the map popup.
+ * MainApp consumes and resets to null.
+ */
+export const mapChatRequest = writable(null);

@@ -5,6 +5,7 @@
   import { COUNTRY_CODES, COUNTRY_MAP, validateMobileLength } from '../lib/countryCodes.js';
   import { toasts } from '../lib/stores/toast.js';
   import { onMount } from 'svelte';
+  import { slide } from 'svelte/transition';
 
   let mode = 'email';
   let loginId = '';
@@ -209,7 +210,7 @@
         </div>
 
         {#if mode === 'email'}
-          <div class="auth-field">
+          <div class="auth-field" transition:slide={{ duration: 180, axis: 'y' }}>
             <label for="login_email">Email address</label>
             <div class="input-wrapper">
               <input
@@ -231,8 +232,9 @@
               <span class="auth-hint error">Enter a valid email address</span>
             {/if}
           </div>
-        {:else}
-          <div class="auth-field">
+        {/if}
+        {#if mode === 'mobile'}
+          <div class="auth-field" transition:slide={{ duration: 180, axis: 'y' }}>
             <label for="login_mobile">Mobile number</label>
             <div class="auth-phone-row">
               <select class="auth-cc-select" bind:value={countryIso} on:change={validateMobile} aria-label="Country code">
@@ -265,6 +267,7 @@
               class="input"
               class:is-invalid={passwordError}
               bind:value={password}
+              placeholder="••••••••"
               autocomplete="current-password"
               on:blur={() => passwordTouched = true}
             />
@@ -281,7 +284,7 @@
           {/if}
         </div>
 
-        <button class="auth-submit" type="submit" disabled={loading}>
+        <button class="auth-submit" type="submit" disabled={loading} class:redirecting={redirecting}>
           {#if loading}
             <span class="submit-spinner" aria-hidden="true"></span>
             {redirecting ? 'Opening dashboard...' : 'Signing in...'}
@@ -397,8 +400,18 @@
 
   .mobile-brand-tagline {
     font-size: 0.8125rem;
-    color: rgba(255, 255, 255, 0.45);
+    color: rgba(255, 255, 255, 0.62);
     letter-spacing: 0.01em;
+  }
+
+  /* Submit button transitions to success green after redirect */
+  :global(.auth-submit.redirecting) {
+    background: linear-gradient(135deg, var(--success-500, #10b981) 0%, var(--success-700, #047857) 100%) !important;
+    box-shadow:
+      0 8px 24px rgba(16, 185, 129, 0.40),
+      0 3px 8px rgba(16, 185, 129, 0.25),
+      inset 0 1px 0 rgba(255, 255, 255, 0.22) !important;
+    transition: background 300ms var(--ease-out), box-shadow 300ms var(--ease-out) !important;
   }
 
   @media (max-width: 767px) {
