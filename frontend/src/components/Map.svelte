@@ -3,7 +3,8 @@
   // maplibregl is loaded dynamically inside onMount so the main bundle
   // does not block on the ~283 kB maplibre chunk at parse time.
   let maplibregl;
-  import { otherUsers, myLocation, mySocketId, mySafetyStatus, focusUser, mapFlyTo, routeGeometry, navigationState } from '../lib/stores/map.js';
+  import { otherUsers, myLocation, mySocketId, mySafetyStatus, focusUser, mapFlyTo, routeGeometry, navigationState, mapTappedUser } from '../lib/stores/map.js';
+  import { haptics } from '../lib/haptics.js';
   import { createMapIcon, createPersonMarker, getPresenceState, escapeAttr, calculateDistance, formatDistance, circleGeoJSON } from '../lib/tracking.js';
   import { animateMarkerTo, cancelAnimation, cancelAllAnimations } from '../lib/markerInterpolator.js';
   import { getUserColor } from '../lib/getUserColor.js';
@@ -18,6 +19,7 @@
   let map;
   let markers = new Map();       // sid → maplibregl.Marker
   let markerPopups = new Map();   // sid → maplibregl.Popup
+  let markerUsers = new Map();    // sid → user object (for mobile tap → QA sheet)
   let markerState = new Map();
   let geofenceIds = new Set();
   let myMarker = null;
@@ -254,6 +256,31 @@
       }
       addCircleSources();
     });
+
+    // Feature 5: Double-tap map canvas to center on self
+    // Use non-passive capture so we can preventDefault to stop MapLibre's native double-tap zoom.
+    let dtLastTap = 0;
+    let dtLastX = 0;
+    let dtLastY = 0;
+    function onCanvasDoubleTap(e) {
+      const now = Date.now();
+      const touch = e.changedTouches[0];
+      const dx = Math.abs(touch.clientX - dtLastX);
+      const dy = Math.abs(touch.clientY - dtLastY);
+      if (now - dtLastTap < 300 && dx < 30 && dy < 30) {
+        e.preventDefault();
+        focusUser.set('__self__');
+        haptics.tap?.();
+        dtLastTap = 0; // reset so triple-tap doesn't re-fire
+      } else {
+        dtLastTap = now;
+        dtLastX = touch.clientX;
+        dtLastY = touch.clientY;
+      }
+    }
+    if (isMobile) {
+      map.getCanvas().addEventListener('touchend', onCanvasDoubleTap, { passive: false, capture: true });
+    }
   });
 
   onDestroy(() => {
@@ -263,6 +290,7 @@
     markers.clear();
     for (const p of markerPopups.values()) p.remove();
     markerPopups.clear();
+    markerUsers.clear();
     if (myMarker) myMarker.remove();
     if (myPopup) myPopup.remove();
     // F3: clean up meeting point markers
@@ -476,34 +504,66 @@
       });
     }
 
+    // On mobile: tapping a marker directly opens the quick-action sheet (skipping the
+    // MapLibre popup). On desktop the popup behaviour is unchanged.
+    function attachMobileTap(el, userObj) {
+      el.addEventListener('click', () => {
+        haptics.tap?.();
+        mapTappedUser.set(userObj);
+      });
+    }
+
+    markerUsers.set(sid, user);
+
     if (markers.has(sid)) {
       const m = markers.get(sid);
       animateMarkerTo(sid, m, lngLat);
       if (markerState.get(sid) !== iconKey) {
         const el = makePersonEl();
-        const newMarker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
-          .setLngLat(m.getLngLat())
-          .addTo(map);
-        const popup = markerPopups.get(sid);
-        if (popup) { popup.setHTML(popupContent); newMarker.setPopup(popup); }
-        m.remove();
-        markers.set(sid, newMarker);
-        markerState.set(sid, iconKey);
+        if (isMobile) {
+          attachMobileTap(el, user);
+          const newMarker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+            .setLngLat(m.getLngLat())
+            .addTo(map);
+          m.remove();
+          markers.set(sid, newMarker);
+          markerState.set(sid, iconKey);
+        } else {
+          const newMarker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+            .setLngLat(m.getLngLat())
+            .addTo(map);
+          const popup = markerPopups.get(sid);
+          if (popup) { popup.setHTML(popupContent); newMarker.setPopup(popup); }
+          m.remove();
+          markers.set(sid, newMarker);
+          markerState.set(sid, iconKey);
+        }
       } else {
-        const popup = markerPopups.get(sid);
-        if (popup) popup.setHTML(popupContent);
+        if (!isMobile) {
+          const popup = markerPopups.get(sid);
+          if (popup) popup.setHTML(popupContent);
+        }
       }
     } else {
       const el = makePersonEl();
-      const popup = new maplibregl.Popup({ offset: [0, -54], maxWidth: '280px', closeButton: true })
-        .setHTML(popupContent);
-      const m = new maplibregl.Marker({ element: el, anchor: 'bottom' })
-        .setLngLat(lngLat)
-        .setPopup(popup)
-        .addTo(map);
-      markers.set(sid, m);
-      markerPopups.set(sid, popup);
-      markerState.set(sid, iconKey);
+      if (isMobile) {
+        attachMobileTap(el, user);
+        const m = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+          .setLngLat(lngLat)
+          .addTo(map);
+        markers.set(sid, m);
+        markerState.set(sid, iconKey);
+      } else {
+        const popup = new maplibregl.Popup({ offset: [0, -54], maxWidth: '280px', closeButton: true })
+          .setHTML(popupContent);
+        const m = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+          .setLngLat(lngLat)
+          .setPopup(popup)
+          .addTo(map);
+        markers.set(sid, m);
+        markerPopups.set(sid, popup);
+        markerState.set(sid, iconKey);
+      }
     }
   }
 
@@ -521,6 +581,7 @@
         popupCache.delete(sid);
         _lastRenderedUsers.delete(sid);
         if (markerPopups.has(sid)) { markerPopups.get(sid).remove(); markerPopups.delete(sid); }
+        markerUsers.delete(sid);
         dirtyMarkers.delete(sid);
       }
     }

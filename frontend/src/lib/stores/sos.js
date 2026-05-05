@@ -10,3 +10,7 @@ export const sosNarratives = writable(new Map());
 
 // activeSosUsers: Map<userId, sosPayload> for AlertOverlay to show narrative
 export const activeSosUsers = writable(new Map());
+
+// Increment to trigger a camera shake in AlertOverlay without starting the audio alarm.
+// Used by geofence breach events (placeAlert leave).
+export const geofenceShake = writable(0);

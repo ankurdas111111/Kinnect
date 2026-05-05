@@ -53,6 +53,24 @@
   let sidebarCollapsed = false;
   let sosConfirmOpen = false;
   let batteryPromptOpen = false;
+
+  // Feature 7: Panic Mode — read from localStorage (set in SettingsPanel)
+  // Double-tap the SOS FAB to fire SOS instantly without the confirm modal.
+  let sosFabLastTap = 0;
+  function onSosFabClick() {
+    if ($mySosActive) { socket.emit('cancelSOS'); return; }
+    const panicMode = localStorage.getItem('kinnect_panic_mode') === 'true';
+    const now = Date.now();
+    if (panicMode && now - sosFabLastTap < 400) {
+      // Double-tap in panic mode → fire immediately
+      sosFabLastTap = 0;
+      haptics.sos?.();
+      socket.emit('triggerSOS', { reason: 'SOS', medicalCard: getMedicalSnapshot() });
+    } else {
+      sosFabLastTap = now;
+      sosConfirmOpen = true;
+    }
+  }
   let secretChatPeer = null; // { id: string, name: string }
 
   /**
@@ -725,7 +743,7 @@
   <svelte:fragment slot="bottomSheet">
     <BottomSheet
       open={sheetOpen}
-      title={mobileTab === 'track' ? 'Track' : mobileTab === 'people' ? 'People' : mobileTab === 'share' ? 'Share' : mobileTab === 'safety' ? 'Safety' : 'Me'}
+      title={mobileTab === 'track' ? 'Map' : mobileTab === 'people' ? 'People' : mobileTab === 'share' ? 'Connect' : mobileTab === 'safety' ? 'Safety' : 'Me'}
       on:close={() => {
         setSheetOpen(false);
       }}
@@ -764,7 +782,7 @@
           </button>
         </div>
         <div class="spatial-subtabs">
-          <button class="spatial-subtab" class:active={meSubTab === 'info'} on:click={() => meSubTab = 'info'}>Info</button>
+          <button class="spatial-subtab" class:active={meSubTab === 'info'} on:click={() => meSubTab = 'info'}>Status</button>
           <button class="spatial-subtab" class:active={meSubTab === 'places'} on:click={() => meSubTab = 'places'}>Places</button>
           <button class="spatial-subtab" class:active={meSubTab === 'settings'} on:click={() => meSubTab = 'settings'}>Settings</button>
         </div>
@@ -841,10 +859,7 @@
       class="sos-fab"
       class:active={$mySosActive}
       style={isMobile ? `bottom: ${fabBottomOffset}` : undefined}
-      on:click={() => {
-        if ($mySosActive) { socket.emit('cancelSOS'); }
-        else { sosConfirmOpen = true; }
-      }}
+      on:click={onSosFabClick}
       aria-label={$mySosActive ? 'Cancel SOS' : 'Send SOS'}
     >
       {#if $mySosActive}

@@ -10,11 +10,11 @@
   const dispatch = createEventDispatcher();
 
   const tabs = [
-    { id: 'info', label: 'Info', icon: 'info' },
-    { id: 'sharing', label: 'Sharing', icon: 'share' },
-    { id: 'admin', label: 'Admin', icon: 'shield' },
-    { id: 'places', label: 'Places', icon: 'map-pin' },
-    { id: 'settings', label: 'Settings', icon: 'settings' },
+    { id: 'info',     label: 'Status',   icon: 'info'    },
+    { id: 'sharing',  label: 'Connect',  icon: 'share'   },
+    { id: 'admin',    label: 'Rules',    icon: 'shield'  },
+    { id: 'places',   label: 'Places',   icon: 'map-pin' },
+    { id: 'settings', label: 'Settings', icon: 'settings'},
   ];
 
   function selectTab(id) {
@@ -63,7 +63,7 @@
         aria-selected={activeTab === tab.id && !collapsed}
         tabindex={activeTab === tab.id && !collapsed ? 0 : -1}
         title={tab.label}
-        aria-label={tab.id === 'admin' ? (isAdmin ? 'Admin controls' : 'Safety controls') : tab.label}
+        aria-label={tab.id === 'admin' ? 'Safety rules' : tab.label}
       >
         {#if tab.icon === 'info'}
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>

@@ -1,5 +1,5 @@
 <script>
-  import { alertState, sosNarratives, activeSosUsers } from '../lib/stores/sos.js';
+  import { alertState, sosNarratives, activeSosUsers, geofenceShake } from '../lib/stores/sos.js';
   import Modal from './primitives/Modal.svelte';
   import { haptics } from '../lib/haptics.js';
 
@@ -31,6 +31,14 @@
     triggerShake();
   } else {
     stopAlarm();
+  }
+
+  // Feature 8: geofence breach shake — camera shake without audio alarm
+  let _prevGeofenceShake = 0;
+  $: if ($geofenceShake > _prevGeofenceShake) {
+    _prevGeofenceShake = $geofenceShake;
+    triggerShake();
+    haptics.warning?.();
   }
 
   function triggerHaptic() { haptics.sos(); }

@@ -388,7 +388,7 @@
 
     <!-- ── SAFETY ZONE ───────────────────────────────────────────────── -->
     <div class="safety-zone">
-      <span class="card-eyebrow safety-eyebrow">Safety</span>
+      <span class="card-eyebrow safety-eyebrow">Quick Actions</span>
       <div class="safety-actions">
         <button
           class="sos-action-btn"
@@ -469,7 +469,7 @@
     <!-- ── F6: GEOFENCE LOG ───────────────────────────────────────────── -->
     <div class="feature-section">
       <button class="collapsible-header" on:click={toggleGeofenceLog} aria-expanded={geofenceLogOpen}>
-        <span class="card-eyebrow" style="margin:0">Geofence Log</span>
+        <span class="card-eyebrow" style="margin:0">Zone History</span>
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true" style="transform: rotate({geofenceLogOpen ? 180 : 0}deg); transition: transform 200ms"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
       {#if geofenceLogOpen}
@@ -554,7 +554,7 @@
 
     <!-- ── AMBIENT STATUS MESSAGE ─────────────────────────────────── -->
     <div class="status-msg-zone">
-      <span class="card-eyebrow">My Status</span>
+      <span class="card-eyebrow">Status Message</span>
       <div class="status-msg-row">
         <input
           class="status-msg-input"
@@ -827,7 +827,7 @@
 
       <!-- SAFETY ZONE -->
       <div class="safety-zone">
-        <span class="card-eyebrow safety-eyebrow">Safety</span>
+        <span class="card-eyebrow safety-eyebrow">Quick Actions</span>
         <div class="safety-actions">
           <button class="sos-action-btn" class:sos-live={$mySosActive} on:click={toggleSOS} aria-label={$mySosActive ? 'Cancel SOS' : 'Send emergency SOS alert'}>
             <span class="sos-icon-wrap" aria-hidden="true">
@@ -899,7 +899,7 @@
       <!-- F6: GEOFENCE LOG -->
       <div class="feature-section">
         <button class="collapsible-header" on:click={toggleGeofenceLog} aria-expanded={geofenceLogOpen}>
-          <span class="card-eyebrow" style="margin:0">Geofence Log</span>
+          <span class="card-eyebrow" style="margin:0">Zone History</span>
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true" style="transform: rotate({geofenceLogOpen ? 180 : 0}deg); transition: transform 200ms"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
         {#if geofenceLogOpen}
@@ -984,7 +984,7 @@
 
       <!-- AMBIENT STATUS MESSAGE -->
       <div class="status-msg-zone">
-        <span class="card-eyebrow">My Status</span>
+        <span class="card-eyebrow">Status Message</span>
         <div class="status-msg-row">
           <input
             class="status-msg-input"

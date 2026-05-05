@@ -42,3 +42,10 @@ export const walkDestination = writable(null);
  * to enter navigation mode. Set to { active: false } to exit.
  */
 export const navigationState = writable({ active: false });
+
+/**
+ * Set to a user object when a map marker is tapped on mobile.
+ * UsersList watches this to open the quick-action sheet directly.
+ * Automatically reset to null after consumption.
+ */
+export const mapTappedUser = writable(null);

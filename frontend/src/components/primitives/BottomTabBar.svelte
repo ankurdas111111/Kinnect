@@ -1,5 +1,6 @@
 <script>
   import { createEventDispatcher } from 'svelte';
+  import { haptics } from '../../lib/haptics.js';
 
   export let activeTab = 'track';
   export let isAdmin = false;
@@ -10,8 +11,21 @@
   const tabOrder = ['track', 'people', 'share', 'safety', 'me'];
 
   function selectTab(tab) {
+    // Different haptic intensity per tab to give tactile identity to each section
+    if (tab === 'safety') haptics.warning?.();
+    else if (tab === 'people' || tab === 'share') haptics.confirm?.();
+    else haptics.tap?.();
     dispatch('tabChange', tab);
   }
+
+  // Tab display metadata — IDs stay unchanged so all store/logic bindings are unaffected
+  const tabMeta = {
+    track:  { label: 'Map',     ariaBase: 'Map' },
+    people: { label: 'People',  ariaBase: 'People' },
+    share:  { label: 'Connect', ariaBase: 'Connect' },
+    safety: { label: 'Safety',  ariaBase: 'Safety' },
+    me:     { label: 'Profile', ariaBase: 'Profile' },
+  };
 
   function onTabKeydown(e, tab) {
     const idx = tabOrder.indexOf(tab);
@@ -47,7 +61,7 @@
     role="tab"
     aria-selected={activeTab === 'track'}
     tabindex={activeTab === 'track' ? 0 : -1}
-    aria-label={isTracking ? 'Track, tracking active' : 'Track'}
+    aria-label={isTracking ? 'Map, tracking active' : 'Map'}
   >
     <div class="tab-icon-wrap">
       {#if activeTab === 'track'}
@@ -59,7 +73,7 @@
         <span class="tracking-dot" aria-hidden="true"></span>
       {/if}
     </div>
-    <span class="tab-label">Track</span>
+    <span class="tab-label">Map</span>
   </button>
 
   <button
@@ -88,14 +102,14 @@
     role="tab"
     aria-selected={activeTab === 'share'}
     tabindex={activeTab === 'share' ? 0 : -1}
-    aria-label="Share"
+    aria-label="Connect"
   >
     {#if activeTab === 'share'}
       <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="2" x2="12" y2="15" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
     {:else}
       <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
     {/if}
-    <span class="tab-label">Share</span>
+    <span class="tab-label">Connect</span>
   </button>
 
   <button

@@ -38,6 +38,9 @@
 
   // Quiet Hours state
   let quietHoursEnabled = false;
+
+  // Panic Mode state (opt-in: double-tap SOS FAB fires SOS without confirm modal)
+  let panicMode = localStorage.getItem('kinnect_panic_mode') === 'true';
   let quietHoursStart = '22:00';
   let quietHoursEnd = '07:00';
 
@@ -433,6 +436,23 @@
         </div>
       {/if}
       <button class="btn btn-primary btn-sm" on:click={saveQuietHours}>Save Quiet Hours</button>
+    </div>
+
+    <hr class="divider" />
+    <h4 class="section-title-bold">Panic Mode</h4>
+    <div class="form-section">
+      <p class="hint">Double-tap the SOS button to send an alert instantly, skipping the confirmation step. Only enable if you might need to trigger SOS one-handed in an emergency.</p>
+      <label class="toggle-row">
+        <span>Enable Panic Mode</span>
+        <button
+          class="toggle-btn"
+          class:on={panicMode}
+          on:click={() => { panicMode = !panicMode; localStorage.setItem('kinnect_panic_mode', String(panicMode)); }}
+          aria-label={panicMode ? 'Disable panic mode' : 'Enable panic mode'}
+        >
+          <span class="toggle-knob"></span>
+        </button>
+      </label>
     </div>
 
     <hr class="divider" />

@@ -2,7 +2,7 @@
   import { createEventDispatcher } from 'svelte';
   import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
-  import { otherUsers, myLocation, focusUser } from '../lib/stores/map.js';
+  import { otherUsers, myLocation, focusUser, mapTappedUser } from '../lib/stores/map.js';
   import { authUser } from '../lib/stores/auth.js';
   import { socket } from '../lib/socket.js';
   import { banner } from '../lib/stores/sos.js';
@@ -127,6 +127,43 @@
 
   function closeQuickActions() { quickUser = null; }
 
+  // Feature 2: When map marker is tapped on mobile, open quick-action sheet
+  $: if ($mapTappedUser) {
+    quickUser = $mapTappedUser;
+    mapTappedUser.set(null);
+  }
+
+  // ── Pull-to-refresh ──────────────────────────────────────────────────────
+  let pullStartY = 0;
+  let pullDelta = 0;
+  let pullRefreshing = false;
+  let pullBodyEl;
+
+  function onPullTouchStart(e) {
+    if (pullBodyEl && pullBodyEl.scrollTop > 0) return;
+    pullStartY = e.touches[0].clientY;
+    pullDelta = 0;
+  }
+
+  function onPullTouchMove(e) {
+    if (!pullStartY) return;
+    if (pullBodyEl && pullBodyEl.scrollTop > 0) { pullStartY = 0; return; }
+    const dy = e.touches[0].clientY - pullStartY;
+    if (dy > 0) pullDelta = Math.min(dy, 90);
+  }
+
+  function onPullTouchEnd() {
+    if (pullDelta > 60 && !pullRefreshing) {
+      pullRefreshing = true;
+      haptics.confirm?.();
+      dispatch('refresh');
+      setTimeout(() => { pullRefreshing = false; pullDelta = 0; }, 800);
+    } else {
+      pullDelta = 0;
+    }
+    pullStartY = 0;
+  }
+
   function qaLocate() {
     if (!quickUser) return;
     locateUser(quickUser.socketId);
@@ -196,14 +233,32 @@
 <div class="panel-shell panel-right panel-base" class:embedded-view={embedded} transition:fly={{ x: 400, duration: 250, easing: cubicOut }}>
   {#if !embedded}
     <div class="panel-header">
-      <h3>Family</h3>
-      <button class="btn btn-icon btn-ghost panel-close-btn" aria-label="Close people panel" on:click={() => dispatch('close')}>
+      <h3>People</h3>
+      <button class="btn btn-icon btn-ghost panel-close-btn" aria-label="Close" on:click={() => dispatch('close')}>
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
   {/if}
 
-  <div class="panel-body panel-list-body users-list-body">
+  <div
+    class="panel-body panel-list-body users-list-body"
+    bind:this={pullBodyEl}
+    on:touchstart={onPullTouchStart}
+    on:touchmove={onPullTouchMove}
+    on:touchend={onPullTouchEnd}
+  >
+    <!-- Pull-to-refresh indicator -->
+    {#if pullDelta > 0 || pullRefreshing}
+      <div class="pull-indicator" style="height: {pullRefreshing ? 44 : pullDelta * 0.5}px; opacity: {pullRefreshing ? 1 : pullDelta / 60};" aria-hidden="true">
+        {#if pullRefreshing}
+          <span class="pull-spinner"></span>
+        {:else}
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="transform: rotate({(pullDelta / 60) * 180}deg)">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        {/if}
+      </div>
+    {/if}
 
     <!-- Section label -->
     {#if $myLocation || userList.length > 0}
@@ -255,13 +310,13 @@
       <!-- Full empty state — nobody here yet -->
       <div class="empty-state-container">
         <KinnectNexus />
-        <p class="empty-title">Your family will appear here</p>
-        <p class="empty-desc">Share your code with family members so you can see each other on the map</p>
+        <p class="empty-title">Your people will appear here</p>
+        <p class="empty-desc">Share your code with friends or family so you can see each other on the map</p>
       </div>
     {:else if userList.length === 0}
       <!-- Just self is visible — prompt to add people -->
       <div class="empty-state-container empty-state-solo">
-        <p class="empty-desc">Invite your family to Kinnect — they'll appear here once connected</p>
+        <p class="empty-desc">Invite friends or family to Kinnect — they'll appear here once connected</p>
       </div>
     {:else}
       <div class="vlist-region">
@@ -464,6 +519,30 @@
 </div>
 
 <style>
+  /* ── Pull-to-refresh indicator ─────────────────────────────────────────── */
+  .pull-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    transition: height 120ms ease, opacity 120ms ease;
+    color: var(--primary-400);
+    flex-shrink: 0;
+  }
+
+  .pull-spinner {
+    width: 18px;
+    height: 18px;
+    border: 2.5px solid rgba(20, 184, 166, 0.25);
+    border-top-color: var(--primary-400);
+    border-radius: 50%;
+    animation: pull-spin 0.7s linear infinite;
+  }
+
+  @keyframes pull-spin {
+    to { transform: rotate(360deg); }
+  }
+
   /* ── VirtualList layout ────────────────────────────────────────────────── */
   .users-list-body {
     display: flex;
@@ -644,6 +723,8 @@
     display: flex;
     align-items: center;
     gap: var(--space-1-5);
+    min-width: 0;
+    overflow: hidden;
   }
 
   .user-name {

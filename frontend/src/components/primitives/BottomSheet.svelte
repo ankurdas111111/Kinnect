@@ -9,6 +9,7 @@
   let sheetEl;
   let dragging = false;
   let startY = 0;
+  let startTime = 0;
   let currentOffset = 0;
   let snapState = 'peek';
   let lastFocusedEl = null;
@@ -39,6 +40,7 @@
     if (e.target.closest('.sheet-body')) return;
     dragging = true;
     startY = e.clientY;
+    startTime = Date.now();
     if (sheetEl) sheetEl.style.transition = 'none';
   }
 
@@ -68,7 +70,15 @@
     if (sheetEl) sheetEl.style.transition = '';
 
     const delta = e.clientY - startY;
-    const rawOffset = currentOffset + delta;
+    const elapsed = Math.max(Date.now() - startTime, 1);
+    // px/s downward velocity
+    const velocity = (delta / elapsed) * 1000;
+
+    // Momentum dismiss: fast flick downward from peek → dismiss without needing full drag distance
+    if (velocity > 200 && snapState === 'peek') {
+      dismiss();
+      return;
+    }
 
     if (delta > 80) {
       if (snapState === 'full') { snap('half'); }

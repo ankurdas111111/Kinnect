@@ -3,7 +3,8 @@ import { otherUsers, mySocketId, myLocation, mySafetyStatus } from './stores/map
 import { myRooms, myShareCode, myContactInfo, roomNotes } from './stores/rooms.js';
 import { myContacts } from './stores/contacts.js';
 import { myGuardianData, canManage, pendingIncomingRequests } from './stores/guardians.js';
-import { banner, alertState, myLiveLinks, mySosActive, sosNarratives, activeSosUsers } from './stores/sos.js';
+import { banner, alertState, myLiveLinks, mySosActive, sosNarratives, activeSosUsers, geofenceShake } from './stores/sos.js';
+import { haptics } from './haptics.js';
 import { adminOverview } from './stores/admin.js';
 import { authUser } from './stores/auth.js';
 import { drainBuffer, hasBuffered } from './offlineBuffer.js';
@@ -582,6 +583,11 @@ export function setupSocketHandlers() {
     if (!data) return;
     const action = data.type === 'arrive' ? 'arrived at' : 'left';
     setBanner({ type: 'info', text: `${data.targetName || 'Someone'} ${action} ${data.placeName || 'a place'}`, actions: [] }, 5000);
+    // Feature 8: geofence breach (leave) → haptic warning + camera shake in AlertOverlay
+    if (data.type === 'leave') {
+      haptics.warning?.();
+      geofenceShake.update(n => n + 1);
+    }
   });
 
   // ── F5: Speed alert — guardian receives when ward exceeds threshold ────────────
