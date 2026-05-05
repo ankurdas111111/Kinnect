@@ -1,0 +1,26 @@
+frontend/src/components/Map.svelte
+  b72fd53c-2fa0-4f4e-b181-e881df2e8661:2026-05-05T22:22:25.316Z 6,235-247,462-464,1108-1110
+frontend/src/components/PersonCard.svelte
+  4aac7d25-46ec-4dc7-aa61-3d1404ebf06d:2026-05-05T22:13:32.328Z 47-58,130,179,183,245-247,346-347,356,374-378,385-386,404-406,412-420,422-428,487-489,505-511,529
+frontend/src/components/SecretChatPanel.svelte
+  b72fd53c-2fa0-4f4e-b181-e881df2e8661:2026-05-05T21:57:47.375Z 18,20,23,25-26,29-32,34-37,67-71,73-76,92,106-116,118,144,147-148,281,319-320,329,354-355,359-364,370-402,407,409,416,418-422,424,428,434-439,443-446,450-461,465-468,483-494,501,547-556,565,567,570,581,596,607,650,706,709,732,741,745,747,754,759,761,766,802-804,812,820-821,834-835,837,866-873,875-882,884-888,890-897,899,901-902,904-905,907-917,919-926,928-936,947,957,980,985-992,995,1000,1003,1024-1027,1036-1040,1044,1051,1135,1142,1147,1205,1231-1233,1236,1249
+frontend/src/components/SosFloat.svelte
+  32a99a15-82f7-43ff-9f88-2ee2c309d116:2026-05-05T22:08:37.808Z 191,202-203,205-226,259,336,475-477
+frontend/src/components/UsersList.svelte
+  b72fd53c-2fa0-4f4e-b181-e881df2e8661:2026-05-05T22:25:31.798Z 9,80,84-88,108,126,237-256,289-312,339,374,376,384,397,544,546,550-555,564-571,573-581,583-592,594,596-608,610,612-625,627-629,631-633,635-645,647-657,762,766,768-770,773-777,779-780,847-850,852-855
+frontend/src/global.css
+  4aac7d25-46ec-4dc7-aa61-3d1404ebf06d:2026-05-05T22:16:45.941Z 114-116,125-128,1096,1100-1101,1761,1763-1772,1774-1782,1784-1795
+frontend/src/lib/stores/auth.js
+  4aac7d25-46ec-4dc7-aa61-3d1404ebf06d:2026-05-05T21:55:39.568Z 7-16,22-25,27-36
+frontend/src/lib/stores/map.js
+  b72fd53c-2fa0-4f4e-b181-e881df2e8661:2026-05-05T22:21:42.761Z 53-57
+frontend/src/pages/Login.svelte
+  4aac7d25-46ec-4dc7-aa61-3d1404ebf06d:2026-05-05T22:17:49.426Z 8,213,235-237,270,287,403,407-415
+frontend/src/pages/MainApp.svelte
+  b72fd53c-2fa0-4f4e-b181-e881df2e8661:2026-05-05T22:22:45.867Z 8,76-77
+frontend/src/pages/SecretChatViewer.svelte
+  b72fd53c-2fa0-4f4e-b181-e881df2e8661:2026-05-05T22:00:50.451Z 18-20,43,56-60,62-65,67,105-111,114,121-131,133,187,263,266-267,269-275,277,279-284,286-288,290-321,323-329,347-360,364,366-370,376,380-385,388-391,395-397,400-403,413-421,427,447,468-470,501,512,558,582,584-591,593-601,603-605,609,612,616,619,621-622,624-630,632-638,641-648,650-654,656-660,662-663,665,667-668,670,672-685,687-690,692,700-701,706,709,715-721,728-740,746-753,755-762,765,767-769,774-782,784-794,798-810,814-825,835-860,862-876,883-891,894-906,908-922,927-937,947
+frontend/src/styles/auth.css
+  4aac7d25-46ec-4dc7-aa61-3d1404ebf06d:2026-05-05T22:15:02.107Z 10,82-84,324-325,341-343,347-349,352-353,513-514,516,518,571,590-606,608-610
+---
+{"schema_version": "authorship/3.0.0", "base_commit_sha": "HEAD~1", "prompts": {"b72fd53c-2fa0-4f4e-b181-e881df2e8661:2026-05-05T22:22:25.316Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 20, "overriden_lines": 0}, "4aac7d25-46ec-4dc7-aa61-3d1404ebf06d:2026-05-05T22:13:32.328Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 58, "overriden_lines": 0}, "b72fd53c-2fa0-4f4e-b181-e881df2e8661:2026-05-05T21:57:47.375Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 264, "overriden_lines": 0}, "32a99a15-82f7-43ff-9f88-2ee2c309d116:2026-05-05T22:08:37.808Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 30, "overriden_lines": 0}, "b72fd53c-2fa0-4f4e-b181-e881df2e8661:2026-05-05T22:25:31.798Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 170, "overriden_lines": 0}, "4aac7d25-46ec-4dc7-aa61-3d1404ebf06d:2026-05-05T22:16:45.941Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 42, "overriden_lines": 0}, "4aac7d25-46ec-4dc7-aa61-3d1404ebf06d:2026-05-05T21:55:39.568Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 24, "overriden_lines": 0}, "b72fd53c-2fa0-4f4e-b181-e881df2e8661:2026-05-05T22:21:42.761Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 5, "overriden_lines": 0}, "4aac7d25-46ec-4dc7-aa61-3d1404ebf06d:2026-05-05T22:17:49.426Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 17, "overriden_lines": 0}, "b72fd53c-2fa0-4f4e-b181-e881df2e8661:2026-05-05T22:22:45.867Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 3, "overriden_lines": 0}, "b72fd53c-2fa0-4f4e-b181-e881df2e8661:2026-05-05T22:00:50.451Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 412, "overriden_lines": 0}, "4aac7d25-46ec-4dc7-aa61-3d1404ebf06d:2026-05-05T22:15:02.107Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 39, "overriden_lines": 0}}}
