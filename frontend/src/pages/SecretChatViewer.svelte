@@ -4,6 +4,7 @@
 
 <script>
   import { onMount, tick } from 'svelte';
+  import { fade } from 'svelte/transition';
   import { decryptMessage, encryptMessage } from '../lib/crypto.js';
   import EmojiPicker from '../components/primitives/EmojiPicker.svelte';
   import StickerPicker from '../components/primitives/StickerPicker.svelte';
@@ -36,6 +37,15 @@
   let stickerOpen = false;
   let stickerAnchor;
   let panicMode = false;
+
+  // PIN shake feedback
+  let pinShake = false;
+  let _pinShakeTimer = null;
+  function triggerShake() {
+    pinShake = true;
+    clearTimeout(_pinShakeTimer);
+    _pinShakeTimer = setTimeout(() => { pinShake = false; }, 520);
+  }
 
   function restoreFromPanic() {
     panicMode = false;
@@ -113,6 +123,7 @@
         pinError = 'Incorrect PIN';
         unlocking = false;
         pinDigits = [];
+        triggerShake();
         return;
       }
     }
@@ -250,6 +261,22 @@
     const m = GIF_RE.exec(text);
     return m ? m[1] : null;
   }
+
+  // Date divider helper
+  function dateLabel(ts, prevTs) {
+    const d = new Date(ts);
+    const p = prevTs ? new Date(prevTs) : null;
+    if (p && d.toDateString() === p.toDateString()) return null;
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    if (d.toDateString() === today.toDateString()) return 'Today';
+    if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    return d.toLocaleDateString([], {
+      month: 'short', day: 'numeric',
+      year: d.getFullYear() !== today.getFullYear() ? 'numeric' : undefined,
+    });
+  }
 </script>
 
 {#if panicMode}
@@ -292,7 +319,7 @@
         <p class="scv-gate-label">Enter access code</p>
 
         <!-- PIN dot indicators -->
-        <div class="scv-pin-dots" aria-live="polite" aria-label="{pinDigits.length} digit{pinDigits.length === 1 ? '' : 's'} entered">
+        <div class="scv-pin-dots" class:scv-pin-dots--shake={pinShake} aria-live="polite" aria-label="{pinDigits.length} digit{pinDigits.length === 1 ? '' : 's'} entered">
           {#each {length: Math.max(4, pinDigits.length)} as _, i}
             <div class="scv-pin-dot" class:scv-pin-dot--filled={i < pinDigits.length}></div>
           {/each}
@@ -337,10 +364,15 @@
 
         <button
           class="scv-gate-btn"
+          class:scv-gate-btn--ready={pin.length >= 4}
           on:click={unlock}
           disabled={unlocking || pin.length < 4}
         >
-          {unlocking ? '…' : 'Continue'}
+          {#if unlocking}
+            <div class="scv-gate-spinner"></div>
+          {:else}
+            {pin.length >= 4 ? 'Open' : 'Continue'}
+          {/if}
         </button>
       </div>
     </div>
@@ -388,9 +420,14 @@
           </div>
         {/if}
 
-        {#each groupedDecrypted as msg (msg.id)}
+        {#each groupedDecrypted as msg, i (msg.id)}
           {@const showInline = activeDecryptId === msg.id}
           {@const isDecrypted = !msg.own && msg.body !== null && !lockedSet.has(msg.id)}
+          {@const label = dateLabel(msg.createdAt, i > 0 ? groupedDecrypted[i-1].createdAt : null)}
+
+          {#if label}
+            <div class="scv-date-div"><span>{label}</span></div>
+          {/if}
 
           <div
             class="scv-msg"
@@ -969,4 +1006,68 @@
 
   .scv-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
   @keyframes scv-spin { to { transform: rotate(360deg); } }
+
+  /* ── PIN shake animation ────────────────────────────────────── */
+  @keyframes scv-shake {
+    0%, 100% { transform: translateX(0); }
+    15%      { transform: translateX(-7px); }
+    35%      { transform: translateX(7px); }
+    55%      { transform: translateX(-5px); }
+    75%      { transform: translateX(4px); }
+    90%      { transform: translateX(-2px); }
+  }
+  .scv-pin-dots--shake { animation: scv-shake 0.48s cubic-bezier(.36,.07,.19,.97) both; }
+
+  /* ── Gate button CTA state (4+ digits entered) ──────────────── */
+  .scv-gate-btn--ready {
+    background: rgba(129,140,248,0.85);
+    color: #fff;
+    border-color: transparent;
+    font-weight: 600;
+  }
+  .scv-gate-btn--ready:hover:not(:disabled) {
+    background: #818cf8;
+    color: #fff;
+    border-color: transparent;
+  }
+  .scv-gate-spinner {
+    width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.25);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: scv-spin 0.8s linear infinite;
+    margin: 0 auto;
+  }
+
+  /* ── Message slide-in animation ─────────────────────────────── */
+  @keyframes scv-msg-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .scv-msg { animation: scv-msg-in 0.18s ease-out both; }
+
+  /* ── Date divider ───────────────────────────────────────────── */
+  .scv-date-div {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 10px 0 6px;
+    align-self: stretch;
+    animation: scv-msg-in 0.18s ease-out both;
+  }
+  .scv-date-div::before,
+  .scv-date-div::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(255,255,255,0.06);
+  }
+  .scv-date-div span {
+    font-size: 10px;
+    color: rgba(255,255,255,0.22);
+    white-space: nowrap;
+    font-family: system-ui, sans-serif;
+    letter-spacing: 0.03em;
+    padding: 2px 4px;
+  }
 </style>

@@ -84,6 +84,28 @@
   let stickerAnchor;
   let panicMode = false;
 
+  // Delete confirmation — two-tap: first tap enters confirm mode, second executes
+  let deletingMsgId = null;
+
+  // PIN shake feedback for wrong inline PIN
+  let pinShake = false;
+  let _pinShakeTimer = null;
+  function triggerShake() {
+    pinShake = true;
+    clearTimeout(_pinShakeTimer);
+    _pinShakeTimer = setTimeout(() => { pinShake = false; }, 520);
+  }
+
+  function deleteMsg(msgId) {
+    if (deletingMsgId === msgId) {
+      socket.emit('deleteSecretMsg', { id: msgId });
+      deletingMsgId = null;
+    } else {
+      deletingMsgId = msgId;
+      setTimeout(() => { if (deletingMsgId === msgId) deletingMsgId = null; }, 2500);
+    }
+  }
+
   function restoreFromPanic() {
     panicMode = false;
     gateOpen = false;
@@ -182,6 +204,7 @@
       startAutoLock(msg.id);
     } catch {
       inlineErrors = { ...inlineErrors, [msg.id]: 'Wrong PIN' };
+      triggerShake();
     } finally {
       inlineUnlocking = { ...inlineUnlocking, [msg.id]: false };
     }
@@ -276,6 +299,22 @@
     const m = GIF_RE.exec(text);
     return m ? m[1] : null;
   }
+
+  // Date divider — returns label string if this message starts a new day vs prev
+  function dateLabel(ts, prevTs) {
+    const d = new Date(ts);
+    const p = prevTs ? new Date(prevTs) : null;
+    if (p && d.toDateString() === p.toDateString()) return null;
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    if (d.toDateString() === today.toDateString()) return 'Today';
+    if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    return d.toLocaleDateString([], {
+      month: 'short', day: 'numeric',
+      year: d.getFullYear() !== today.getFullYear() ? 'numeric' : undefined,
+    });
+  }
 </script>
 
 {#if panicMode}
@@ -364,7 +403,7 @@
       </div>
 
       <!-- PIN dot indicators -->
-      <div class="scp-pin-dots" aria-live="polite" aria-label="{pinDigits.length} digit{pinDigits.length === 1 ? '' : 's'} entered">
+      <div class="scp-pin-dots" class:scp-pin-dots--shake={pinShake} aria-live="polite" aria-label="{pinDigits.length} digit{pinDigits.length === 1 ? '' : 's'} entered">
         {#each {length: Math.max(4, pinDigits.length)} as _, i}
           <div class="scp-pin-dot" class:scp-pin-dot--filled={i < pinDigits.length}></div>
         {/each}
@@ -432,11 +471,16 @@
         </div>
       {/if}
 
-      {#each groupedMsgs as msg (msg.id)}
+      {#each groupedMsgs as msg, i (msg.id)}
         {@const d = getMsgDisplay(msg, lockedSet, chat.decryptedMessages)}
         {@const unread = isUnread(msg)}
         {@const decrypted = !d.isOwn && d.plain !== null}
         {@const showInline = activeDecryptId === msg.id}
+        {@const label = dateLabel(msg.createdAt, i > 0 ? groupedMsgs[i-1].createdAt : null)}
+
+        {#if label}
+          <div class="scp-date-div"><span>{label}</span></div>
+        {/if}
 
         <div
           class="scp-msg"
@@ -466,6 +510,25 @@
                 </span>
               </div>
             {/if}
+
+            <!-- Delete action — subtle on desktop (hover), always visible on mobile -->
+            <div class="scp-msg-actions">
+              <button
+                class="scp-delete-btn"
+                class:scp-delete-btn--confirm={deletingMsgId === msg.id}
+                on:click={() => deleteMsg(msg.id)}
+                aria-label={deletingMsgId === msg.id ? 'Tap again to confirm delete' : 'Delete message'}
+                title={deletingMsgId === msg.id ? 'Tap again to delete' : 'Delete'}
+                type="button"
+              >
+                {#if deletingMsgId === msg.id}
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                  Delete?
+                {:else}
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                {/if}
+              </button>
+            </div>
 
           {:else if decrypted}
             <!-- Received + decrypted -->
@@ -652,10 +715,15 @@
         on:pick={(e) => { composeText += e.detail; stickerOpen = false; }}
         on:close={() => stickerOpen = false}
       />
-      <p class="scp-compose-hint">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        End-to-end encrypted
-      </p>
+      <div class="scp-compose-meta">
+        <p class="scp-compose-hint">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          End-to-end encrypted
+        </p>
+        {#if composeText.length > 1800}
+          <span class="scp-char-count" class:scp-char-count--warn={composeText.length > 1950}>{2000 - composeText.length}</span>
+        {/if}
+      </div>
     </div>
   {/if}
 </div>
@@ -1318,4 +1386,113 @@
     0%, 100% { box-shadow: 0 0 0 0 rgba(74,222,128,0.4); }
     50%       { box-shadow: 0 0 0 4px rgba(74,222,128,0); }
   }
+
+  /* ── Message slide-in animation ─────────────────────────────── */
+  @keyframes scp-msg-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .scp-msg { animation: scp-msg-in 0.18s ease-out both; }
+
+  /* ── Date divider ───────────────────────────────────────────── */
+  .scp-date-div {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 10px 0 6px;
+    align-self: stretch;
+    animation: scp-msg-in 0.18s ease-out both;
+  }
+  .scp-date-div::before,
+  .scp-date-div::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(255,255,255,0.06);
+  }
+  .scp-date-div span {
+    font-size: 10px;
+    color: rgba(255,255,255,0.22);
+    white-space: nowrap;
+    font-family: system-ui, sans-serif;
+    letter-spacing: 0.03em;
+    padding: 2px 4px;
+  }
+
+  /* ── PIN shake animation ────────────────────────────────────── */
+  @keyframes scp-shake {
+    0%, 100% { transform: translateX(0); }
+    15%      { transform: translateX(-7px); }
+    35%      { transform: translateX(7px); }
+    55%      { transform: translateX(-5px); }
+    75%      { transform: translateX(4px); }
+    90%      { transform: translateX(-2px); }
+  }
+  .scp-pin-dots--shake { animation: scp-shake 0.48s cubic-bezier(.36,.07,.19,.97) both; }
+
+  /* ── PIN dot bounce on fill ─────────────────────────────────── */
+  @keyframes scp-dot-pop {
+    0%   { transform: scale(1); }
+    45%  { transform: scale(1.35); }
+    100% { transform: scale(1.1); }
+  }
+
+  /* ── Delete button + actions row ─────────────────────────────── */
+  .scp-msg-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 2px;
+    opacity: 0;
+    transition: opacity 0.15s;
+    min-height: 22px;
+  }
+  .scp-msg--own:hover .scp-msg-actions,
+  .scp-msg--own:focus-within .scp-msg-actions {
+    opacity: 1;
+  }
+  /* Always visible (dimly) on touch devices */
+  @media (hover: none) {
+    .scp-msg-actions { opacity: 0.4; }
+  }
+
+  .scp-delete-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: rgba(255,255,255,0.22);
+    font-size: 10px;
+    font-family: system-ui, sans-serif;
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+    touch-action: manipulation;
+    min-height: 28px;
+  }
+  .scp-delete-btn:hover {
+    color: rgba(248,113,113,0.8);
+    background: rgba(248,113,113,0.08);
+  }
+  .scp-delete-btn--confirm {
+    color: #f87171;
+    background: rgba(248,113,113,0.12);
+    border-radius: 8px;
+  }
+
+  /* ── Compose meta row (hint + char count) ───────────────────── */
+  .scp-compose-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .scp-char-count {
+    font-size: 10px;
+    color: rgba(255,255,255,0.28);
+    font-family: system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
+    transition: color 0.2s;
+  }
+  .scp-char-count--warn { color: rgba(248,113,113,0.75); }
 </style>
