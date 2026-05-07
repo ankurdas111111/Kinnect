@@ -210,6 +210,23 @@
     decrypted = decrypted.map(m => m.id === id ? { ...m, body: null } : m);
   }
 
+  // Sticky scroll — only auto-scroll when user is near the bottom
+  let userScrolledUp = false;
+  let unreadWhileScrolledUp = 0;
+
+  function handleMessagesScroll() {
+    if (!messagesEl) return;
+    const { scrollTop, scrollHeight, clientHeight } = messagesEl;
+    userScrolledUp = scrollHeight - scrollTop - clientHeight > 60;
+    if (!userScrolledUp) unreadWhileScrolledUp = 0;
+  }
+
+  function jumpToBottom() {
+    if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
+    userScrolledUp = false;
+    unreadWhileScrolledUp = 0;
+  }
+
   // ── Reply ─────────────────────────────────────────────────────
   async function sendReply() {
     if (sending || !replyText.trim() || gatePin.length < 4) return;
@@ -231,7 +248,7 @@
       replyText = '';
       replySent = true;
       await tick();
-      if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
+      if (!userScrolledUp && messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
     } catch {
       replyError = 'Send failed. Check your connection.';
     } finally {
@@ -381,6 +398,17 @@
   {:else if state === 'messages'}
     <div class="scv-view">
       <div class="scv-header">
+        <!-- Back — returns to gate, keeps the invite link alive -->
+        <button
+          class="scv-back-btn"
+          on:click={() => { state = 'gate'; gatePin = ''; decrypted = []; activeDecryptId = null; for (const id of Object.keys(lockIntervals)) clearInterval(lockIntervals[id]); lockIntervals = {}; lockCountdowns = {}; lockedSet = new Set(); pinDigits = []; pinError = ''; }}
+          aria-label="Back to access code"
+          type="button"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="15 18 9 12 15 6"/>
+          </svg>
+        </button>
         <div class="scv-header-lock">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
@@ -407,7 +435,7 @@
         </button>
       </div>
 
-      <div class="scv-msgs" bind:this={messagesEl}>
+      <div class="scv-msgs" bind:this={messagesEl} on:scroll={handleMessagesScroll} role="log" aria-live="polite" aria-label="Secret chat messages">
         {#if groupedDecrypted.length === 0}
           <div class="scv-empty">
             <div class="scv-empty-ring" aria-hidden="true">
@@ -445,7 +473,7 @@
                 <span>Sent · encrypted</span>
               </div>
               {#if msg.groupLast}
-                <span class="scv-time">{clockTime(msg.createdAt)}</span>
+                <time class="scv-time" datetime={msg.createdAt}>{clockTime(msg.createdAt)}</time>
               {/if}
 
             {:else if isDecrypted}
@@ -467,7 +495,7 @@
                   {#if lockCountdowns[msg.id] != null}
                     <span class="scv-countdown">Locks in {lockCountdowns[msg.id]}s</span>
                   {:else}
-                    <span class="scv-time">{clockTime(msg.createdAt)}</span>
+                    <time class="scv-time" datetime={msg.createdAt}>{clockTime(msg.createdAt)}</time>
                   {/if}
                 </div>
               {/if}
@@ -518,7 +546,7 @@
               {/if}
 
               {#if msg.groupLast}
-                <span class="scv-time">{clockTime(msg.createdAt)}</span>
+                <time class="scv-time" datetime={msg.createdAt}>{clockTime(msg.createdAt)}</time>
               {/if}
             {/if}
           </div>
@@ -531,6 +559,21 @@
           </div>
         {/if}
       </div>
+
+      <!-- Scroll-to-bottom FAB -->
+      {#if userScrolledUp}
+        <button
+          class="scv-scroll-fab"
+          on:click={jumpToBottom}
+          aria-label="Jump to latest messages"
+          type="button"
+          transition:fade={{ duration: 120 }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </button>
+      {/if}
 
       <!-- Compose -->
       <div class="scv-compose">
@@ -620,10 +663,32 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #0d0d14;
+    background: #07070f;
     box-sizing: border-box;
     font-family: system-ui, sans-serif;
+    position: relative;
+    overflow: hidden;
   }
+  /* Animated gradient mesh behind all content */
+  .scv::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 70% 55% at 20% 10%, rgba(99,102,241,0.1) 0%, transparent 60%),
+      radial-gradient(ellipse 55% 45% at 80% 90%, rgba(168,85,247,0.08) 0%, transparent 55%),
+      radial-gradient(ellipse 45% 40% at 60% 40%, rgba(59,130,246,0.04) 0%, transparent 55%);
+    pointer-events: none;
+    z-index: 0;
+    animation: scv-mesh-shift 14s ease-in-out infinite alternate;
+  }
+  @keyframes scv-mesh-shift {
+    0%   { opacity: 1; }
+    50%  { opacity: 0.6; }
+    100% { opacity: 1; }
+  }
+  /* Ensure all children sit above mesh */
+  .scv > * { position: relative; z-index: 1; }
 
   /* ── Loading / error ───────────────────────────────────────────── */
   .scv-center { display: flex; flex-direction: column; align-items: center; gap: 16px; }
@@ -642,14 +707,19 @@
     overflow: hidden;
   }
 
-  /* Subtle ambient glow — makes page feel intentional, not broken */
+  /* Ambient glow — makes page feel alive */
   .scv-gate-glow {
     position: absolute;
     inset: 0;
     background:
-      radial-gradient(ellipse 60% 40% at 50% 35%, rgba(129,140,248,0.06) 0%, transparent 70%),
-      radial-gradient(ellipse 40% 30% at 70% 70%, rgba(99,102,241,0.04) 0%, transparent 60%);
+      radial-gradient(ellipse 65% 45% at 50% 30%, rgba(99,102,241,0.1) 0%, transparent 70%),
+      radial-gradient(ellipse 50% 40% at 75% 75%, rgba(168,85,247,0.07) 0%, transparent 60%);
     pointer-events: none;
+    animation: scv-glow-breathe 8s ease-in-out infinite;
+  }
+  @keyframes scv-glow-breathe {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.65; }
   }
 
   .scv-gate-content {
@@ -665,12 +735,18 @@
   }
 
   .scv-gate-icon {
-    width: 56px; height: 56px;
+    width: 68px; height: 68px;
     border-radius: 50%;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.09);
+    background: rgba(99,102,241,0.09);
+    border: 1px solid rgba(129,140,248,0.22);
+    box-shadow: 0 0 0 10px rgba(99,102,241,0.04), 0 0 36px rgba(99,102,241,0.14);
     display: flex; align-items: center; justify-content: center;
-    color: rgba(255,255,255,0.25);
+    color: rgba(165,180,252,0.8);
+    animation: scv-icon-breathe 5s ease-in-out infinite;
+  }
+  @keyframes scv-icon-breathe {
+    0%, 100% { box-shadow: 0 0 0 10px rgba(99,102,241,0.04), 0 0 36px rgba(99,102,241,0.14); }
+    50%       { box-shadow: 0 0 0 16px rgba(99,102,241,0.02), 0 0 52px rgba(99,102,241,0.2); }
   }
 
   .scv-gate-label {
@@ -691,18 +767,19 @@
   }
 
   .scv-pin-dot {
-    width: 13px; height: 13px;
+    width: 14px; height: 14px;
     border-radius: 50%;
-    border: 2px solid rgba(255,255,255,0.18);
+    border: 2px solid rgba(129,140,248,0.22);
     background: transparent;
-    transition: background 0.12s, border-color 0.12s, transform 0.1s;
+    transition: background 0.15s, border-color 0.15s, transform 0.15s, box-shadow 0.15s;
     flex-shrink: 0;
   }
 
   .scv-pin-dot--filled {
-    background: rgba(255,255,255,0.5);
-    border-color: rgba(255,255,255,0.5);
-    transform: scale(1.1);
+    background: linear-gradient(135deg, #818cf8, #6366f1);
+    border-color: transparent;
+    transform: scale(1.2);
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.2), 0 0 12px rgba(99,102,241,0.4);
   }
 
   /* ── Number pad (viewer) ────────────────────────────────────────── */
@@ -721,19 +798,28 @@
     border-radius: 14px;
     border: 1px solid rgba(255,255,255,0.07);
     background: rgba(255,255,255,0.04);
-    color: rgba(255,255,255,0.7);
-    font-size: 20px;
-    font-weight: 400;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: rgba(255,255,255,0.75);
+    font-size: 21px;
+    font-weight: 300;
     cursor: pointer;
     font-family: system-ui, sans-serif;
-    transition: background 0.1s, transform 0.08s;
+    transition: background 0.12s, transform 0.08s, box-shadow 0.12s, border-color 0.12s;
     touch-action: manipulation;
     display: flex; align-items: center; justify-content: center;
     user-select: none;
     -webkit-user-select: none;
   }
-  .scv-numpad-key:hover:not(:disabled) { background: rgba(255,255,255,0.08); }
-  .scv-numpad-key:active:not(:disabled) { background: rgba(255,255,255,0.12); transform: scale(0.94); }
+  .scv-numpad-key:hover:not(:disabled) {
+    background: rgba(99,102,241,0.1);
+    border-color: rgba(129,140,248,0.2);
+  }
+  .scv-numpad-key:active:not(:disabled) {
+    background: rgba(99,102,241,0.18);
+    transform: scale(0.91);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+  }
   .scv-numpad-key:disabled { opacity: 0.25; cursor: not-allowed; }
 
   .scv-numpad-key--back {
@@ -762,20 +848,49 @@
   .scv-gate-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
   /* ── Messages view ─────────────────────────────────────────────── */
-  .scv-view { width: 100%; max-width: 500px; height: 100dvh; display: flex; flex-direction: column; background: #0d0d14; }
+  .scv-view { width: 100%; max-width: 500px; height: 100dvh; display: flex; flex-direction: column; background: transparent; }
 
   .scv-header {
     display: flex; align-items: center; gap: 10px;
     padding: 13px 12px 13px 16px;
-    background: rgba(255,255,255,0.025);
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+    background: rgba(10,10,18,0.7);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(129,140,248,0.1);
     flex-shrink: 0;
   }
-  .scv-header-lock { color: rgba(129,140,248,0.65); display: flex; align-items: center; flex-shrink: 0; }
+  .scv-header-lock { color: rgba(129,140,248,0.75); display: flex; align-items: center; flex-shrink: 0; }
   .scv-header-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-  .scv-header-title { font-size: 14px; font-weight: 600; color: #e2e8f0; }
+  .scv-header-title {
+    font-size: 14px; font-weight: 700;
+    background: linear-gradient(110deg, #c7d2fe 0%, #a5b4fc 40%, #818cf8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
   .scv-header-sub { font-size: 11px; color: rgba(255,255,255,0.35); }
-  .scv-e2e-badge { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(129,140,248,0.6); background: rgba(129,140,248,0.08); border: 1px solid rgba(129,140,248,0.15); padding: 2px 7px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; }
+  .scv-e2e-badge {
+    font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    color: rgba(165,180,252,0.75);
+    background: rgba(99,102,241,0.1);
+    border: 1px solid rgba(129,140,248,0.22);
+    padding: 2px 7px; border-radius: 20px; white-space: nowrap; flex-shrink: 0;
+    box-shadow: 0 0 10px rgba(99,102,241,0.08);
+  }
+
+  .scv-back-btn {
+    width: 36px; height: 36px;
+    min-width: 44px; min-height: 44px;
+    display: flex; align-items: center; justify-content: center;
+    background: none; border: none;
+    color: rgba(255,255,255,0.45);
+    cursor: pointer;
+    border-radius: 8px;
+    flex-shrink: 0;
+    transition: color 0.15s, background 0.15s;
+    touch-action: manipulation;
+  }
+  .scv-back-btn:hover { color: rgba(255,255,255,0.8); background: rgba(255,255,255,0.06); }
 
   .scv-header-panic {
     width: 36px; height: 36px;
@@ -822,27 +937,33 @@
   .scv-msg--own { align-self: flex-end; align-items: flex-end; }
   .scv-msg--their { align-self: flex-start; align-items: flex-start; }
 
-  .scv-bubble { padding: 9px 13px; border-radius: 16px; font-size: 14px; line-height: 1.55; }
+  .scv-bubble { padding: 9px 13px; border-radius: 18px; font-size: 14px; line-height: 1.55; }
   .scv-bubble--own {
     display: flex; align-items: center; gap: 7px;
-    background: rgba(129,140,248,0.13);
-    border: 1px solid rgba(129,140,248,0.18);
-    border-bottom-right-radius: 4px;
-    color: rgba(129,140,248,0.65);
+    background: linear-gradient(135deg, rgba(99,102,241,0.18) 0%, rgba(129,140,248,0.12) 100%);
+    border: 1px solid rgba(129,140,248,0.22);
+    border-bottom-right-radius: 5px;
+    color: rgba(165,180,252,0.75);
     font-size: 12px; font-weight: 500;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), 0 2px 8px rgba(0,0,0,0.15);
   }
-  .scv-bubble--own.scv-bubble--grp-notfirst { border-top-right-radius: 4px; }
+  .scv-bubble--own.scv-bubble--grp-notfirst { border-top-right-radius: 5px; }
 
   .scv-bubble--their {
-    background: rgba(255,255,255,0.07);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-bottom-left-radius: 4px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-bottom-left-radius: 5px;
     color: #e2e8f0;
     word-break: break-word;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 1px 6px rgba(0,0,0,0.12);
   }
   .scv-bubble--their.scv-bubble--grp-notfirst,
   .scv-bubble--locked.scv-bubble--grp-notfirst {
-    border-top-left-radius: 4px;
+    border-top-left-radius: 5px;
   }
 
   .scv-bubble--decrypted { position: relative; padding-right: 30px; }
@@ -934,11 +1055,13 @@
   /* Compose */
   .scv-compose {
     padding: 10px 14px 14px;
-    border-top: 1px solid rgba(255,255,255,0.06);
+    border-top: 1px solid rgba(129,140,248,0.08);
     display: flex; flex-direction: column;
     gap: 7px;
     flex-shrink: 0;
-    background: rgba(0,0,0,0.12);
+    background: rgba(7,7,15,0.75);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
   }
   .scv-compose-inner { display: flex; align-items: flex-end; gap: 8px; }
@@ -972,23 +1095,34 @@
     box-sizing: border-box; width: 100%;
     transition: border-color 0.15s;
   }
-  .scv-compose-text:focus { border-color: rgba(255,255,255,0.18); }
+  .scv-compose-text:focus {
+    border-color: rgba(129,140,248,0.4);
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+  }
   .scv-compose-text::placeholder { color: rgba(255,255,255,0.2); }
   @media (max-width: 767px) { .scv-compose-text { font-size: 16px; } }
 
   .scv-send-btn {
     width: 44px; height: 44px;
     border-radius: 13px; border: none;
-    background: rgba(129,140,248,0.8);
+    background: linear-gradient(135deg, #818cf8 0%, #6366f1 100%);
     color: #fff;
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
-    transition: background 0.15s;
+    transition: transform 0.12s, box-shadow 0.15s;
     touch-action: manipulation;
+    box-shadow: 0 2px 12px rgba(99,102,241,0.4);
   }
-  .scv-send-btn:hover:not(:disabled) { background: #818cf8; }
-  .scv-send-btn:disabled { opacity: 0.28; cursor: not-allowed; }
+  .scv-send-btn:hover:not(:disabled) {
+    transform: scale(1.06);
+    box-shadow: 0 4px 20px rgba(99,102,241,0.6);
+  }
+  .scv-send-btn:active:not(:disabled) {
+    transform: scale(0.93);
+    box-shadow: 0 1px 6px rgba(99,102,241,0.3);
+  }
+  .scv-send-btn:disabled { opacity: 0.28; cursor: not-allowed; box-shadow: none; }
   .scv-send-ring { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.25); border-top-color: #fff; border-radius: 50%; animation: scv-spin 0.8s linear infinite; }
 
   .scv-compose-hint { display: flex; align-items: center; gap: 5px; margin: 0; font-size: 10px; color: rgba(255,255,255,0.18); }
@@ -1020,15 +1154,22 @@
 
   /* ── Gate button CTA state (4+ digits entered) ──────────────── */
   .scv-gate-btn--ready {
-    background: rgba(129,140,248,0.85);
+    background: linear-gradient(135deg, #818cf8 0%, #6366f1 60%, #7c3aed 100%);
     color: #fff;
     border-color: transparent;
     font-weight: 600;
+    box-shadow: 0 4px 20px rgba(99,102,241,0.4);
   }
   .scv-gate-btn--ready:hover:not(:disabled) {
-    background: #818cf8;
+    background: linear-gradient(135deg, #818cf8 0%, #6366f1 60%, #7c3aed 100%);
     color: #fff;
     border-color: transparent;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 28px rgba(99,102,241,0.55);
+  }
+  .scv-gate-btn--ready:active:not(:disabled) {
+    transform: scale(0.97);
+    box-shadow: 0 2px 12px rgba(99,102,241,0.3);
   }
   .scv-gate-spinner {
     width: 16px; height: 16px;
@@ -1039,12 +1180,21 @@
     margin: 0 auto;
   }
 
-  /* ── Message slide-in animation ─────────────────────────────── */
+  /* ── Message slide-in animation (3D tilt entry) ─────────────── */
   @keyframes scv-msg-in {
-    from { opacity: 0; transform: translateY(6px); }
-    to   { opacity: 1; transform: translateY(0); }
+    from {
+      opacity: 0;
+      transform: perspective(500px) rotateX(9deg) translateY(10px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: perspective(500px) rotateX(0deg) translateY(0) scale(1);
+    }
   }
-  .scv-msg { animation: scv-msg-in 0.18s ease-out both; }
+  .scv-msg {
+    animation: scv-msg-in 0.22s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+    transform-origin: bottom center;
+  }
 
   /* ── Date divider ───────────────────────────────────────────── */
   .scv-date-div {
@@ -1062,6 +1212,33 @@
     height: 1px;
     background: rgba(255,255,255,0.06);
   }
+  /* ── Scroll-to-bottom FAB ───────────────────────────────────── */
+  .scv-scroll-fab {
+    align-self: flex-end;
+    margin: -8px 12px 0;
+    position: relative;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    border: 1px solid rgba(129,140,248,0.35);
+    background: rgba(15,15,28,0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: rgba(165,180,252,0.9);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5), 0 0 12px rgba(99,102,241,0.12);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+    z-index: 10;
+    flex-shrink: 0;
+  }
+  .scv-scroll-fab:hover {
+    background: rgba(99,102,241,0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.5), 0 0 20px rgba(99,102,241,0.2);
+  }
+
+
   .scv-date-div span {
     font-size: 10px;
     color: rgba(255,255,255,0.22);

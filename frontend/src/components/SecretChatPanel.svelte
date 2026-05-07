@@ -147,9 +147,14 @@
     socket.emit('secretChatPresence', { peerId, open });
   }
 
+  // Loading state — cleared when store receives server response, or after 4s safety timeout
+  let loadingMessages = true;
+  $: if ($secretChats.has(peerId) && loadingMessages) loadingMessages = false;
+
   onMount(() => {
     socket.emit('getSecretMsgs', { peerId, limit: 20 });
     emitPresence(true);
+    setTimeout(() => { loadingMessages = false; }, 4000);
   });
 
   onDestroy(() => {
@@ -167,10 +172,10 @@
     gateUnlocking = true;
     sessionPin = pinDigits.join('');
     pinDigits = [];
-    gateUnlocking = false;
     gateOpen = true;
     await tick();
     scrollToBottom();
+    gateUnlocking = false;
   }
 
   // ── Per-message inline decrypt ─────────────────────────────────
@@ -234,13 +239,33 @@
     if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 
-  // Auto-scroll to bottom whenever a new message arrives (sent ACK or received).
-  // afterUpdate fires after every DOM update, so the new message is already rendered.
+  // Sticky scroll — only auto-scroll when user is near the bottom
+  let userScrolledUp = false;
+  let unreadWhileScrolledUp = 0;
+
+  function handleMessagesScroll() {
+    if (!messagesEl) return;
+    const { scrollTop, scrollHeight, clientHeight } = messagesEl;
+    userScrolledUp = scrollHeight - scrollTop - clientHeight > 60;
+    if (!userScrolledUp) unreadWhileScrolledUp = 0;
+  }
+
+  function jumpToBottom() {
+    scrollToBottom();
+    userScrolledUp = false;
+    unreadWhileScrolledUp = 0;
+  }
+
   let _prevSortedLength = 0;
   afterUpdate(() => {
     if (gateOpen && sortedMsgs.length > _prevSortedLength) {
+      const newCount = sortedMsgs.length - _prevSortedLength;
       _prevSortedLength = sortedMsgs.length;
-      scrollToBottom();
+      if (userScrolledUp) {
+        unreadWhileScrolledUp += newCount;
+      } else {
+        scrollToBottom();
+      }
     }
   });
 
@@ -458,8 +483,14 @@
 
   {:else}
     <!-- ── Messages ──────────────────────────────────────────── -->
-    <div class="scp-msgs" bind:this={messagesEl}>
-      {#if groupedMsgs.length === 0}
+    <div class="scp-msgs" bind:this={messagesEl} on:scroll={handleMessagesScroll} role="log" aria-live="polite" aria-label="Secret chat messages">
+      {#if loadingMessages}
+        <div class="scp-loading-shimmer" aria-label="Loading messages" aria-busy="true">
+          <div class="scp-shimmer-row scp-shimmer-row--their"><div class="scp-shimmer-bubble"></div></div>
+          <div class="scp-shimmer-row scp-shimmer-row--own"><div class="scp-shimmer-bubble scp-shimmer-bubble--short"></div></div>
+          <div class="scp-shimmer-row scp-shimmer-row--their"><div class="scp-shimmer-bubble scp-shimmer-bubble--long"></div></div>
+        </div>
+      {:else if groupedMsgs.length === 0}
         <div class="scp-empty">
           <div class="scp-empty-ring" aria-hidden="true">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -500,7 +531,7 @@
             </div>
             {#if msg.groupLast}
               <div class="scp-meta scp-meta--own">
-                <span class="scp-time">{clockTime(msg.createdAt)}</span>
+                <time class="scp-time" datetime={msg.createdAt}>{clockTime(msg.createdAt)}</time>
                 <span class="scp-tick" class:scp-tick--seen={msg.seenAt} title={msg.seenAt ? `Read ${clockTime(msg.seenAt)}` : 'Sent'}>
                   {#if msg.seenAt}
                     <svg width="14" height="8" viewBox="0 0 18 10" fill="none" stroke="#53bdeb" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-label="Read"><polyline points="1 5 5 9 13 1"/><polyline points="7 9 15 1"/></svg>
@@ -618,9 +649,9 @@
               <div class="scp-meta scp-meta--their">
                 {#if unread}
                   <span class="scp-unread-dot" aria-label="Unread"></span>
-                  <span class="scp-time scp-time--unread">{timeAgo(msg.createdAt)}</span>
+                  <time class="scp-time scp-time--unread" datetime={msg.createdAt}>{timeAgo(msg.createdAt)}</time>
                 {:else}
-                  <span class="scp-time">{clockTime(msg.createdAt)}</span>
+                  <time class="scp-time" datetime={msg.createdAt}>{clockTime(msg.createdAt)}</time>
                 {/if}
               </div>
             {/if}
@@ -629,13 +660,31 @@
       {/each}
     </div>
 
+    <!-- Scroll-to-bottom FAB — appears when user scrolls up while new messages arrive -->
+    {#if userScrolledUp}
+      <button
+        class="scp-scroll-fab"
+        on:click={jumpToBottom}
+        aria-label="Jump to latest messages"
+        type="button"
+        transition:fade={{ duration: 120 }}
+      >
+        {#if unreadWhileScrolledUp > 0}
+          <span class="scp-scroll-fab-badge">{unreadWhileScrolledUp}</span>
+        {/if}
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
+    {/if}
+
     <!-- ── Compose ─────────────────────────────────────────── -->
     <div class="scp-compose">
       <div class="scp-compose-inner">
         <!-- Panic / blank button — subtle icon -->
         <button
           class="scp-compose-icon-btn scp-compose-icon-btn--panic"
-          on:click={() => panicMode = true}
+          on:click={() => { panicMode = true; document.activeElement?.blur(); }}
           aria-label="Blank screen"
           title="Blank screen (tap to restore)"
           type="button"
@@ -754,15 +803,34 @@
   .scp {
     display: flex;
     flex-direction: column;
-    background: #0f0f17;
-    border: 1px solid rgba(255,255,255,0.08);
+    background: #0a0a12;
+    border: 1px solid rgba(129,140,248,0.14);
     border-radius: 20px;
     overflow: hidden;
     width: 100%;
     max-width: 420px;
     height: min(85dvh, 640px);
-    box-shadow: 0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(129,140,248,0.07);
+    box-shadow:
+      0 24px 80px rgba(0,0,0,0.75),
+      0 0 0 1px rgba(129,140,248,0.1),
+      inset 0 1px 0 rgba(255,255,255,0.06);
+    position: relative;
   }
+  /* Animated gradient mesh behind content */
+  .scp::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 20% 0%, rgba(99,102,241,0.12) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 50% at 80% 100%, rgba(168,85,247,0.09) 0%, transparent 55%),
+      radial-gradient(ellipse 40% 40% at 50% 50%, rgba(59,130,246,0.05) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+    animation: scp-mesh-shift 12s ease-in-out infinite alternate;
+  }
+  /* Ensure content sits above the mesh */
+  .scp > * { position: relative; z-index: 1; }
   @media (max-width: 767px) {
     .scp {
       max-width: 100%;
@@ -776,6 +844,13 @@
   @keyframes scp-slide-up {
     from { transform: translateY(100%); }
     to   { transform: translateY(0);    }
+  }
+
+  /* Mesh gradient shift */
+  @keyframes scp-mesh-shift {
+    0%   { opacity: 1; }
+    50%  { opacity: 0.7; }
+    100% { opacity: 1; }
   }
 
   /* ── Drag handle ──────────────────────────────────────────── */
@@ -797,8 +872,10 @@
     align-items: center;
     gap: 10px;
     padding: 13px 12px 13px 16px;
-    background: rgba(255,255,255,0.025);
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+    background: rgba(255,255,255,0.02);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(129,140,248,0.1);
     flex-shrink: 0;
   }
 
@@ -817,13 +894,24 @@
   }
 
   .scp-header-name {
-    font-size: 14px; font-weight: 600;
-    color: #e2e8f0;
+    font-size: 14px; font-weight: 700;
+    background: linear-gradient(110deg, #c7d2fe 0%, #a5b4fc 40%, #818cf8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     font-family: system-ui, sans-serif;
     transition: opacity 0.25s;
   }
-  .scp-header-name--hidden { opacity: 0.35; letter-spacing: 0.15em; }
+  .scp-header-name--hidden {
+    opacity: 0.35;
+    letter-spacing: 0.15em;
+    /* override gradient clip for hidden state */
+    background: none;
+    -webkit-background-clip: unset;
+    -webkit-text-fill-color: rgba(255,255,255,0.35);
+    background-clip: unset;
+  }
 
   .scp-unread-badge {
     min-width: 18px; height: 18px;
@@ -881,21 +969,38 @@
     height: 32px;
     min-height: 44px;
     border-radius: 20px;
-    border: 1px solid rgba(129,140,248,0.28);
-    background: rgba(129,140,248,0.09);
-    color: rgba(129,140,248,0.9);
+    border: 1px solid rgba(129,140,248,0.3);
+    background: rgba(99,102,241,0.1);
+    color: rgba(165,180,252,0.95);
     font-size: 12px; font-weight: 600;
     font-family: system-ui, sans-serif;
     cursor: pointer;
     flex-shrink: 0;
     white-space: nowrap;
-    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
     touch-action: manipulation;
+    position: relative;
+    overflow: hidden;
   }
-  .scp-invite-pill:hover { background: rgba(129,140,248,0.16); border-color: rgba(129,140,248,0.45); }
+  /* Animated shimmer sweep on hover */
+  .scp-invite-pill::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(165,180,252,0.12) 50%, transparent 100%);
+    transform: translateX(-100%);
+    transition: transform 0.4s ease;
+    pointer-events: none;
+  }
+  .scp-invite-pill:hover::after { transform: translateX(100%); }
+  .scp-invite-pill:hover {
+    background: rgba(99,102,241,0.18);
+    border-color: rgba(129,140,248,0.5);
+    box-shadow: 0 0 16px rgba(99,102,241,0.2);
+  }
   .scp-invite-pill--copied {
-    border-color: rgba(74,222,128,0.35);
-    background: rgba(74,222,128,0.09);
+    border-color: rgba(74,222,128,0.4);
+    background: rgba(74,222,128,0.1);
     color: rgba(74,222,128,0.95);
   }
 
@@ -909,16 +1014,51 @@
     gap: 20px;
     padding: 24px 28px 32px;
     text-align: center;
-    background: radial-gradient(ellipse at 50% 30%, rgba(129,140,248,0.05) 0%, transparent 70%);
+    background: radial-gradient(ellipse at 50% 25%, rgba(99,102,241,0.1) 0%, transparent 65%);
+    overflow: hidden;
+    position: relative;
+  }
+  /* Floating orb 1 */
+  .scp-gate::before {
+    content: '';
+    position: absolute;
+    width: 180px; height: 180px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%);
+    top: -40px; left: -30px;
+    animation: scp-orb-float 8s ease-in-out infinite;
+    pointer-events: none;
+  }
+  /* Floating orb 2 */
+  .scp-gate::after {
+    content: '';
+    position: absolute;
+    width: 140px; height: 140px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(168,85,247,0.1) 0%, transparent 70%);
+    bottom: 10px; right: -20px;
+    animation: scp-orb-float 11s ease-in-out infinite reverse;
+    pointer-events: none;
+  }
+  @keyframes scp-orb-float {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50%       { transform: translateY(-18px) scale(1.07); }
   }
 
   .scp-gate-ring {
-    width: 64px; height: 64px;
+    width: 72px; height: 72px;
     border-radius: 50%;
-    background: rgba(129,140,248,0.08);
-    border: 1px solid rgba(129,140,248,0.18);
+    background: rgba(99,102,241,0.1);
+    border: 1px solid rgba(129,140,248,0.25);
+    box-shadow: 0 0 0 8px rgba(99,102,241,0.05), 0 0 32px rgba(99,102,241,0.15);
     display: flex; align-items: center; justify-content: center;
-    color: rgba(129,140,248,0.7);
+    color: rgba(129,140,248,0.85);
+    position: relative; z-index: 1;
+    animation: scp-ring-breathe 4s ease-in-out infinite;
+  }
+  @keyframes scp-ring-breathe {
+    0%, 100% { box-shadow: 0 0 0 8px rgba(99,102,241,0.05), 0 0 32px rgba(99,102,241,0.15); }
+    50%       { box-shadow: 0 0 0 14px rgba(99,102,241,0.03), 0 0 48px rgba(99,102,241,0.22); }
   }
 
   .scp-gate-text { display: flex; flex-direction: column; gap: 8px; }
@@ -948,18 +1088,19 @@
   }
 
   .scp-pin-dot {
-    width: 13px; height: 13px;
+    width: 14px; height: 14px;
     border-radius: 50%;
-    border: 2px solid rgba(129,140,248,0.3);
+    border: 2px solid rgba(129,140,248,0.25);
     background: transparent;
-    transition: background 0.12s, border-color 0.12s, transform 0.1s;
+    transition: background 0.15s, border-color 0.15s, transform 0.15s, box-shadow 0.15s;
     flex-shrink: 0;
   }
 
   .scp-pin-dot--filled {
-    background: rgba(129,140,248,0.85);
-    border-color: rgba(129,140,248,0.85);
-    transform: scale(1.1);
+    background: linear-gradient(135deg, #818cf8, #6366f1);
+    border-color: transparent;
+    transform: scale(1.2);
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.2), 0 0 12px rgba(99,102,241,0.4);
   }
 
   /* ── Number pad ─────────────────────────────────────────────── */
@@ -976,27 +1117,32 @@
   .scp-numpad-key {
     height: 52px;
     border-radius: 14px;
-    border: 1px solid rgba(255,255,255,0.07);
-    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.04);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     color: #e2e8f0;
-    font-size: 20px;
-    font-weight: 400;
+    font-size: 21px;
+    font-weight: 300;
     cursor: pointer;
     font-family: system-ui, sans-serif;
-    transition: background 0.1s, transform 0.08s;
+    transition: background 0.12s, transform 0.08s, box-shadow 0.12s;
     touch-action: manipulation;
     display: flex;
     align-items: center;
     justify-content: center;
     user-select: none;
     -webkit-user-select: none;
+    position: relative; z-index: 1;
   }
   .scp-numpad-key:hover:not(:disabled) {
-    background: rgba(255,255,255,0.09);
+    background: rgba(129,140,248,0.1);
+    border-color: rgba(129,140,248,0.2);
   }
   .scp-numpad-key:active:not(:disabled) {
-    background: rgba(129,140,248,0.18);
-    transform: scale(0.94);
+    background: rgba(129,140,248,0.2);
+    transform: scale(0.91);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
   }
   .scp-numpad-key:disabled { opacity: 0.25; cursor: not-allowed; }
 
@@ -1023,16 +1169,25 @@
     padding: 13px;
     border-radius: 13px;
     border: none;
-    background: rgba(129,140,248,0.85);
+    background: linear-gradient(135deg, #818cf8 0%, #6366f1 60%, #7c3aed 100%);
     color: #fff;
     font-size: 14px; font-weight: 600;
     cursor: pointer;
     font-family: system-ui, sans-serif;
     min-height: 48px;
-    transition: background 0.15s, opacity 0.15s;
+    transition: transform 0.12s, box-shadow 0.15s, opacity 0.15s;
     touch-action: manipulation;
+    box-shadow: 0 4px 20px rgba(99,102,241,0.35);
+    position: relative; z-index: 1;
   }
-  .scp-primary-btn:hover:not(:disabled) { background: #818cf8; }
+  .scp-primary-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 28px rgba(99,102,241,0.5);
+  }
+  .scp-primary-btn:active:not(:disabled) {
+    transform: scale(0.97);
+    box-shadow: 0 2px 12px rgba(99,102,241,0.3);
+  }
   .scp-primary-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
   /* ── Messages ──────────────────────────────────────────────── */
@@ -1082,7 +1237,7 @@
   /* Bubbles */
   .scp-bubble {
     padding: 9px 13px;
-    border-radius: 16px;
+    border-radius: 18px;
     font-size: 14px;
     line-height: 1.55;
     font-family: system-ui, sans-serif;
@@ -1090,28 +1245,34 @@
 
   .scp-bubble--own {
     display: flex; align-items: center; gap: 7px;
-    background: rgba(129,140,248,0.13);
-    border: 1px solid rgba(129,140,248,0.18);
-    border-bottom-right-radius: 4px;
-    color: rgba(129,140,248,0.65);
+    background: linear-gradient(135deg, rgba(99,102,241,0.18) 0%, rgba(129,140,248,0.12) 100%);
+    border: 1px solid rgba(129,140,248,0.22);
+    border-bottom-right-radius: 5px;
+    color: rgba(165,180,252,0.75);
     font-size: 12px; font-weight: 500;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), 0 2px 8px rgba(0,0,0,0.15);
   }
   /* Grouped own: reduce top-right corner */
   .scp-bubble--own.scp-bubble--grp-notfirst {
-    border-top-right-radius: 4px;
+    border-top-right-radius: 5px;
   }
 
   .scp-bubble--their {
-    background: rgba(255,255,255,0.07);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-bottom-left-radius: 4px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-bottom-left-radius: 5px;
     color: #e2e8f0;
     word-break: break-word;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 1px 6px rgba(0,0,0,0.12);
   }
   /* Grouped their: reduce top-left corner */
   .scp-bubble--their.scp-bubble--grp-notfirst,
   .scp-bubble--locked.scp-bubble--grp-notfirst {
-    border-top-left-radius: 4px;
+    border-top-left-radius: 5px;
   }
 
   .scp-bubble--decrypted {
@@ -1269,11 +1430,13 @@
   /* ── Compose ────────────────────────────────────────────────── */
   .scp-compose {
     padding: 10px 14px 14px;
-    border-top: 1px solid rgba(255,255,255,0.06);
+    border-top: 1px solid rgba(129,140,248,0.08);
     display: flex; flex-direction: column;
     gap: 7px;
     flex-shrink: 0;
-    background: rgba(0,0,0,0.12);
+    background: rgba(0,0,0,0.2);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
   }
 
   .scp-compose-inner {
@@ -1333,23 +1496,34 @@
   @media (max-width: 767px) {
     .scp-compose-text { font-size: 16px; }
   }
-  .scp-compose-text:focus { border-color: rgba(255,255,255,0.18); }
+  .scp-compose-text:focus {
+    border-color: rgba(129,140,248,0.4);
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+  }
   .scp-compose-text::placeholder { color: rgba(255,255,255,0.2); }
 
   .scp-send-btn {
     width: 44px; height: 44px;
     border-radius: 13px;
     border: none;
-    background: rgba(129,140,248,0.8);
+    background: linear-gradient(135deg, #818cf8 0%, #6366f1 100%);
     color: #fff;
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
-    transition: background 0.15s;
+    transition: transform 0.12s, box-shadow 0.15s, background 0.15s;
     touch-action: manipulation;
+    box-shadow: 0 2px 12px rgba(99,102,241,0.4);
   }
-  .scp-send-btn:hover:not(:disabled) { background: #818cf8; }
-  .scp-send-btn:disabled { opacity: 0.28; cursor: not-allowed; }
+  .scp-send-btn:hover:not(:disabled) {
+    transform: scale(1.06);
+    box-shadow: 0 4px 20px rgba(99,102,241,0.6);
+  }
+  .scp-send-btn:active:not(:disabled) {
+    transform: scale(0.93);
+    box-shadow: 0 1px 6px rgba(99,102,241,0.3);
+  }
+  .scp-send-btn:disabled { opacity: 0.28; cursor: not-allowed; box-shadow: none; }
 
   .scp-send-ring {
     width: 16px; height: 16px;
@@ -1387,12 +1561,21 @@
     50%       { box-shadow: 0 0 0 4px rgba(74,222,128,0); }
   }
 
-  /* ── Message slide-in animation ─────────────────────────────── */
+  /* ── Message slide-in animation (3D tilt entry) ─────────────── */
   @keyframes scp-msg-in {
-    from { opacity: 0; transform: translateY(6px); }
-    to   { opacity: 1; transform: translateY(0); }
+    from {
+      opacity: 0;
+      transform: perspective(500px) rotateX(9deg) translateY(10px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: perspective(500px) rotateX(0deg) translateY(0) scale(1);
+    }
   }
-  .scp-msg { animation: scp-msg-in 0.18s ease-out both; }
+  .scp-msg {
+    animation: scp-msg-in 0.22s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+    transform-origin: bottom center;
+  }
 
   /* ── Date divider ───────────────────────────────────────────── */
   .scp-date-div {
@@ -1495,4 +1678,69 @@
     transition: color 0.2s;
   }
   .scp-char-count--warn { color: rgba(248,113,113,0.75); }
+
+  /* ── Scroll-to-bottom FAB ───────────────────────────────────── */
+  .scp-scroll-fab {
+    align-self: flex-end;
+    margin: -8px 12px 0;
+    position: relative;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    border: 1px solid rgba(129,140,248,0.35);
+    background: rgba(10,10,18,0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: rgba(165,180,252,0.9);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5), 0 0 12px rgba(99,102,241,0.12);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+    z-index: 10;
+    flex-shrink: 0;
+  }
+  .scp-scroll-fab:hover {
+    background: rgba(99,102,241,0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.5), 0 0 20px rgba(99,102,241,0.2);
+  }
+  .scp-scroll-fab-badge {
+    position: absolute;
+    top: -5px; right: -5px;
+    min-width: 18px; height: 18px;
+    padding: 0 4px;
+    border-radius: 9px;
+    background: #818cf8;
+    color: #fff;
+    font-size: 10px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    font-family: system-ui, sans-serif;
+  }
+
+  /* ── Loading shimmer ────────────────────────────────────────── */
+  @keyframes scp-shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  .scp-loading-shimmer {
+    display: flex; flex-direction: column; gap: 12px;
+    padding: 8px 0;
+    flex: 1;
+  }
+  .scp-shimmer-row { display: flex; }
+  .scp-shimmer-row--own { justify-content: flex-end; }
+  .scp-shimmer-row--their { justify-content: flex-start; }
+  .scp-shimmer-bubble {
+    height: 36px; width: 52%;
+    border-radius: 16px;
+    background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
+    background-size: 200% 100%;
+    animation: scp-shimmer 1.4s ease infinite;
+  }
+  .scp-shimmer-bubble--short { width: 36%; }
+  .scp-shimmer-bubble--long { width: 65%; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .scp-shimmer-bubble { animation: none; background: rgba(255,255,255,0.05); }
+  }
 </style>
