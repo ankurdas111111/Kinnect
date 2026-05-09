@@ -36,7 +36,7 @@ func (h *Hub) handleSendSecretMsg(c *Client, data json.RawMessage) {
 	}
 
 	// Validate encrypted fields — non-empty, reasonable size.
-	if len(p.Ciphertext) == 0 || len(p.Ciphertext) > 10000 {
+	if len(p.Ciphertext) == 0 || len(p.Ciphertext) > 400000 {
 		return
 	}
 	if len(p.IV) == 0 || len(p.Salt) == 0 {

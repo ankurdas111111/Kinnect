@@ -301,6 +301,29 @@
     return m ? m[1] : null;
   }
 
+  const PHOTO_RE = /^\[photo:(data:image\/[^;]+;base64,[^\]]+)\]$/;
+  function parsePhoto(text) {
+    if (!text) return null;
+    const m = PHOTO_RE.exec(text);
+    return m ? m[1] : null;
+  }
+
+  /**
+   * Generate a plausible-looking ciphertext noise string from a timestamp.
+   * Used in the viewer where we don't store the raw ciphertext on own messages.
+   */
+  function fakeGibberish(ts) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    const seed = new Date(ts).getTime() || Date.now();
+    let s = '';
+    let x = seed % 2147483647;
+    for (let i = 0; i < 32; i++) {
+      x = (x * 16807) % 2147483647;
+      s += chars[x % 64];
+    }
+    return s;
+  }
+
   // Date divider helper
   function dateLabel(ts, prevTs) {
     const d = new Date(ts);
@@ -482,9 +505,13 @@
               <div
                 class="scv-bubble scv-bubble--own"
                 class:scv-bubble--grp-notfirst={!msg.groupFirst}
+                aria-label="Encrypted message sent"
+                title="End-to-end encrypted"
               >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                <span>Sent · encrypted</span>
+                <span class="scv-cipher-text" aria-hidden="true">{fakeGibberish(msg.createdAt)}</span>
+                <span class="scv-lock-icon" aria-hidden="true">
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                </span>
               </div>
               {#if msg.groupLast}
                 <time class="scv-time" datetime={msg.createdAt}>{clockTime(msg.createdAt)}</time>
@@ -495,7 +522,9 @@
                 class="scv-bubble scv-bubble--their scv-bubble--decrypted"
                 class:scv-bubble--grp-notfirst={!msg.groupFirst}
               >
-                {#if parseGif(msg.body)}
+                {#if parsePhoto(msg.body)}
+                  <img src={parsePhoto(msg.body)} class="msg-photo" alt="Encrypted photo" loading="lazy" />
+                {:else if parseGif(msg.body)}
                   <img src={parseGif(msg.body)} class="msg-sticker" alt="sticker" loading="lazy" />
                 {:else}
                   <p class="scv-body">{msg.body}</p>
@@ -936,15 +965,15 @@
 
   .scv-bubble { padding: 9px 13px; border-radius: 18px; font-size: 14px; line-height: 1.55; }
   .scv-bubble--own {
-    display: flex; align-items: center; gap: 7px;
-    background: linear-gradient(135deg, rgba(99,102,241,0.18) 0%, rgba(129,140,248,0.12) 100%);
-    border: 1px solid rgba(129,140,248,0.22);
+    display: flex; align-items: center; gap: 8px;
+    background: linear-gradient(135deg, rgba(99,102,241,0.2) 0%, rgba(129,140,248,0.13) 100%);
+    border: 1px solid rgba(129,140,248,0.25);
     border-bottom-right-radius: 5px;
-    color: rgba(165,180,252,0.75);
-    font-size: 12px; font-weight: 500;
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), 0 2px 8px rgba(0,0,0,0.15);
+    max-width: 100%;
+    overflow: hidden;
   }
   .scv-bubble--own.scv-bubble--grp-notfirst { border-top-right-radius: 5px; }
 
@@ -1134,6 +1163,27 @@
   }
 
   :global(.msg-sticker) { max-width: 120px; max-height: 120px; border-radius: 8px; display: block; }
+  :global(.msg-photo) { max-width: 220px; max-height: 260px; border-radius: 10px; display: block; object-fit: cover; }
+
+  /* Cipher-text gibberish on own sent bubbles */
+  .scv-cipher-text {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: rgba(165,180,252,0.55);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+    user-select: none;
+  }
+  .scv-lock-icon {
+    color: rgba(129,140,248,0.4);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+  }
 
   .scv-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
   @keyframes scv-spin { to { transform: rotate(360deg); } }

@@ -12,77 +12,145 @@
   const CDN = 'https://fonts.gstatic.com/s/e/notoemoji/latest';
 
   const TABS = [
-    { id: 'flirty', label: '❤️ Flirty' },
-    { id: 'spicy',  label: '🔥 Spicy'  },
-    { id: 'fun',    label: '😂 Fun'    },
+    { id: 'flirty',    label: '💕 Flirty'   },
+    { id: 'spicy',     label: '🔥 Spicy'    },
+    { id: 'fun',       label: '😂 Fun'      },
+    { id: 'reactions', label: '🫢 Reactions' },
+    { id: 'hands',     label: '🫰 Hands'    },
   ];
 
+  // Only animated GIFs — all codes are expressive faces, effects, or movement-based gestures.
+  // Static objects (food, flowers, jewelry, animals) removed entirely.
   const STICKERS = {
     flirty: [
-      { hex: '1f970', alt: '🥰' },
-      { hex: '1f60d', alt: '😍' },
-      { hex: '1f618', alt: '😘' },
-      { hex: '1f48b', alt: '💋' },
-      { hex: '2764_fe0f', alt: '❤️' },
-      { hex: '1f495', alt: '💕' },
-      { hex: '1f49e', alt: '💞' },
-      { hex: '1f497', alt: '💗' },
-      { hex: '1fae6', alt: '🫦' },
-      { hex: '1f609', alt: '😉' },
-      { hex: '1f979', alt: '🥹' },
-      { hex: '1f48c', alt: '💌' },
-      { hex: '1f60f', alt: '😏' },
-      { hex: '1f61c', alt: '😜' },
-      { hex: '1fae0', alt: '🫠' },
-      { hex: '1f491', alt: '💑' },
-      { hex: '1f48f', alt: '💏' },
-      { hex: '1f444', alt: '👄' },
-      { hex: '1f493', alt: '💓' },
-      { hex: '1fac0', alt: '🫀' },
+      { hex: '1f970', alt: '🥰' },  // smiling face with hearts
+      { hex: '1f60d', alt: '😍' },  // heart eyes
+      { hex: '1f618', alt: '😘' },  // kissing heart
+      { hex: '1f48b', alt: '💋' },  // kiss mark
+      { hex: '2764',  alt: '❤️' },  // red heart
+      { hex: '1f495', alt: '💕' },  // two hearts
+      { hex: '1f49e', alt: '💞' },  // revolving hearts
+      { hex: '1f497', alt: '💗' },  // growing heart
+      { hex: '1fae6', alt: '🫦' },  // biting lip
+      { hex: '1f609', alt: '😉' },  // winking face
+      { hex: '1f979', alt: '🥹' },  // holding back tears
+      { hex: '1f48c', alt: '💌' },  // love letter
+      { hex: '1f60f', alt: '😏' },  // smirk
+      { hex: '1f61c', alt: '😜' },  // winking tongue
+      { hex: '1fae0', alt: '🫠' },  // melting face
+      { hex: '1f493', alt: '💓' },  // beating heart
+      { hex: '1f4ab', alt: '💫' },  // dizzy
+      { hex: '2728',  alt: '✨' },  // sparkles
+      { hex: '1f97a', alt: '🥺' },  // pleading face
+      { hex: '1f633', alt: '😳' },  // flushed face
+      { hex: '1f917', alt: '🤗' },  // hugging face
+      { hex: '1f60a', alt: '😊' },  // smiling face with smiling eyes
+      { hex: '1f643', alt: '🙃' },  // upside-down face
+      { hex: '1f607', alt: '😇' },  // smiling face with halo
     ],
     spicy: [
-      { hex: '1f525', alt: '🔥' },
-      { hex: '1f975', alt: '🥵' },
-      { hex: '1f4a6', alt: '💦' },
-      { hex: '1f346', alt: '🍆' },
-      { hex: '1f351', alt: '🍑' },
-      { hex: '1f353', alt: '🍓' },
-      { hex: '1f60b', alt: '😋' },
-      { hex: '1f924', alt: '🤤' },
-      { hex: '1f608', alt: '😈' },
-      { hex: '1f445', alt: '👅' },
-      { hex: '1fae6', alt: '🫦' },
-      { hex: '1f336', alt: '🌶️' },
-      { hex: '1f36d', alt: '🍭' },
-      { hex: '1f36f', alt: '🍯' },
-      { hex: '1f352', alt: '🍒' },
-      { hex: '1f9e8', alt: '🧨' },
-      { hex: '1f4a5', alt: '💥' },
-      { hex: '1f386', alt: '🎆' },
-      { hex: '1f624', alt: '😤' },
-      { hex: '1f929', alt: '🤩' },
+      { hex: '1f525', alt: '🔥' },  // fire
+      { hex: '1f975', alt: '🥵' },  // hot face
+      { hex: '1f608', alt: '😈' },  // smiling imp
+      { hex: '1f60b', alt: '😋' },  // yum
+      { hex: '1f924', alt: '🤤' },  // drooling face
+      { hex: '1fae6', alt: '🫦' },  // biting lip
+      { hex: '1f4a5', alt: '💥' },  // collision
+      { hex: '1f386', alt: '🎆' },  // fireworks
+      { hex: '1f624', alt: '😤' },  // face with steam
+      { hex: '1f929', alt: '🤩' },  // star-struck
+      { hex: '1f911', alt: '🤑' },  // money-mouth face
+      { hex: '1f920', alt: '🤠' },  // cowboy hat face
+      { hex: '1f921', alt: '🤡' },  // clown face
+      { hex: '1f635', alt: '😵' },  // dizzy face
+      { hex: '1f47f', alt: '👿' },  // angry face with horns
+      { hex: '1f47a', alt: '👺' },  // goblin
+      { hex: '1f479', alt: '👹' },  // ogre
+      { hex: '1f480', alt: '💀' },  // skull
+      { hex: '1f922', alt: '🤢' },  // nauseated face
+      { hex: '1f92e', alt: '🤮' },  // face vomiting
+      { hex: '1f913', alt: '🤓' },  // nerd face
+      { hex: '1f47b', alt: '👻' },  // ghost
+      { hex: '1f916', alt: '🤖' },  // robot face
+      { hex: '1f47e', alt: '👾' },  // alien monster
     ],
     fun: [
-      { hex: '1f602', alt: '😂' },
-      { hex: '1f973', alt: '🥳' },
-      { hex: '1f389', alt: '🎉' },
-      { hex: '1f648', alt: '🙈' },
-      { hex: '1f649', alt: '🙉' },
-      { hex: '1f64a', alt: '🙊' },
-      { hex: '1f974', alt: '🥴' },
-      { hex: '1f62d', alt: '😭' },
-      { hex: '1f923', alt: '🤣' },
-      { hex: '1f92f', alt: '🤯' },
-      { hex: '1fae3', alt: '🫣' },
-      { hex: '1f92d', alt: '🤭' },
-      { hex: '1f631', alt: '😱' },
-      { hex: '1fae1', alt: '🫡' },
-      { hex: '1f978', alt: '🥸' },
-      { hex: '1f480', alt: '💀' },
-      { hex: '1faf6', alt: '🫶' },
-      { hex: '1f918', alt: '🤘' },
-      { hex: '1fac2', alt: '🫂' },
-      { hex: '1f3ad', alt: '🎭' },
+      { hex: '1f602', alt: '😂' },  // face with tears of joy
+      { hex: '1f973', alt: '🥳' },  // partying face
+      { hex: '1f389', alt: '🎉' },  // party popper
+      { hex: '1f648', alt: '🙈' },  // see-no-evil
+      { hex: '1f649', alt: '🙉' },  // hear-no-evil
+      { hex: '1f64a', alt: '🙊' },  // speak-no-evil
+      { hex: '1f974', alt: '🥴' },  // woozy face
+      { hex: '1f62d', alt: '😭' },  // loudly crying
+      { hex: '1f923', alt: '🤣' },  // rolling on floor laughing
+      { hex: '1f92f', alt: '🤯' },  // exploding head
+      { hex: '1fae3', alt: '🫣' },  // face with peeking eye
+      { hex: '1f92d', alt: '🤭' },  // face with hand over mouth
+      { hex: '1f631', alt: '😱' },  // face screaming
+      { hex: '1fae1', alt: '🫡' },  // saluting face
+      { hex: '1f978', alt: '🥸' },  // disguised face
+      { hex: '1faf6', alt: '🫶' },  // heart hands
+      { hex: '1f918', alt: '🤘' },  // sign of horns
+      { hex: '1fac2', alt: '🫂' },  // people hugging
+      { hex: '1f914', alt: '🤔' },  // thinking face
+      { hex: '1fae4', alt: '🫤' },  // face with diagonal mouth
+      { hex: '1fae8', alt: '🫨' },  // shaking face
+      { hex: '1fae5', alt: '🫥' },  // dotted line face
+      { hex: '1fae7', alt: '🫧' },  // bubbles
+      { hex: '1fae2', alt: '🫢' },  // face with open eyes and hand over mouth
+    ],
+    reactions: [
+      { hex: '1f976', alt: '🥶' },  // cold face
+      { hex: '1f925', alt: '🤥' },  // lying face
+      { hex: '1f92b', alt: '🤫' },  // shushing face
+      { hex: '1f9d0', alt: '🧐' },  // face with monocle
+      { hex: '1f644', alt: '🙄' },  // face with rolling eyes
+      { hex: '1f621', alt: '😡' },  // pouting face
+      { hex: '1f92c', alt: '🤬' },  // face with symbols over mouth
+      { hex: '1f612', alt: '😒' },  // unamused face
+      { hex: '1f614', alt: '😔' },  // pensive face
+      { hex: '1f62c', alt: '😬' },  // grimacing face
+      { hex: '1f634', alt: '😴' },  // sleeping face
+      { hex: '1f62b', alt: '😫' },  // tired face
+      { hex: '1f629', alt: '😩' },  // weary face
+      { hex: '1f627', alt: '😧' },  // anguished face
+      { hex: '1f628', alt: '😨' },  // fearful face
+      { hex: '1f630', alt: '😰' },  // anxious face with sweat
+      { hex: '1f626', alt: '😦' },  // frowning face with open mouth
+      { hex: '1f625', alt: '😥' },  // sad but relieved face
+      { hex: '1f622', alt: '😢' },  // crying face
+      { hex: '1f61e', alt: '😞' },  // disappointed face
+      { hex: '1f620', alt: '😠' },  // angry face
+      { hex: '1f615', alt: '😕' },  // confused face
+      { hex: '1f641', alt: '🙁' },  // slightly frowning face
+      { hex: '1f610', alt: '😐' },  // neutral face
+    ],
+    hands: [
+      { hex: '1faf6', alt: '🫶' },  // heart hands
+      { hex: '1faf0', alt: '🫰' },  // hand with index finger and thumb crossed
+      { hex: '1faf1', alt: '🫱' },  // rightwards hand
+      { hex: '1faf2', alt: '🫲' },  // leftwards hand
+      { hex: '1faf3', alt: '🫳' },  // palm down hand
+      { hex: '1faf4', alt: '🫴' },  // palm up hand
+      { hex: '1faf5', alt: '🫵' },  // index pointing at viewer
+      { hex: '1faf7', alt: '🫷' },  // leftwards pushing hand
+      { hex: '1faf8', alt: '🫸' },  // rightwards pushing hand
+      { hex: '1f91d', alt: '🤝' },  // handshake
+      { hex: '1f44f', alt: '👏' },  // clapping hands
+      { hex: '1f44b', alt: '👋' },  // waving hand
+      { hex: '1f91f', alt: '🤟' },  // love-you gesture
+      { hex: '1f918', alt: '🤘' },  // sign of horns
+      { hex: '1f919', alt: '🤙' },  // call me hand
+      { hex: '1f44d', alt: '👍' },  // thumbs up
+      { hex: '1f44e', alt: '👎' },  // thumbs down
+      { hex: '1f91e', alt: '🤞' },  // crossed fingers
+      { hex: '1fac2', alt: '🫂' },  // people hugging
+      { hex: '1f64f', alt: '🙏' },  // folded hands
+      { hex: '1f64c', alt: '🙌' },  // raising hands
+      { hex: '1f932', alt: '🤲' },  // palms up together
+      { hex: '1f483', alt: '💃' },  // woman dancing
+      { hex: '1f57a', alt: '🕺' },  // man dancing
     ],
   };
 
@@ -98,11 +166,10 @@
   function reposition() {
     if (!wrapEl || !anchor) return;
     const ab = anchor.getBoundingClientRect();
-    const pw = wrapEl.offsetWidth  || 280;
-    const ph = wrapEl.offsetHeight || 300;
+    const pw = wrapEl.offsetWidth  || 300;
+    const ph = wrapEl.offsetHeight || 340;
     const vw = window.innerWidth;
 
-    // Prefer above anchor
     let top = ab.top - ph - 8;
     if (top < 8) top = ab.bottom + 8;
 
@@ -131,17 +198,25 @@
 
 {#if open}
   <div class="sp-wrap" bind:this={wrapEl}>
-    <div class="sp-tabs">
+    <div class="sp-tabs" role="tablist" aria-label="Sticker categories">
       {#each TABS as tab}
         <button
           class="sp-tab"
           class:sp-tab--active={activeTab === tab.id}
           on:click={() => activeTab = tab.id}
           type="button"
+          role="tab"
+          aria-selected={activeTab === tab.id}
+          aria-controls="sp-panel-{tab.id}"
         >{tab.label}</button>
       {/each}
     </div>
-    <div class="sp-grid">
+    <div
+      class="sp-grid"
+      role="tabpanel"
+      id="sp-panel-{activeTab}"
+      aria-label="{TABS.find(t => t.id === activeTab)?.label} stickers"
+    >
       {#each STICKERS[activeTab] as s (s.hex)}
         <button
           class="sp-sticker-btn"
@@ -155,6 +230,8 @@
             alt={s.alt}
             loading="lazy"
             class="sp-img"
+            width="48"
+            height="48"
           />
         </button>
       {/each}
@@ -166,8 +243,7 @@
   .sp-wrap {
     position: fixed;
     z-index: 9999;
-    width: 280px;
-    height: 300px;
+    width: 300px;
     background: #111118;
     border: 1px solid rgba(255,255,255,0.08);
     border-radius: 16px;
@@ -176,17 +252,21 @@
     flex-direction: column;
     overflow: hidden;
     animation: sp-pop 0.18s cubic-bezier(0.34,1.56,0.64,1) both;
+    max-height: min(340px, 60dvh);
   }
 
   .sp-tabs {
     display: flex;
     border-bottom: 1px solid rgba(255,255,255,0.07);
     flex-shrink: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
   }
+  .sp-tabs::-webkit-scrollbar { display: none; }
 
   .sp-tab {
-    flex: 1;
-    padding: 9px 4px;
+    flex-shrink: 0;
+    padding: 9px 10px;
     background: none;
     border: none;
     color: rgba(255,255,255,0.35);
@@ -197,6 +277,8 @@
     transition: color 0.15s, background 0.15s;
     border-bottom: 2px solid transparent;
     white-space: nowrap;
+    touch-action: manipulation;
+    min-height: 36px;
   }
   .sp-tab:hover { color: rgba(255,255,255,0.65); background: rgba(255,255,255,0.04); }
   .sp-tab--active {
@@ -209,8 +291,8 @@
     overflow-y: auto;
     padding: 8px;
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 4px;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 2px;
     align-content: start;
   }
   .sp-grid::-webkit-scrollbar { width: 3px; }
@@ -227,15 +309,15 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.12s;
+    transition: background 0.12s, transform 0.1s;
     touch-action: manipulation;
   }
-  .sp-sticker-btn:hover { background: rgba(255,255,255,0.08); }
-  .sp-sticker-btn:active { background: rgba(129,140,248,0.18); }
+  .sp-sticker-btn:hover { background: rgba(255,255,255,0.08); transform: scale(1.1); }
+  .sp-sticker-btn:active { background: rgba(129,140,248,0.18); transform: scale(0.95); }
 
   .sp-img {
-    width: 48px;
-    height: 48px;
+    width: 40px;
+    height: 40px;
     object-fit: contain;
     display: block;
     border-radius: 4px;
@@ -244,5 +326,11 @@
   @keyframes sp-pop {
     from { opacity: 0; transform: scale(0.88) translateY(8px); }
     to   { opacity: 1; transform: scale(1)    translateY(0);    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sp-wrap { animation: none; }
+    .sp-sticker-btn:hover { transform: none; }
+    .sp-sticker-btn:active { transform: none; }
   }
 </style>
