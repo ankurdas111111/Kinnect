@@ -64,6 +64,11 @@
   }
 
   // ── PIN pad helpers ──────────────────────────────────────────
+  let pinInputEl;
+
+  // Auto-focus the hidden input whenever the gate is visible
+  $: if (!gateOpen && pinInputEl) setTimeout(() => pinInputEl?.focus(), 80);
+
   function addPinDigit(d) {
     if (pinDigits.length >= 8 || gateUnlocking) return;
     pinDigits = [...pinDigits, d];
@@ -72,6 +77,24 @@
   function removePinDigit() {
     if (!pinDigits.length) return;
     pinDigits = pinDigits.slice(0, -1);
+  }
+
+  // Keyboard / numeric-keyboard input handler
+  function handlePinInput(e) {
+    const raw = e.target.value.replace(/\D/g, '');
+    for (const ch of raw) addPinDigit(ch);
+    e.target.value = '';
+  }
+
+  function handlePinKeydown(e) {
+    if (e.key === 'Backspace') { e.preventDefault(); removePinDigit(); }
+    if (e.key === 'Enter')     { e.preventDefault(); submitGate(); }
+  }
+
+  // Numpad button: add digit then re-focus hidden input so keyboard stays active
+  function numpadPress(d) {
+    addPinDigit(d);
+    pinInputEl?.focus();
   }
 
   let composeText = '';
@@ -142,6 +165,9 @@
   $: peerChatOpen = peerPresence?.open ?? false;
   $: peerLastOpenedAt = (peerPresence && !peerPresence.open) ? peerPresence.at : null;
   $: peerKinnectOnline = Array.from($otherUsers.values()).some(u => u.userId === peerId && u.online !== false);
+  // Fall back to last message from peer as "last seen" timestamp
+  $: peerLastMsgAt = sortedMsgs.filter(m => m.senderId === peerId).slice(-1)[0]?.createdAt ?? null;
+  $: peerLastSeenAt = peerLastOpenedAt ?? peerLastMsgAt;
 
   function emitPresence(open) {
     socket.emit('secretChatPresence', { peerId, open });
@@ -377,8 +403,8 @@
           <span class="scp-dot scp-dot--online"></span><span class="scp-subtext">In this chat</span>
         {:else if peerKinnectOnline}
           <span class="scp-dot scp-dot--online" style="background:#60a5fa;box-shadow:0 0 0 2px rgba(96,165,250,0.25)"></span><span class="scp-subtext">Online</span>
-        {:else if peerLastOpenedAt}
-          <span class="scp-dot"></span><span class="scp-subtext">Last seen {formatLastSeen(peerLastOpenedAt)}</span>
+        {:else if peerLastSeenAt}
+          <span class="scp-dot"></span><span class="scp-subtext">Last seen {formatLastSeen(peerLastSeenAt)}</span>
         {:else}
           <span class="scp-dot" style="background:rgba(255,255,255,0.12)"></span><span class="scp-subtext">Offline</span>
         {/if}
@@ -427,50 +453,41 @@
         </p>
       </div>
 
-      <!-- PIN dot indicators -->
-      <div class="scp-pin-dots" class:scp-pin-dots--shake={pinShake} aria-live="polite" aria-label="{pinDigits.length} digit{pinDigits.length === 1 ? '' : 's'} entered">
+      <!-- Hidden input: captures physical keyboard + mobile numeric keyboard -->
+      <input
+        bind:this={pinInputEl}
+        class="scp-pin-input"
+        type="tel"
+        inputmode="numeric"
+        pattern="[0-9]*"
+        autocomplete="one-time-code"
+        on:input={handlePinInput}
+        on:keydown={handlePinKeydown}
+        aria-label="Enter PIN"
+        value=""
+      />
+
+      <!-- PIN dot indicators — tap to bring up keyboard on mobile -->
+      <button
+        class="scp-pin-dots"
+        class:scp-pin-dots--shake={pinShake}
+        on:click={() => pinInputEl?.focus()}
+        aria-live="polite"
+        aria-label="{pinDigits.length} of 4+ digits entered — tap to type PIN"
+        type="button"
+      >
         {#each {length: Math.max(4, pinDigits.length)} as _, i}
           <div class="scp-pin-dot" class:scp-pin-dot--filled={i < pinDigits.length}></div>
         {/each}
-      </div>
+      </button>
 
       {#if gateError}
         <p class="scp-gate-error" role="alert">{gateError}</p>
       {/if}
 
-      <!-- Number pad -->
-      <div class="scp-numpad" role="group" aria-label="PIN keypad">
-        {#each [1,2,3,4,5,6,7,8,9] as d}
-          <button
-            class="scp-numpad-key"
-            on:click={() => addPinDigit(String(d))}
-            type="button"
-            disabled={gateUnlocking}
-            aria-label={String(d)}
-          >{d}</button>
-        {/each}
-        <!-- row 4 -->
-        <div class="scp-numpad-spacer" aria-hidden="true"></div>
-        <button
-          class="scp-numpad-key"
-          on:click={() => addPinDigit('0')}
-          type="button"
-          disabled={gateUnlocking}
-          aria-label="0"
-        >0</button>
-        <button
-          class="scp-numpad-key scp-numpad-key--back"
-          on:click={removePinDigit}
-          type="button"
-          disabled={gateUnlocking || pinDigits.length === 0}
-          aria-label="Backspace"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/>
-            <line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/>
-          </svg>
-        </button>
-      </div>
+      <p class="scp-gate-keyboard-hint">
+        {pinDigits.length === 0 ? 'Tap above and type your PIN' : pinDigits.length < 4 ? `${pinDigits.length} digit${pinDigits.length === 1 ? '' : 's'} entered` : 'Press Enter or Open Chat'}
+      </p>
 
       <button
         class="scp-primary-btn"
@@ -1004,6 +1021,19 @@
     color: rgba(74,222,128,0.95);
   }
 
+  /* ── Hidden PIN keyboard input ─────────────────────────────── */
+  .scp-pin-input {
+    position: absolute;
+    width: 1px; height: 1px;
+    opacity: 0;
+    border: none; outline: none;
+    pointer-events: none;
+    caret-color: transparent;
+    background: transparent;
+    color: transparent;
+    z-index: -1;
+  }
+
   /* ── Gate ──────────────────────────────────────────────────── */
   .scp-gate {
     flex: 1;
@@ -1078,14 +1108,21 @@
     font-family: system-ui, sans-serif;
   }
 
-  /* ── PIN dot indicators ─────────────────────────────────────── */
+  /* ── PIN dot indicators (tap-to-focus button) ───────────────── */
   .scp-pin-dots {
     display: flex;
     gap: 14px;
     justify-content: center;
-    height: 20px;
     align-items: center;
+    padding: 14px 24px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    border-radius: 12px;
+    transition: background 0.15s;
+    touch-action: manipulation;
   }
+  .scp-pin-dots:hover { background: rgba(255,255,255,0.04); }
 
   .scp-pin-dot {
     width: 14px; height: 14px;
@@ -1094,6 +1131,7 @@
     background: transparent;
     transition: background 0.15s, border-color 0.15s, transform 0.15s, box-shadow 0.15s;
     flex-shrink: 0;
+    pointer-events: none;
   }
 
   .scp-pin-dot--filled {
@@ -1103,58 +1141,13 @@
     box-shadow: 0 0 0 3px rgba(99,102,241,0.2), 0 0 12px rgba(99,102,241,0.4);
   }
 
-  /* ── Number pad ─────────────────────────────────────────────── */
-  .scp-numpad {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-    width: 100%;
-    max-width: 240px;
-  }
-
-  .scp-numpad-spacer { height: 52px; }
-
-  .scp-numpad-key {
-    height: 52px;
-    border-radius: 14px;
-    border: 1px solid rgba(255,255,255,0.08);
-    background: rgba(255,255,255,0.04);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    color: #e2e8f0;
-    font-size: 21px;
-    font-weight: 300;
-    cursor: pointer;
+  .scp-gate-keyboard-hint {
+    margin: 0;
+    font-size: 11px;
+    color: rgba(255,255,255,0.3);
     font-family: system-ui, sans-serif;
-    transition: background 0.12s, transform 0.08s, box-shadow 0.12s;
-    touch-action: manipulation;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    user-select: none;
-    -webkit-user-select: none;
-    position: relative; z-index: 1;
-  }
-  .scp-numpad-key:hover:not(:disabled) {
-    background: rgba(129,140,248,0.1);
-    border-color: rgba(129,140,248,0.2);
-  }
-  .scp-numpad-key:active:not(:disabled) {
-    background: rgba(129,140,248,0.2);
-    transform: scale(0.91);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
-  }
-  .scp-numpad-key:disabled { opacity: 0.25; cursor: not-allowed; }
-
-  .scp-numpad-key--back {
-    background: transparent;
-    border-color: transparent;
-    color: rgba(255,255,255,0.45);
-    font-size: 14px;
-  }
-  .scp-numpad-key--back:hover:not(:disabled) {
-    background: rgba(255,255,255,0.06);
-    color: rgba(255,255,255,0.7);
+    text-align: center;
+    letter-spacing: 0.02em;
   }
 
   .scp-gate-error {
