@@ -1,0 +1,8 @@
+frontend/src/components/SecretChatPanel.svelte
+  fecfef28-5b62-43d1-9131-6357b870c36f:2026-05-10T15:36:16.304Z 98,957,985-997
+frontend/src/components/primitives/EmojiPicker.svelte
+  fecfef28-5b62-43d1-9131-6357b870c36f:2026-05-10T15:32:29.771Z 44
+frontend/src/pages/SecretChatViewer.svelte
+  fecfef28-5b62-43d1-9131-6357b870c36f:2026-05-10T15:38:15.741Z 35,681,706-718
+---
+{"schema_version": "authorship/3.0.0", "base_commit_sha": "HEAD~1", "prompts": {"fecfef28-5b62-43d1-9131-6357b870c36f:2026-05-10T15:36:16.304Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 15, "overriden_lines": 0}, "fecfef28-5b62-43d1-9131-6357b870c36f:2026-05-10T15:32:29.771Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 1, "overriden_lines": 0}, "fecfef28-5b62-43d1-9131-6357b870c36f:2026-05-10T15:38:15.741Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 15, "overriden_lines": 0}}}
