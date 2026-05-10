@@ -95,6 +95,7 @@
   let sending = false;
   let copyDone = false;
   let messagesEl;
+  let composeTextEl;
   let emojiOpen = false;
   let emojiAnchor;
   let stickerOpen = false;
@@ -953,6 +954,7 @@
           maxlength="2000"
           placeholder="Type a secret message…"
           bind:value={composeText}
+          bind:this={composeTextEl}
           on:keydown={handleComposeKeydown}
           disabled={sending}
         ></textarea>
@@ -970,18 +972,6 @@
         </button>
       </div>
 
-      <EmojiPicker
-        open={emojiOpen}
-        anchor={emojiAnchor}
-        on:pick={(e) => { composeText += e.detail; }}
-        on:close={() => emojiOpen = false}
-      />
-      <StickerPicker
-        open={stickerOpen}
-        anchor={stickerAnchor}
-        on:pick={(e) => { composeText += e.detail; stickerOpen = false; }}
-        on:close={() => stickerOpen = false}
-      />
       <div class="scp-compose-meta">
         <p class="scp-compose-hint">
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
@@ -992,6 +982,19 @@
         {/if}
       </div>
     </div>
+    <!-- Pickers sit outside .scp-compose to avoid backdrop-filter containing-block bug on iOS/Safari -->
+    <EmojiPicker
+      open={emojiOpen}
+      anchor={emojiAnchor}
+      on:pick={(e) => { composeText += e.detail; emojiOpen = false; setTimeout(() => composeTextEl?.focus(), 50); }}
+      on:close={() => emojiOpen = false}
+    />
+    <StickerPicker
+      open={stickerOpen}
+      anchor={stickerAnchor}
+      on:pick={(e) => { composeText += e.detail; stickerOpen = false; }}
+      on:close={() => stickerOpen = false}
+    />
   {/if}
 </div>
 </div>

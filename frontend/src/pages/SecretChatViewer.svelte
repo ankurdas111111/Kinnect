@@ -32,6 +32,7 @@
   let replySent = false;
   let sending = false;
   let messagesEl;
+  let replyTextEl;
   let emojiOpen = false;
   let emojiAnchor;
   let stickerOpen = false;
@@ -677,6 +678,7 @@
             maxlength="2000"
             placeholder="Type a secret reply…"
             bind:value={replyText}
+            bind:this={replyTextEl}
             on:keydown={handleReplyKeydown}
             disabled={sending}
           ></textarea>
@@ -693,19 +695,6 @@
             {/if}
           </button>
         </div>
-        <EmojiPicker
-          open={emojiOpen}
-          anchor={emojiAnchor}
-          on:pick={(e) => { replyText += e.detail; }}
-          on:close={() => emojiOpen = false}
-        />
-        <StickerPicker
-          open={stickerOpen}
-          anchor={stickerAnchor}
-          on:pick={(e) => { replyText += e.detail; stickerOpen = false; }}
-          on:close={() => stickerOpen = false}
-        />
-
         {#if replyError}
           <p class="scv-reply-err" role="alert">{replyError}</p>
         {/if}
@@ -714,6 +703,19 @@
           End-to-end encrypted
         </p>
       </div>
+    <!-- Pickers sit outside .scv-compose to avoid backdrop-filter containing-block bug on iOS/Safari -->
+    <EmojiPicker
+      open={emojiOpen}
+      anchor={emojiAnchor}
+      on:pick={(e) => { replyText += e.detail; emojiOpen = false; setTimeout(() => replyTextEl?.focus(), 50); }}
+      on:close={() => emojiOpen = false}
+    />
+    <StickerPicker
+      open={stickerOpen}
+      anchor={stickerAnchor}
+      on:pick={(e) => { replyText += e.detail; stickerOpen = false; }}
+      on:close={() => stickerOpen = false}
+    />
     </div>
   {/if}
 </div>

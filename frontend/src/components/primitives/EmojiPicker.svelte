@@ -41,7 +41,7 @@
   }
 
   function handlePick(e) {
-    const emoji = e.detail?.unicode;
+    const emoji = e.detail?.emoji?.unicode;
     if (emoji) dispatch('pick', emoji);
   }
 
