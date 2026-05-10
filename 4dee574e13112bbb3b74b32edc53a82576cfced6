@@ -1,0 +1,4 @@
+backend/internal/db/schema.go
+  fecfef28-5b62-43d1-9131-6357b870c36f:2026-05-10T15:05:39.392Z 203-204,251-252
+---
+{"schema_version": "authorship/3.0.0", "base_commit_sha": "HEAD~1", "prompts": {"fecfef28-5b62-43d1-9131-6357b870c36f:2026-05-10T15:05:39.392Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 4, "overriden_lines": 0}}}
