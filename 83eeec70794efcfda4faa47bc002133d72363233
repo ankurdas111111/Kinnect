@@ -1,0 +1,4 @@
+frontend/src/components/SecretChatPanel.svelte
+  1e4de95f-bc4c-4f20-83b9-577c2c5a6550:2026-05-10T14:46:12.395Z 65-70,72-79,81-82,195-196,205-206,516,1301-1303
+---
+{"schema_version": "authorship/3.0.0", "base_commit_sha": "HEAD~1", "prompts": {"1e4de95f-bc4c-4f20-83b9-577c2c5a6550:2026-05-10T14:46:12.395Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 24, "overriden_lines": 0}}}
