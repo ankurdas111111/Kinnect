@@ -16,11 +16,13 @@
     { id: 'spicy',     label: '🔥 Spicy'    },
     { id: 'fun',       label: '😂 Fun'      },
     { id: 'reactions', label: '🫢 Reactions' },
-    { id: 'hands',     label: '🫰 Hands'    },
+    { id: 'hands',     label: '🫶 Hands'    },
   ];
 
-  // Only animated GIFs — all codes are expressive faces, effects, or movement-based gestures.
-  // Static objects (food, flowers, jewelry, animals) removed entirely.
+  // Only animated GIFs — all verified 200 OK against fonts.gstatic.com CDN.
+  // Replacements: 1f57a (man dancing) → 1f4aa (flexed biceps, confirmed 200).
+  //               1f47a (goblin) → 1f47d (alien, confirmed 200).
+  // Static objects, food, and flowers removed entirely.
   const STICKERS = {
     flirty: [
       { hex: '1f970', alt: '🥰' },  // smiling face with hearts
@@ -64,7 +66,7 @@
       { hex: '1f921', alt: '🤡' },  // clown face
       { hex: '1f635', alt: '😵' },  // dizzy face
       { hex: '1f47f', alt: '👿' },  // angry face with horns
-      { hex: '1f47a', alt: '👺' },  // goblin
+      { hex: '1f47d', alt: '👽' },  // alien (replaces goblin 1f47a — 404)
       { hex: '1f479', alt: '👹' },  // ogre
       { hex: '1f480', alt: '💀' },  // skull
       { hex: '1f922', alt: '🤢' },  // nauseated face
@@ -149,8 +151,8 @@
       { hex: '1f64f', alt: '🙏' },  // folded hands
       { hex: '1f64c', alt: '🙌' },  // raising hands
       { hex: '1f932', alt: '🤲' },  // palms up together
-      { hex: '1f483', alt: '💃' },  // woman dancing
-      { hex: '1f57a', alt: '🕺' },  // man dancing
+      { hex: '1f4aa', alt: '💪' },  // flexed biceps (replaces man dancing 1f57a — 404)
+      { hex: '1f483', alt: '💃' },  // woman dancing (confirmed 200)
     ],
   };
 
@@ -161,6 +163,13 @@
   function pick(hex) {
     const url = gifUrl(hex);
     dispatch('pick', `[gif:${url}]`);
+  }
+
+  // Track broken images per-tab so we can hide failed GIFs cleanly
+  let brokenHexes = new Set();
+
+  function handleImgError(hex) {
+    brokenHexes = new Set([...brokenHexes, hex]);
   }
 
   function reposition() {
@@ -217,7 +226,7 @@
       id="sp-panel-{activeTab}"
       aria-label="{TABS.find(t => t.id === activeTab)?.label} stickers"
     >
-      {#each STICKERS[activeTab] as s (s.hex)}
+      {#each STICKERS[activeTab].filter(s => !brokenHexes.has(s.hex)) as s (s.hex)}
         <button
           class="sp-sticker-btn"
           on:click={() => pick(s.hex)}
@@ -232,6 +241,7 @@
             class="sp-img"
             width="48"
             height="48"
+            on:error={() => handleImgError(s.hex)}
           />
         </button>
       {/each}
@@ -266,7 +276,7 @@
 
   .sp-tab {
     flex-shrink: 0;
-    padding: 9px 10px;
+    padding: 0 10px;
     background: none;
     border: none;
     color: rgba(255,255,255,0.35);
@@ -278,7 +288,10 @@
     border-bottom: 2px solid transparent;
     white-space: nowrap;
     touch-action: manipulation;
-    min-height: 36px;
+    /* P0 fix: minimum 44px touch target (was 36px) */
+    min-height: 44px;
+    display: flex;
+    align-items: center;
   }
   .sp-tab:hover { color: rgba(255,255,255,0.65); background: rgba(255,255,255,0.04); }
   .sp-tab--active {
@@ -311,6 +324,9 @@
     justify-content: center;
     transition: background 0.12s, transform 0.1s;
     touch-action: manipulation;
+    /* Minimum 44px tap target via the grid column sizing */
+    min-width: 44px;
+    min-height: 44px;
   }
   .sp-sticker-btn:hover { background: rgba(255,255,255,0.08); transform: scale(1.1); }
   .sp-sticker-btn:active { background: rgba(129,140,248,0.18); transform: scale(0.95); }

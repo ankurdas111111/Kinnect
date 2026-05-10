@@ -63,10 +63,6 @@
   }
 
   // ── iOS keyboard avoidance ───────────────────────────────────
-  // When the soft keyboard opens, iOS doesn't shrink the viewport — it just
-  // overlays the bottom of the screen. We use visualViewport to detect the
-  // keyboard height and shift the panel upward so the submit button stays
-  // visible. Falls back gracefully on browsers without visualViewport.
   let scpEl;
 
   function onVVChange() {
@@ -78,7 +74,6 @@
     scpEl.style.transition = 'margin-bottom 0.2s ease';
   }
 
-  // Reset when gate closes (keyboard dismissed on submit)
   $: if (gateOpen && scpEl) { scpEl.style.marginBottom = ''; }
 
   // ── PIN input helpers ────────────────────────────────────────
@@ -244,25 +239,21 @@
   // ── Photo sending ─────────────────────────────────────────────
   // Images are compressed client-side (WebP → JPEG fallback, multi-pass size reduction),
   // then encrypted with the session PIN before being stored as opaque ciphertext blobs.
-  // Target: ≤150 KB binary (≤205 KB base64) per photo to stay within the 1 GB DB budget.
+  // Target: ≤100 KB binary (≤137 KB base64) per photo to fit within the 1 GB DB budget.
   let photoInputEl;
   let cameraInputEl;
   let photoSending = false;
   let attachMenuOpen = false;
 
   // Downscale longest edge to this before encoding
-  const MAX_PHOTO_EDGE = 800;
-  // Binary budget per photo — ~150 KB → ~205 KB base64 → ~280 KB encrypted text
-  const MAX_BINARY_BYTES = 150_000;
+  const MAX_PHOTO_EDGE = 720;
+  // Binary budget per photo — 100 KB ensures base64 stays under ~137 KB
+  const MAX_BINARY_BYTES = 100_000;
 
   /**
-   * Ultra-compress an image File via multi-pass Canvas encoding:
-   *   1. Downscale to MAX_PHOTO_EDGE on longest side (800px vs old 1024 = 39% fewer pixels)
-   *   2. Encode as WebP at q=0.82 — ~30% smaller than JPEG at equal perceptual quality.
-   *      Falls back to JPEG if browser doesn't support WebP output (Safari < 16).
-   *   3. If binary estimate still exceeds MAX_BINARY_BYTES, iterate: shrink dimensions
-   *      proportionally and drop quality slightly each pass (max 3 passes).
-   * Typical result: 35–120 KB binary vs 180–350 KB with plain JPEG at 72%.
+   * Ultra-compress an image File via multi-pass Canvas encoding.
+   * Returns the compressed DataURL string.
+   * Rejects with { tooLarge: true, sizeKB: N } if all passes fail to reach target.
    */
   function compressImage(file) {
     return new Promise((resolve, reject) => {
@@ -291,18 +282,25 @@
         const c0 = document.createElement('canvas');
         c0.width = width; c0.height = height;
         c0.getContext('2d').drawImage(img, 0, 0, width, height);
-        let result = encode(c0, 0.82);
+        let result = encode(c0, 0.80);
 
         // Multi-pass: shrink until under budget (result.length * 0.75 ≈ binary bytes)
         let w = width, h = height;
-        for (let pass = 0; pass < 3 && result.length * 0.75 > MAX_BINARY_BYTES; pass++) {
-          const scale = Math.sqrt(MAX_BINARY_BYTES / (result.length * 0.75)) * 0.9;
-          w = Math.max(160, Math.round(w * scale));
-          h = Math.max(120, Math.round(h * scale));
+        for (let pass = 0; pass < 4 && result.length * 0.75 > MAX_BINARY_BYTES; pass++) {
+          const scale = Math.sqrt(MAX_BINARY_BYTES / (result.length * 0.75)) * 0.88;
+          w = Math.max(120, Math.round(w * scale));
+          h = Math.max(90, Math.round(h * scale));
           const c = document.createElement('canvas');
           c.width = w; c.height = h;
           c.getContext('2d').drawImage(img, 0, 0, w, h);
-          result = encode(c, 0.78 - pass * 0.06);
+          result = encode(c, 0.72 - pass * 0.05);
+        }
+
+        const finalBinaryKB = Math.round((result.length * 0.75) / 1024);
+        if (result.length * 0.75 > MAX_BINARY_BYTES * 1.5) {
+          // After 4 passes still too large — reject with size info so the toast is specific
+          reject({ tooLarge: true, sizeKB: finalBinaryKB });
+          return;
         }
 
         resolve(result);
@@ -315,7 +313,6 @@
   function toggleAttachMenu() {
     attachMenuOpen = !attachMenuOpen;
     if (attachMenuOpen) {
-      // One-shot click-outside to close
       const close = (e) => {
         if (!e.target.closest?.('.scp-attach-wrap')) attachMenuOpen = false;
         document.removeEventListener('click', close, true);
@@ -334,7 +331,7 @@
       return;
     }
     if (file.size > 15 * 1024 * 1024) {
-      toasts.error('Photo too large — max 15 MB');
+      toasts.error('Photo too large to process — max 15 MB');
       return;
     }
 
@@ -344,8 +341,12 @@
       const payload = `[photo:${dataUrl}]`;
       const { ciphertext, iv, salt } = await encryptMessage(payload, sessionPin);
       socket.emit('sendSecretMsg', { receiverId: peerId, ciphertext, iv, salt });
-    } catch {
-      toasts.error('Could not send photo');
+    } catch (err) {
+      if (err && err.tooLarge) {
+        toasts.error(`Photo still too large after maximum compression (${err.sizeKB} KB). Use a screenshot or a simpler image.`);
+      } else {
+        toasts.error('Could not send photo');
+      }
     } finally {
       photoSending = false;
     }
@@ -466,6 +467,16 @@
     return m ? m[1] : null;
   }
 
+  /**
+   * Detect if a message is a photo type from ciphertext prefix analysis.
+   * Since we can't decrypt locked messages, we use a heuristic: photo payloads
+   * produce longer ciphertext due to base64 image data (typically >5000 chars).
+   * This is imprecise but purely cosmetic — it drives the locked photo placeholder.
+   */
+  function isLikelyPhoto(ciphertext) {
+    return ciphertext && ciphertext.length > 5000;
+  }
+
   function dateLabel(ts, prevTs) {
     const d = new Date(ts);
     const p = prevTs ? new Date(prevTs) : null;
@@ -482,13 +493,18 @@
   }
 
   /**
-   * Return a short ciphertext excerpt for visual "gibberish" display.
-   * Shows the first 32 chars of the base64 ciphertext to suggest encryption
-   * without revealing anything meaningful. Intentionally looks like noise.
+   * Return a short excerpt of the actual base64 ciphertext for visual "gibberish" display.
+   * Uses the real ciphertext characters — reproducible, not random.
+   * Length varies by position in string to create visual rhythm: 20–36 chars.
+   * Ends with ellipsis to signal truncation.
    */
   function ciphertextGibberish(ciphertext) {
     if (!ciphertext) return '···';
-    return ciphertext.slice(0, 32);
+    // Offset into the ciphertext by 4 chars to skip the leading AAAA PBKDF2 prefix
+    // that's present on all AES-GCM outputs — makes the displayed chars more varied
+    const start = Math.min(4, ciphertext.length);
+    const raw = ciphertext.slice(start, start + 30);
+    return raw.length >= 6 ? raw + '…' : '···';
   }
 </script>
 
@@ -635,6 +651,7 @@
         {@const decrypted = !d.isOwn && d.plain !== null}
         {@const showInline = activeDecryptId === msg.id}
         {@const label = dateLabel(msg.createdAt, i > 0 ? groupedMsgs[i-1].createdAt : null)}
+        {@const likelyPhoto = !d.isOwn && !decrypted && isLikelyPhoto(msg.ciphertext)}
 
         {#if label}
           <div class="scp-date-div"><span>{label}</span></div>
@@ -648,7 +665,7 @@
         >
 
           {#if d.isOwn}
-            <!-- Sent: show raw ciphertext as visual gibberish — confirms encryption is active -->
+            <!-- Sent: show actual ciphertext excerpt as visual gibberish — confirms encryption is active -->
             <div
               class="scp-bubble scp-bubble--own"
               class:scp-bubble--grp-notfirst={!msg.groupFirst}
@@ -696,6 +713,7 @@
             <div
               class="scp-bubble scp-bubble--their scp-bubble--decrypted"
               class:scp-bubble--grp-notfirst={!msg.groupFirst}
+              class:scp-bubble--photo={parsePhoto(d.plain) !== null}
             >
               {#if parsePhoto(d.plain)}
                 <img
@@ -737,17 +755,35 @@
               class="scp-bubble scp-bubble--locked"
               class:scp-bubble--locked-active={showInline}
               class:scp-bubble--grp-notfirst={!msg.groupFirst}
+              class:scp-bubble--locked-photo={likelyPhoto}
               on:click={() => toggleInline(msg.id)}
               aria-expanded={showInline}
-              aria-label="Tap to enter PIN and decrypt"
+              aria-label={likelyPhoto ? 'Tap to enter PIN and decrypt photo' : 'Tap to enter PIN and decrypt'}
             >
               {#if unread}
                 <span class="scp-pulse" aria-hidden="true"></span>
               {/if}
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-              <span>Tap to read</span>
-              {#if unread}
-                <span class="scp-ago">{timeAgo(msg.createdAt)}</span>
+              {#if likelyPhoto}
+                <!-- Photo placeholder: blurred noise frame + camera icon -->
+                <span class="scp-photo-placeholder" aria-hidden="true">
+                  <span class="scp-photo-blur-layer"></span>
+                  <span class="scp-photo-cam-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                      <circle cx="12" cy="13" r="4"/>
+                    </svg>
+                  </span>
+                </span>
+                <span class="scp-locked-photo-label">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  Photo — tap to unlock
+                </span>
+              {:else}
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <span class="scp-cipher-preview" aria-hidden="true">{ciphertextGibberish(msg.ciphertext)}</span>
+                {#if unread}
+                  <span class="scp-ago">{timeAgo(msg.createdAt)}</span>
+                {/if}
               {/if}
             </button>
 
@@ -757,11 +793,11 @@
                 <input
                   id="scp-inline-{msg.id}"
                   class="scp-inline-pin"
-                  type="tel"
+                  type="password"
                   inputmode="numeric"
                   pattern="[0-9]*"
                   maxlength="8"
-                  placeholder="Enter PIN"
+                  placeholder="Sender's PIN"
                   value={inlinePins[msg.id] ?? ''}
                   on:input={(e) => inlinePinInput(e, msg.id)}
                   on:keydown={(e) => e.key === 'Enter' && decryptOne(msg)}
@@ -849,7 +885,7 @@
           </svg>
         </button>
 
-        <!-- Sticker / animated emoji button -->
+        <!-- Sticker / animated GIF button -->
         <button
           class="scp-compose-icon-btn"
           bind:this={stickerAnchor}
@@ -865,8 +901,8 @@
         </button>
 
         <!-- Attachment menu (camera + gallery) -->
-        <input bind:this={photoInputEl} type="file" accept="image/*" class="scp-photo-input" on:change={handlePhotoSelect} aria-hidden="true" tabindex="-1" />
-        <input bind:this={cameraInputEl} type="file" accept="image/*" capture="environment" class="scp-photo-input" on:change={handlePhotoSelect} aria-hidden="true" tabindex="-1" />
+        <input bind:this={photoInputEl} type="file" accept="image/*" style="display:none" on:change={handlePhotoSelect} aria-hidden="true" tabindex="-1" />
+        <input bind:this={cameraInputEl} type="file" accept="image/*" capture="environment" style="display:none" on:change={handlePhotoSelect} aria-hidden="true" tabindex="-1" />
         <div class="scp-attach-wrap">
           <button
             class="scp-compose-icon-btn"
@@ -883,7 +919,8 @@
               <div class="scp-mini-spinner" aria-hidden="true"></div>
             {:else}
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="4"/>
               </svg>
             {/if}
           </button>
@@ -965,9 +1002,9 @@
     position: fixed;
     inset: 0;
     z-index: var(--z-modal, 5000);
-    background: rgba(0, 0, 0, 0.55);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -984,27 +1021,28 @@
   .scp {
     display: flex;
     flex-direction: column;
-    background: #0a0a12;
-    border: 1px solid rgba(129,140,248,0.14);
+    background: #080810;
+    border: 1px solid rgba(129,140,248,0.18);
     border-radius: 20px;
     overflow: hidden;
     width: 100%;
     max-width: 420px;
     height: min(85dvh, 640px);
     box-shadow:
-      0 24px 80px rgba(0,0,0,0.75),
-      0 0 0 1px rgba(129,140,248,0.1),
-      inset 0 1px 0 rgba(255,255,255,0.06);
+      0 32px 96px rgba(0,0,0,0.85),
+      0 0 0 1px rgba(129,140,248,0.12),
+      inset 0 1px 0 rgba(255,255,255,0.07);
     position: relative;
   }
+  /* Subtle ambient light mesh — cyberpunk atmosphere without garish colors */
   .scp::before {
     content: '';
     position: absolute;
     inset: 0;
     background:
-      radial-gradient(ellipse 80% 60% at 20% 0%, rgba(99,102,241,0.12) 0%, transparent 60%),
-      radial-gradient(ellipse 60% 50% at 80% 100%, rgba(168,85,247,0.09) 0%, transparent 55%),
-      radial-gradient(ellipse 40% 40% at 50% 50%, rgba(59,130,246,0.05) 0%, transparent 60%);
+      radial-gradient(ellipse 80% 60% at 20% 0%, rgba(99,102,241,0.14) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 50% at 80% 100%, rgba(168,85,247,0.11) 0%, transparent 55%),
+      radial-gradient(ellipse 40% 40% at 50% 50%, rgba(59,130,246,0.06) 0%, transparent 60%);
     pointer-events: none;
     z-index: 0;
     animation: scp-mesh-shift 12s ease-in-out infinite alternate;
@@ -1027,7 +1065,7 @@
 
   @keyframes scp-mesh-shift {
     0%   { opacity: 1; }
-    50%  { opacity: 0.7; }
+    50%  { opacity: 0.65; }
     100% { opacity: 1; }
   }
 
@@ -1036,7 +1074,7 @@
     display: none;
     width: 36px; height: 4px;
     border-radius: 2px;
-    background: rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.16);
     margin: 10px auto 4px;
     flex-shrink: 0;
   }
@@ -1050,20 +1088,20 @@
     align-items: center;
     gap: 10px;
     padding: 13px 12px 13px 16px;
-    background: rgba(255,255,255,0.02);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: rgba(255,255,255,0.025);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     border-bottom: 1px solid rgba(129,140,248,0.1);
     flex-shrink: 0;
   }
 
   .scp-header-lock {
-    color: rgba(255,255,255,0.2);
+    color: rgba(255,255,255,0.18);
     display: flex; align-items: center;
     flex-shrink: 0;
     transition: color 0.3s;
   }
-  .scp-header-lock--open { color: rgba(129,140,248,0.65); }
+  .scp-header-lock--open { color: rgba(129,140,248,0.7); }
 
   .scp-header-info { flex: 1; min-width: 0; }
 
@@ -1082,11 +1120,11 @@
     transition: opacity 0.25s;
   }
   .scp-header-name--hidden {
-    opacity: 0.35;
+    opacity: 0.3;
     letter-spacing: 0.15em;
     background: none;
     -webkit-background-clip: unset;
-    -webkit-text-fill-color: rgba(255,255,255,0.35);
+    -webkit-text-fill-color: rgba(255,255,255,0.3);
     background-clip: unset;
   }
 
@@ -1109,14 +1147,14 @@
 
   .scp-subtext {
     font-size: 11px;
-    color: rgba(255,255,255,0.35);
+    color: rgba(255,255,255,0.3);
     font-family: system-ui, sans-serif;
   }
 
   .scp-dot {
     width: 6px; height: 6px;
     border-radius: 50%;
-    background: rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.18);
     flex-shrink: 0;
   }
   .scp-dot--online {
@@ -1130,7 +1168,7 @@
     min-width: 44px; min-height: 44px;
     display: flex; align-items: center; justify-content: center;
     background: none; border: none;
-    color: rgba(255,255,255,0.35);
+    color: rgba(255,255,255,0.3);
     cursor: pointer;
     border-radius: 8px;
     transition: background 0.15s, color 0.15s;
@@ -1213,73 +1251,6 @@
   }
   .scp-pin-field--shake { animation: scp-shake 0.48s cubic-bezier(.36,.07,.19,.97) both; }
 
-  /* ── Hidden photo file input ────────────────────────────────── */
-  .scp-photo-input {
-    position: absolute;
-    width: 0; height: 0;
-    opacity: 0;
-    border: none; outline: none;
-    pointer-events: none;
-    overflow: hidden;
-  }
-
-  /* ── Attachment menu ────────────────────────────────────────── */
-  .scp-attach-wrap {
-    position: relative;
-  }
-
-  .scp-attach-menu {
-    position: absolute;
-    bottom: calc(100% + 6px);
-    left: 50%;
-    transform: translateX(-50%);
-    background: #16161e;
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 12px;
-    padding: 4px;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 130px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.6);
-    animation: scp-pop 0.14s cubic-bezier(0.34,1.56,0.64,1) both;
-    z-index: 10;
-  }
-
-  .scp-attach-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 9px 12px;
-    background: none;
-    border: none;
-    border-radius: 8px;
-    color: rgba(255,255,255,0.8);
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    white-space: nowrap;
-    min-height: 44px;
-    font-family: system-ui, sans-serif;
-    transition: background 0.12s, color 0.12s;
-  }
-  .scp-attach-item:hover { background: rgba(255,255,255,0.07); color: #fff; }
-  .scp-attach-item:active { background: rgba(129,140,248,0.15); }
-
-  .scp-compose-icon-btn--attach-active {
-    color: #818cf8;
-    background: rgba(129,140,248,0.12);
-  }
-
-  @keyframes scp-pop {
-    from { opacity: 0; transform: translateX(-50%) scale(0.88) translateY(6px); }
-    to   { opacity: 1; transform: translateX(-50%) scale(1)    translateY(0);   }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .scp-attach-menu { animation: none; }
-  }
-
   /* ── Gate ──────────────────────────────────────────────────── */
   .scp-gate {
     flex: 1;
@@ -1349,7 +1320,7 @@
   .scp-gate-sub {
     margin: 0;
     font-size: 12px;
-    color: rgba(255,255,255,0.35);
+    color: rgba(255,255,255,0.32);
     line-height: 1.65;
     font-family: system-ui, sans-serif;
   }
@@ -1443,12 +1414,15 @@
   /* Sent bubble: dark indigo glass, ciphertext rendered as visible noise */
   .scp-bubble--own {
     display: flex; align-items: center; gap: 8px;
-    background: linear-gradient(135deg, rgba(99,102,241,0.2) 0%, rgba(129,140,248,0.13) 100%);
-    border: 1px solid rgba(129,140,248,0.25);
+    background: linear-gradient(135deg, rgba(99,102,241,0.22) 0%, rgba(129,140,248,0.14) 100%);
+    border: 1px solid rgba(129,140,248,0.28);
     border-bottom-right-radius: 5px;
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), 0 2px 8px rgba(0,0,0,0.15);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.08),
+      0 2px 8px rgba(0,0,0,0.2),
+      0 0 0 1px rgba(99,102,241,0.08);
     max-width: 100%;
     overflow: hidden;
   }
@@ -1456,12 +1430,26 @@
     border-top-right-radius: 5px;
   }
 
-  /* The ciphertext gibberish — monospace, truncated, muted but readable */
+  /* The ciphertext gibberish — monospace, truncated, muted violet */
   .scp-cipher-text {
     font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
     font-size: 11px;
+    letter-spacing: 0.05em;
+    color: rgba(165,180,252,0.5);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+    user-select: none;
+  }
+
+  /* Ciphertext preview inside locked received bubble */
+  .scp-cipher-preview {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
+    font-size: 10px;
     letter-spacing: 0.04em;
-    color: rgba(165,180,252,0.55);
+    color: rgba(165,180,252,0.35);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1479,7 +1467,7 @@
   }
 
   .scp-bubble--their {
-    background: rgba(255,255,255,0.06);
+    background: rgba(255,255,255,0.055);
     border: 1px solid rgba(255,255,255,0.08);
     border-bottom-left-radius: 5px;
     color: #e2e8f0;
@@ -1498,43 +1486,105 @@
     padding-right: 30px;
   }
 
+  /* Photo bubble: remove extra padding, let image fill edge-to-edge */
+  .scp-bubble--decrypted.scp-bubble--photo {
+    padding: 4px;
+    overflow: hidden;
+  }
+
   .scp-relock-btn {
     position: absolute;
     top: 4px; right: 4px;
     width: 22px; height: 22px;
     padding: 11px; margin: -11px;
     display: flex; align-items: center; justify-content: center;
-    background: none; border: none; cursor: pointer;
-    color: rgba(255,255,255,0.18);
+    background: rgba(0,0,0,0.35);
+    border: none; cursor: pointer;
+    color: rgba(255,255,255,0.45);
     border-radius: 8px;
     transition: color 0.15s, background 0.15s;
     touch-action: manipulation;
     box-sizing: content-box;
   }
-  .scp-relock-btn:hover { color: rgba(129,140,248,0.7); background: rgba(129,140,248,0.08); }
+  .scp-relock-btn:hover { color: rgba(129,140,248,0.9); background: rgba(129,140,248,0.18); }
 
   .scp-countdown {
     font-size: 10px;
-    color: rgba(129,140,248,0.5);
+    color: rgba(129,140,248,0.55);
     font-family: system-ui, sans-serif;
     font-variant-numeric: tabular-nums;
   }
 
+  /* ── Locked bubble ───────────────────────────────────────────── */
   .scp-bubble--locked {
     display: flex; align-items: center; gap: 8px;
-    background: rgba(255,255,255,0.04);
+    background: rgba(255,255,255,0.03);
     border: 1px dashed rgba(255,255,255,0.1);
     border-bottom-left-radius: 4px;
-    color: rgba(255,255,255,0.3);
+    color: rgba(255,255,255,0.28);
     font-size: 13px;
     cursor: pointer;
     min-height: 44px;
     transition: background 0.15s, border-color 0.15s;
     position: relative;
     touch-action: manipulation;
+    overflow: hidden;
   }
-  .scp-bubble--locked:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.18); }
+  .scp-bubble--locked:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.18); }
   .scp-bubble--locked-active { border-color: rgba(129,140,248,0.35); background: rgba(129,140,248,0.06); }
+
+  /* Photo locked state — larger bubble with blurred placeholder */
+  .scp-bubble--locked-photo {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+    border-style: solid;
+    min-height: 80px;
+    overflow: hidden;
+    border-radius: 12px;
+    border-bottom-left-radius: 4px;
+  }
+
+  /* Blurred noise layer simulating a censored photo */
+  .scp-photo-placeholder {
+    position: relative;
+    width: 180px;
+    height: 120px;
+    display: block;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .scp-photo-blur-layer {
+    position: absolute;
+    inset: 0;
+    /* Pseudo-random gradient noise pattern — suggests a blurred image */
+    background:
+      radial-gradient(ellipse 60% 50% at 30% 40%, rgba(99,102,241,0.18) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 55% at 70% 60%, rgba(168,85,247,0.12) 0%, transparent 55%),
+      radial-gradient(ellipse 80% 40% at 50% 50%, rgba(59,130,246,0.1) 0%, transparent 70%),
+      linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(0,0,0,0.25) 100%);
+    filter: blur(8px);
+  }
+
+  .scp-photo-cam-icon {
+    position: absolute;
+    inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(255,255,255,0.55);
+  }
+
+  .scp-locked-photo-label {
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 12px;
+    font-size: 11px;
+    color: rgba(255,255,255,0.35);
+    font-family: system-ui, sans-serif;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    width: 100%;
+    box-sizing: border-box;
+    flex-shrink: 0;
+  }
 
   .scp-ago {
     margin-left: auto;
@@ -1542,6 +1592,7 @@
     color: rgba(255,255,255,0.2);
     font-family: system-ui, sans-serif;
     white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .scp-pulse {
@@ -1613,6 +1664,8 @@
     box-sizing: border-box;
   }
 
+  /* P0 fix: type="password" with inputmode="numeric" — consistent with gate PIN,
+     prevents digits appearing in plain text on keyboards */
   .scp-inline-pin {
     flex: 1; min-width: 0;
     padding: 10px 10px;
@@ -1668,9 +1721,9 @@
     display: flex; flex-direction: column;
     gap: 7px;
     flex-shrink: 0;
-    background: rgba(0,0,0,0.2);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    background: rgba(0,0,0,0.25);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
 
   .scp-compose-inner {
@@ -1691,7 +1744,7 @@
     min-width: 44px; min-height: 44px;
     display: flex; align-items: center; justify-content: center;
     background: none; border: none;
-    color: rgba(255,255,255,0.3);
+    color: rgba(255,255,255,0.28);
     cursor: pointer;
     border-radius: 10px;
     flex-shrink: 0;
@@ -1699,9 +1752,9 @@
     touch-action: manipulation;
   }
   .scp-compose-icon-btn:hover { color: rgba(255,255,255,0.65); background: rgba(255,255,255,0.06); }
-  .scp-compose-icon-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+  .scp-compose-icon-btn:disabled { opacity: 0.22; cursor: not-allowed; }
 
-  .scp-compose-icon-btn--panic { color: rgba(255,255,255,0.18); }
+  .scp-compose-icon-btn--panic { color: rgba(255,255,255,0.16); }
   .scp-compose-icon-btn--panic:hover { color: rgba(248,113,113,0.6); background: rgba(248,113,113,0.06); }
 
   .scp-compose-icon-btn--loading { cursor: wait; }
@@ -1739,7 +1792,7 @@
     border-color: rgba(129,140,248,0.4);
     box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
   }
-  .scp-compose-text::placeholder { color: rgba(255,255,255,0.2); }
+  .scp-compose-text::placeholder { color: rgba(255,255,255,0.18); }
 
   .scp-send-btn {
     width: 44px; height: 44px;
@@ -1776,8 +1829,61 @@
     display: flex; align-items: center; gap: 5px;
     margin: 0;
     font-size: 10px;
-    color: rgba(255,255,255,0.18);
+    color: rgba(255,255,255,0.16);
     font-family: system-ui, sans-serif;
+  }
+
+  /* ── Attachment menu ────────────────────────────────────────── */
+  .scp-attach-wrap {
+    position: relative;
+  }
+
+  .scp-attach-menu {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #14141e;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 130px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+    animation: scp-pop 0.14s cubic-bezier(0.34,1.56,0.64,1) both;
+    z-index: 10;
+  }
+
+  .scp-attach-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    background: none;
+    border: none;
+    border-radius: 8px;
+    color: rgba(255,255,255,0.8);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    min-height: 44px;
+    font-family: system-ui, sans-serif;
+    transition: background 0.12s, color 0.12s;
+  }
+  .scp-attach-item:hover { background: rgba(255,255,255,0.07); color: #fff; }
+  .scp-attach-item:active { background: rgba(129,140,248,0.15); }
+
+  .scp-compose-icon-btn--attach-active {
+    color: #818cf8;
+    background: rgba(129,140,248,0.12);
+  }
+
+  @keyframes scp-pop {
+    from { opacity: 0; transform: translateX(-50%) scale(0.88) translateY(6px); }
+    to   { opacity: 1; transform: translateX(-50%) scale(1)    translateY(0);   }
   }
 
   /* ── Utilities ─────────────────────────────────────────────── */
@@ -1866,7 +1972,7 @@
     border-radius: 8px;
     border: none;
     background: transparent;
-    color: rgba(255,255,255,0.22);
+    color: rgba(255,255,255,0.2);
     font-size: 10px;
     font-family: system-ui, sans-serif;
     cursor: pointer;
@@ -1907,7 +2013,7 @@
     width: 36px; height: 36px;
     border-radius: 50%;
     border: 1px solid rgba(129,140,248,0.35);
-    background: rgba(10,10,18,0.85);
+    background: rgba(8,8,16,0.88);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     color: rgba(165,180,252,0.9);
@@ -1953,7 +2059,7 @@
   .scp-shimmer-bubble {
     height: 36px; width: 52%;
     border-radius: 16px;
-    background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
+    background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.07) 50%, rgba(255,255,255,0.03) 75%);
     background-size: 200% 100%;
     animation: scp-shimmer 1.4s ease infinite;
   }
@@ -1961,7 +2067,9 @@
   .scp-shimmer-bubble--long { width: 65%; }
 
   @media (prefers-reduced-motion: reduce) {
-    .scp-shimmer-bubble { animation: none; background: rgba(255,255,255,0.05); }
+    /* Disable all animations — critical for users with vestibular disorders */
+    .scp::before { animation: none; }
+    .scp-shimmer-bubble { animation: none; background: rgba(255,255,255,0.04); }
     .scp-msg { animation: none; }
     .scp-date-div { animation: none; }
     .scp-gate::before, .scp-gate::after { animation: none; }
@@ -1969,5 +2077,6 @@
     .scp-dot--online { animation: none; }
     .scp-pulse { animation: none; }
     .scp-unread-dot { animation: none; }
+    .scp-attach-menu { animation: none; }
   }
 </style>

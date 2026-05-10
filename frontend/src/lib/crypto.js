@@ -24,7 +24,16 @@ async function deriveKey(pin, saltBytes) {
   );
 }
 
-const toB64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+const toB64 = (buf) => {
+  const bytes = new Uint8Array(buf);
+  let binary = '';
+  // Process in 8 KB chunks to avoid exceeding V8's max spread argument count (~65 K).
+  // Without chunking, large photo buffers (~134 KB) throw RangeError on spread.
+  for (let i = 0; i < bytes.length; i += 8192) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  }
+  return btoa(binary);
+};;
 const fromB64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 
 /**

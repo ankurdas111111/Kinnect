@@ -119,8 +119,6 @@
     unlocking = true;
 
     // Validate PIN by attempting to decrypt the first owner-side message.
-    // Without this check, any 4+ digit PIN would silently pass the gate and
-    // replies would be encrypted with the wrong PIN.
     const firstOwnerMsg = rawMessages.find(m => m.fromOwner);
     if (firstOwnerMsg) {
       try {
@@ -140,6 +138,8 @@
       own: !m.fromOwner,
       createdAt: m.createdAt,
       raw: m.fromOwner ? m : null,
+      // Store ciphertext for received messages so we can show gibberish preview
+      ciphertext: m.fromOwner ? m.ciphertext : null,
     }));
     decrypted = results;
     gatePin = pin;
@@ -250,7 +250,7 @@
         replyError = data.expired ? 'Link expired.' : 'Send failed. Try again.';
         return;
       }
-      decrypted = [...decrypted, { id: Date.now(), body: null, own: true, createdAt: new Date().toISOString() }];
+      decrypted = [...decrypted, { id: Date.now(), body: null, own: true, createdAt: new Date().toISOString(), ciphertext }];
       replyText = '';
       replySent = true;
       await tick();
@@ -293,19 +293,40 @@
   }
 
   /**
-   * Generate a plausible-looking ciphertext noise string from a timestamp.
-   * Used in the viewer where we don't store the raw ciphertext on own messages.
+   * Generate a plausible ciphertext noise string from a timestamp.
+   * Used in the viewer where we don't always have the raw ciphertext on own messages.
+   * The LCG is seeded by timestamp so the display is reproducible — same as SecretChatPanel.
    */
   function fakeGibberish(ts) {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
     const seed = new Date(ts).getTime() || Date.now();
     let s = '';
     let x = seed % 2147483647;
-    for (let i = 0; i < 32; i++) {
+    for (let i = 0; i < 30; i++) {
       x = (x * 16807) % 2147483647;
       s += chars[x % 64];
     }
-    return s;
+    return s + '…';
+  }
+
+  /**
+   * Return a short excerpt of the actual base64 ciphertext for locked received messages.
+   * Skips 4 chars to avoid the leading AAAA PBKDF2 prefix.
+   */
+  function ciphertextGibberish(ciphertext) {
+    if (!ciphertext) return '···';
+    const start = Math.min(4, ciphertext.length);
+    const raw = ciphertext.slice(start, start + 28);
+    return raw.length >= 6 ? raw + '…' : '···';
+  }
+
+  /**
+   * Detect if a locked message is likely a photo — longer ciphertext due to base64 image.
+   * This is a heuristic for the locked placeholder UI only.
+   */
+  function isLikelyPhoto(msg) {
+    const ct = msg.raw?.ciphertext;
+    return ct && ct.length > 5000;
   }
 
   // Date divider helper
@@ -459,6 +480,7 @@
           {@const showInline = activeDecryptId === msg.id}
           {@const isDecrypted = !msg.own && msg.body !== null && !lockedSet.has(msg.id)}
           {@const label = dateLabel(msg.createdAt, i > 0 ? groupedDecrypted[i-1].createdAt : null)}
+          {@const likelyPhoto = !msg.own && !isDecrypted && isLikelyPhoto(msg)}
 
           {#if label}
             <div class="scv-date-div"><span>{label}</span></div>
@@ -478,7 +500,10 @@
                 aria-label="Encrypted message sent"
                 title="End-to-end encrypted"
               >
-                <span class="scv-cipher-text" aria-hidden="true">{fakeGibberish(msg.createdAt)}</span>
+                <!-- Use real ciphertext if available (reply messages), else seeded gibberish -->
+                <span class="scv-cipher-text" aria-hidden="true">
+                  {msg.ciphertext ? ciphertextGibberish(msg.ciphertext) : fakeGibberish(msg.createdAt)}
+                </span>
                 <span class="scv-lock-icon" aria-hidden="true">
                   <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                 </span>
@@ -491,6 +516,7 @@
               <div
                 class="scv-bubble scv-bubble--their scv-bubble--decrypted"
                 class:scv-bubble--grp-notfirst={!msg.groupFirst}
+                class:scv-bubble--photo={parsePhoto(msg.body) !== null}
               >
                 {#if parsePhoto(msg.body)}
                   <img src={parsePhoto(msg.body)} class="msg-photo" alt="Encrypted photo" loading="lazy" />
@@ -518,22 +544,44 @@
                 class="scv-bubble scv-bubble--locked"
                 class:scv-bubble--locked-active={showInline}
                 class:scv-bubble--grp-notfirst={!msg.groupFirst}
+                class:scv-bubble--locked-photo={likelyPhoto}
                 on:click={() => toggleInline(msg.id)}
                 aria-expanded={showInline}
-                aria-label="Tap to enter PIN and decrypt"
+                aria-label={likelyPhoto ? 'Tap to enter PIN and decrypt photo' : 'Tap to enter PIN and decrypt'}
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                <span>Tap to read</span>
-                <span class="scv-ago">{timeAgo(msg.createdAt)}</span>
+                {#if likelyPhoto}
+                  <span class="scv-photo-placeholder" aria-hidden="true">
+                    <span class="scv-photo-blur-layer"></span>
+                    <span class="scv-photo-cam-icon">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                        <circle cx="12" cy="13" r="4"/>
+                      </svg>
+                    </span>
+                  </span>
+                  <span class="scv-locked-photo-label">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    Photo — tap to unlock
+                  </span>
+                {:else}
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  {#if msg.raw?.ciphertext}
+                    <span class="scv-cipher-preview" aria-hidden="true">{ciphertextGibberish(msg.raw.ciphertext)}</span>
+                  {:else}
+                    <span>Tap to read</span>
+                  {/if}
+                  <span class="scv-ago">{timeAgo(msg.createdAt)}</span>
+                {/if}
               </button>
 
               {#if showInline}
-                <div class="scv-inline-decrypt">
+                <!-- transition:fade matches SecretChatPanel behavior — smooth expand/collapse -->
+                <div class="scv-inline-decrypt" transition:fade={{ duration: 100 }}>
                   <label class="scv-sr" for="scv-ipin-{msg.id}">PIN</label>
                   <input
                     id="scv-ipin-{msg.id}"
                     class="scv-inline-pin"
-                    type="tel"
+                    type="password"
                     inputmode="numeric"
                     pattern="[0-9]*"
                     maxlength="8"
@@ -606,7 +654,7 @@
             </svg>
           </button>
 
-          <!-- Sticker button — distinct star icon -->
+          <!-- Sticker button -->
           <button
             class="scv-compose-icon-btn"
             bind:this={stickerAnchor}
@@ -914,19 +962,22 @@
   .scv-bubble { padding: 9px 13px; border-radius: 18px; font-size: 14px; line-height: 1.55; }
   .scv-bubble--own {
     display: flex; align-items: center; gap: 8px;
-    background: linear-gradient(135deg, rgba(99,102,241,0.2) 0%, rgba(129,140,248,0.13) 100%);
-    border: 1px solid rgba(129,140,248,0.25);
+    background: linear-gradient(135deg, rgba(99,102,241,0.22) 0%, rgba(129,140,248,0.14) 100%);
+    border: 1px solid rgba(129,140,248,0.28);
     border-bottom-right-radius: 5px;
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), 0 2px 8px rgba(0,0,0,0.15);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.08),
+      0 2px 8px rgba(0,0,0,0.2),
+      0 0 0 1px rgba(99,102,241,0.08);
     max-width: 100%;
     overflow: hidden;
   }
   .scv-bubble--own.scv-bubble--grp-notfirst { border-top-right-radius: 5px; }
 
   .scv-bubble--their {
-    background: rgba(255,255,255,0.06);
+    background: rgba(255,255,255,0.055);
     border: 1px solid rgba(255,255,255,0.08);
     border-bottom-left-radius: 5px;
     color: #e2e8f0;
@@ -942,43 +993,135 @@
 
   .scv-bubble--decrypted { position: relative; padding-right: 30px; }
 
+  /* Photo decrypted bubble — edge-to-edge image */
+  .scv-bubble--decrypted.scv-bubble--photo {
+    padding: 4px;
+    overflow: hidden;
+  }
+
   .scv-bubble--locked {
     display: flex; align-items: center; gap: 8px;
-    background: rgba(255,255,255,0.04);
+    background: rgba(255,255,255,0.03);
     border: 1px dashed rgba(255,255,255,0.1);
     border-bottom-left-radius: 4px;
-    color: rgba(255,255,255,0.3);
+    color: rgba(255,255,255,0.28);
     font-size: 13px;
     cursor: pointer;
     min-height: 44px;
     position: relative;
     touch-action: manipulation;
     transition: background 0.15s, border-color 0.15s;
+    overflow: hidden;
   }
-  .scv-bubble--locked:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.18); }
+  .scv-bubble--locked:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.18); }
   .scv-bubble--locked-active { border-color: rgba(129,140,248,0.35); background: rgba(129,140,248,0.06); }
+
+  /* Photo locked state */
+  .scv-bubble--locked-photo {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+    border-style: solid;
+    min-height: 80px;
+    border-radius: 12px;
+    border-bottom-left-radius: 4px;
+  }
+
+  .scv-photo-placeholder {
+    position: relative;
+    width: 180px;
+    height: 120px;
+    display: block;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .scv-photo-blur-layer {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 50% at 30% 40%, rgba(99,102,241,0.18) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 55% at 70% 60%, rgba(168,85,247,0.12) 0%, transparent 55%),
+      radial-gradient(ellipse 80% 40% at 50% 50%, rgba(59,130,246,0.1) 0%, transparent 70%),
+      linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(0,0,0,0.25) 100%);
+    filter: blur(8px);
+  }
+
+  .scv-photo-cam-icon {
+    position: absolute;
+    inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(255,255,255,0.55);
+  }
+
+  .scv-locked-photo-label {
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 12px;
+    font-size: 11px;
+    color: rgba(255,255,255,0.35);
+    font-family: system-ui, sans-serif;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    width: 100%;
+    box-sizing: border-box;
+    flex-shrink: 0;
+  }
+
+  /* Ciphertext preview in locked received bubbles */
+  .scv-cipher-preview {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    color: rgba(165,180,252,0.32);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+    user-select: none;
+  }
 
   .scv-relock-btn {
     position: absolute; top: 4px; right: 4px;
     width: 22px; height: 22px;
     padding: 11px; margin: -11px;
     display: flex; align-items: center; justify-content: center;
-    background: none; border: none; cursor: pointer;
-    color: rgba(255,255,255,0.18);
+    background: rgba(0,0,0,0.35);
+    border: none; cursor: pointer;
+    color: rgba(255,255,255,0.45);
     border-radius: 8px;
     touch-action: manipulation;
     box-sizing: content-box;
-    transition: color 0.15s;
+    transition: color 0.15s, background 0.15s;
   }
-  .scv-relock-btn:hover { color: rgba(129,140,248,0.7); }
+  .scv-relock-btn:hover { color: rgba(129,140,248,0.9); background: rgba(129,140,248,0.18); }
 
   .scv-body { margin: 0; }
-  .scv-ago { margin-left: auto; font-size: 10px; color: rgba(255,255,255,0.2); white-space: nowrap; }
+  .scv-ago { margin-left: auto; font-size: 10px; color: rgba(255,255,255,0.2); white-space: nowrap; flex-shrink: 0; }
   .scv-meta { display: flex; align-items: center; gap: 4px; padding: 0 2px; }
   .scv-time { font-size: 10px; color: rgba(255,255,255,0.22); padding: 0 2px; }
   .scv-countdown { font-size: 10px; color: rgba(129,140,248,0.5); font-variant-numeric: tabular-nums; padding: 0 2px; }
 
-  /* Inline decrypt */
+  /* Cipher text on own bubbles */
+  .scv-cipher-text {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    color: rgba(165,180,252,0.5);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+    user-select: none;
+  }
+  .scv-lock-icon {
+    color: rgba(129,140,248,0.4);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+  }
+
+  /* Inline decrypt — P0 fix: type="password" with inputmode="numeric" */
   .scv-inline-decrypt {
     display: flex; align-items: center; gap: 8px; flex-wrap: nowrap;
     margin-top: 4px;
@@ -1033,7 +1176,7 @@
     display: flex; flex-direction: column;
     gap: 7px;
     flex-shrink: 0;
-    background: rgba(7,7,15,0.75);
+    background: rgba(7,7,15,0.8);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
@@ -1045,7 +1188,7 @@
     min-width: 44px; min-height: 44px;
     display: flex; align-items: center; justify-content: center;
     background: none; border: none;
-    color: rgba(255,255,255,0.3);
+    color: rgba(255,255,255,0.28);
     cursor: pointer;
     border-radius: 10px;
     flex-shrink: 0;
@@ -1073,7 +1216,7 @@
     border-color: rgba(129,140,248,0.4);
     box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
   }
-  .scv-compose-text::placeholder { color: rgba(255,255,255,0.2); }
+  .scv-compose-text::placeholder { color: rgba(255,255,255,0.18); }
   @media (max-width: 767px) { .scv-compose-text { font-size: 16px; } }
 
   .scv-send-btn {
@@ -1099,7 +1242,7 @@
   .scv-send-btn:disabled { opacity: 0.28; cursor: not-allowed; box-shadow: none; }
   .scv-send-ring { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.25); border-top-color: #fff; border-radius: 50%; animation: scv-spin 0.8s linear infinite; }
 
-  .scv-compose-hint { display: flex; align-items: center; gap: 5px; margin: 0; font-size: 10px; color: rgba(255,255,255,0.18); }
+  .scv-compose-hint { display: flex; align-items: center; gap: 5px; margin: 0; font-size: 10px; color: rgba(255,255,255,0.16); }
   .scv-reply-err { margin: 0; font-size: 12px; color: #f87171; }
 
   /* Panic overlay */
@@ -1113,26 +1256,6 @@
   :global(.msg-sticker) { max-width: 120px; max-height: 120px; border-radius: 8px; display: block; }
   :global(.msg-photo) { max-width: 220px; max-height: 260px; border-radius: 10px; display: block; object-fit: cover; }
 
-  /* Cipher-text gibberish on own sent bubbles */
-  .scv-cipher-text {
-    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
-    font-size: 11px;
-    letter-spacing: 0.04em;
-    color: rgba(165,180,252,0.55);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    flex: 1;
-    min-width: 0;
-    user-select: none;
-  }
-  .scv-lock-icon {
-    color: rgba(129,140,248,0.4);
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-  }
-
   .scv-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
   @keyframes scv-spin { to { transform: rotate(360deg); } }
 
@@ -1145,9 +1268,6 @@
     box-shadow: 0 4px 20px rgba(99,102,241,0.4);
   }
   .scv-gate-btn--ready:hover:not(:disabled) {
-    background: linear-gradient(135deg, #818cf8 0%, #6366f1 60%, #7c3aed 100%);
-    color: #fff;
-    border-color: transparent;
     transform: translateY(-1px);
     box-shadow: 0 6px 28px rgba(99,102,241,0.55);
   }
@@ -1204,7 +1324,7 @@
     width: 36px; height: 36px;
     border-radius: 50%;
     border: 1px solid rgba(129,140,248,0.35);
-    background: rgba(15,15,28,0.8);
+    background: rgba(15,15,28,0.85);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     color: rgba(165,180,252,0.9);
@@ -1222,7 +1342,6 @@
     box-shadow: 0 6px 20px rgba(0,0,0,0.5), 0 0 20px rgba(99,102,241,0.2);
   }
 
-
   .scv-date-div span {
     font-size: 10px;
     color: rgba(255,255,255,0.22);
@@ -1230,5 +1349,17 @@
     font-family: system-ui, sans-serif;
     letter-spacing: 0.03em;
     padding: 2px 4px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* Disable all animations — includes background mesh, gate icon, message entry */
+    .scv::before { animation: none; }
+    .scv-msg { animation: none; }
+    .scv-date-div { animation: none; }
+    .scv-spinner { animation: none; }
+    .scv-send-ring { animation: none; }
+    .scv-gate-spinner { animation: none; }
+    .scv-gate-glow { animation: none; }
+    .scv-gate-icon { animation: none; }
   }
 </style>
