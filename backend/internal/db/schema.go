@@ -200,6 +200,8 @@ func InitDB(db *sql.DB) error {
 			lng        DOUBLE PRECISION NOT NULL,
 			ts         BIGINT NOT NULL
 		)`,
+		// Migration guard: ts column added after initial deployment
+		`ALTER TABLE geofence_events ADD COLUMN IF NOT EXISTS ts BIGINT NOT NULL DEFAULT 0`,
 		`CREATE INDEX IF NOT EXISTS idx_geofence_events_user_ts ON geofence_events(user_id, ts DESC)`,
 
 		// F7: Proximity alerts
@@ -246,6 +248,8 @@ func InitDB(db *sql.DB) error {
 			speed   DOUBLE PRECISION,
 			ts      BIGINT NOT NULL
 		)`,
+		// Migration guard: ts column added after initial deployment
+		`ALTER TABLE position_history ADD COLUMN IF NOT EXISTS ts BIGINT NOT NULL DEFAULT 0`,
 		`CREATE INDEX IF NOT EXISTS idx_position_history_user_ts ON position_history(user_id, ts DESC)`,
 	}
 
