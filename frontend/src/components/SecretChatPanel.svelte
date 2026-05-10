@@ -62,6 +62,25 @@
     }, 1000);
   }
 
+  // ── iOS keyboard avoidance ───────────────────────────────────
+  // When the soft keyboard opens, iOS doesn't shrink the viewport — it just
+  // overlays the bottom of the screen. We use visualViewport to detect the
+  // keyboard height and shift the panel upward so the submit button stays
+  // visible. Falls back gracefully on browsers without visualViewport.
+  let scpEl;
+
+  function onVVChange() {
+    if (!scpEl) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const kbH = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    scpEl.style.marginBottom = kbH > 50 ? `${kbH}px` : '';
+    scpEl.style.transition = 'margin-bottom 0.2s ease';
+  }
+
+  // Reset when gate closes (keyboard dismissed on submit)
+  $: if (gateOpen && scpEl) { scpEl.style.marginBottom = ''; }
+
   // ── PIN pad helpers ──────────────────────────────────────────
   let pinInputEl;
   $: if (!gateOpen && pinInputEl) setTimeout(() => pinInputEl?.focus(), 80);
@@ -173,6 +192,8 @@
     socket.emit('getSecretMsgs', { peerId, limit: 20 });
     emitPresence(true);
     setTimeout(() => { loadingMessages = false; }, 4000);
+    window.visualViewport?.addEventListener('resize', onVVChange);
+    window.visualViewport?.addEventListener('scroll', onVVChange);
   });
 
   onDestroy(() => {
@@ -181,6 +202,8 @@
     sessionPin = '';
     gateOpen = false;
     for (const id of Object.values(lockIntervals)) clearInterval(id);
+    window.visualViewport?.removeEventListener('resize', onVVChange);
+    window.visualViewport?.removeEventListener('scroll', onVVChange);
   });
 
   // ── Gate ──────────────────────────────────────────────────────
@@ -490,7 +513,7 @@
 {/if}
 
 <div class="scp-backdrop" transition:fade={{ duration: 180 }} on:click|self={onClose}>
-<div class="scp">
+<div class="scp" bind:this={scpEl}>
   <!-- Mobile drag handle -->
   <div class="scp-drag-handle" aria-hidden="true"></div>
 
@@ -1275,7 +1298,9 @@
     padding: 24px 28px 32px;
     text-align: center;
     background: radial-gradient(ellipse at 50% 25%, rgba(99,102,241,0.1) 0%, transparent 65%);
-    overflow: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
     position: relative;
   }
   .scp-gate::before {
