@@ -63,37 +63,21 @@
     lockCountdowns = {};
   }
 
-  // PIN pad helpers
+  // PIN input helpers
   let pinInputEl;
 
-  // Auto-focus hidden input whenever gate is active
   $: if (state === 'gate' && pinInputEl) setTimeout(() => pinInputEl?.focus(), 80);
+  // Sync DOM value when pinDigits is cleared from code (failed unlock, restore, etc.)
+  $: if (pinInputEl && pinDigits.length === 0) pinInputEl.value = '';
 
-  function addPinDigit(d) {
-    if (pinDigits.length >= 8 || unlocking) return;
-    pinDigits = [...pinDigits, d];
-  }
-
-  function removePinDigit() {
-    if (!pinDigits.length) return;
-    pinDigits = pinDigits.slice(0, -1);
-  }
-
-  // Keyboard / numeric-keyboard input handler
   function handlePinInput(e) {
-    const raw = e.target.value.replace(/\D/g, '');
-    for (const ch of raw) addPinDigit(ch);
-    e.target.value = '';
+    const digits = e.target.value.replace(/\D/g, '').slice(0, 8);
+    e.target.value = digits;
+    pinDigits = digits.split('');
   }
 
   function handlePinKeydown(e) {
-    if (e.key === 'Backspace') { e.preventDefault(); removePinDigit(); }
-    if (e.key === 'Enter')     { e.preventDefault(); unlock(); }
-  }
-
-  function numpadPress(d) {
-    addPinDigit(d);
-    pinInputEl?.focus();
+    if (e.key === 'Enter') { e.preventDefault(); unlock(); }
   }
 
   // Per-message inline decrypt
@@ -380,41 +364,27 @@
 
         <p class="scv-gate-label">Enter access code</p>
 
-        <!-- Hidden input: captures physical keyboard + mobile numeric keyboard -->
         <input
           bind:this={pinInputEl}
-          class="scv-pin-input"
-          type="tel"
+          class="scv-pin-field"
+          class:scv-pin-field--shake={pinShake}
+          type="password"
           inputmode="numeric"
-          pattern="[0-9]*"
+          pattern="\d*"
+          maxlength="8"
+          placeholder="PIN"
           autocomplete="one-time-code"
+          autocorrect="off"
+          autocapitalize="none"
           on:input={handlePinInput}
           on:keydown={handlePinKeydown}
-          aria-label="Enter PIN"
-          value=""
+          aria-label="Enter access code — minimum 4 digits"
+          aria-describedby={pinError ? 'scv-pin-err' : undefined}
         />
 
-        <!-- PIN dot indicators — tap/click to re-focus keyboard -->
-        <button
-          class="scv-pin-dots"
-          class:scv-pin-dots--shake={pinShake}
-          on:click={() => pinInputEl?.focus()}
-          aria-live="polite"
-          aria-label="{pinDigits.length} of 4+ digits entered — tap to type PIN"
-          type="button"
-        >
-          {#each {length: Math.max(4, pinDigits.length)} as _, i}
-            <div class="scv-pin-dot" class:scv-pin-dot--filled={i < pinDigits.length}></div>
-          {/each}
-        </button>
-
         {#if pinError}
-          <p class="scv-gate-err" role="alert">{pinError}</p>
+          <p class="scv-gate-err" id="scv-pin-err" role="alert">{pinError}</p>
         {/if}
-
-        <p class="scv-gate-keyboard-hint">
-          {pinDigits.length === 0 ? 'Tap above and type your PIN' : pinDigits.length < 4 ? `${pinDigits.length} digit${pinDigits.length === 1 ? '' : 's'} entered` : 'Press Enter or tap Open'}
-        </p>
 
         <button
           class="scv-gate-btn"
@@ -739,18 +709,38 @@
   .scv-icon-ring--err { width: 52px; height: 52px; border-radius: 50%; background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.2); display: flex; align-items: center; justify-content: center; color: #f87171; }
   .scv-err-txt { color: rgba(255,255,255,0.45); font-size: 14px; text-align: center; margin: 0; max-width: 240px; }
 
-  /* ── Hidden PIN keyboard input ──────────────────────────────────── */
-  .scv-pin-input {
-    position: absolute;
-    width: 1px; height: 1px;
-    opacity: 0;
-    border: none; outline: none;
-    pointer-events: none;
-    caret-color: transparent;
-    background: transparent;
-    color: transparent;
-    z-index: -1;
+  /* ── PIN field ───────────────────────────────────────────────────── */
+  .scv-pin-field {
+    width: 100%;
+    padding: 14px 18px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(129,140,248,0.25);
+    border-radius: 13px;
+    color: #e2e8f0;
+    font-size: 22px;
+    letter-spacing: 0.3em;
+    text-align: center;
+    font-family: system-ui, sans-serif;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    caret-color: #818cf8;
+    -webkit-appearance: none;
+    appearance: none;
   }
+  .scv-pin-field::placeholder { color: rgba(255,255,255,0.2); letter-spacing: 0.05em; font-size: 15px; }
+  .scv-pin-field:focus {
+    border-color: rgba(129,140,248,0.6);
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.18);
+  }
+  @keyframes scv-shake {
+    0%, 100% { transform: translateX(0); }
+    15%      { transform: translateX(-7px); }
+    35%      { transform: translateX(7px); }
+    55%      { transform: translateX(-5px); }
+    75%      { transform: translateX(4px); }
+    90%      { transform: translateX(-2px); }
+  }
+  .scv-pin-field--shake { animation: scv-shake 0.48s cubic-bezier(.36,.07,.19,.97) both; }
 
   /* ── Gate — full-screen, atmospheric, deliberately neutral ─────── */
   .scv-gate {
@@ -811,48 +801,6 @@
     color: rgba(255,255,255,0.3);
     letter-spacing: 0.04em;
     font-family: system-ui, sans-serif;
-  }
-
-  /* ── PIN dots (viewer) — tap-to-focus button ───────────────────── */
-  .scv-pin-dots {
-    display: flex;
-    gap: 14px;
-    justify-content: center;
-    align-items: center;
-    padding: 14px 24px;
-    background: none;
-    border: none;
-    cursor: pointer;
-    border-radius: 12px;
-    transition: background 0.15s;
-    touch-action: manipulation;
-  }
-  .scv-pin-dots:hover { background: rgba(255,255,255,0.04); }
-
-  .scv-pin-dot {
-    width: 14px; height: 14px;
-    border-radius: 50%;
-    border: 2px solid rgba(129,140,248,0.22);
-    background: transparent;
-    transition: background 0.15s, border-color 0.15s, transform 0.15s, box-shadow 0.15s;
-    flex-shrink: 0;
-    pointer-events: none;
-  }
-
-  .scv-pin-dot--filled {
-    background: linear-gradient(135deg, #818cf8, #6366f1);
-    border-color: transparent;
-    transform: scale(1.2);
-    box-shadow: 0 0 0 3px rgba(99,102,241,0.2), 0 0 12px rgba(99,102,241,0.4);
-  }
-
-  .scv-gate-keyboard-hint {
-    margin: 0;
-    font-size: 11px;
-    color: rgba(255,255,255,0.28);
-    font-family: system-ui, sans-serif;
-    text-align: center;
-    letter-spacing: 0.02em;
   }
 
   .scv-gate-err { color: #f87171; font-size: 12px; margin: 0; }
@@ -1187,17 +1135,6 @@
 
   .scv-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
   @keyframes scv-spin { to { transform: rotate(360deg); } }
-
-  /* ── PIN shake animation ────────────────────────────────────── */
-  @keyframes scv-shake {
-    0%, 100% { transform: translateX(0); }
-    15%      { transform: translateX(-7px); }
-    35%      { transform: translateX(7px); }
-    55%      { transform: translateX(-5px); }
-    75%      { transform: translateX(4px); }
-    90%      { transform: translateX(-2px); }
-  }
-  .scv-pin-dots--shake { animation: scv-shake 0.48s cubic-bezier(.36,.07,.19,.97) both; }
 
   /* ── Gate button CTA state (4+ digits entered) ──────────────── */
   .scv-gate-btn--ready {
