@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	readLimitBytes   = 32 * 1024
+	readLimitBytes   = 512 * 1024 // 512 KB — accommodates encrypted photo payloads (~180 KB base64 ciphertext)
 	readDeadline     = 90 * time.Second
 	pingInterval     = 25 * time.Second
 	sendChannelSize  = 256
