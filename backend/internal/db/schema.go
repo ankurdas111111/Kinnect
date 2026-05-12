@@ -167,6 +167,14 @@ func InitDB(db *sql.DB) error {
 		// Migration guard: add seen_at to existing deployments that predate this column
 		`ALTER TABLE secret_messages ADD COLUMN IF NOT EXISTS seen_at TIMESTAMPTZ`,
 
+		// Secret chat invite tokens — persisted so permanent links survive server restarts
+		`CREATE TABLE IF NOT EXISTS secret_chat_invites (
+			token      TEXT PRIMARY KEY,
+			owner_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			peer_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		)`,
+
 		// F3: Meeting point columns on rooms
 		`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS meeting_lat    DOUBLE PRECISION`,
 		`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS meeting_lng    DOUBLE PRECISION`,

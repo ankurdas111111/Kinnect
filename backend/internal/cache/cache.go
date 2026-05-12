@@ -1602,7 +1602,7 @@ func (c *Cache) CollectExpiredSecretChatInvites(now int64) []string {
 	defer c.mu.Unlock()
 	var out []string
 	for token, inv := range c.SecretChatInvites {
-		if now > inv.ExpiresAt {
+		if inv.ExpiresAt != 0 && now > inv.ExpiresAt {
 			out = append(out, token)
 			delete(c.SecretChatInvites, token)
 		}

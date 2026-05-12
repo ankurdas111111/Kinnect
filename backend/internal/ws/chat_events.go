@@ -295,8 +295,16 @@ func (h *Hub) handleCreateSecretChatInvite(c *Client, data json.RawMessage) {
 	}
 
 	token := generateLiveToken() // reuses same 22-char base64url impl from auth_events.go
-	expiresAt := time.Now().Add(24 * time.Hour).UnixMilli()
-	h.Cache.AddSecretChatInvite(token, user.UserID, p.PeerID, expiresAt)
+
+	// Persist permanently to DB — survives server restarts.
+	// ON CONFLICT is a safety net for the astronomically unlikely token collision.
+	_, _ = h.pool.DB.ExecContext(context.Background(),
+		`INSERT INTO secret_chat_invites (token, owner_id, peer_id)
+		 VALUES ($1, $2, $3) ON CONFLICT (token) DO NOTHING`,
+		token, user.UserID, p.PeerID,
+	)
+	// ExpiresAt=0 signals "permanent" — the cleanup goroutine and pages.go both honour this.
+	h.Cache.AddSecretChatInvite(token, user.UserID, p.PeerID, 0)
 
 	c.Send("secretChatInviteCreated", map[string]interface{}{
 		"token": token,

@@ -232,17 +232,34 @@ type SecretChatMessage struct {
 	CreatedAt   time.Time `json:"createdAt"`
 }
 
+// secretChatInvite returns the invite from cache, falling back to the DB for
+// permanent tokens that were written before this server instance started.
+func (h *PagesHandler) secretChatInvite(ctx context.Context, token string) *cache.SecretChatInvite {
+	if inv := h.cache.GetSecretChatInvite(token); inv != nil {
+		return inv
+	}
+	var ownerID, peerID string
+	err := h.db.QueryRowContext(ctx,
+		`SELECT owner_id, peer_id FROM secret_chat_invites WHERE token = $1`, token,
+	).Scan(&ownerID, &peerID)
+	if err != nil {
+		return nil
+	}
+	h.cache.AddSecretChatInvite(token, ownerID, peerID, 0) // 0 = permanent
+	return h.cache.GetSecretChatInvite(token)
+}
+
 // MInvite handles GET /api/m/{token}.
 // No authentication required — ciphertext is worthless without the PIN,
 // so serving it publicly is safe. The PIN is the only security layer.
 func (h *PagesHandler) MInvite(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
-	invite := h.cache.GetSecretChatInvite(token)
+	invite := h.secretChatInvite(r.Context(), token)
 	if invite == nil {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "expired": true})
 		return
 	}
-	if time.Now().UnixMilli() > invite.ExpiresAt {
+	if invite.ExpiresAt != 0 && time.Now().UnixMilli() > invite.ExpiresAt {
 		h.cache.DeleteSecretChatInvite(token)
 		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "expired": true})
 		return
@@ -253,7 +270,7 @@ func (h *PagesHandler) MInvite(w http.ResponseWriter, r *http.Request) {
 		 FROM secret_messages
 		 WHERE (sender_id = $1 AND receiver_id = $2)
 		    OR (sender_id = $2 AND receiver_id = $1)
-		 ORDER BY created_at ASC LIMIT 50`,
+		 ORDER BY created_at ASC`,
 		invite.OwnerID, invite.PeerID,
 	)
 	if err != nil {
@@ -292,12 +309,12 @@ func (h *PagesHandler) MInvite(w http.ResponseWriter, r *http.Request) {
 // The token proves access; the PIN on the message is the security layer.
 func (h *PagesHandler) MInviteReply(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
-	invite := h.cache.GetSecretChatInvite(token)
+	invite := h.secretChatInvite(r.Context(), token)
 	if invite == nil {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "expired": true})
 		return
 	}
-	if time.Now().UnixMilli() > invite.ExpiresAt {
+	if invite.ExpiresAt != 0 && time.Now().UnixMilli() > invite.ExpiresAt {
 		h.cache.DeleteSecretChatInvite(token)
 		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "expired": true})
 		return
@@ -309,7 +326,7 @@ func (h *PagesHandler) MInviteReply(w http.ResponseWriter, r *http.Request) {
 		Salt       string `json:"salt"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil ||
-		len(body.Ciphertext) == 0 || len(body.Ciphertext) > 10000 ||
+		len(body.Ciphertext) == 0 || len(body.Ciphertext) > 400000 ||
 		body.IV == "" || body.Salt == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid"})
 		return
