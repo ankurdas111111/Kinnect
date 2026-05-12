@@ -1,0 +1,6 @@
+frontend/src/components/CustomPinDialog.svelte
+  1e4de95f-bc4c-4f20-83b9-577c2c5a6550:2026-05-12T09:46:05.281Z 264
+frontend/src/components/PlaceSearch.svelte
+  1e4de95f-bc4c-4f20-83b9-577c2c5a6550:2026-05-12T09:46:05.281Z 422
+---
+{"schema_version": "authorship/3.0.0", "base_commit_sha": "HEAD~1", "prompts": {"1e4de95f-bc4c-4f20-83b9-577c2c5a6550:2026-05-12T09:46:05.281Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 1, "overriden_lines": 0}}}
