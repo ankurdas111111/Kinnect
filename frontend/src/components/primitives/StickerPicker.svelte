@@ -254,20 +254,24 @@
     position: fixed;
     z-index: 9999;
     width: 300px;
-    background: #111118;
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 16px;
-    box-shadow: 0 16px 48px rgba(0,0,0,0.7), 0 0 0 1px rgba(129,140,248,0.07);
+    /* Teal-tinted dark surface — matches SecretChatPanel token system */
+    background: #0a0a18;
+    border: 1px solid rgba(20, 184, 166, 0.12);
+    border-radius: var(--radius-xl, 20px);
+    box-shadow:
+      0 16px 48px rgba(0, 0, 0, 0.75),
+      0 0 0 1px rgba(20, 184, 166, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    animation: sp-pop 0.18s cubic-bezier(0.34,1.56,0.64,1) both;
+    animation: sp-pop var(--duration-normal, 200ms) var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
     max-height: min(340px, 60dvh);
   }
 
   .sp-tabs {
     display: flex;
-    border-bottom: 1px solid rgba(255,255,255,0.07);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     flex-shrink: 0;
     overflow-x: auto;
     scrollbar-width: none;
@@ -276,77 +280,100 @@
 
   .sp-tab {
     flex-shrink: 0;
-    padding: 0 10px;
+    padding: 0 var(--space-2-5, 10px);
     background: none;
     border: none;
-    color: rgba(255,255,255,0.35);
-    font-size: 11px;
+    color: rgba(255, 255, 255, 0.32);
+    font-size: var(--text-xs, 0.75rem);
     font-weight: 500;
     cursor: pointer;
-    font-family: system-ui, sans-serif;
-    transition: color 0.15s, background 0.15s;
+    /* Use design system font — not system-ui */
+    font-family: var(--font-sans, 'Nunito', sans-serif);
+    transition: color var(--duration-fast, 100ms), background var(--duration-fast, 100ms);
     border-bottom: 2px solid transparent;
     white-space: nowrap;
     touch-action: manipulation;
-    /* P0 fix: minimum 44px touch target (was 36px) */
+    /* Minimum 44px touch target */
     min-height: 44px;
     display: flex;
     align-items: center;
   }
-  .sp-tab:hover { color: rgba(255,255,255,0.65); background: rgba(255,255,255,0.04); }
+  .sp-tab:hover {
+    color: rgba(255, 255, 255, 0.65);
+    background: rgba(255, 255, 255, 0.04);
+  }
+  /* Teal active state — replaces purple #818cf8 */
   .sp-tab--active {
-    color: #818cf8;
-    border-bottom-color: #818cf8;
+    color: var(--primary-500, #14b8a6);
+    border-bottom-color: var(--primary-500, #14b8a6);
+  }
+  .sp-tab:focus-visible {
+    outline: 2px solid var(--primary-500, #14b8a6);
+    outline-offset: -2px;
   }
 
   .sp-grid {
     flex: 1;
     overflow-y: auto;
-    padding: 8px;
+    padding: var(--space-2, 8px);
     display: grid;
     grid-template-columns: repeat(6, 1fr);
     gap: 2px;
     align-content: start;
   }
   .sp-grid::-webkit-scrollbar { width: 3px; }
-  .sp-grid::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+  .sp-grid::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.07);
+    border-radius: var(--radius-full, 9999px);
+  }
 
   .sp-sticker-btn {
     width: 100%;
     aspect-ratio: 1;
     background: none;
     border: none;
-    border-radius: 8px;
+    border-radius: var(--radius-sm2, 8px);
     cursor: pointer;
     padding: 3px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.12s, transform 0.1s;
+    transition: background var(--duration-fast, 100ms), transform var(--duration-fast, 100ms);
     touch-action: manipulation;
-    /* Minimum 44px tap target via the grid column sizing */
+    /* Minimum 44px tap target via grid column sizing */
     min-width: 44px;
     min-height: 44px;
   }
-  .sp-sticker-btn:hover { background: rgba(255,255,255,0.08); transform: scale(1.1); }
-  .sp-sticker-btn:active { background: rgba(129,140,248,0.18); transform: scale(0.95); }
+  .sp-sticker-btn:hover {
+    background: rgba(255, 255, 255, 0.07);
+    transform: scale(1.12);
+  }
+  /* Teal active press — replaces purple rgba(129,140,248,0.18) */
+  .sp-sticker-btn:active {
+    background: rgba(20, 184, 166, 0.16);
+    transform: scale(0.95);
+  }
+  .sp-sticker-btn:focus-visible {
+    outline: 2px solid var(--primary-500, #14b8a6);
+    outline-offset: 2px;
+  }
 
   .sp-img {
     width: 40px;
     height: 40px;
     object-fit: contain;
     display: block;
-    border-radius: 4px;
+    border-radius: var(--radius-xs, 4px);
   }
 
   @keyframes sp-pop {
     from { opacity: 0; transform: scale(0.88) translateY(8px); }
-    to   { opacity: 1; transform: scale(1)    translateY(0);    }
+    to   { opacity: 1; transform: scale(1)    translateY(0);   }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .sp-wrap { animation: none; }
-    .sp-sticker-btn:hover { transform: none; }
+    .sp-sticker-btn:hover  { transform: none; }
     .sp-sticker-btn:active { transform: none; }
   }
 </style>

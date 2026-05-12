@@ -17,7 +17,6 @@
     const pw = wrapEl.offsetWidth  || 320;
     const ph = wrapEl.offsetHeight || 400;
     const vw = window.innerWidth;
-    const vh = window.innerHeight;
 
     // Prefer above the anchor
     let top = ab.top - ph - 8;
@@ -71,40 +70,43 @@
   .ep-wrap {
     position: fixed;
     z-index: 9999;
-    border-radius: 16px;
+    border-radius: var(--radius-xl, 20px);
     overflow: hidden;
-    box-shadow: 0 16px 48px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.08);
-    animation: ep-pop 0.18s cubic-bezier(0.34,1.56,0.64,1) both;
+    box-shadow:
+      0 16px 48px rgba(0, 0, 0, 0.75),
+      0 0 0 1px rgba(20, 184, 166, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    animation: ep-pop var(--duration-normal, 200ms) var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
   }
 
-  /* Override emoji-picker-element CSS variables to match dark theme */
+  /* Override emoji-picker-element CSS variables to match teal dark theme */
   .ep-wrap :global(emoji-picker) {
-    --background: #111118;
-    --border-color: rgba(255,255,255,0.08);
-    --border-size: 1px;
-    --button-active-background: rgba(129,140,248,0.2);
-    --button-hover-background: rgba(255,255,255,0.08);
-    --category-emoji-padding: 4px;
-    --category-emoji-size: 1.6rem;
-    --category-font-color: rgba(255,255,255,0.4);
-    --category-font-size: 0.7rem;
-    --emoji-padding: 5px;
-    --emoji-size: 1.5rem;
-    --indicator-color: #818cf8;
-    --indicator-height: 2px;
-    --input-border-color: rgba(255,255,255,0.12);
-    --input-border-radius: 10px;
-    --input-border-size: 1px;
-    --input-font-color: #e2e8f0;
-    --input-font-size: 14px;
-    --input-line-height: 1.5;
-    --input-padding: 8px 12px;
-    --input-placeholder-color: rgba(255,255,255,0.3);
-    --num-columns: 8;
-    --outline-color: rgba(129,140,248,0.4);
-    --outline-size: 2px;
-    --skintone-border-radius: 50%;
-    --category-padding: 4px 8px;
+    --background:               #0a0a18;
+    --border-color:             rgba(255, 255, 255, 0.07);
+    --border-size:              1px;
+    --button-active-background: rgba(20, 184, 166, 0.18);
+    --button-hover-background:  rgba(255, 255, 255, 0.07);
+    --category-emoji-padding:   4px;
+    --category-emoji-size:      1.6rem;
+    --category-font-color:      rgba(255, 255, 255, 0.35);
+    --category-font-size:       0.7rem;
+    --emoji-padding:            5px;
+    --emoji-size:               1.5rem;
+    --indicator-color:          #14b8a6;
+    --indicator-height:         2px;
+    --input-border-color:       rgba(255, 255, 255, 0.10);
+    --input-border-radius:      var(--radius-md, 10px);
+    --input-border-size:        1px;
+    --input-font-color:         rgba(255, 255, 255, 0.90);
+    --input-font-size:          14px;
+    --input-line-height:        1.5;
+    --input-padding:            8px 12px;
+    --input-placeholder-color:  rgba(255, 255, 255, 0.28);
+    --num-columns:              8;
+    --outline-color:            rgba(20, 184, 166, 0.45);
+    --outline-size:             2px;
+    --skintone-border-radius:   50%;
+    --category-padding:         4px 8px;
     width: 320px;
     height: 380px;
   }
@@ -118,6 +120,10 @@
 
   @keyframes ep-pop {
     from { opacity: 0; transform: scale(0.88) translateY(8px); }
-    to   { opacity: 1; transform: scale(1)    translateY(0);    }
+    to   { opacity: 1; transform: scale(1)    translateY(0);   }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ep-wrap { animation: none; }
   }
 </style>
