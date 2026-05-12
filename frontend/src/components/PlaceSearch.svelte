@@ -419,7 +419,7 @@
   .ps-icon { color: rgba(255,255,255,0.30); flex-shrink: 0; }
   .ps-back { display: flex; align-items: center; background: none; border: none; color: rgba(255,255,255,0.5); cursor: pointer; flex-shrink: 0; padding: 0; }
   .ps-back:hover { color: #fff; }
-  .ps-input { flex: 1; background: none; border: none; outline: none; color: rgba(255,255,255,0.90); font-size: 14px; font-weight: 500; font-family: inherit; min-width: 0; }
+  .ps-input { flex: 1; background: none; border: none; outline: none; color: rgba(255,255,255,0.90); font-size: 16px; font-weight: 500; font-family: inherit; min-width: 0; }
   .ps-input::placeholder { color: rgba(255,255,255,0.22); }
   .ps-clear { display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.06); border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; color: rgba(255,255,255,0.4); flex-shrink: 0; }
   .ps-clear:hover { background: rgba(255,255,255,0.12); }

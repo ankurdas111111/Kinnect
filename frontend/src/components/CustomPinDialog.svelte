@@ -261,7 +261,7 @@
     border: 1.5px solid var(--border-default, #e2e8f0);
     background: var(--surface-1, #f8fafc);
     color: var(--text-primary, #0f172a);
-    font-size: 14px;
+    font-size: 16px;
     font-family: var(--font-sans, 'Inter', sans-serif);
     outline: none;
     box-sizing: border-box;
