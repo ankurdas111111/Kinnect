@@ -1,0 +1,8 @@
+backend/internal/api/pages.go
+  fecfef28-5b62-43d1-9131-6357b870c36f:2026-05-13T20:31:26.184Z 318-319,333-339,341-350,368
+backend/internal/db/schema.go
+  1c393101-9083-443a-97a8-ee4543408a39:2026-05-13T20:33:10.450Z 81-82,179-180
+backend/internal/ws/chat_events.go
+  fecfef28-5b62-43d1-9131-6357b870c36f:2026-05-13T20:29:25.607Z 297-302,304-320
+---
+{"schema_version": "authorship/3.0.0", "base_commit_sha": "HEAD~1", "prompts": {"fecfef28-5b62-43d1-9131-6357b870c36f:2026-05-13T20:31:26.184Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 20, "overriden_lines": 0}, "1c393101-9083-443a-97a8-ee4543408a39:2026-05-13T20:33:10.450Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 4, "overriden_lines": 0}, "fecfef28-5b62-43d1-9131-6357b870c36f:2026-05-13T20:29:25.607Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 23, "overriden_lines": 0}}}
