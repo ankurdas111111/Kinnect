@@ -39,8 +39,8 @@
   const SALERT_KEY  = 'kinnect_speed_alerts';
 
   // Zone Story state — per-place visit history
-  let storyPlaceId = null;     // which place's story is open
-  let storyVisits = [];        // fetched visits
+  let storyPlaceId = null;
+  let storyVisits = [];
   let storyLoading = false;
 
   $: visibleUsers = buildUserList($otherUsers, $authUser);
@@ -54,7 +54,6 @@
     return list;
   }
 
-  // ── Persistence helpers (localStorage — only for alerts, places now live in backend) ──
   function loadAlertsFromStorage() {
     try {
       const pa = localStorage.getItem(PALERT_KEY);
@@ -70,10 +69,8 @@
 
   onMount(async () => {
     loadAlertsFromStorage();
-    // Load saved places from backend (canonical source)
     const res = await apiGet('/api/places');
     if (Array.isArray(res)) {
-      // Map backend field names to frontend convention
       savedPlaces.set(res.map(p => ({
         id: p.id,
         name: p.name,
@@ -85,7 +82,6 @@
     }
   });
 
-  // ── Saved Places ─────────────────────────────────────────────────────────────
   async function addPlace() {
     if (!newPlaceName.trim()) return;
     const loc = $myLocation;
@@ -117,12 +113,12 @@
       banner.set({ type: 'info', text: `"${res.name}" saved at your current location`, actions: [] });
       setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 2500);
     } else {
-      banner.set({ type: 'sos', text: res?.error || 'Failed to save place', actions: [] });
+      banner.set({ type: 'sos', text: res?.error || 'Failed to save place — check your connection and try again', actions: [] });
       setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 3000);
     }
   }
 
-  async function removePlace(placeId) {
+  async function removePlace(placeId, placeName) {
     await apiDelete(`/api/places/${placeId}`);
     savedPlaces.update(arr => arr.filter(p => p.id !== placeId));
     placeAlerts.update(arr => {
@@ -154,8 +150,7 @@
 
   function formatTime(iso) {
     if (!iso) return '';
-    const d = new Date(iso);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
   function formatDate(iso) {
@@ -202,7 +197,6 @@
     });
   }
 
-  // ── Speed Alerts ─────────────────────────────────────────────────────────────
   function addSpeedAlert() {
     if (!speedTargetId) return;
     const user = visibleUsers.find(u => u.id === speedTargetId);
@@ -244,157 +238,266 @@
 {#if embedded}
   <div class="panel-body places-panel">
 
-    <!-- ── Your Spots ─────────────────────────────────────────────────── -->
-    <h4 class="section-title-bold">Saved Places</h4>
-    <div class="section-content">
-      <p class="hint">Save places like home or work. You'll get notified when family members arrive or leave.</p>
+    <!-- ── Saved Places ─────────────────────────────────────────────────── -->
+    <div class="section-header">
+      <span class="section-label">Saved Places</span>
+      {#if $savedPlaces.length > 0}
+        <span class="section-badge">{$savedPlaces.length}</span>
+      {/if}
+    </div>
 
-      {#each $savedPlaces as place}
-        <div class="list-item">
-          <div class="item-icon">{iconEmoji[place.icon] ?? '📍'}</div>
-          <div class="item-info">
-            <span class="item-name">{place.name}</span>
-            <span class="item-detail">{place.radiusM}m radius · {place.lat?.toFixed(4)}, {place.lng?.toFixed(4)}</span>
+    <div class="section-content">
+      <p class="hint">Save home, work, school. Get notified when family arrives or leaves.</p>
+
+      {#if $savedPlaces.length === 0 && !showAddPlace}
+        <!-- Empty state with CTA -->
+        <div class="empty-state">
+          <div class="empty-icon" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
           </div>
-          <button class="btn-icon-sm story-btn" on:click={() => viewStory(place.id)} title="View visit history">
-            {storyPlaceId === place.id ? '▲' : '📋'}
+          <p class="empty-title">No saved places yet</p>
+          <p class="empty-sub">Add home or work to get arrival and departure alerts.</p>
+          <button class="btn btn-primary btn-sm" on:click={() => showAddPlace = true}>
+            Add a Place
           </button>
-          <button class="btn-icon-sm" on:click={() => removePlace(place.id)} title="Remove">✕</button>
         </div>
-        {#if storyPlaceId === place.id}
-          <div class="zone-story">
-            {#if storyLoading}
-              <p class="story-empty">Loading...</p>
-            {:else if storyVisits.length === 0}
-              <p class="story-empty">No visits in the last 7 days.</p>
-            {:else}
-              {#each storyVisits as v}
-                <div class="story-row">
-                  <div class="story-avatar">{v.displayName?.charAt(0) ?? '?'}</div>
-                  <div class="story-info">
-                    <span class="story-name">{v.displayName}</span>
-                    <span class="story-time">
-                      {formatDate(v.arrivedAt)} · {formatTime(v.arrivedAt)}
-                      {#if v.departedAt} – {formatTime(v.departedAt)}{/if}
-                      {#if v.durationSeconds} · {formatDuration(v.durationSeconds)}{/if}
-                    </span>
-                  </div>
-                  {#if !v.departedAt}<span class="story-badge-here">Here now</span>{/if}
-                </div>
-              {/each}
-            {/if}
+      {:else}
+        {#each $savedPlaces as place (place.id)}
+          <div class="list-item">
+            <div class="item-icon" aria-hidden="true">{iconEmoji[place.icon] ?? '📍'}</div>
+            <div class="item-info">
+              <span class="item-name">{place.name}</span>
+              <span class="item-detail">{place.radiusM}m radius</span>
+            </div>
+            <button
+              class="icon-action"
+              on:click={() => viewStory(place.id)}
+              aria-label="View visit history for {place.name}"
+              aria-expanded={storyPlaceId === place.id}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            </button>
+            <button
+              class="icon-action icon-action--danger"
+              on:click={() => removePlace(place.id, place.name)}
+              aria-label="Remove {place.name}"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            </button>
           </div>
-        {/if}
-      {/each}
+
+          {#if storyPlaceId === place.id}
+            <div class="zone-story" role="region" aria-label="Visit history for {place.name}">
+              {#if storyLoading}
+                <div class="story-skeleton" role="status" aria-label="Loading visit history" aria-busy="true">
+                  <div class="skel-row skel-wide"></div>
+                  <div class="skel-row skel-mid"></div>
+                </div>
+              {:else if storyVisits.length === 0}
+                <p class="story-empty">No visits in the last 7 days.</p>
+              {:else}
+                {#each storyVisits as v}
+                  <div class="story-row">
+                    <div class="story-avatar" aria-hidden="true">{v.displayName?.charAt(0) ?? '?'}</div>
+                    <div class="story-info">
+                      <span class="story-name">{v.displayName}</span>
+                      <span class="story-time">
+                        {formatDate(v.arrivedAt)} · {formatTime(v.arrivedAt)}
+                        {#if v.departedAt} – {formatTime(v.departedAt)}{/if}
+                        {#if v.durationSeconds} · {formatDuration(v.durationSeconds)}{/if}
+                      </span>
+                    </div>
+                    {#if !v.departedAt}
+                      <span class="story-badge-here" aria-label="Currently here">Here now</span>
+                    {/if}
+                  </div>
+                {/each}
+              {/if}
+            </div>
+          {/if}
+        {/each}
+      {/if}
 
       {#if showAddPlace}
-        <div class="add-form">
+        <div class="add-form" role="form" aria-label="Add a saved place">
           <input
             type="text"
             bind:value={newPlaceName}
             class="field-input field-full"
-            placeholder="Name this place (Home, Work, School...)"
+            placeholder="Name this place (Home, Work, School…)"
             maxlength="100"
             autocomplete="off"
+            aria-label="Place name"
           />
           <div class="form-row">
-            <select bind:value={newPlaceIcon} class="field-input field-sm">
+            <label class="sr-only" for="place-icon">Icon</label>
+            <select id="place-icon" bind:value={newPlaceIcon} class="field-input field-sm" aria-label="Place icon">
               {#each iconOptions as opt}
                 <option value={opt.value}>{iconEmoji[opt.value]} {opt.label}</option>
               {/each}
             </select>
             <label class="field-label-inline">
               Radius
-              <input type="number" bind:value={newPlaceRadius} class="field-input field-num" min="50" max="5000" step="50" />
-              m
+              <input
+                type="number"
+                bind:value={newPlaceRadius}
+                class="field-input field-num"
+                min="50"
+                max="5000"
+                step="50"
+                aria-label="Geofence radius in meters"
+              />
+              <span aria-hidden="true">m</span>
             </label>
           </div>
           <div class="form-actions">
-            <button class="btn btn-primary btn-sm" on:click={addPlace} disabled={!newPlaceName.trim()}>
+            <button
+              class="btn btn-primary btn-sm"
+              on:click={addPlace}
+              disabled={!newPlaceName.trim()}
+            >
               Save This Place
             </button>
-            <button class="btn btn-secondary btn-sm" on:click={() => { showAddPlace = false; newPlaceName = ''; }}>Cancel</button>
+            <button
+              class="btn btn-secondary btn-sm"
+              on:click={() => { showAddPlace = false; newPlaceName = ''; }}
+            >
+              Cancel
+            </button>
           </div>
         </div>
-      {:else}
-        <button class="btn btn-secondary btn-sm add-btn" on:click={() => showAddPlace = true}>Add a Place</button>
+      {:else if $savedPlaces.length > 0}
+        <button class="btn btn-secondary btn-sm add-btn" on:click={() => showAddPlace = true}>
+          + Add a Place
+        </button>
       {/if}
     </div>
 
-    <hr class="divider" />
+    <div class="section-divider" role="separator"></div>
 
-    <!-- ── Arrival Pings ──────────────────────────────────────────────── -->
-    <h4 class="section-title-bold">Arrival Alerts</h4>
+    <!-- ── Arrival Alerts ──────────────────────────────────────────────── -->
+    <div class="section-header">
+      <span class="section-label">Arrival Alerts</span>
+      {#if $placeAlerts.length > 0}
+        <span class="section-badge">{$placeAlerts.length}</span>
+      {/if}
+    </div>
     <div class="section-content">
-      <p class="hint">Get notified when someone arrives at or leaves one of your saved places.</p>
+      <p class="hint">Get notified when someone arrives at or leaves a saved place.</p>
 
       {#if $placeAlerts.length === 0}
-        <p class="empty">No alerts yet. Add one for home so your family knows when you arrive.</p>
-      {/if}
-      {#each $placeAlerts as alert}
-        <div class="list-item">
-          <div class="item-icon">🔔</div>
-          <div class="item-info">
-            <span class="item-name">{getUserName(alert.targetId)} at {alert.placeName || '?'}</span>
-            <span class="item-detail">
-              {[alert.onArrive && 'Arrive', alert.onDepart && 'Depart'].filter(Boolean).join(' + ')}
-            </span>
-          </div>
-          <button class="btn-icon-sm" on:click={() => removePlaceAlert(alert.id)} title="Remove">✕</button>
+        <div class="inline-empty">
+          <p class="inline-empty-text">No alerts yet.</p>
+          {#if $savedPlaces.length === 0}
+            <p class="inline-empty-cta-hint">Save a place above first to set up alerts.</p>
+          {:else}
+            <p class="inline-empty-cta-hint">Add an alert below — know when your family arrives home.</p>
+          {/if}
         </div>
-      {/each}
+      {:else}
+        {#each $placeAlerts as alert (alert.id)}
+          <div class="list-item">
+            <div class="item-icon" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            </div>
+            <div class="item-info">
+              <span class="item-name">{getUserName(alert.targetId)} at {alert.placeName || '?'}</span>
+              <span class="item-detail">
+                {[alert.onArrive && 'Arrive', alert.onDepart && 'Depart'].filter(Boolean).join(' + ')}
+              </span>
+            </div>
+            <button
+              class="icon-action icon-action--danger"
+              on:click={() => removePlaceAlert(alert.id)}
+              aria-label="Remove alert: {getUserName(alert.targetId)} at {alert.placeName}"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            </button>
+          </div>
+        {/each}
+      {/if}
 
       {#if $savedPlaces.length > 0}
-        <div class="add-form">
+        <div class="add-form" role="form" aria-label="Add arrival alert">
           <div class="form-row">
-            <select bind:value={alertTargetId} class="field-input field-sm">
+            <label class="sr-only" for="alert-person">Person</label>
+            <select id="alert-person" bind:value={alertTargetId} class="field-input field-sm" aria-label="Choose a person">
               <option value="">Choose a person</option>
               {#each visibleUsers as u}
                 <option value={u.id}>{u.name}</option>
               {/each}
             </select>
-            <select bind:value={alertPlaceId} class="field-input field-sm">
+            <label class="sr-only" for="alert-place">Place</label>
+            <select id="alert-place" bind:value={alertPlaceId} class="field-input field-sm" aria-label="Choose a place">
               <option value="">Choose a place</option>
               {#each $savedPlaces as p}
                 <option value={p.id}>{iconEmoji[p.icon] ?? '📍'} {p.name}</option>
               {/each}
             </select>
           </div>
-          <div class="form-row">
-            <label class="check-label"><input type="checkbox" bind:checked={alertOnArrive} /> When they arrive</label>
-            <label class="check-label"><input type="checkbox" bind:checked={alertOnDepart} /> When they leave</label>
-            <button class="btn btn-primary btn-sm" on:click={addPlaceAlert} disabled={!alertTargetId || !alertPlaceId || (!alertOnArrive && !alertOnDepart)}>Add</button>
+          <div class="form-row form-row--check">
+            <label class="check-label">
+              <input type="checkbox" bind:checked={alertOnArrive} />
+              When they arrive
+            </label>
+            <label class="check-label">
+              <input type="checkbox" bind:checked={alertOnDepart} />
+              When they leave
+            </label>
           </div>
+          <button
+            class="btn btn-primary btn-sm"
+            on:click={addPlaceAlert}
+            disabled={!alertTargetId || !alertPlaceId || (!alertOnArrive && !alertOnDepart)}
+          >
+            Add Alert
+          </button>
         </div>
-      {:else}
-        <p class="empty">Save a place first to set up alerts.</p>
       {/if}
     </div>
 
-    <hr class="divider" />
+    <div class="section-divider" role="separator"></div>
 
-    <!-- ── Speed Checks ─────────────────────────────────────────────────── -->
-    <h4 class="section-title-bold">Speed Alerts</h4>
+    <!-- ── Speed Alerts ─────────────────────────────────────────────────── -->
+    <div class="section-header">
+      <span class="section-label">Speed Alerts</span>
+      {#if $speedAlerts.length > 0}
+        <span class="section-badge">{$speedAlerts.length}</span>
+      {/if}
+    </div>
     <div class="section-content">
-      <p class="hint">Get a heads-up when someone drives faster than a set limit.</p>
+      <p class="hint">Get notified when someone drives faster than a set limit.</p>
 
       {#if $speedAlerts.length === 0}
-        <p class="empty">No speed alerts yet.</p>
-      {/if}
-      {#each $speedAlerts as sa}
-        <div class="list-item">
-          <div class="item-icon">🚗</div>
-          <div class="item-info">
-            <span class="item-name">{getUserName(sa.targetId)}</span>
-            <span class="item-detail">Alert above {sa.thresholdKmh} km/h</span>
-          </div>
-          <button class="btn-icon-sm" on:click={() => removeSpeedAlert(sa.id)} title="Remove">✕</button>
+        <div class="inline-empty">
+          <p class="inline-empty-text">No speed alerts yet.</p>
+          <p class="inline-empty-cta-hint">Set a limit below to protect family members driving.</p>
         </div>
-      {/each}
+      {:else}
+        {#each $speedAlerts as sa (sa.id)}
+          <div class="list-item">
+            <div class="item-icon" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r=".5" fill="currentColor"/></svg>
+            </div>
+            <div class="item-info">
+              <span class="item-name">{getUserName(sa.targetId)}</span>
+              <span class="item-detail">Alert above {sa.thresholdKmh} km/h</span>
+            </div>
+            <button
+              class="icon-action icon-action--danger"
+              on:click={() => removeSpeedAlert(sa.id)}
+              aria-label="Remove speed alert for {getUserName(sa.targetId)}"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            </button>
+          </div>
+        {/each}
+      {/if}
 
-      <div class="add-form">
+      <div class="add-form" role="form" aria-label="Add speed alert">
         <div class="form-row">
-          <select bind:value={speedTargetId} class="field-input field-sm">
+          <label class="sr-only" for="speed-person">Person</label>
+          <select id="speed-person" bind:value={speedTargetId} class="field-input field-sm" aria-label="Choose a person">
             <option value="">Choose a person</option>
             {#each visibleUsers as u}
               <option value={u.id}>{u.name}</option>
@@ -402,10 +505,25 @@
           </select>
           <label class="field-label-inline">
             Limit
-            <input type="number" bind:value={speedThreshold} class="field-input field-num" min="10" max="300" step="5" />
-            km/h
+            <input
+              type="number"
+              bind:value={speedThreshold}
+              class="field-input field-num"
+              min="10"
+              max="300"
+              step="5"
+              aria-label="Speed limit in km/h"
+            />
+            <span aria-hidden="true">km/h</span>
           </label>
-          <button class="btn btn-primary btn-sm" on:click={addSpeedAlert} disabled={!speedTargetId}>Add</button>
+          <button
+            class="btn btn-primary btn-sm"
+            on:click={addSpeedAlert}
+            disabled={!speedTargetId}
+            style="min-height: 44px;"
+          >
+            Add
+          </button>
         </div>
       </div>
     </div>
@@ -415,7 +533,7 @@
   <div class="panel-shell panel-left panel-base">
     <div class="panel-header">
       <h3>Places</h3>
-      <button class="panel-close" on:click={() => dispatch('close')} aria-label="Close">&times;</button>
+      <button class="panel-close" on:click={() => dispatch('close')} aria-label="Close places panel">&times;</button>
     </div>
     <div class="panel-body">
       <p>Open Places from the sidebar.</p>
@@ -426,17 +544,49 @@
 <style>
   .places-panel { padding: 0; }
 
-  h4.section-title-bold {
-    margin: var(--space-4) 0 var(--space-1);
-    padding: 0 var(--space-4);
+  /* ── Section header ────────────────────────────────────────────────────── */
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-4) var(--space-4) var(--space-1);
   }
 
-  .section-content { padding: 0 var(--space-4) var(--space-2); }
+  .section-label {
+    font-family: var(--font-display);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    flex: 1;
+  }
+
+  .section-badge {
+    font-family: var(--font-display);
+    font-size: var(--text-2xs);
+    font-weight: 700;
+    color: var(--text-tertiary);
+    background: var(--surface-inset);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-full);
+    padding: 1px var(--space-2);
+    min-width: 20px;
+    text-align: center;
+  }
+
+  .section-content { padding: 0 var(--space-4) var(--space-3); }
+
+  .section-divider {
+    height: 1px;
+    background: var(--border-subtle);
+    margin: var(--space-2) 0;
+  }
 
   .hint {
     font-size: var(--text-xs);
     color: var(--text-tertiary);
-    line-height: 1.5;
+    line-height: var(--leading-normal);
     margin: 0 0 var(--space-2);
   }
 
@@ -444,13 +594,21 @@
   .list-item {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 8px 0;
+    gap: var(--space-2-5);
+    padding: var(--space-2) 0;
     border-bottom: 1px solid var(--border-subtle);
   }
   .list-item:last-of-type { border-bottom: none; }
 
-  .item-icon { font-size: 18px; flex-shrink: 0; }
+  .item-icon {
+    font-size: var(--text-lg);
+    flex-shrink: 0;
+    width: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+  }
 
   .item-info {
     flex: 1;
@@ -469,50 +627,158 @@
     text-overflow: ellipsis;
   }
 
-  .item-detail { font-size: var(--text-xs); color: var(--text-tertiary); }
+  .item-detail {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+  }
 
-  .btn-icon-sm {
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
+  /* Icon action buttons — 44px touch target */
+  .icon-action {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-sm2);
     border: none;
-    background: var(--surface-3);
+    background: transparent;
     color: var(--text-tertiary);
     cursor: pointer;
-    font-size: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    transition: background 0.15s, color 0.15s;
+    transition: background var(--duration-fast) var(--ease-out),
+                color var(--duration-fast) var(--ease-out);
+    touch-action: manipulation;
   }
-  .btn-icon-sm:hover { background: rgba(220, 38, 38, 0.18); color: #f87171; }
-  .story-btn:hover { background: var(--surface-3); color: var(--text-secondary); }
+
+  .icon-action:hover {
+    background: var(--surface-hover);
+    color: var(--text-primary);
+  }
+
+  .icon-action:focus-visible {
+    outline: 2px solid var(--primary-500);
+    outline-offset: 2px;
+  }
+
+  .icon-action--danger:hover {
+    background: rgba(239, 68, 68, 0.10);
+    color: var(--danger-500);
+  }
+
+  /* ── Empty states ────────────────────────────────────────────────────────── */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-6) var(--space-4);
+    text-align: center;
+    background: var(--surface-inset);
+    border: 1px dashed var(--border-subtle);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--space-2);
+  }
+
+  .empty-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-full);
+    background: linear-gradient(135deg, rgba(20, 184, 166, 0.12) 0%, rgba(20, 184, 166, 0.06) 100%);
+    border: 1px solid rgba(20, 184, 166, 0.18);
+    color: var(--primary-500);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .empty-title {
+    font-family: var(--font-display);
+    font-size: var(--text-sm);
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+  }
+
+  .empty-sub {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    line-height: var(--leading-normal);
+    margin: 0;
+    max-width: 220px;
+  }
+
+  .inline-empty {
+    padding: var(--space-2) 0 var(--space-3);
+  }
+
+  .inline-empty-text {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    margin: 0 0 var(--space-1);
+  }
+
+  .inline-empty-cta-hint {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    font-style: italic;
+    margin: 0;
+    opacity: 0.75;
+  }
 
   /* ── Zone Story Timeline ──────────────────────────────────────────────────── */
   .zone-story {
-    margin: 4px 0 8px;
-    padding: 8px 10px;
+    margin: 0 0 var(--space-2);
+    padding: var(--space-2) var(--space-3);
     background: var(--surface-inset);
-    border-left: 3px solid var(--color-primary, #6366f1);
+    border-left: 3px solid var(--primary-500);
     border-radius: 0 var(--radius-md) var(--radius-md) 0;
   }
-  .story-empty { font-size: var(--text-xs); color: var(--text-tertiary); margin: 0; }
+
+  .story-skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-1) 0;
+  }
+
+  .skel-row {
+    height: var(--space-3);
+    border-radius: var(--radius-sm);
+    background: var(--skeleton-base, rgba(255,255,255,0.05));
+    animation: skel-pulse 1.6s ease-in-out infinite;
+  }
+  .skel-wide  { width: 100%; }
+  .skel-mid   { width: 65%; }
+
+  @keyframes skel-pulse {
+    0%, 100% { opacity: 0.5; }
+    50%       { opacity: 1; }
+  }
+
+  .story-empty {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    margin: 0;
+    padding: var(--space-1) 0;
+  }
+
   .story-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 5px 0;
+    gap: var(--space-2);
+    padding: var(--space-1-5) 0;
     border-bottom: 1px solid var(--border-subtle);
   }
   .story-row:last-of-type { border-bottom: none; }
+
   .story-avatar {
     width: 24px;
     height: 24px;
-    border-radius: 50%;
-    background: var(--color-primary, #6366f1);
-    color: #fff;
-    font-size: 11px;
+    border-radius: var(--radius-full);
+    background: var(--primary-500);
+    color: var(--text-inverse);
+    font-size: var(--text-2xs);
     font-weight: 700;
     display: flex;
     align-items: center;
@@ -520,26 +786,47 @@
     flex-shrink: 0;
     text-transform: uppercase;
   }
-  .story-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-  .story-name { font-size: var(--text-xs); font-weight: 600; color: var(--text-primary); }
-  .story-time { font-size: 10px; color: var(--text-tertiary); }
-  .story-badge-here {
-    font-size: 10px;
+
+  .story-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .story-name {
+    font-size: var(--text-xs);
     font-weight: 600;
-    color: #22c55e;
-    background: rgba(34, 197, 94, 0.15);
-    padding: 2px 6px;
-    border-radius: 999px;
+    color: var(--text-primary);
+  }
+
+  .story-time {
+    font-size: var(--text-2xs);
+    color: var(--text-tertiary);
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .story-badge-here {
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    color: var(--success-600);
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.24);
+    padding: 2px var(--space-1-5);
+    border-radius: var(--radius-full);
     flex-shrink: 0;
+    white-space: nowrap;
   }
 
   /* ── Add form ────────────────────────────────────────────────────────────── */
   .add-form {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    margin-top: 8px;
-    padding: 12px;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+    padding: var(--space-3);
     background: var(--surface-inset);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-lg);
@@ -547,35 +834,49 @@
 
   .form-row {
     display: flex;
-    gap: 8px;
+    gap: var(--space-2);
     align-items: center;
     flex-wrap: wrap;
   }
 
+  .form-row--check {
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+
   .field-input {
-    padding: 8px 10px;
+    padding: var(--space-2) var(--space-2-5);
     border: 1px solid var(--border-default);
     border-radius: var(--radius-md);
     font-size: var(--text-sm);
     background: var(--surface-3);
     color: var(--text-primary);
+    font-family: var(--font-sans);
+    transition: border-color var(--duration-fast) var(--ease-out),
+                box-shadow var(--duration-fast) var(--ease-out);
   }
+
   .field-input::placeholder { color: var(--text-tertiary); }
-  .field-input option { background: var(--surface-2); color: var(--text-primary); }
-  .field-full { width: 100%; box-sizing: border-box; }
-  .field-sm  { flex: 1; min-width: 90px; padding: 6px 8px; font-size: var(--text-xs); }
-  .field-num { width: 64px; flex: none; padding: 6px 8px; font-size: var(--text-xs); }
+
+  .field-input option {
+    background: var(--surface-2);
+    color: var(--text-primary);
+  }
 
   .field-input:focus {
     outline: none;
     border-color: var(--primary-500);
-    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
+    box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.18);
   }
+
+  .field-full { width: 100%; box-sizing: border-box; }
+  .field-sm  { flex: 1; min-width: 80px; }
+  .field-num { width: 64px; flex: none; }
 
   .field-label-inline {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1-5);
     font-size: var(--text-xs);
     color: var(--text-secondary);
     white-space: nowrap;
@@ -584,24 +885,38 @@
   .check-label {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1-5);
     font-size: var(--text-xs);
     color: var(--text-primary);
     cursor: pointer;
     user-select: none;
+    min-height: 44px;
   }
 
-  .form-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .form-actions {
+    display: flex;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
 
-  .btn-sm { padding: 6px 14px; font-size: var(--text-xs); min-height: 32px; }
+  .add-btn {
+    align-self: flex-start;
+    margin-top: var(--space-2);
+  }
 
-  .add-btn { align-self: flex-start; margin-top: 4px; }
+  /* ── Screen reader only ─────────────────────────────────────────────────── */
+  .sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    white-space: nowrap;
+    border: 0;
+  }
 
-  .empty { font-size: var(--text-xs); color: var(--text-tertiary); margin: 4px 0 6px; }
-
-  .divider {
-    border: none;
-    border-top: 1px solid var(--border-subtle);
-    margin: var(--space-2) 0;
+  /* ── Reduced motion ──────────────────────────────────────────────────────── */
+  @media (prefers-reduced-motion: reduce) {
+    .skel-row { animation: none; }
   }
 </style>

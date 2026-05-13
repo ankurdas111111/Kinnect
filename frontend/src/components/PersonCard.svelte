@@ -559,8 +559,8 @@
   /* ── Actions ─────────────────────────────────────────────────────────────── */
   .card-actions {
     display: flex;
-    gap: 8px;
-    padding: 10px 14px 14px;
+    gap: var(--space-2);
+    padding: var(--space-2-5) var(--space-3-5) var(--space-3-5);
   }
 
   .action-btn {
@@ -568,6 +568,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 5px;
+    gap: var(--space-1);
+    min-height: 44px;
   }
 </style>

@@ -488,11 +488,14 @@
         <button class="btn btn-primary btn-sm" on:click={generateLiveLink}>Share Live Location</button>
       </div>
       {#if $myLiveLinks.length === 0}
-        <div class="section-empty">
+        <div class="section-empty section-empty--with-cta">
           <div class="section-empty-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 6l10.5 6L22 6"/><rect x="1" y="4" width="21" height="16" rx="2"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 6l10.5 6L22 6"/><rect x="1" y="4" width="21" height="16" rx="2"/></svg>
           </div>
-          <span class="section-empty-text">No live links active</span>
+          <div class="section-empty-body">
+            <span class="section-empty-text">No live links active</span>
+            <span class="section-empty-cta-hint">Pick a duration above, then tap Share Live Location</span>
+          </div>
         </div>
       {:else}
         <div class="broadcasts-list">
@@ -946,18 +949,25 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: rgba(99, 102, 241, 0.10);
-    border: 1px solid rgba(99, 102, 241, 0.22);
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-full);
+    background: rgba(20, 184, 166, 0.08);
+    border: 1px solid rgba(20, 184, 166, 0.20);
     color: var(--primary-400);
     cursor: pointer;
-    transition: background 150ms var(--ease-out), transform 120ms var(--ease-spring);
+    flex-shrink: 0;
+    transition: background var(--duration-fast) var(--ease-out),
+                transform var(--duration-fast) var(--ease-spring);
+    touch-action: manipulation;
   }
   .locate-pill:hover {
-    background: rgba(99, 102, 241, 0.20);
-    transform: scale(1.10);
+    background: rgba(20, 184, 166, 0.16);
+    transform: scale(1.08);
+  }
+  .locate-pill:focus-visible {
+    outline: 2px solid var(--primary-500);
+    outline-offset: 2px;
   }
 
   /* ── Room members ────────────────────────────────────────────────── */
@@ -1162,16 +1172,16 @@
   .quick-actions-row {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-    margin-bottom: 16px;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
   }
 
   .quick-action-card {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
-    padding: 14px 8px;
+    gap: var(--space-1-5);
+    padding: var(--space-3-5) var(--space-2);
     background: var(--surface-inset);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-lg, 14px);
@@ -1199,7 +1209,7 @@
   .qa-icon {
     width: 40px;
     height: 40px;
-    border-radius: 12px;
+    border-radius: var(--radius-sm2);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1229,12 +1239,12 @@
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
-    gap: 10px;
-    padding: 11px 14px;
-    margin-bottom: 8px;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 12px;
+    gap: var(--space-2-5);
+    padding: var(--space-3) var(--space-3-5);
+    margin-bottom: var(--space-2);
+    background: var(--surface-inset);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
   }
 
   .my-code-left {
@@ -1245,55 +1255,56 @@
   }
 
   .my-code-label {
-    font-size: 10px;
+    font-size: var(--text-2xs);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.07em;
-    color: rgba(255,255,255,0.3);
+    color: var(--text-tertiary);
     font-family: var(--font-display);
   }
 
   .my-code-value {
-    font-size: 18px;
+    font-size: var(--text-xl);
     font-weight: 800;
-    color: var(--text-primary, #e2e8f0);
+    color: var(--text-primary);
     letter-spacing: 0.12em;
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
   }
 
   .my-code-actions {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     flex-shrink: 0;
   }
 
   .my-code-btn {
     display: flex;
     align-items: center;
-    gap: 5px;
-    padding: 7px 11px;
+    gap: var(--space-1);
+    padding: var(--space-2) var(--space-3);
     min-height: 44px;
-    border-radius: 8px;
-    border: 1px solid rgba(255,255,255,0.1);
-    background: rgba(255,255,255,0.05);
-    color: rgba(255,255,255,0.55);
-    font-size: 11px;
+    border-radius: var(--radius-sm2);
+    border: 1px solid var(--border-default);
+    background: var(--surface-hover);
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
     font-weight: 600;
     font-family: var(--font-display);
     cursor: pointer;
     white-space: nowrap;
-    transition: background 0.15s;
+    transition: background var(--duration-fast) var(--ease-out);
     touch-action: manipulation;
   }
-  .my-code-btn:hover { background: rgba(255,255,255,0.09); }
+  .my-code-btn:hover { background: var(--surface-active); }
+  .my-code-btn:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 2px; }
 
   .my-code-btn--wa {
-    border-color: rgba(37,211,102,0.25);
-    background: rgba(37,211,102,0.08);
+    border-color: rgba(37, 211, 102, 0.25);
+    background: rgba(37, 211, 102, 0.07);
     color: #25d366;
   }
-  .my-code-btn--wa:hover { background: rgba(37,211,102,0.14); }
+  .my-code-btn--wa:hover { background: rgba(37, 211, 102, 0.14); }
 
   .qa-label {
     font-family: var(--font-display);
@@ -1319,5 +1330,21 @@
   @keyframes qa-pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.4; }
+  }
+
+  /* Empty state with inline CTA hint */
+  .section-empty--with-cta {
+    align-items: flex-start;
+  }
+  .section-empty-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .section-empty-cta-hint {
+    font-size: var(--text-xs);
+    color: var(--primary-500);
+    font-weight: 500;
   }
 </style>
