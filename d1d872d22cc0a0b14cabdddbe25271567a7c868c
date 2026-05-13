@@ -1,0 +1,14 @@
+frontend/src/App.svelte
+  1e4de95f-bc4c-4f20-83b9-577c2c5a6550:2026-05-12T10:16:46.010Z 12-13,16,20-22,46-48,50-52,56-64,66-79,81-87,89-92,94-99
+frontend/src/components/AlertOverlay.svelte
+  1e4de95f-bc4c-4f20-83b9-577c2c5a6550:2026-05-12T10:16:46.010Z 337,339,345,347,352-354,360-363,370-376,382-384,389,392-395,403,405,411-412,414,416,420,427-428,440,444,446-448,452-454,463-464,468,473,483,485,490,504-505,509,513,515,521,529-536
+frontend/src/components/PersonCard.svelte
+  1e4de95f-bc4c-4f20-83b9-577c2c5a6550:2026-05-12T09:56:35.701Z 2,48,52,57-61,67-69,510,513-519
+frontend/src/components/UsersList.svelte
+  1e4de95f-bc4c-4f20-83b9-577c2c5a6550:2026-05-12T09:56:35.701Z 2,72,74,78-79,81-84,91-93,147-150,395-398,605-625,1152,1159,1165,1242-1263,1450-1453,1455-1462,1464-1468,1470-1485
+frontend/src/pages/FamilyDashboard.svelte
+  1e4de95f-bc4c-4f20-83b9-577c2c5a6550:2026-05-12T09:56:35.701Z 68,70-71,74,76-77,220,224-226,233,235,238,260-265,270,375,708,711,955,970-971,978-981,1109,1112
+frontend/src/styles/auth.css
+  1e4de95f-bc4c-4f20-83b9-577c2c5a6550:2026-05-12T09:56:35.701Z 91-92,111,121-139
+---
+{"schema_version": "authorship/3.0.0", "base_commit_sha": "HEAD~1", "prompts": {"1e4de95f-bc4c-4f20-83b9-577c2c5a6550:2026-05-12T10:16:46.010Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 52, "overriden_lines": 0}, "1e4de95f-bc4c-4f20-83b9-577c2c5a6550:2026-05-12T09:56:35.701Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 19, "overriden_lines": 0}}}
