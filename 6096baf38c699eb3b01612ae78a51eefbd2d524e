@@ -1,0 +1,4 @@
+frontend/src/pages/SecretChatViewer.svelte
+  fecfef28-5b62-43d1-9131-6357b870c36f:2026-05-13T20:01:37.509Z 2,6,117-120,128-145,147-154,162-164,180-182,184,190,233,235-252,254-285,287-295,301,303,313,421,429,456,461-462,522,544,602,604-617,660-661,753-772,774,780,791,816,1207
+---
+{"schema_version": "authorship/3.0.0", "base_commit_sha": "HEAD~1", "prompts": {"fecfef28-5b62-43d1-9131-6357b870c36f:2026-05-13T20:01:37.509Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 152, "overriden_lines": 0}}}
