@@ -344,7 +344,7 @@
     color: var(--text-tertiary);
     display: flex;
     align-items: center;
-    padding: 12px;
+    padding: var(--space-3, 12px);
     min-width: 44px;
     min-height: 44px;
     border-radius: 4px;
@@ -393,7 +393,7 @@
     font-family: var(--font-display, 'Sora', sans-serif);
     font-size: 1.25rem;
     font-weight: 800;
-    color: #ffffff;
+    color: var(--text-primary, #ffffff);
     letter-spacing: -0.02em;
     line-height: 1;
   }

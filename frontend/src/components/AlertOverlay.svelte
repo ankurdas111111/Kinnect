@@ -334,50 +334,65 @@
   .narrative-chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--space-1-5);
     justify-content: center;
-    margin-top: 4px;
+    margin-top: var(--space-1);
   }
 
   .narrative-chip {
     display: inline-block;
     font-family: var(--font-display);
-    font-size: 12px;
+    font-size: var(--text-xs);
     font-weight: 600;
-    padding: 4px 12px;
+    padding: var(--space-1) var(--space-3);
     border-radius: var(--radius-full);
     letter-spacing: 0.01em;
   }
 
-  .narrative-chip.motion  { background: rgba(245,158,11,0.15);  color: #f59e0b; border: 1px solid rgba(245,158,11,0.25); }
-  .narrative-chip.battery { background: rgba(16,185,129,0.12);  color: var(--success-500); border: 1px solid rgba(16,185,129,0.20); }
-  .narrative-chip.trigger { background: rgba(239,68,68,0.12);   color: var(--danger-500);  border: 1px solid rgba(239,68,68,0.20); }
+  .narrative-chip.motion  { background: rgba(245,158,11,0.15);  color: var(--warning-500);  border: 1px solid rgba(245,158,11,0.25); }
+  .narrative-chip.battery { background: rgba(16,185,129,0.12);  color: var(--success-500);  border: 1px solid rgba(16,185,129,0.20); }
+  .narrative-chip.trigger { background: rgba(239,68,68,0.12);   color: var(--danger-500);   border: 1px solid rgba(239,68,68,0.20); }
 
   /* ── Medical Card (Feature 9) ────────────────────────────────────────────── */
   .med-card {
     width: 100%;
     max-width: 380px;
-    margin-top: 4px;
-    border-radius: 14px;
+    margin-top: var(--space-1);
+    border-radius: var(--radius-lg);
+    /* Token-based: dark mode uses the same values since danger tokens
+       already pick up the correct shade from the theme */
     background: rgba(239, 68, 68, 0.05);
     border: 1px solid rgba(239, 68, 68, 0.20);
     overflow: hidden;
     text-align: left;
   }
 
+  /* Dark-mode override — uses [data-theme] to match the app's theme system,
+     not prefers-color-scheme which ignores the user's in-app theme toggle. */
+  :global([data-theme="dark"]) .med-card,
+  :global(:root:not([data-theme="light"])) .med-card {
+    background: rgba(239, 68, 68, 0.08);
+    border-color: rgba(239, 68, 68, 0.25);
+  }
+
   .med-card-header {
     width: 100%;
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 10px 14px;
+    gap: var(--space-2);
+    padding: var(--space-2-5) var(--space-3-5);
+    min-height: 44px;
     background: transparent;
     border: none;
     cursor: pointer;
     text-align: left;
-    transition: background 150ms ease;
+    transition: background var(--duration-fast) var(--ease-out);
   }
   .med-card-header:hover { background: rgba(239,68,68,0.14); }
+  .med-card-header:focus-visible {
+    outline: 2px solid var(--danger-400);
+    outline-offset: -2px;
+  }
 
   .med-card-icon {
     display: flex;
@@ -385,33 +400,32 @@
     justify-content: center;
     width: 28px;
     height: 28px;
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     background: rgba(239, 68, 68, 0.12);
-    color: var(--danger-500, #ef4444);
+    color: var(--danger-500);
     flex-shrink: 0;
   }
 
   .med-card-title {
     flex: 1;
-    font-size: 13px;
+    font-family: var(--font-display);
+    font-size: var(--text-2xs);
     font-weight: 700;
-    color: var(--danger-600, #dc2626);
-    letter-spacing: 0.01em;
-    text-transform: uppercase;
-    font-size: 11px;
+    color: var(--danger-600);
     letter-spacing: 0.06em;
+    text-transform: uppercase;
   }
 
   .med-card-chevron {
-    color: var(--danger-400, #f87171);
+    color: var(--danger-400);
     display: flex;
     align-items: center;
     transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
   }
   .med-card-chevron.open { transform: rotate(180deg); }
 
-  /* Fix #1: constrain med-card-body height so it scrolls on short iPhones (667px + notch).
-     100dvh accounts for iOS browser chrome; safe-area insets cover the notch and home indicator. */
+  /* Constrain body height so it scrolls on short phones (667px viewport).
+     100dvh accounts for iOS browser chrome; safe-area insets cover notch and home indicator. */
   .med-card-body {
     display: flex;
     flex-direction: column;
@@ -423,13 +437,20 @@
     -webkit-overflow-scrolling: touch;
   }
 
+  /* med-row: dark-first surface — uses surface token so light theme overrides naturally */
   .med-row {
     display: flex;
     align-items: flex-start;
-    gap: 8px;
+    gap: var(--space-2);
     padding: 9px 14px;
-    background: rgba(255,255,255,0.80);
+    /* Token-aware: var(--surface-1) resolves to a dark surface in dark mode,
+       and a light surface in [data-theme="light"] — no hardcoded white */
+    background: var(--surface-1, rgba(15, 23, 42, 0.70));
     backdrop-filter: blur(8px);
+  }
+
+  :global([data-theme="light"]) .med-row {
+    background: rgba(255, 255, 255, 0.92);
   }
 
   /* Blood type — large, prominent */
@@ -439,16 +460,17 @@
     background: rgba(239, 68, 68, 0.06);
   }
   .med-blood-label {
-    font-size: 11px;
+    font-family: var(--font-display);
+    font-size: var(--text-2xs);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: var(--danger-500, #ef4444);
+    color: var(--danger-500);
   }
   .med-blood-value {
     font-size: 22px;
     font-weight: 800;
-    color: var(--danger-600, #dc2626);
+    color: var(--danger-600);
     line-height: 1;
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.02em;
@@ -458,14 +480,14 @@
   .med-row-alert {
     background: rgba(239, 68, 68, 0.07);
   }
-  .med-row-alert .med-field-label { color: var(--danger-600, #dc2626); }
+  .med-row-alert .med-field-label { color: var(--danger-600); }
 
-  /* Contact rows */
+  /* Contact rows — empty rule kept for selector specificity */
   .med-row-contact {}
 
   .med-field-icon {
     flex-shrink: 0;
-    color: var(--danger-400, #f87171);
+    color: var(--danger-400);
     margin-top: 2px;
     display: flex;
     align-items: center;
@@ -479,23 +501,24 @@
   }
 
   .med-field-label {
-    font-size: 10px;
+    font-family: var(--font-display);
+    font-size: var(--text-2xs);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.07em;
-    color: var(--text-tertiary, #94a3b8);
+    color: var(--text-tertiary);
   }
 
   .med-field-value {
-    font-size: 13px;
+    font-size: var(--text-sm);
     font-weight: 500;
-    color: var(--text-primary, #0f172a);
+    color: var(--text-primary);
     line-height: 1.4;
     word-break: break-word;
   }
 
   .med-phone-link {
-    color: var(--primary-600, #4f46e5);
+    color: var(--primary-500);
     text-decoration: none;
     font-weight: 600;
   }
@@ -503,12 +526,13 @@
   .med-relation { opacity: 0.75; font-weight: 400; }
   .med-address  { opacity: 0.7; font-size: 0.8em; }
 
-  /* Dark mode */
-  @media (prefers-color-scheme: dark) {
-    .med-card { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.25); }
-    .med-row  { background: rgba(15,23,42,0.70); }
-    .med-row-bloodtype { background: rgba(239,68,68,0.10); }
-    .med-row-alert     { background: rgba(239,68,68,0.10); }
-    .med-field-value   { color: #f1f5f9; }
+  /* Reduced motion — disable shake animation and icon pulse */
+  @media (prefers-reduced-motion: reduce) {
+    .alert-shake-wrapper.shaking :global(.modal-backdrop) {
+      animation: none;
+    }
+    .alert-sos-icon {
+      animation: none;
+    }
   }
 </style>

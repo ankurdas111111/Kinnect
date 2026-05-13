@@ -88,6 +88,8 @@
   left: -150px;
   animation: blob-drift 22s ease-in-out infinite;
   filter: blur(60px);
+  /* GPU compositor hint — blob animates only transform, no layout */
+  will-change: transform;
 }
 
 .auth-bg-blob::after {
@@ -106,6 +108,7 @@
   right: -100px;
   animation: blob-drift 28s ease-in-out infinite reverse;
   filter: blur(50px);
+  will-change: transform;
 }
 
 @keyframes blob-drift {
@@ -113,6 +116,26 @@
   25%       { transform: translate(80px, 60px) scale(1.08); }
   50%       { transform: translate(40px, 120px) scale(0.96); }
   75%       { transform: translate(-40px, 40px) scale(1.04); }
+}
+
+/* Disable decorative blob animation for users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .auth-bg-blob,
+  .auth-bg-blob::after {
+    animation: none;
+    will-change: auto;
+  }
+  .auth-brand-features li {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .auth-card {
+    animation: none;
+  }
+  .auth-submit::after {
+    display: none;
+  }
 }
 
 /* ── Brand panel (desktop split layout) ─────────────────────────────────── */

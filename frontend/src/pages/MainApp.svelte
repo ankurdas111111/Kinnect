@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, tick } from 'svelte';
   import { push } from 'svelte-spa-router';
   import { authUser, authLoading } from '../lib/stores/auth.js';
   import { socket, setupSocketHandlers, cancelReconnectBanner, setBanner as socketSetBanner } from '../lib/socket.js';
@@ -73,8 +73,65 @@
   }
   let secretChatPeer = null; // { id: string, name: string }
 
+  // Dialog element refs for programmatic focus management
+  let sosConfirmEl = null;
+  let batteryPromptEl = null;
+
+  // aria-live announcement text — polled by the live region in the overlay
+  let liveAnnouncement = '';
+
+  // Track what was focused before a dialog opened so we can return focus on close
+  let _sosLastFocus = null;
+  let _batteryLastFocus = null;
+
+  // Move focus into a dialog element after Svelte updates the DOM
+  async function focusDialog(el) {
+    await tick();
+    if (!el) return;
+    const focusable = el.querySelectorAll(
+      'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    if (focusable.length) focusable[0].focus();
+    else el.focus();
+  }
+
   // Map popup "Chat" button → open chat panel directly without going via action sheet
   $: if ($mapChatRequest) { secretChatPeer = $mapChatRequest; mapChatRequest.set(null); }
+
+  // Focus management: move focus into dialogs when they open + return focus on close
+  $: if (sosConfirmOpen && sosConfirmEl) {
+    _sosLastFocus = document.activeElement;
+    focusDialog(sosConfirmEl);
+  }
+  $: if (!sosConfirmOpen && _sosLastFocus) {
+    const el = _sosLastFocus;
+    _sosLastFocus = null;
+    tick().then(() => { if (el && typeof el.focus === 'function') el.focus(); });
+  }
+  $: if (batteryPromptOpen && batteryPromptEl) {
+    _batteryLastFocus = document.activeElement;
+    focusDialog(batteryPromptEl);
+  }
+  $: if (!batteryPromptOpen && _batteryLastFocus) {
+    const el = _batteryLastFocus;
+    _batteryLastFocus = null;
+    tick().then(() => { if (el && typeof el.focus === 'function') el.focus(); });
+  }
+
+  // aria-live: announce tracking start/stop to screen readers
+  $: if ($tracking !== undefined) {
+    liveAnnouncement = $tracking ? 'Location sharing started.' : 'Location sharing stopped.';
+  }
+
+  // aria-live: announce connection state changes (debounced — only on disconnect/reconnect)
+  let _prevSocketConnected = null;
+  $: {
+    const connected = $connectivityStore.socketConnected;
+    if (_prevSocketConnected !== null && connected !== _prevSocketConnected) {
+      liveAnnouncement = connected ? 'Reconnected to Kinnect.' : 'Connection lost. Reconnecting…';
+    }
+    _prevSocketConnected = connected;
+  }
 
   /**
    * Detect Android device manufacturer from the WebView UA string.
@@ -838,6 +895,15 @@
   </svelte:fragment>
 
   <svelte:fragment slot="overlay">
+    <!-- Polite live region — announces real-time status changes to screen readers -->
+    <!-- assertive region is owned by AlertOverlay for SOS announcements -->
+    <div
+      aria-live="polite"
+      aria-atomic="true"
+      class="sr-only"
+      aria-relevant="additions text"
+    >{liveAnnouncement}</div>
+
     <AlertOverlay />
 
     <!-- Secret encrypted chat overlay -->
@@ -888,12 +954,12 @@
 
     <!-- SOS Confirmation Modal -->
     {#if sosConfirmOpen}
-      <div class="sos-confirm-backdrop" on:click|self={() => sosConfirmOpen = false} on:keydown={(e) => { if (e.key === 'Escape') sosConfirmOpen = false; }} role="dialog" aria-modal="true" aria-label="Confirm SOS" tabindex="-1">
+      <div class="sos-confirm-backdrop" bind:this={sosConfirmEl} on:click|self={() => sosConfirmOpen = false} on:keydown={(e) => { if (e.key === 'Escape') sosConfirmOpen = false; }} role="dialog" aria-modal="true" aria-labelledby="sos-confirm-title" tabindex="-1">
         <div class="sos-confirm-card-spatial">
           <div class="sos-icon-ring">
-            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--danger-500, #ef4444)" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           </div>
-          <h3 class="sos-confirm-title">Send an SOS to your family?</h3>
+          <h3 id="sos-confirm-title" class="sos-confirm-title">Send an SOS to your family?</h3>
           <p class="sos-confirm-desc">Everyone connected to you will be notified right away. They'll see your live location until you're safe.</p>
           <div class="sos-confirm-actions">
             <button class="btn btn-ghost sos-cancel-btn" on:click={() => sosConfirmOpen = false}>Cancel</button>
@@ -905,12 +971,12 @@
 
     <!-- Battery Optimization Prompt -->
     {#if batteryPromptOpen}
-      <div class="battery-prompt-backdrop" on:click|self={() => batteryPromptOpen = false} on:keydown={(e) => { if (e.key === 'Escape') batteryPromptOpen = false; }} role="dialog" aria-modal="true" aria-label="Allow background access" tabindex="-1">
+      <div class="battery-prompt-backdrop" bind:this={batteryPromptEl} on:click|self={() => batteryPromptOpen = false} on:keydown={(e) => { if (e.key === 'Escape') batteryPromptOpen = false; }} role="dialog" aria-modal="true" aria-labelledby="battery-prompt-title" tabindex="-1">
         <div class="battery-prompt-card">
           <div class="battery-prompt-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><rect x="2" y="7" width="16" height="10" rx="2"/><path d="M22 11v2"/><path d="M6 11v2"/><path d="M10 11v2"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--warning-400, #f59e0b)" stroke-width="2"><rect x="2" y="7" width="16" height="10" rx="2"/><path d="M22 11v2"/><path d="M6 11v2"/><path d="M10 11v2"/></svg>
           </div>
-          <h3 class="battery-prompt-title">Allow Background Access</h3>
+          <h3 id="battery-prompt-title" class="battery-prompt-title">Allow Background Access</h3>
           {#if BATTERY_INSTRUCTIONS[batteryManufacturer].steps}
             {@const info = BATTERY_INSTRUCTIONS[batteryManufacturer]}
             <p class="battery-prompt-brand">{info.brand} detected</p>
@@ -981,11 +1047,11 @@
     padding: 8px 12px;
     min-height: 44px;
     border-radius: var(--radius-lg);
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.10);
+    background: var(--surface-1, rgba(255, 255, 255, 0.06));
+    border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.10));
     color: var(--text-secondary);
     font-family: var(--font-display);
-    font-size: 12px;
+    font-size: var(--text-xs, 12px);
     font-weight: 600;
     white-space: nowrap;
     cursor: pointer;
@@ -994,8 +1060,8 @@
     -webkit-tap-highlight-color: transparent;
   }
   .page-nav-btn:hover {
-    background: rgba(99, 102, 241, 0.14);
-    border-color: rgba(99, 102, 241, 0.30);
+    background: var(--primary-50, rgba(99, 102, 241, 0.14));
+    border-color: var(--primary-200, rgba(99, 102, 241, 0.30));
     color: var(--primary-300);
   }
   .page-nav-btn:active {
@@ -1022,7 +1088,7 @@
     width: 52px;
     height: 52px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+    background: linear-gradient(135deg, var(--danger-500, #ef4444) 0%, var(--danger-700, #b91c1c) 100%);
     color: white;
     border: 3px solid rgba(255,255,255,0.85);
     cursor: pointer;
@@ -1068,7 +1134,7 @@
     line-height: 1;
   }
   .sos-fab.active {
-    background: #991b1b;
+    background: var(--danger-800, #991b1b);
   }
   /* Ripple ring via pseudo-element — uses transform+opacity (composited, no paint) */
   .sos-fab::after {
@@ -1137,17 +1203,17 @@
   }
   /* sos-confirm-card-spatial, .sos-icon-ring styles are in global.css */
   .sos-confirm-title {
-    font-size: 20px;
+    font-size: var(--text-xl, 20px);
     font-weight: 800;
-    color: white;
+    color: var(--text-primary, white);
     margin: 0 0 8px;
     letter-spacing: -0.02em;
   }
   .sos-confirm-desc {
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.65);
+    font-size: var(--text-sm, 13px);
+    color: var(--text-secondary, rgba(255, 255, 255, 0.65));
     line-height: 1.55;
-    margin: 0 0 24px;
+    margin: 0 0 var(--space-6, 24px);
   }
   .sos-confirm-actions {
     display: flex;
@@ -1167,6 +1233,13 @@
     transition: background var(--duration-fast) var(--ease-out);
   }
   .sos-cancel-btn:hover { background: rgba(255, 255, 255, 0.12); }
+  .sos-cancel-btn:focus-visible,
+  .sos-send-btn:focus-visible,
+  .battery-allow-btn:focus-visible,
+  .battery-skip-btn:focus-visible {
+    outline: 3px solid var(--primary-400, #818cf8);
+    outline-offset: 2px;
+  }
   .sos-send-btn {
     flex: 1;
     padding: 11px 16px;
@@ -1174,15 +1247,44 @@
     font-weight: 800;
     font-size: 14px;
     letter-spacing: 0.01em;
-    background: #dc2626;
-    color: white;
+    background: var(--danger-600, #dc2626);
+    color: var(--text-on-danger, white);
     border: none;
     cursor: pointer;
     box-shadow: 0 4px 16px rgba(220, 38, 38, 0.50);
     transition: background var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
   }
-  .sos-send-btn:hover { background: #ef4444; box-shadow: 0 6px 24px rgba(239, 68, 68, 0.55); }
+  .sos-send-btn:hover { background: var(--danger-500, #ef4444); box-shadow: 0 6px 24px rgba(239, 68, 68, 0.55); }
   @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+  /* Screen-reader-only utility — visually hidden but in the accessibility tree */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* Reduced motion overrides */
+  @media (prefers-reduced-motion: reduce) {
+    .sos-confirm-backdrop,
+    .battery-prompt-backdrop {
+      animation: none;
+    }
+    .sos-fab::after {
+      animation: none;
+    }
+    .sos-fab {
+      transition:
+        bottom 300ms ease,
+        background 0.2s ease;
+    }
+  }
 
   /* ── Battery Optimization Prompt ─────────────────────────────────────── */
   .battery-prompt-backdrop {
@@ -1199,10 +1301,10 @@
     animation: fade-in 0.2s ease;
   }
   .battery-prompt-card {
-    background: #1a1a2e;
+    background: var(--surface-2, #1a1a2e);
     border: 1px solid rgba(245, 158, 11, 0.25);
     border-radius: var(--radius-xl, 20px);
-    padding: 28px 24px 24px;
+    padding: var(--space-7, 28px) var(--space-6, 24px) var(--space-6, 24px);
     max-width: 340px;
     width: 100%;
     text-align: center;
@@ -1220,30 +1322,30 @@
     margin: 0 auto 16px;
   }
   .battery-prompt-title {
-    font-size: 18px;
+    font-size: var(--text-lg, 18px);
     font-weight: 800;
-    color: white;
-    margin: 0 0 8px;
+    color: var(--text-primary, white);
+    margin: 0 0 var(--space-2, 8px);
     letter-spacing: -0.02em;
   }
   .battery-prompt-desc {
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.60);
+    font-size: var(--text-sm, 13px);
+    color: var(--text-secondary, rgba(255, 255, 255, 0.60));
     line-height: 1.55;
-    margin: 0 0 24px;
+    margin: 0 0 var(--space-6, 24px);
   }
   .battery-prompt-brand {
-    font-size: 11px;
+    font-size: var(--text-2xs, 11px);
     font-weight: 700;
-    color: #f59e0b;
+    color: var(--warning-400, #f59e0b);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     margin: 0 0 10px;
   }
   .battery-steps-list {
     text-align: left;
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.75);
+    font-size: var(--text-sm, 13px);
+    color: var(--text-secondary, rgba(255, 255, 255, 0.75));
     line-height: 1.6;
     margin: 0 0 24px;
     padding-left: 20px;
@@ -1261,24 +1363,24 @@
     border-radius: var(--radius-lg);
     font-weight: 700;
     font-size: 14px;
-    background: #f59e0b;
-    color: #0a0a15;
+    background: var(--warning-400, #f59e0b);
+    color: var(--bg-base, #0a0a15);
     border: none;
     cursor: pointer;
     transition: background var(--duration-fast) var(--ease-out);
   }
-  .battery-allow-btn:hover { background: #fbbf24; }
+  .battery-allow-btn:hover { background: var(--warning-300, #fbbf24); }
   .battery-skip-btn {
     padding: 10px 16px;
     border-radius: var(--radius-lg);
     font-weight: 500;
     font-size: 13px;
     background: transparent;
-    color: rgba(255, 255, 255, 0.45);
+    color: var(--text-tertiary, rgba(255, 255, 255, 0.45));
     border: none;
     cursor: pointer;
   }
-  .battery-skip-btn:hover { color: rgba(255, 255, 255, 0.70); }
+  .battery-skip-btn:hover { color: var(--text-secondary, rgba(255, 255, 255, 0.70)); }
 
   /* ── Place search overlay on map ─────────────────────────────────── */
   /* Fix #3: wrapper changed from pointer-events:auto to pointer-events:none

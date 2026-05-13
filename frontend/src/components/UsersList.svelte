@@ -1,5 +1,5 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onDestroy } from 'svelte';
   import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { otherUsers, myLocation, focusUser, mapTappedUser } from '../lib/stores/map.js';
@@ -69,14 +69,27 @@
     return 'Online';
   }
 
+  // Admin delete — uses dispatch to show confirmation in a non-blocking modal
   let deletingUser = null;
+  let deleteConfirmUser = null;
+
   function deleteUser(user) {
     if (!isAdmin || deletingUser) return;
-    if (!confirm(`Delete user "${user.displayName}"? This will disconnect them.`)) return;
+    deleteConfirmUser = user;
+  }
+
+  function confirmDelete() {
+    if (!deleteConfirmUser) return;
+    const user = deleteConfirmUser;
+    deleteConfirmUser = null;
     deletingUser = user.socketId;
     socket.emit('adminDeleteUser', { socketId: user.socketId });
     banner.set({ type: 'info', text: `Deleted ${user.displayName}`, actions: [] });
     setTimeout(() => { banner.set({ type: null, text: null, actions: [] }); deletingUser = null; }, 3000);
+  }
+
+  function cancelDelete() {
+    deleteConfirmUser = null;
   }
 
   // ── Swipe-right to locate on map ────────────────────────────────────────
@@ -130,6 +143,11 @@
   function rowPU() {
     if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; }
   }
+
+  // Cancel long-press timer on component destroy to prevent firing on unmounted component
+  onDestroy(() => {
+    if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; }
+  });
 
   function rowClick(user) {
     if (lpSuppressClick) { lpSuppressClick = false; return; }
@@ -374,6 +392,10 @@
         <KinnectNexus />
         <p class="empty-title">Your people will appear here</p>
         <p class="empty-desc">Share your code with friends or family so you can see each other on the map</p>
+        <button class="empty-cta" on:click={() => dispatch('addPeople')}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+          Add people
+        </button>
       </div>
     {:else if userList.length === 0}
       <!-- Just self is visible — prompt to add people -->
@@ -577,6 +599,28 @@
       </div>
 
       <button class="qa-cancel-btn" on:click={closeQuickActions}>Cancel</button>
+    </div>
+  {/if}
+
+  <!-- ── Admin delete confirmation dialog (non-blocking, accessible) ─────── -->
+  {#if deleteConfirmUser}
+    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+    <div class="qa-backdrop" on:click={cancelDelete} aria-hidden="true" transition:fade={{ duration: 150 }}></div>
+    <div
+      class="qa-sheet delete-confirm-sheet"
+      role="alertdialog"
+      aria-label="Confirm delete {deleteConfirmUser.displayName}"
+      aria-modal="true"
+      transition:fly={{ y: 120, duration: 250, easing: cubicOut }}
+    >
+      <div class="qa-handle" aria-hidden="true"></div>
+      <p class="delete-confirm-text">
+        Remove <strong>{deleteConfirmUser.displayName}</strong> from this session? This will disconnect them.
+      </p>
+      <div class="delete-confirm-actions">
+        <button class="qa-cancel-btn" on:click={cancelDelete}>Cancel</button>
+        <button class="delete-confirm-btn" on:click={confirmDelete}>Remove</button>
+      </div>
     </div>
   {/if}
 </div>
@@ -1105,19 +1149,20 @@
   .acc-low   { color: var(--danger-400); }
   .acc-low.acc-dot { background: var(--danger-400); }
 
+  /* ETA chip — token-based colors (no hardcoded hex) */
   .eta-chip {
     display: inline-flex;
     align-items: center;
     gap: 3px;
     font-size: var(--text-xs);
     font-weight: 600;
-    color: #d97706;
+    color: var(--warning-600, #d97706);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 120px;
   }
-  :global([data-theme="dark"]) .eta-chip { color: #fcd34d; }
+  :global([data-theme="dark"]) .eta-chip { color: var(--warning-300, #fcd34d); }
 
   /* ── Actions column ─────────────────────────────────────────────────────── */
   .user-actions {
@@ -1193,6 +1238,29 @@
     line-height: var(--leading-relaxed);
     margin: 0;
   }
+
+  /* CTA button in empty state */
+  .empty-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1-5);
+    margin-top: var(--space-3);
+    padding: var(--space-2-5) var(--space-4);
+    min-height: 44px;
+    background: linear-gradient(135deg, var(--primary-500, #14b8a6), var(--primary-700, #0f766e));
+    color: white;
+    border: none;
+    border-radius: var(--radius-lg);
+    font-family: var(--font-display);
+    font-size: var(--text-sm);
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(20, 184, 166, 0.30);
+    transition: transform var(--duration-fast) var(--ease-spring), box-shadow var(--duration-fast);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .empty-cta:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(20, 184, 166, 0.40); }
+  .empty-cta:active { transform: scale(0.97); }
 
   /* ── Embedded panel ────────────────────────────────────────────────────── */
   .embedded-view {
@@ -1378,4 +1446,41 @@
 
   .qa-cancel-btn:hover { background: var(--surface-hover); }
   .qa-cancel-btn:active { transform: scale(0.98); transition-duration: 60ms; }
+
+  /* ── Admin delete confirmation ─────────────────────────────────────────── */
+  .delete-confirm-sheet {
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .delete-confirm-text {
+    font-size: var(--text-base);
+    color: var(--text-primary);
+    text-align: center;
+    margin: 0 0 var(--space-4);
+    line-height: var(--leading-relaxed);
+    padding: 0 var(--space-2);
+  }
+
+  .delete-confirm-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+  }
+
+  .delete-confirm-btn {
+    padding: 14px;
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.28);
+    border-radius: var(--radius-lg);
+    color: var(--danger-400, #f87171);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    font-weight: 700;
+    cursor: pointer;
+    transition: background var(--duration-fast) var(--ease-out);
+    -webkit-tap-highlight-color: transparent;
+    min-height: 44px;
+  }
+  .delete-confirm-btn:hover { background: rgba(239, 68, 68, 0.20); }
+  .delete-confirm-btn:active { transform: scale(0.97); transition-duration: 60ms; }
 </style>

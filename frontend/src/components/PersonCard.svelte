@@ -1,4 +1,5 @@
 <script>
+  import { onDestroy } from 'svelte';
   import { getUserColor, getUserColorLight } from '../lib/getUserColor.js';
   import FreshnessChip from './primitives/FreshnessChip.svelte';
   import TiltCard from './primitives/TiltCard.svelte';
@@ -44,18 +45,28 @@
     navigator.clipboard?.writeText(text).catch(() => {});
   }
 
-  // Flash stat cells when coordinates update
+  // Flash stat cells when coordinates update — timer cleaned up on destroy
   let coordFlash = false;
   let _prevLat = null;
   let _prevLng = null;
+  let _coordFlashTimer = null;
+
   $: if (user?.lat !== _prevLat || user?.lng !== _prevLng) {
     if (_prevLat !== null) {
       coordFlash = true;
-      setTimeout(() => { coordFlash = false; }, 850);
+      if (_coordFlashTimer) clearTimeout(_coordFlashTimer);
+      _coordFlashTimer = setTimeout(() => {
+        coordFlash = false;
+        _coordFlashTimer = null;
+      }, 850);
     }
     _prevLat = user?.lat ?? null;
     _prevLng = user?.lng ?? null;
   }
+
+  onDestroy(() => {
+    if (_coordFlashTimer) clearTimeout(_coordFlashTimer);
+  });
 </script>
 
 {#if user}
@@ -496,19 +507,16 @@
     white-space: nowrap;
   }
 
+  /* Close button — actual 44x44px touch target (no pseudo-element workaround) */
   .close-btn {
     flex-shrink: 0;
-    width: 28px;
-    height: 28px;
-    min-width: 28px;
-    min-height: 28px;
-    position: relative;
-  }
-  /* Expand hit area to 44px without affecting layout */
-  .close-btn::before {
-    content: '';
-    position: absolute;
-    inset: -8px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   /* ── Stat grid ───────────────────────────────────────────────────────────── */

@@ -8,6 +8,11 @@
   export let title = '';
   export let size = 'md';
 
+  // Stable ID for aria-labelledby — derived from title, ASCII-safe fallback
+  $: titleId = title
+    ? 'modal-title-' + title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 32)
+    : null;
+
   const dispatch = createEventDispatcher();
   let dialogEl;
   let lastFocusedEl = null;
@@ -98,12 +103,13 @@
       tabindex="-1"
       role="dialog"
       aria-modal="true"
-      aria-label={title || 'Modal dialog'}
+      aria-labelledby={title ? titleId : undefined}
+      aria-label={title ? undefined : 'Modal dialog'}
       transition:scale={{ start: 0.95, duration: 200, easing: cubicOut }}
     >
       {#if title}
         <div class="modal-header">
-          <h3 class="modal-title" class:urgent>{title}</h3>
+          <h3 id={titleId} class="modal-title" class:urgent>{title}</h3>
           <button class="btn btn-icon btn-ghost modal-close" on:click={dismiss} aria-label="Close">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>

@@ -51,6 +51,12 @@
 
   function getInitials(n) { return (n||'').split(' ').map(s=>s[0]).join('').toUpperCase().slice(0,2)||'?'; }
   function presence(u) { if(u.sos?.active) return 'sos'; if(!u.online) return 'offline'; if(u.speed>1) return 'moving'; return 'online'; }
+  function presenceLabel(u) {
+    if (u.sos?.active) return 'SOS active';
+    if (!u.online) return 'offline';
+    if (u.speed > 1) return 'moving at ' + (u.speed * 3.6).toFixed(0) + ' km/h';
+    return 'online';
+  }
   function distText(u) { if(!u.lat||!u.lng||!$myLocation) return null; return formatDistance(calculateDistance($myLocation.latitude,$myLocation.longitude,u.lat,u.lng)); }
   function speedKmh(u) { return u.speed ? (u.speed*3.6).toFixed(0) : '0'; }
 
@@ -59,198 +65,16 @@
   $: ringOffset = SC * (1 - safetyScore / 100);
   $: ringColor = allSafe ? '#10b981' : '#ef4444';
 
+  // Curated quotes — family-safety context, not generic motivational platitudes
   const QUOTES = [
-    { text: "Family is not an important thing. It's everything.", author: "Michael J. Fox" },
-    { text: "The bond that links your true family is not blood, but respect and joy.", author: "Richard Bach" },
-    { text: "In family life, love is the oil that eases friction.", author: "Friedrich Nietzsche" },
-    { text: "Family means no one gets left behind or forgotten.", author: "Lilo & Stitch" },
-    { text: "The family is the first essential cell of human society.", author: "Pope John XXIII" },
-    { text: "A happy family is but an earlier heaven.", author: "George Bernard Shaw" },
-    { text: "The love of a family is life's greatest blessing.", author: "Anonymous" },
-    { text: "Other things may change us, but we start and end with family.", author: "Anthony Brandt" },
-    { text: "Family is the anchor that holds us through life's storms.", author: "Anonymous" },
-    { text: "Families are the compass that guides us.", author: "Brad Henry" },
-    { text: "Having somewhere to go is home. Having someone to love is family.", author: "Anonymous" },
-    { text: "The memories we make with our family is everything.", author: "Candace Cameron Bure" },
-    { text: "You don't choose your family. They are God's gift to you, as you are to them.", author: "Desmond Tutu" },
-    { text: "Family is not about blood. It's about who is willing to hold your hand when you need it the most.", author: "Anonymous" },
-    { text: "Being a family means you are a part of something very wonderful.", author: "Lisa Weedn" },
-    { text: "A family is a risky venture, because the greater the love, the greater the loss. That's the trade-off.", author: "Brad Pitt" },
-    { text: "The strength of a family, like the strength of an army, lies in its loyalty to each other.", author: "Mario Puzo" },
-    { text: "To us, family means putting your arms around each other and being there.", author: "Barbara Bush" },
-    { text: "Family is the most important thing in the world.", author: "Princess Diana" },
-    { text: "Home is where you are loved the most and act the worst.", author: "Marjorie Pay Hinckley" },
-    { text: "When everything goes to hell, the people who stand by you without flinching — they are your family.", author: "Jim Butcher" },
-    { text: "The informality of family life is a blessed condition that allows us to become our best while looking our worst.", author: "Marge Kennedy" },
-    { text: "Rejoice with your family in the beautiful land of life.", author: "Albert Einstein" },
-    { text: "Family and friends are hidden treasures. Seek them and enjoy their riches.", author: "Wanda Hope Carter" },
-    { text: "A man travels the world over in search of what he needs, and returns home to find it.", author: "George Moore" },
-    { text: "What can you do to promote world peace? Go home and love your family.", author: "Mother Teresa" },
-    { text: "The only rock I know that stays steady is the rock that is the family.", author: "Nicholas Sparks" },
-    { text: "There is no doubt that it is around the family and the home that all the greatest virtues are created.", author: "Winston Churchill" },
-    { text: "Call it a clan, call it a network, call it a tribe, call it a family: whatever you call it, whoever you are, you need one.", author: "Jane Howard" },
-    { text: "Families are like branches on a tree. We grow in different directions, yet our roots remain as one.", author: "Anonymous" },
-    { text: "My family is my strength and my weakness.", author: "Aishwarya Rai" },
-    { text: "Family makes you who you are and aren't.", author: "Anonymous" },
-    { text: "At the end of the day, a loving family should find everything forgivable.", author: "Mark V. Olsen" },
-    { text: "The greatest thing in family life is to take a hint when a hint is intended — and not to take a hint when a hint isn't intended.", author: "Robert Frost" },
-    { text: "Family is a life jacket in the stormy sea of life.", author: "J.K. Rowling" },
-    { text: "Friends are the family we choose for ourselves.", author: "Edna Buchanan" },
-    { text: "A real friend is one who walks in when the rest of the world walks out.", author: "Walter Winchell" },
-    { text: "Friendship is born at that moment when one person says to another, 'What! You too?'", author: "C.S. Lewis" },
-    { text: "There is nothing on this earth more to be prized than true friendship.", author: "Thomas Aquinas" },
-    { text: "A true friend is somebody who can make us do what we can.", author: "Ralph Waldo Emerson" },
-    { text: "Friendship is the only cement that will ever hold the world together.", author: "Woodrow Wilson" },
-    { text: "A friend is someone who knows all about you and still loves you.", author: "Elbert Hubbard" },
-    { text: "True friendship comes when the silence between two people is comfortable.", author: "David Tyson" },
-    { text: "Friends show their love in times of trouble, not in happiness.", author: "Euripides" },
-    { text: "A sweet friendship refreshes the soul.", author: "Proverbs 27:9" },
-    { text: "No friendship is an accident.", author: "O. Henry" },
-    { text: "One loyal friend is worth ten thousand relatives.", author: "Euripides" },
-    { text: "Walking with a friend in the dark is better than walking alone in the light.", author: "Helen Keller" },
-    { text: "Life is nothing without friendship.", author: "Cicero" },
-    { text: "The greatest gift of life is friendship, and I have received it.", author: "Hubert H. Humphrey" },
-    { text: "A friend is one of the best things you can be and the greatest thing you can have.", author: "Sarah Valdez" },
-    { text: "In the sweetness of friendship let there be laughter, for in the dew of little things the heart finds its morning and is refreshed.", author: "Khalil Gibran" },
-    { text: "Friends are the siblings God never gave us.", author: "Mencius" },
-    { text: "A friend may be waiting behind a stranger's face.", author: "Maya Angelou" },
-    { text: "Good friends, good books, and a sleepy conscience: this is the ideal life.", author: "Mark Twain" },
-    { text: "Lots of people want to ride with you in the limo, but what you want is someone who will take the bus with you when the limo breaks down.", author: "Oprah Winfrey" },
-    { text: "True friends are like diamonds — bright, beautiful, valuable, and always in style.", author: "Nicole Richie" },
-    { text: "Friendship is a sheltering tree.", author: "Samuel Taylor Coleridge" },
-    { text: "There are no strangers here; only friends you haven't yet met.", author: "William Butler Yeats" },
-    { text: "The only way to have a friend is to be one.", author: "Ralph Waldo Emerson" },
-    { text: "Find a group of people who challenge and inspire you; spend a lot of time with them, and it will change your life.", author: "Amy Poehler" },
-    { text: "Home is wherever I'm with my people.", author: "Anonymous" },
-    { text: "Home is not a place — it's a feeling.", author: "Anonymous" },
-    { text: "Where we love is home — home that our feet may leave, but not our hearts.", author: "Oliver Wendell Holmes" },
-    { text: "There is nothing like staying at home for real comfort.", author: "Jane Austen" },
-    { text: "The ache for home lives in all of us.", author: "Maya Angelou" },
-    { text: "Home is the nicest word there is.", author: "Laura Ingalls Wilder" },
-    { text: "Every house where love abides and friendship is a guest, is surely home.", author: "Henry Van Dyke" },
-    { text: "You will never be completely at home again, because part of your heart will always be elsewhere.", author: "Miriam Adeney" },
-    { text: "We may have all come on different ships, but we're in the same boat now.", author: "Martin Luther King Jr." },
-    { text: "Wherever you go, go with all your heart.", author: "Confucius" },
-    { text: "We are most alive when we're in love.", author: "John Updike" },
-    { text: "Love is composed of a single soul inhabiting two bodies.", author: "Aristotle" },
-    { text: "The best thing to hold onto in life is each other.", author: "Audrey Hepburn" },
-    { text: "Being deeply loved by someone gives you strength, while loving someone deeply gives you courage.", author: "Lao Tzu" },
-    { text: "There is only one happiness in this life, to love and be loved.", author: "George Sand" },
-    { text: "You know you're in love when you can't fall asleep because reality is finally better than your dreams.", author: "Dr. Seuss" },
-    { text: "To the world you may be one person, but to one person you may be the world.", author: "Bill Wilson" },
-    { text: "Love recognizes no barriers.", author: "Maya Angelou" },
-    { text: "The giving of love is an education in itself.", author: "Eleanor Roosevelt" },
-    { text: "Love is a friendship set to music.", author: "Joseph Campbell" },
-    { text: "Love does not dominate; it cultivates.", author: "Johann Wolfgang von Goethe" },
-    { text: "Where there is love there is life.", author: "Mahatma Gandhi" },
-    { text: "Life without love is like a tree without blossoms or fruit.", author: "Khalil Gibran" },
-    { text: "We loved with a love that was more than love.", author: "Edgar Allan Poe" },
-    { text: "I have decided to stick with love. Hate is too great a burden to bear.", author: "Martin Luther King Jr." },
-    { text: "Believe you can and you're halfway there.", author: "Theodore Roosevelt" },
-    { text: "The only impossible journey is the one you never begin.", author: "Tony Robbins" },
-    { text: "It always seems impossible until it's done.", author: "Nelson Mandela" },
-    { text: "Act as if what you do makes a difference. It does.", author: "William James" },
-    { text: "What lies behind us and what lies before us are tiny matters compared to what lies within us.", author: "Ralph Waldo Emerson" },
-    { text: "You are never too old to set another goal or to dream a new dream.", author: "C.S. Lewis" },
-    { text: "The future belongs to those who believe in the beauty of their dreams.", author: "Eleanor Roosevelt" },
-    { text: "In the middle of every difficulty lies opportunity.", author: "Albert Einstein" },
-    { text: "Keep your face always toward the sunshine — and shadows will fall behind you.", author: "Walt Whitman" },
-    { text: "It is during our darkest moments that we must focus to see the light.", author: "Aristotle" },
-    { text: "The best time to plant a tree was 20 years ago. The second best time is now.", author: "Anonymous" },
-    { text: "Everything you've ever wanted is on the other side of fear.", author: "George Addair" },
-    { text: "You are braver than you believe, stronger than you seem, and smarter than you think.", author: "A.A. Milne" },
-    { text: "Start where you are. Use what you have. Do what you can.", author: "Arthur Ashe" },
-    { text: "Do what you can, with what you have, where you are.", author: "Theodore Roosevelt" },
-    { text: "The secret of getting ahead is getting started.", author: "Mark Twain" },
-    { text: "Don't watch the clock; do what it does. Keep going.", author: "Sam Levenson" },
-    { text: "Hardships often prepare ordinary people for an extraordinary destiny.", author: "C.S. Lewis" },
-    { text: "You don't have to be great to start, but you have to start to be great.", author: "Zig Ziglar" },
-    { text: "With the new day comes new strength and new thoughts.", author: "Eleanor Roosevelt" },
-    { text: "Courage is not the absence of fear, but rather the judgment that something else is more important than fear.", author: "Ambrose Redmoon" },
-    { text: "Success is not final, failure is not fatal: it is the courage to continue that counts.", author: "Winston Churchill" },
-    { text: "The only limit to our realization of tomorrow will be our doubts of today.", author: "Franklin D. Roosevelt" },
-    { text: "You miss 100% of the shots you don't take.", author: "Wayne Gretzky" },
-    { text: "Life is 10% what happens to us and 90% how we react to it.", author: "Charles R. Swindoll" },
-    { text: "Happiness is not something ready made. It comes from your own actions.", author: "Dalai Lama" },
-    { text: "What you get by achieving your goals is not as important as what you become by achieving your goals.", author: "Zig Ziglar" },
-    { text: "I can't change the direction of the wind, but I can adjust my sails.", author: "Jimmy Dean" },
-    { text: "It does not matter how slowly you go as long as you do not stop.", author: "Confucius" },
-    { text: "When you reach the end of your rope, tie a knot in it and hang on.", author: "Franklin D. Roosevelt" },
-    { text: "Safety is something that happens between your ears, not something you hold in your hands.", author: "Jeff Cooper" },
+    { text: "Knowing your people are safe lets you sleep at night.", author: "Kinnect" },
     { text: "The greatest protection any person can have is a loving family.", author: "Anonymous" },
-    { text: "A safe family is a strong family.", author: "Anonymous" },
-    { text: "Knowing your people are safe lets you sleep at night.", author: "Anonymous" },
-    { text: "The best security blanket a child can have is parents who respect each other.", author: "Jane Blaustone" },
-    { text: "Being safe is the foundation upon which everything else is built.", author: "Anonymous" },
-    { text: "Caring for your people is the highest form of strength.", author: "Anonymous" },
-    { text: "Peace of mind comes when you know your family is okay.", author: "Anonymous" },
-    { text: "Gratitude turns what we have into enough.", author: "Aesop" },
-    { text: "No act of kindness, no matter how small, is ever wasted.", author: "Aesop" },
-    { text: "Enjoy the little things, for one day you may look back and realize they were the big things.", author: "Robert Brault" },
-    { text: "The roots of all goodness lie in the soil of appreciation for goodness.", author: "Dalai Lama" },
-    { text: "We can complain because rose bushes have thorns, or rejoice because thorn bushes have roses.", author: "Abraham Lincoln" },
-    { text: "When I started counting my blessings, my whole life turned around.", author: "Willie Nelson" },
-    { text: "Gratitude is not only the greatest of virtues, but the parent of all the others.", author: "Cicero" },
-    { text: "Be thankful for what you have; you'll end up having more.", author: "Oprah Winfrey" },
-    { text: "Appreciation is a wonderful thing. It makes what is excellent in others belong to us as well.", author: "Voltaire" },
-    { text: "Kindness is a language which the deaf can hear and the blind can see.", author: "Mark Twain" },
-    { text: "A single act of kindness throws out roots in all directions, and the roots spring up and make new trees.", author: "Amelia Earhart" },
-    { text: "Carry out a random act of kindness with no expectation of reward.", author: "Princess Diana" },
-    { text: "The purpose of our lives is to be happy.", author: "Dalai Lama" },
-    { text: "Life is really simple, but we insist on making it complicated.", author: "Confucius" },
-    { text: "In three words I can sum up everything I've learned about life: it goes on.", author: "Robert Frost" },
-    { text: "Life is what happens when you're busy making other plans.", author: "John Lennon" },
-    { text: "The biggest adventure you can take is to live the life of your dreams.", author: "Oprah Winfrey" },
-    { text: "Do not dwell in the past, do not dream of the future, concentrate the mind on the present moment.", author: "Buddha" },
-    { text: "Not how long, but how well you have lived is the main thing.", author: "Seneca" },
-    { text: "Life is either a daring adventure or nothing at all.", author: "Helen Keller" },
-    { text: "The unexamined life is not worth living.", author: "Socrates" },
-    { text: "Turn your wounds into wisdom.", author: "Oprah Winfrey" },
-    { text: "The best and most beautiful things in the world cannot be seen or even touched — they must be felt with the heart.", author: "Helen Keller" },
-    { text: "Life isn't about finding yourself. Life is about creating yourself.", author: "George Bernard Shaw" },
-    { text: "Spread love everywhere you go. Let no one ever come to you without leaving happier.", author: "Mother Teresa" },
-    { text: "We make a living by what we get, but we make a life by what we give.", author: "Winston Churchill" },
-    { text: "The best preparation for tomorrow is doing your best today.", author: "H. Jackson Brown Jr." },
-    { text: "Be yourself; everyone else is already taken.", author: "Oscar Wilde" },
-    { text: "If you want to lift yourself up, lift up someone else.", author: "Booker T. Washington" },
-    { text: "Strive not to be a success, but rather to be of value.", author: "Albert Einstein" },
-    { text: "Twenty years from now you will be more disappointed by the things that you didn't do than by the ones you did do.", author: "Mark Twain" },
-    { text: "The way to get started is to quit talking and begin doing.", author: "Walt Disney" },
-    { text: "The human spirit is stronger than anything that can happen to it.", author: "C.C. Scott" },
-    { text: "Tough times never last, but tough people do.", author: "Robert H. Schuller" },
-    { text: "Rock bottom became the solid foundation on which I rebuilt my life.", author: "J.K. Rowling" },
-    { text: "A smooth sea never made a skilled sailor.", author: "Franklin D. Roosevelt" },
-    { text: "Fall seven times, stand up eight.", author: "Japanese Proverb" },
-    { text: "Strength does not come from winning. Your struggles develop your strengths.", author: "Arnold Schwarzenegger" },
-    { text: "The oak fought the wind and was broken, the willow bent when it must and survived.", author: "Robert Jordan" },
-    { text: "Stars can't shine without darkness.", author: "Anonymous" },
-    { text: "She stood in the storm, and when the wind did not blow her way, she adjusted her sails.", author: "Elizabeth Edwards" },
-    { text: "You were given this life because you are strong enough to live it.", author: "Anonymous" },
-    { text: "Out of difficulties grow miracles.", author: "Jean de La Bruyere" },
+    { text: "Family means no one gets left behind or forgotten.", author: "Lilo & Stitch" },
+    { text: "Families are the compass that guides us.", author: "Brad Henry" },
+    { text: "Peace of mind comes when you know your family is okay.", author: "Kinnect" },
     { text: "Alone we can do so little; together we can do so much.", author: "Helen Keller" },
-    { text: "If you want to go fast, go alone. If you want to go far, go together.", author: "African Proverb" },
-    { text: "No man is an island, entire of itself.", author: "John Donne" },
-    { text: "We rise by lifting others.", author: "Robert Ingersoll" },
-    { text: "The greatness of a community is most accurately measured by the compassionate actions of its members.", author: "Coretta Scott King" },
-    { text: "It takes a village to raise a child.", author: "African Proverb" },
-    { text: "Coming together is a beginning, staying together is progress, and working together is success.", author: "Henry Ford" },
-    { text: "Unity is strength. When there is teamwork and collaboration, wonderful things can be achieved.", author: "Mattie Stepanek" },
-    { text: "None of us is as smart as all of us.", author: "Ken Blanchard" },
-    { text: "A candle loses nothing by lighting another candle.", author: "James Keller" },
-    { text: "Happiness is not by chance, but by choice.", author: "Jim Rohn" },
-    { text: "The most wasted of days is one without laughter.", author: "E.E. Cummings" },
-    { text: "Think of all the beauty still left around you and be happy.", author: "Anne Frank" },
-    { text: "For every minute you are angry you lose sixty seconds of happiness.", author: "Ralph Waldo Emerson" },
-    { text: "The sun himself is weak when he first rises, and gathers strength and courage as the day gets on.", author: "Charles Dickens" },
-    { text: "Count your age by friends, not years. Count your life by smiles, not tears.", author: "John Lennon" },
-    { text: "Very little is needed to make a happy life; it is all within yourself, in your way of thinking.", author: "Marcus Aurelius" },
-    { text: "Happiness often sneaks in through a door you didn't know you left open.", author: "John Barrymore" },
-    { text: "There is nothing either good or bad, but thinking makes it so.", author: "William Shakespeare" },
-    { text: "Today is a good day to have a good day.", author: "Anonymous" },
-    { text: "Let us always meet each other with smile, for the smile is the beginning of love.", author: "Mother Teresa" },
-    { text: "Be the reason someone smiles today.", author: "Anonymous" },
-    { text: "Happiness is a warm puppy.", author: "Charles M. Schulz" },
-    { text: "The most important thing is to enjoy your life — to be happy — it's all that matters.", author: "Audrey Hepburn" },
+    { text: "The strength of a family lies in its loyalty to each other.", author: "Mario Puzo" },
+    { text: "Being safe is the foundation upon which everything else is built.", author: "Kinnect" },
   ];
   let quoteIdx = Math.floor(Math.random() * QUOTES.length);
   let quoteVisible = true;
@@ -393,23 +217,25 @@
 
         <!-- Interactive member avatars — click to focus on map -->
         {#if members.length > 0}
-          <div class="d-member-ring">
+          <div class="d-member-ring" role="group" aria-label="Family members">
             {#each members.slice(0, 7) as user (user.userId)}
               {@const color = getUserColor(user.userId)}
               {@const pres = presence(user)}
-              <!-- svelte-ignore a11y-no-static-element-interactions -->
-              <!-- svelte-ignore a11y-click-events-have-key-events -->
-              <div class="d-mr-bubble" style="--mc:{color}"
+              <button
+                class="d-mr-bubble"
+                style="--mc:{color}"
                 on:click={() => { focusUser.set(user.userId); push('/'); }}
-                title="{user.displayName} — {pres}">
+                aria-label="{user.displayName} — {presenceLabel(user)}, view on map"
+              >
                 <span class="d-mr-init">{getInitials(user.displayName)}</span>
                 <span class="d-mr-dot"
                   class:dot-on={pres==='online'} class:dot-mv={pres==='moving'}
-                  class:dot-sos={pres==='sos'} class:dot-off={pres==='offline'}></span>
-              </div>
+                  class:dot-sos={pres==='sos'} class:dot-off={pres==='offline'}
+                  aria-hidden="true"></span>
+              </button>
             {/each}
             {#if members.length > 7}
-              <div class="d-mr-more">+{members.length - 7}</div>
+              <div class="d-mr-more" aria-hidden="true">+{members.length - 7}</div>
             {/if}
           </div>
         {/if}
@@ -431,15 +257,17 @@
           </div>
         {/if}
 
-        <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <div class="d-quote-globe" class:dqg-on={quoteVisible} role="complementary"
-          on:click={cycleQuote} title="Click for next quote">
+        <button
+          class="d-quote-globe"
+          class:dqg-on={quoteVisible}
+          on:click={cycleQuote}
+          aria-label="Cycle quote"
+        >
           <span class="d-qg-mark" aria-hidden="true">"</span>
           <p class="d-qg-text">{QUOTES[quoteIdx].text}"</p>
           <span class="d-qg-author">— {QUOTES[quoteIdx].author}</span>
           <span class="d-qg-cycle" aria-hidden="true">↻ next</span>
-        </div>
+        </button>
       </div>
 
     </div>
@@ -544,7 +372,7 @@
               style="--mc:{color}" on:click={() => { focusUser.set(user.userId); push('/'); }}>
               <div class="m-av">
                 <span class="m-init">{getInitials(user.displayName)}</span>
-                <span class="m-dot" class:dot-sos={pres==='sos'} class:dot-off={pres==='offline'} class:dot-mv={pres==='moving'} class:dot-on={pres==='online'}></span>
+                <span class="m-dot" class:dot-sos={pres==='sos'} class:dot-off={pres==='offline'} class:dot-mv={pres==='moving'} class:dot-on={pres==='online'} aria-hidden="true"></span>
               </div>
               <div class="m-info">
                 <span class="m-name">{user.displayName || 'Unknown'}</span>
@@ -605,7 +433,7 @@
   .d {
     height: 100dvh;
     background: var(--surface-0, #050812);
-    color: #fff;
+    color: var(--text-primary, #fff);
     font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
     position: relative;
     overflow: hidden;
@@ -652,16 +480,20 @@
   }
   .d-back {
     display: flex; align-items: center; gap: 4px;
+    min-height: 44px; /* WCAG 2.5.8 — minimum touch target */
+    padding: 0 var(--space-3) 0 var(--space-2);
     background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 20px; padding: 5px 11px 5px 7px;
-    color: rgba(255,255,255,0.65); font-size: 12px; font-weight: 600;
-    cursor: pointer; transition: background 0.15s, color 0.15s;
+    border-radius: 22px;
+    color: var(--text-secondary); font-size: var(--text-xs); font-weight: 600;
+    cursor: pointer;
+    transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
   }
-  .d-back:hover { background: rgba(255,255,255,0.10); color: #fff; }
+  .d-back:hover { background: rgba(255,255,255,0.10); color: var(--text-primary); }
+  .d-back:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
   .d-back:active { transform: scale(0.96); }
   .d-clock {
     font-size: 20px; font-weight: 700; letter-spacing: -0.03em;
-    color: rgba(255,255,255,0.85); font-variant-numeric: tabular-nums;
+    color: var(--text-primary); font-variant-numeric: tabular-nums;
     font-family: var(--font-display, system-ui);
   }
 
@@ -755,17 +587,17 @@
     font-size: clamp(1.7rem, 5vw, 2.4rem); font-weight: 400;
     letter-spacing: -0.03em; line-height: 1.15; margin: 0;
     font-family: var(--font-display, system-ui);
-    color: rgba(255,255,255,0.55); /* base: muted gray for "Up late," */
+    color: var(--text-secondary); /* base: muted for greeting prefix */
   }
   .d-greet-word {
-    /* "Up late," — medium weight, muted */
+    /* greeting prefix — medium weight, muted */
     font-weight: 400;
-    color: rgba(255,255,255,0.55);
+    color: var(--text-secondary);
   }
   .d-name-word {
-    /* "Ankur" — bold, white→purple gradient */
+    /* first name — bold, white→violet gradient using design tokens */
     font-weight: 800;
-    background: linear-gradient(135deg, #fff 30%, #c4b5fd 100%);
+    background: linear-gradient(135deg, #fff 30%, var(--primary-300, #c4b5fd) 100%);
     -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
   }
   .d-date { margin: 5px 0 0; font-size: 12px; font-weight: 400; color: rgba(255,255,255,0.28); letter-spacing: 0.01em; }
@@ -774,8 +606,8 @@
   .d-ring-progress { transition: stroke-dashoffset 1s cubic-bezier(0.4,0,0.2,1), stroke 0.4s; }
   .d-safety-score { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); font-size: 13px; font-weight: 800; color: rgba(255,255,255,0.9); font-family: var(--font-display, system-ui); }
   .d-safety-badge { display: flex; align-items: center; gap: 4px; font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 20px; white-space: nowrap; }
-  .badge-safe { background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.25); color: #10b981; }
-  .badge-sos  { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.25); color: #f87171; }
+  .badge-safe { background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.25); color: var(--success-500); }
+  .badge-sos  { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.25); color: var(--danger-400); }
   .d-badge-dot { width: 4px; height: 4px; border-radius: 50%; background: currentColor; animation: pulse 2s ease-in-out infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
@@ -804,13 +636,13 @@
     transition: border-color 0.2s, background 0.2s;
   }
   .d-stat:active { background: rgba(255,255,255,0.07); }
-  .d-stat-val { font-size: 18px; font-weight: 800; color: #fff; line-height: 1; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; font-family: var(--font-display, system-ui); }
-  .d-stat-lbl { font-size: 8px; font-weight: 600; color: rgba(255,255,255,0.25); text-transform: uppercase; letter-spacing: 0.07em; }
+  .d-stat-val { font-size: 18px; font-weight: 800; color: var(--text-primary); line-height: 1; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; font-family: var(--font-display, system-ui); }
+  .d-stat-lbl { font-size: var(--text-2xs, 8px); font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.07em; }
   .stat-active { border-color: rgba(16,185,129,0.25); }
-  .stat-active .d-stat-val { color: #10b981; }
+  .stat-active .d-stat-val { color: var(--success-400); }
   .stat-warn { border-color: rgba(245,158,11,0.25); }
-  .stat-warn .d-stat-val { color: #f59e0b; }
-  .d-stat-dot { position: absolute; top: 5px; right: 5px; width: 4px; height: 4px; border-radius: 50%; background: #10b981; animation: pulse 2s ease-in-out infinite; }
+  .stat-warn .d-stat-val { color: var(--warning-400); }
+  .d-stat-dot { position: absolute; top: 5px; right: 5px; width: 4px; height: 4px; border-radius: 50%; background: var(--success-400); animation: pulse 2s ease-in-out infinite; }
 
   /* ═══ Panel (glass card for Network & Actions) ═════════════════════ */
   .d-panel {
@@ -845,11 +677,11 @@
   .m-av { position: relative; width: 32px; height: 32px; border-radius: 50%; background: color-mix(in srgb, var(--mc,#6366f1) 15%, transparent); border: 2px solid var(--mc,#6366f1); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .m-init { font-size: 11px; font-weight: 800; color: var(--mc,#6366f1); line-height: 1; user-select: none; }
   .m-dot { position: absolute; bottom: -1px; right: -1px; width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--surface-0, #050812); }
-  .dot-on { background: #10b981; } .dot-mv { background: #3b82f6; } .dot-off { background: #475569; } .dot-sos { background: #ef4444; }
+  .dot-on { background: var(--success-500); } .dot-mv { background: var(--info-500, #3b82f6); } .dot-off { background: var(--text-tertiary); } .dot-sos { background: var(--danger-500); }
   .m-info { flex: 1; min-width: 0; }
-  .m-name { display: block; font-size: 12px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .m-name { display: block; font-size: var(--text-xs); font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .m-status { font-size: 10px; color: rgba(255,255,255,0.35); }
-  .m-sos-text { color: #f87171; font-weight: 700; }
+  .m-sos-text { color: var(--danger-400); font-weight: 700; }
   .m-dist { font-size: 9px; color: rgba(255,255,255,0.22); font-variant-numeric: tabular-nums; flex-shrink: 0; }
 
   /* ═══ Empty ════════════════════════════════════════════════════════ */
@@ -859,7 +691,7 @@
   }
   .d-cta {
     background: linear-gradient(135deg, var(--primary-500, #4f46e5), var(--primary-600, #7c3aed));
-    color: #fff; border: none; border-radius: 10px; padding: 7px 14px;
+    color: var(--text-on-primary, #fff); border: none; border-radius: var(--radius-md, 10px); padding: var(--space-2, 7px) var(--space-4, 14px);
     font-size: 11px; font-weight: 700; cursor: pointer;
     transition: transform 0.12s, box-shadow 0.2s;
     box-shadow: 0 2px 10px rgba(99,102,241,0.3);
@@ -873,20 +705,21 @@
     background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
     border-radius: 12px; padding: 12px 6px 10px;
     display: flex; flex-direction: column; align-items: center; gap: 6px;
-    cursor: pointer; color: rgba(255,255,255,0.65); font-size: 10px; font-weight: 600;
+    cursor: pointer; color: rgba(255,255,255,0.65); font-size: 11px; font-weight: 600;
     transition: border-color 0.2s, transform 0.1s, background 0.2s;
     -webkit-tap-highlight-color: transparent;
+    min-height: 44px;
   }
   .d-act:hover { border-color: rgba(255,255,255,0.12); background: rgba(255,255,255,0.05); }
   .d-act:active { transform: scale(0.95); }
-  .act-map { color: #818cf8; } .act-activity { color: #34d399; } .act-replay { color: #fbbf24; }
-  .act-sos { color: #f87171; } .act-checkin { color: #22d3ee; } .act-network { color: #a78bfa; }
+  .act-map { color: var(--primary-400); } .act-activity { color: var(--success-300, #34d399); } .act-replay { color: var(--warning-300, #fbbf24); }
+  .act-sos { color: var(--danger-400); } .act-checkin { color: var(--info-300, #22d3ee); } .act-network { color: var(--primary-300); }
   .act-sos-on { border-color: rgba(239,68,68,0.25); animation: sos-b 2s ease-in-out infinite; }
   @keyframes sos-b { 0%,100%{border-color:rgba(239,68,68,0.15)} 50%{border-color:rgba(239,68,68,0.45)} }
 
-  .d-dot { position: absolute; top: 6px; right: 6px; width: 6px; height: 6px; border-radius: 50%; background: #f59e0b; box-shadow: 0 0 5px rgba(245,158,11,0.6); }
-  .d-dot-red { background: #ef4444; box-shadow: 0 0 5px rgba(239,68,68,0.6); }
-  .d-dot-cyan { background: #22d3ee; box-shadow: 0 0 5px rgba(34,211,238,0.6); }
+  .d-dot { position: absolute; top: 6px; right: 6px; width: 6px; height: 6px; border-radius: 50%; background: var(--warning-400); box-shadow: 0 0 5px rgba(245,158,11,0.6); }
+  .d-dot-red { background: var(--danger-500); box-shadow: 0 0 5px rgba(239,68,68,0.6); }
+  .d-dot-cyan { background: var(--info-400, #22d3ee); box-shadow: 0 0 5px rgba(34,211,238,0.6); }
 
   /* ═══ Mobile Globe section ══════════════════════════════════════════ */
   .d-mobile-globe {
@@ -917,8 +750,27 @@
 
   /* ═══ Reduced motion ═══════════════════════════════════════════════ */
   @media (prefers-reduced-motion: reduce) {
-    .d-aurora, .d-badge-dot, .d-stat-dot, .d-member.m-sos, .d-act.act-sos-on { animation: none !important; }
-    .d-hero, .d-stats, .d-panel, .d-quote { opacity: 1 !important; transform: none !important; transition: none !important; }
+    /* Disable all decorative animations */
+    .d-aurora, .d-badge-dot, .d-stat-dot, .d-globe-blip,
+    .d-member.m-sos, .d-act.act-sos-on,
+    .gsr-on .d-gsr-dot, .gsr-alert .d-gsr-dot {
+      animation: none !important;
+    }
+    /* Show content immediately — skip stagger entrance */
+    .d-hero, .d-stats, .d-panel, .d-quote, .d-quote-globe {
+      opacity: 1 !important;
+      transform: none !important;
+      transition: none !important;
+    }
+    /* Disable globe tilt hover transforms — can cause motion sickness */
+    .d-globe-side-l .d-side-card:hover,
+    .d-globe-side-r .d-side-card:hover {
+      transform: none !important;
+    }
+    /* Disable ring progress animation */
+    .d-ring-progress {
+      transition: none !important;
+    }
   }
 
   /* ═══ Mouse cursor glow ════════════════════════════════════════════ */
@@ -1016,39 +868,39 @@
   /* ON / green */
   .gsr-on {
     border-color: rgba(16,185,129,0.22);
-    color: rgba(52,211,153,0.75);
+    color: var(--success-300, rgba(52,211,153,0.75));
   }
   .gsr-on .d-gsr-dot {
-    background: #10b981;
+    background: var(--success-500, #10b981);
     box-shadow: 0 0 5px rgba(16,185,129,0.55);
     animation: blip-g 2.5s ease-in-out infinite;
   }
   /* SAFE / green */
   .gsr-safe {
     border-color: rgba(16,185,129,0.22);
-    color: rgba(52,211,153,0.75);
+    color: var(--success-300, rgba(52,211,153,0.75));
   }
   .gsr-safe .d-gsr-dot {
-    background: #10b981;
+    background: var(--success-500, #10b981);
     box-shadow: 0 0 5px rgba(16,185,129,0.55);
   }
   /* ALERT / red */
   .gsr-alert {
     border-color: rgba(239,68,68,0.28);
-    color: rgba(248,113,113,0.85);
+    color: var(--danger-400);
   }
   .gsr-alert .d-gsr-dot {
-    background: #ef4444;
+    background: var(--danger-500, #ef4444);
     box-shadow: 0 0 5px rgba(239,68,68,0.60);
     animation: pulse 1.5s ease-in-out infinite;
   }
   /* WARN / amber */
   .gsr-warn {
     border-color: rgba(245,158,11,0.24);
-    color: rgba(251,191,36,0.75);
+    color: var(--warning-300, rgba(251,191,36,0.75));
   }
   .gsr-warn .d-gsr-dot {
-    background: #f59e0b;
+    background: var(--warning-400, #f59e0b);
     box-shadow: 0 0 5px rgba(245,158,11,0.50);
   }
 
@@ -1070,7 +922,7 @@
   }
   .d-globe-blip {
     width: 5px; height: 5px; border-radius: 50%;
-    background: #10b981;
+    background: var(--success-500);
     box-shadow: 0 0 6px rgba(16,185,129,0.7);
     animation: blip-g 2.5s ease-in-out infinite;
     flex-shrink: 0;
@@ -1100,7 +952,7 @@
     gap: 5px;
   }
 
-  /* ── Quote in globe column ──────────────────────────────────────── */
+  /* ── Quote in globe column — button for keyboard accessibility ────── */
   .d-quote-globe {
     position: relative;
     width: 100%; max-width: 340px;
@@ -1115,11 +967,17 @@
     text-align: center;
     opacity: 0; transform: translateY(8px);
     transition: opacity 0.55s ease, transform 0.55s ease, border-color 0.2s, background 0.2s;
+    color: inherit;
+    font: inherit;
   }
   .d-quote-globe.dqg-on { opacity: 1; transform: translateY(0); }
   .d-quote-globe:hover {
     background: rgba(99,102,241,0.06);
     border-color: rgba(99,102,241,0.18);
+  }
+  .d-quote-globe:focus-visible {
+    outline: 2px solid rgba(99,102,241,0.6);
+    outline-offset: 2px;
   }
   .d-qg-mark {
     display: block;
@@ -1214,22 +1072,23 @@
     font-size: 9px; font-weight: 600; color: rgba(255,255,255,0.28);
     margin-top: 5px; text-align: left;
   }
-  .row-safe { color: rgba(52,211,153,0.75); }
-  .row-sos  { color: rgba(248,113,113,0.80); }
+  .row-safe { color: var(--success-400); }
+  .row-sos  { color: var(--danger-400); }
   .d-sd {
     width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0;
     background: rgba(255,255,255,0.15);
   }
-  .d-sd.dot-on { background: #10b981; box-shadow: 0 0 4px rgba(16,185,129,0.55); }
-  .d-sd.dot-mv { background: #3b82f6; box-shadow: 0 0 4px rgba(59,130,246,0.55); }
+  .d-sd.dot-on { background: var(--success-500); box-shadow: 0 0 4px rgba(16,185,129,0.55); }
+  .d-sd.dot-mv { background: var(--info-500, #3b82f6); box-shadow: 0 0 4px rgba(59,130,246,0.55); }
 
   /* ═══ Interactive member avatar ring ════════════════════════════════ */
   .d-member-ring {
     display: flex; align-items: center; gap: 8px;
     flex-wrap: wrap; justify-content: center;
   }
+  /* d-mr-bubble is now a <button> — reset button defaults */
   .d-mr-bubble {
-    position: relative; width: 40px; height: 40px;
+    position: relative; width: 44px; height: 44px;
     border-radius: 50%;
     background: color-mix(in srgb, var(--mc,#6366f1) 14%, rgba(5,8,18,0.75));
     border: 2px solid color-mix(in srgb, var(--mc,#6366f1) 60%, transparent);
@@ -1238,6 +1097,8 @@
     transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.25s, border-color 0.2s;
     -webkit-tap-highlight-color: transparent;
     user-select: none;
+    padding: 0;
+    color: inherit;
   }
   .d-mr-bubble:hover {
     transform: scale(1.18) translateY(-3px);
@@ -1245,6 +1106,10 @@
     box-shadow: 0 6px 20px color-mix(in srgb, var(--mc,#6366f1) 40%, transparent);
   }
   .d-mr-bubble:active { transform: scale(0.92); }
+  .d-mr-bubble:focus-visible {
+    outline: 2px solid var(--mc, #6366f1);
+    outline-offset: 2px;
+  }
   .d-mr-init {
     font-size: 12px; font-weight: 800;
     color: color-mix(in srgb, var(--mc,#6366f1) 90%, white);
@@ -1256,12 +1121,12 @@
     border-radius: 50%; border: 2px solid rgba(5,8,18,0.9);
     background: rgba(255,255,255,0.15);
   }
-  .d-mr-dot.dot-on  { background: #10b981; }
-  .d-mr-dot.dot-mv  { background: #3b82f6; }
-  .d-mr-dot.dot-sos { background: #ef4444; box-shadow: 0 0 5px rgba(239,68,68,0.7); }
-  .d-mr-dot.dot-off { background: #475569; }
+  .d-mr-dot.dot-on  { background: var(--success-500); }
+  .d-mr-dot.dot-mv  { background: var(--info-500, #3b82f6); }
+  .d-mr-dot.dot-sos { background: var(--danger-500); box-shadow: 0 0 5px rgba(239,68,68,0.7); }
+  .d-mr-dot.dot-off { background: var(--text-tertiary); }
   .d-mr-more {
-    width: 40px; height: 40px; border-radius: 50%;
+    width: 44px; height: 44px; border-radius: 50%;
     background: rgba(255,255,255,0.04);
     border: 2px solid rgba(255,255,255,0.10);
     display: flex; align-items: center; justify-content: center;

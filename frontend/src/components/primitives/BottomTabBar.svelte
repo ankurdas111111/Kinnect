@@ -233,7 +233,7 @@
   }
 
   .tab-item:hover {
-    color: rgba(255, 255, 255, 0.65);
+    color: var(--text-secondary, rgba(255, 255, 255, 0.65));
   }
 
   :global([data-theme="light"]) .tab-item:hover {
@@ -243,6 +243,12 @@
   .tab-item:active {
     transform: scale(0.86);
     transition-duration: 70ms;
+  }
+
+  .tab-item:focus-visible {
+    outline: 2px solid var(--primary-400, #818cf8);
+    outline-offset: -3px;
+    border-radius: var(--radius-md, 8px);
   }
 
   /* Active tab — primary color + subtle icon scale */
@@ -271,7 +277,7 @@
      where 5 labels have more horizontal breathing room. */
   @media (min-width: 390px) {
     .tab-label {
-      font-size: 12px;
+      font-size: var(--text-xs, 12px);
     }
   }
 
@@ -329,6 +335,23 @@
     35%  { transform: scale(1.22) translateY(-3px); }
     65%  { transform: scale(0.94) translateY(0); }
     100% { transform: scale(1) translateY(0); }
+  }
+
+  @keyframes aurora-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.3); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tab-item.active .tab-icon-wrap {
+      animation: none;
+    }
+    .tracking-dot {
+      animation: none;
+    }
+    .tab-pill {
+      transition: none;
+    }
   }
 
   @media (min-width: 768px) {
