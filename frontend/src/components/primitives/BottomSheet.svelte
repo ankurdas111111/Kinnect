@@ -230,7 +230,10 @@
     left: 0;
     right: 0;
     bottom: 0;
+    /* 90vh fallback for browsers that don't support dvh;
+       100dvh accounts for iOS Safari address-bar show/hide without layout jump */
     height: 90vh;
+    height: 90dvh;
     z-index: var(--z-panel);
     /* 3D glass sheet with depth */
     background: var(--glass-3d);

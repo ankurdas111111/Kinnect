@@ -464,6 +464,8 @@
     align-items: center;
     gap: 5px;
     padding: 6px 10px;
+    min-height: 44px;
+    min-width: 44px;
     border-radius: 9px;
     background: rgba(16, 185, 129, 0.18);
     border: 1px solid rgba(16, 185, 129, 0.35);
@@ -472,6 +474,7 @@
     font-weight: 700;
     text-decoration: none;
     white-space: nowrap;
+    touch-action: manipulation;
     transition:
       background var(--duration-fast) var(--ease-out),
       transform var(--duration-fast) var(--ease-spring);
@@ -480,6 +483,11 @@
   .sf-call-btn:hover {
     background: rgba(16, 185, 129, 0.28);
     transform: scale(1.04);
+  }
+  @media (hover: none) {
+    .sf-call-btn:hover {
+      transform: none;
+    }
   }
   .sf-call-btn:active { transform: scale(0.95); }
 

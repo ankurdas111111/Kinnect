@@ -384,10 +384,12 @@
   }
   .nav-controls { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
   .nav-ctrl {
-    width: 32px; height: 32px; border-radius: 8px; border: none;
+    width: 44px; height: 44px; border-radius: 8px; border: none;
     background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.5);
     display: flex; align-items: center; justify-content: center;
     cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
   .nav-ctrl:hover { background: rgba(255,255,255,0.10); color: #fff; }
   .nav-ctrl:disabled { opacity: 0.2; cursor: default; }
@@ -399,6 +401,8 @@
     padding: 6px 12px; border-radius: 8px; font-size: 11px; font-weight: 700;
     background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.22);
     color: #f87171; cursor: pointer; margin-left: 4px;
+    min-height: 44px; touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
   .nav-stop:hover { background: rgba(239,68,68,0.22); }
 
@@ -417,17 +421,18 @@
   }
   .ps-bar:focus-within { border-color: rgba(99,102,241,0.35); box-shadow: 0 4px 20px rgba(0,0,0,0.3), 0 0 0 3px rgba(99,102,241,0.08); }
   .ps-icon { color: rgba(255,255,255,0.30); flex-shrink: 0; }
-  .ps-back { display: flex; align-items: center; background: none; border: none; color: rgba(255,255,255,0.5); cursor: pointer; flex-shrink: 0; padding: 0; }
+  .ps-back { display: flex; align-items: center; justify-content: center; background: none; border: none; color: rgba(255,255,255,0.5); cursor: pointer; flex-shrink: 0; padding: 0; min-width: 44px; min-height: 44px; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   .ps-back:hover { color: #fff; }
   .ps-input { flex: 1; background: none; border: none; outline: none; color: rgba(255,255,255,0.90); font-size: 16px; font-weight: 500; font-family: inherit; min-width: 0; }
   .ps-input::placeholder { color: rgba(255,255,255,0.22); }
-  .ps-clear { display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.06); border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; color: rgba(255,255,255,0.4); flex-shrink: 0; }
-  .ps-clear:hover { background: rgba(255,255,255,0.12); }
+  .ps-clear { display: flex; align-items: center; justify-content: center; background: transparent; border: none; border-radius: 50%; min-width: 44px; min-height: 44px; cursor: pointer; color: rgba(255,255,255,0.4); flex-shrink: 0; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  .ps-clear svg { background: rgba(255,255,255,0.06); border-radius: 50%; padding: 5px; box-sizing: content-box; }
+  .ps-clear:hover svg { background: rgba(255,255,255,0.12); }
   .ps-spinner { width: 14px; height: 14px; border: 2px solid rgba(99,102,241,0.25); border-top-color: rgba(99,102,241,0.8); border-radius: 50%; animation: ps-spin 0.5s linear infinite; flex-shrink: 0; }
   @keyframes ps-spin { to { transform: rotate(360deg); } }
 
   .ps-results { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: rgba(8,12,24,0.96); backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 4px; list-style: none; margin: 0; max-height: 300px; overflow-y: auto; box-shadow: 0 12px 40px rgba(0,0,0,0.5); }
-  .ps-result { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 10px; cursor: pointer; transition: background 0.1s; }
+  .ps-result { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; min-height: 44px; border-radius: 10px; cursor: pointer; transition: background 0.1s; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   .ps-result:hover, .ps-result-hl { background: rgba(99,102,241,0.10); }
   .ps-result:active { background: rgba(99,102,241,0.18); }
   .ps-result-icon { color: rgba(99,102,241,0.55); flex-shrink: 0; margin-top: 1px; }
@@ -438,7 +443,7 @@
   /* Nav panel */
   .ps-nav { margin-top: 4px; background: rgba(8,12,24,0.96); backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; box-shadow: 0 12px 40px rgba(0,0,0,0.5); overflow: hidden; }
   .ps-modes { display: flex; border-bottom: 1px solid rgba(255,255,255,0.06); }
-  .ps-mode { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 10px 4px 8px; border: none; background: transparent; color: rgba(255,255,255,0.30); cursor: pointer; position: relative; transition: all 0.15s; }
+  .ps-mode { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 10px 4px 8px; min-height: 44px; border: none; background: transparent; color: rgba(255,255,255,0.30); cursor: pointer; position: relative; transition: all 0.15s; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   .ps-mode:hover { color: rgba(255,255,255,0.55); background: rgba(255,255,255,0.03); }
   .ps-mode-on { color: var(--primary-300, #a5b4fc) !important; background: rgba(99,102,241,0.08) !important; }
   .ps-mode-on::after { content: ''; position: absolute; bottom: 0; left: 20%; right: 20%; height: 2px; background: var(--primary-400, #818cf8); border-radius: 2px; }
@@ -460,7 +465,7 @@
   .ps-step-meta { font-size: 10px; color: rgba(255,255,255,0.22); }
 
   .ps-actions { display: flex; gap: 6px; padding: 8px 10px 10px; border-top: 1px solid rgba(255,255,255,0.05); }
-  .ps-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 11px 8px; border-radius: 12px; font-size: 13px; font-weight: 700; border: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .ps-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 11px 8px; min-height: 44px; border-radius: 12px; font-size: 13px; font-weight: 700; border: none; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
   .ps-btn:active { transform: scale(0.97); }
   .ps-btn-start { background: #3b82f6; color: #fff; box-shadow: 0 2px 12px rgba(59,130,246,0.35); }
   .ps-btn-start:hover { background: #2563eb; }

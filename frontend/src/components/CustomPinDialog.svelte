@@ -225,6 +225,11 @@
     border-radius: 6px;
     display: flex;
     align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
   .cpd-close:hover { background: var(--surface-3, #f1f5f9); }
 
@@ -371,11 +376,12 @@
     border: 1.5px solid var(--primary-400, #818cf8);
     background: var(--surface-1, #f8fafc);
     color: var(--text-primary, #0f172a);
-    font-size: 13px;
+    font-size: 16px; /* 16px minimum prevents iOS Safari auto-zoom on focus */
     font-family: var(--font-sans, 'Inter', sans-serif);
     outline: none;
     box-sizing: border-box;
     cursor: pointer;
+    touch-action: manipulation;
   }
 
   .cpd-error {

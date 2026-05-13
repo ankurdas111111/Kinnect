@@ -139,6 +139,7 @@
     padding: var(--space-4);
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
+    overscroll-behavior: none;
   }
 
   .modal-backdrop.urgent {

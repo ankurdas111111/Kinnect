@@ -1199,6 +1199,7 @@
     align-items: center;
     justify-content: center;
     padding: var(--space-4);
+    overscroll-behavior: none;
     animation: fade-in 0.15s ease;
   }
   /* sos-confirm-card-spatial, .sos-icon-ring styles are in global.css */
@@ -1298,6 +1299,7 @@
     align-items: center;
     justify-content: center;
     padding: var(--space-4);
+    overscroll-behavior: none;
     animation: fade-in 0.2s ease;
   }
   .battery-prompt-card {

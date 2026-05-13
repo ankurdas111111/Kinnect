@@ -235,6 +235,7 @@
               bind:value={firstName}
               placeholder="John"
               autocomplete="given-name"
+              enterkeyhint="next"
               on:blur={() => firstNameTouched = true}
             />
             {#if firstNameTouched && !firstName.trim()}
@@ -243,7 +244,7 @@
           </div>
           <div class="auth-field">
             <label for="last_name">Last name</label>
-            <input id="last_name" class="input" bind:value={lastName} placeholder="Doe" autocomplete="family-name" />
+            <input id="last_name" class="input" bind:value={lastName} placeholder="Doe" autocomplete="family-name" enterkeyhint="next" />
           </div>
         </div>
 
@@ -257,6 +258,7 @@
             class:is-invalid={passwordTouched && password.length > 0 && password.length < 6}
             bind:value={password}
             autocomplete="new-password"
+            enterkeyhint="next"
             on:blur={() => passwordTouched = true}
           />
           <button type="button" class="input-icon input-icon--toggle" on:click={() => showPassword = !showPassword} aria-label={showPassword ? 'Hide password' : 'Show password'}>
@@ -289,6 +291,7 @@
               class:is-valid={confirmTouched && confirmMatch}
               bind:value={confirm}
               autocomplete="new-password"
+              enterkeyhint="next"
               on:blur={() => confirmTouched = true}
             />
             {#if confirmTouched && confirmMatch}
@@ -328,6 +331,7 @@
                 placeholder="you@example.com"
                 on:blur={() => { emailTouched = true; validateEmail(); }}
                 autocomplete="email"
+                enterkeyhint="go"
               />
               {#if emailTouched && emailValid}
                 <span class="input-icon valid" aria-hidden="true">&#10003;</span>
@@ -353,6 +357,7 @@
                 bind:value={mobileDigits}
                 placeholder={mobilePlaceholder()}
                 inputmode="numeric"
+                enterkeyhint="go"
                 on:blur={() => { mobileTouched = true; validateMobile(); }}
               />
             </div>

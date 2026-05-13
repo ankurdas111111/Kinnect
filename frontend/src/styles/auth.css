@@ -560,11 +560,13 @@
   border: 1px solid var(--auth-input-border);
   border-radius: var(--radius-md);
   font-family: var(--font-sans);
-  font-size: var(--text-sm);
+  /* 16px minimum prevents iOS Safari auto-zoom on focus */
+  font-size: 16px;
   background: var(--auth-input-bg);
   color: var(--auth-input-text);
   cursor: pointer;
   outline: none;
+  touch-action: manipulation;
   transition: border-color var(--duration-normal) var(--ease-out);
 }
 

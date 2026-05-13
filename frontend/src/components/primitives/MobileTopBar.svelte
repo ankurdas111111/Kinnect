@@ -117,6 +117,7 @@
     position: relative;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
     box-shadow: var(--elevation-1, 0 2px 8px rgba(0,0,0,0.08));
     transition: background var(--duration-fast) var(--ease-out), transform 100ms ease;
   }
@@ -124,6 +125,11 @@
   .icon-btn:active {
     background: var(--surface-active);
     transform: scale(0.93);
+  }
+  @media (hover: none) {
+    .icon-btn:hover {
+      background: var(--surface-2);
+    }
   }
 
   /* Dashboard shortcut — teal tint to stand out */

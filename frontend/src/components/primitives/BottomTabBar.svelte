@@ -50,7 +50,7 @@
   <div
     class="tab-pill"
     aria-hidden="true"
-    style="left: calc({pillOffset}% + 4px)"
+    style="left: 4px; transform: translateX({pillOffset}%)"
   ></div>
   <button
     class="tab-item"
@@ -192,7 +192,7 @@
     border-top-color: rgba(20, 184, 166, 0.55);
     border-radius: var(--radius-lg);
     pointer-events: none;
-    transition: left 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: transform 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
     box-shadow:
       0 4px 16px rgba(20, 184, 166, 0.30),
       inset 0 1px 0 rgba(255, 255, 255, 0.12);

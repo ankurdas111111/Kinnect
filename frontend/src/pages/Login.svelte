@@ -222,6 +222,7 @@
                 bind:value={loginId}
                 placeholder="you@example.com"
                 autocomplete="email"
+                enterkeyhint="next"
                 on:blur={() => emailTouched = true}
               />
               {#if emailTouched && emailValid}
@@ -251,6 +252,7 @@
                 bind:value={mobileDigits}
                 placeholder={mobilePlaceholder()}
                 inputmode="numeric"
+                enterkeyhint="next"
                 on:blur={() => { mobileTouched = true; validateMobile(); }}
               />
             </div>
@@ -269,6 +271,7 @@
               bind:value={password}
               placeholder="••••••••"
               autocomplete="current-password"
+              enterkeyhint="go"
               on:blur={() => passwordTouched = true}
             />
             <button type="button" class="input-icon input-icon--toggle" on:click={() => showPassword = !showPassword} aria-label={showPassword ? 'Hide password' : 'Show password'}>
