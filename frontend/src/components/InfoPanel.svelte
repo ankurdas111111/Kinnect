@@ -320,12 +320,12 @@
     <!-- ── GPS LIVE STATUS ──────────────────────────────────────────── -->
     {#if $myLocation}
       <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <div class="gps-live-card" class:is-tracking={$tracking} on:click={tapGps} role="presentation" aria-hidden="true">
+      <div class="gps-live-card" class:is-tracking={$tracking} on:click={tapGps} role="presentation">
         <div class="gps-signal-left">
-          <span class="gps-ping" class:active={$tracking && $trackingMetrics.lastAccuracy != null}></span>
+          <span class="gps-ping" class:active={$tracking && $trackingMetrics.lastAccuracy != null} aria-hidden="true"></span>
           <div class="gps-coord-block">
-            <span class="gps-accuracy-label">{accLabel}</span>
-            <div class="gps-sub">
+            <span class="gps-accuracy-label" aria-live="polite" aria-atomic="true">{accLabel}</span>
+            <div class="gps-sub" aria-hidden="true">
               {#if $trackingMetrics.lastAccuracy != null}
                 <span class="accuracy-dot {accClass}"></span>
               {/if}
@@ -334,9 +334,9 @@
           </div>
         </div>
         {#if ($myLocation.speed || 0) >= 1}
-          <div class="speed-pill">
-            <span class="speed-num">{Math.round($myLocation.speed)}</span>
-            <span class="speed-unit">km/h</span>
+          <div class="speed-pill" aria-live="polite" aria-atomic="true" aria-label="{Math.round($myLocation.speed)} km/h">
+            <span class="speed-num" aria-hidden="true">{Math.round($myLocation.speed)}</span>
+            <span class="speed-unit" aria-hidden="true">km/h</span>
           </div>
         {/if}
       </div>
@@ -415,7 +415,7 @@
           I'm Safe
         </button>
       </div>
-      <div class="safety-actions" style="margin-top:6px;">
+      <div class="safety-actions safety-actions--gap">
         {#if onMyWayActive}
           <button class="ok-action-btn ok-action-btn--active" on:click={cancelOnMyWay} aria-label="Cancel On My Way broadcast">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -432,7 +432,7 @@
           Verify Location
         </button>
       </div>
-      <div class="safety-actions" style="margin-top:6px;">
+      <div class="safety-actions safety-actions--gap">
         <button class="ok-action-btn" class:ok-action-btn--active={$rideShare.active} on:click={() => rideShareOpen = true} aria-label="Share My Ride with family">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
           {$rideShare.active ? 'Ride Active' : 'Share My Ride'}
@@ -496,7 +496,7 @@
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true" style="transform: rotate({proximitySection ? 180 : 0}deg); transition: transform 200ms"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
       {#if proximitySection}
-        <div class="feature-row" style="margin-top:6px;">
+        <div class="feature-row feature-row--mt">
           <input
             class="feature-input"
             type="text"
@@ -760,12 +760,12 @@
       <!-- GPS LIVE STATUS -->
       {#if $myLocation}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <div class="gps-live-card" class:is-tracking={$tracking} on:click={tapGps} role="presentation" aria-hidden="true">
+        <div class="gps-live-card" class:is-tracking={$tracking} on:click={tapGps} role="presentation">
           <div class="gps-signal-left">
-            <span class="gps-ping" class:active={$tracking && $trackingMetrics.lastAccuracy != null}></span>
+            <span class="gps-ping" class:active={$tracking && $trackingMetrics.lastAccuracy != null} aria-hidden="true"></span>
             <div class="gps-coord-block">
-              <span class="gps-accuracy-label">{accLabel}</span>
-              <div class="gps-sub">
+              <span class="gps-accuracy-label" aria-live="polite" aria-atomic="true">{accLabel}</span>
+              <div class="gps-sub" aria-hidden="true">
                 {#if $trackingMetrics.lastAccuracy != null}
                   <span class="accuracy-dot {accClass}"></span>
                 {/if}
@@ -774,9 +774,9 @@
             </div>
           </div>
           {#if ($myLocation.speed || 0) >= 1}
-            <div class="speed-pill">
-              <span class="speed-num">{Math.round($myLocation.speed)}</span>
-              <span class="speed-unit">km/h</span>
+            <div class="speed-pill" aria-live="polite" aria-atomic="true" aria-label="{Math.round($myLocation.speed)} km/h">
+              <span class="speed-num" aria-hidden="true">{Math.round($myLocation.speed)}</span>
+              <span class="speed-unit" aria-hidden="true">km/h</span>
             </div>
           {/if}
         </div>
@@ -849,7 +849,7 @@
             I'm Safe
           </button>
         </div>
-        <div class="safety-actions" style="margin-top:6px;">
+        <div class="safety-actions safety-actions--gap">
           {#if onMyWayActive}
             <button class="ok-action-btn ok-action-btn--active" on:click={cancelOnMyWay} aria-label="Cancel On My Way broadcast">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -866,7 +866,7 @@
             Verify Location
           </button>
         </div>
-        <div class="safety-actions" style="margin-top:6px;">
+        <div class="safety-actions safety-actions--gap">
           <button class="ok-action-btn" class:ok-action-btn--active={$rideShare.active} on:click={() => rideShareOpen = true} aria-label="Share My Ride with family">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
             {$rideShare.active ? 'Ride Active' : 'Share My Ride'}
@@ -926,7 +926,7 @@
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true" style="transform: rotate({proximitySection ? 180 : 0}deg); transition: transform 200ms"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
         {#if proximitySection}
-          <div class="feature-row" style="margin-top:6px;">
+          <div class="feature-row feature-row--mt">
             <input
               class="feature-input"
               type="text"
@@ -1536,6 +1536,11 @@
     color: var(--danger-500);
   }
 
+  /* Secondary row gap modifier — replaces inline margin-top */
+  .safety-actions--gap {
+    margin-top: var(--space-2);
+  }
+
   /* I'm OK / secondary action buttons */
   .ok-action-btn {
     display: flex;
@@ -1855,6 +1860,8 @@
     color: var(--text-primary);
   }
   .collapsible-header:hover { opacity: 0.8; }
+
+  .feature-row--mt { margin-top: var(--space-1-5); }
 
   .feature-row {
     display: flex;

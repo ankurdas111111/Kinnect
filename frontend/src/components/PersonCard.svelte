@@ -260,38 +260,38 @@
 
   /* ── Inline emergency card ─────────────────────────────────────────────── */
   .ec-card {
-    background: rgba(239, 68, 68, 0.06);
-    border-bottom: 1px solid rgba(239, 68, 68, 0.14);
+    background: rgba(var(--danger-500-rgb, 239, 68, 68), 0.06);
+    border-bottom: 1px solid rgba(var(--danger-500-rgb, 239, 68, 68), 0.14);
   }
   .ec-top {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 6px;
-    padding: 8px 12px;
+    gap: var(--space-1-5);
+    padding: var(--space-2) var(--space-3);
   }
   .ec-blood {
     display: flex;
     flex-direction: column;
     align-items: center;
-    background: rgba(239, 68, 68, 0.14);
-    border: 1px solid rgba(239, 68, 68, 0.30);
-    border-radius: 8px;
-    padding: 3px 8px;
+    background: rgba(var(--danger-500-rgb, 239, 68, 68), 0.14);
+    border: 1px solid rgba(var(--danger-500-rgb, 239, 68, 68), 0.30);
+    border-radius: var(--radius-md);
+    padding: var(--space-1) var(--space-2);
     flex-shrink: 0;
   }
   .ec-blood-label {
-    font-size: 8px;
+    font-size: var(--text-2xs);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.07em;
-    color: var(--danger-500, #ef4444);
+    color: var(--danger-500);
     line-height: 1;
   }
   .ec-blood-val {
-    font-size: 16px;
+    font-size: var(--text-xl);
     font-weight: 900;
-    color: var(--danger-600, #dc2626);
+    color: var(--danger-600);
     letter-spacing: -0.03em;
     line-height: 1.1;
     font-variant-numeric: tabular-nums;
@@ -299,12 +299,12 @@
   .ec-pill {
     display: inline-flex;
     align-items: center;
-    padding: 3px 8px;
-    border-radius: 6px;
-    font-size: 10px;
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm2);
+    font-size: var(--text-2xs);
     font-weight: 600;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.10);
+    background: var(--surface-overlay-subtle, rgba(255, 255, 255, 0.06));
+    border: 1px solid var(--border-subtle);
     color: var(--text-secondary);
     max-width: 140px;
     overflow: hidden;
@@ -312,23 +312,23 @@
     white-space: nowrap;
   }
   .ec-pill-alert {
-    background: rgba(239, 68, 68, 0.10);
-    border-color: rgba(239, 68, 68, 0.25);
-    color: var(--danger-600, #dc2626);
+    background: rgba(var(--danger-500-rgb, 239, 68, 68), 0.10);
+    border-color: rgba(var(--danger-500-rgb, 239, 68, 68), 0.25);
+    color: var(--danger-600);
   }
   .ec-contacts {
     display: flex;
     flex-direction: column;
     gap: 1px;
-    border-top: 1px solid rgba(239, 68, 68, 0.10);
+    border-top: 1px solid rgba(var(--danger-500-rgb, 239, 68, 68), 0.10);
   }
   .ec-contact {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
-    padding: 6px 12px;
-    background: rgba(255, 255, 255, 0.02);
+    gap: var(--space-2);
+    padding: var(--space-1-5) var(--space-3);
+    background: var(--surface-inset);
   }
   .ec-contact-info {
     display: flex;
@@ -337,7 +337,7 @@
     min-width: 0;
   }
   .ec-contact-name {
-    font-size: 11px;
+    font-size: var(--text-xs);
     font-weight: 700;
     color: var(--text-primary);
     white-space: nowrap;
@@ -345,7 +345,7 @@
     text-overflow: ellipsis;
   }
   .ec-contact-rel {
-    font-size: 9px;
+    font-size: var(--text-2xs);
     font-weight: 500;
     color: var(--text-tertiary);
   }
@@ -353,40 +353,40 @@
     flex-shrink: 0;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 10px 12px;
+    gap: var(--space-1);
+    padding: var(--space-2-5) var(--space-3);
     min-height: 44px;
-    border-radius: 7px;
-    background: rgba(16, 185, 129, 0.12);
-    border: 1px solid rgba(16, 185, 129, 0.28);
-    color: var(--success-600, #059669);
-    font-size: 10px;
+    border-radius: var(--radius-md);
+    background: rgba(var(--success-500-rgb, 16, 185, 129), 0.12);
+    border: 1px solid rgba(var(--success-500-rgb, 16, 185, 129), 0.28);
+    color: var(--success-600);
+    font-size: var(--text-2xs);
     font-weight: 700;
     text-decoration: none;
     white-space: nowrap;
     transition: background var(--duration-fast) var(--ease-out);
     -webkit-tap-highlight-color: transparent;
   }
-  .ec-call:hover { background: rgba(16, 185, 129, 0.22); }
+  .ec-call:hover { background: rgba(var(--success-500-rgb, 16, 185, 129), 0.22); }
 
   /* ── SOS banner ─────────────────────────────────────────────────────────── */
   .sos-banner {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 8px 14px;
-    background: rgba(239, 68, 68, 0.12);
-    border-bottom: 1px solid rgba(239, 68, 68, 0.20);
-    color: var(--danger-600, #dc2626);
-    font-size: var(--text-xs, 11px);
+    gap: var(--space-1-5);
+    padding: var(--space-2) var(--space-3-5);
+    background: rgba(var(--danger-500-rgb, 239, 68, 68), 0.12);
+    border-bottom: 1px solid rgba(var(--danger-500-rgb, 239, 68, 68), 0.20);
+    color: var(--danger-600);
+    font-size: var(--text-xs);
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
     animation: sos-breathe 2s ease-in-out infinite;
   }
   @keyframes sos-breathe {
-    0%, 100% { background: rgba(239, 68, 68, 0.12); }
-    50%       { background: rgba(239, 68, 68, 0.22); }
+    0%, 100% { background: rgba(var(--danger-500-rgb, 239, 68, 68), 0.12); }
+    50%       { background: rgba(var(--danger-500-rgb, 239, 68, 68), 0.22); }
   }
 
   /* ── Card header ─────────────────────────────────────────────────────────── */

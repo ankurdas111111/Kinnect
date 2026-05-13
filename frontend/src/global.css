@@ -213,6 +213,17 @@
   --brand-sos:         #ef4444;
   --brand-safe:        #10b981;
   --brand-guardian:    #8b5cf6;
+  --whatsapp-green:    #25D366;  /* WhatsApp brand green — used for share actions */
+  --whatsapp-dark:     #128C7E;  /* WhatsApp dark green — hover state */
+
+  /* ── RGB Triplets (for rgba() fallbacks in components) ───────────── */
+  --danger-500-rgb:  239, 68, 68;
+  --success-500-rgb: 16, 185, 129;
+
+  /* ── Popup Theme Tokens (MapLibre popup content, light mode base) ─── */
+  --popup-text-heading: var(--gray-900);   /* person name */
+  --popup-text-val:     var(--gray-800);   /* data values  */
+  --popup-text-label:   var(--gray-500);   /* field labels */
 
   /* ── Presence Tokens ──────────────────────────────────────────────── */
   --ring-live:   0 0 0 3px rgba(16, 185, 129, 0.4);
@@ -417,6 +428,11 @@
 
   --float-shadow:      0 16px 56px rgba(0,0,0,0.55), 0 6px 18px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.06);
   --float-shadow-sm:   0 8px 32px rgba(0,0,0,0.45), 0 4px 12px rgba(0,0,0,0.30);
+
+  /* Popup text tokens — inverted for dark map popups */
+  --popup-text-heading: var(--gray-50);
+  --popup-text-val:     rgba(255, 255, 255, 0.90);
+  --popup-text-label:   rgba(255, 255, 255, 0.50);
 }
 
 /* Auto dark mode fallback — matches [data-theme="dark"] MERIDIAN tokens */
@@ -490,6 +506,11 @@
     --shadow-3d-rest:    0 2px 10px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.05);
     --shadow-3d-hover:   0 12px 40px rgba(0,0,0,0.45), 0 4px 14px rgba(0,0,0,0.30);
     --shadow-3d-active:  0 1px 6px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.06);
+
+    /* Popup text tokens — inverted for dark map popups */
+    --popup-text-heading: var(--gray-50);
+    --popup-text-val:     rgba(255, 255, 255, 0.90);
+    --popup-text-label:   rgba(255, 255, 255, 0.50);
   }
 }
 

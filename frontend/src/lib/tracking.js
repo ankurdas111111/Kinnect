@@ -131,6 +131,30 @@ export function getPresenceText(user) {
   return 'A while ago';
 }
 
+/** Map presence states to short accessible labels. */
+const _presenceLabels = {
+  now:    'here now',
+  recent: 'connected',
+  away:   'away',
+  gone:   'offline',
+  sos:    'SOS active',
+};
+
+/**
+ * Attach keyboard activation to a map marker element.
+ * Makes the element reachable via Tab and activatable via Enter/Space,
+ * mirroring native <button> behaviour for WCAG 2.1 SC 2.1.1.
+ * @param {HTMLElement} el
+ */
+function _attachMarkerKeyboard(el) {
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      el.click();
+    }
+  });
+}
+
 /**
  * Create an avatar-style person marker for MapLibre GL.
  * Shows initials in a circle with a presence-state ring.
@@ -164,17 +188,21 @@ export function createPersonMarker(options = {}) {
       `<div style="width:40px;height:40px;border-radius:50%;background:rgba(8,8,20,0.92);border:2.5px solid #818cf8;box-shadow:0 0 0 3px rgba(99,102,241,0.14),0 0 20px rgba(99,102,241,0.28);display:flex;align-items:center;justify-content:center;animation:glow-breathe 2.5s ease-in-out infinite;">`
       + `<svg width="14" height="18" viewBox="0 0 14 18" fill="none"><path d="M7 0L14 7L7 18L0 7Z" fill="#818cf8"/></svg>`
       + `</div>`
-      + `<div style="width:2px;height:7px;background:#818cf8;border-radius:0 0 2px 2px;margin:0 auto;opacity:0.6;"></div>`;
+      + `<div style="width:2px;height:7px;background:#818cf8;border-radius:0 0 2px 2px;margin:0 auto;opacity:0.6;" aria-hidden="true"></div>`;
+    el.setAttribute('role', 'button');
+    el.setAttribute('tabindex', '0');
+    el.setAttribute('aria-label', 'You — tap to see your location details');
+    _attachMarkerKeyboard(el);
     return el;
   }
 
   // Presence ring style
   let ringBorder, ringGlow, textColor, tailColor;
   if (isSos) {
-    ringBorder = '2.5px solid #ef4444';
-    ringGlow   = '0 0 0 3px rgba(239,68,68,0.18),0 0 20px rgba(239,68,68,0.40)';
-    textColor  = '#ef4444';
-    tailColor  = '#ef4444';
+    ringBorder = '2.5px solid var(--danger-500, #ef4444)';
+    ringGlow   = '0 0 0 3px rgba(var(--danger-500-rgb,239,68,68),0.18),0 0 20px rgba(var(--danger-500-rgb,239,68,68),0.40)';
+    textColor  = 'var(--danger-500, #ef4444)';
+    tailColor  = 'var(--danger-500, #ef4444)';
   } else if (presenceState === 'now') {
     ringBorder = `2.5px solid ${color}`;
     ringGlow   = `0 0 0 3px ${color}28,0 0 14px ${color}40`;
@@ -204,29 +232,40 @@ export function createPersonMarker(options = {}) {
     : 'animation:person-marker-arrive 460ms cubic-bezier(0.34,1.56,0.64,1) both;';
 
   const sosSvg = isSos
-    ? `<div style="position:absolute;inset:-7px;border-radius:50%;border:2px solid rgba(239,68,68,0.50);animation:signal-ring-out 1.4s ease-out infinite;pointer-events:none;"></div>`
-      + `<div style="position:absolute;inset:-7px;border-radius:50%;border:2px solid rgba(239,68,68,0.40);animation:signal-ring-out 1.4s ease-out 0.5s infinite;pointer-events:none;"></div>`
+    ? `<div style="position:absolute;inset:-7px;border-radius:50%;border:2px solid rgba(var(--danger-500-rgb,239,68,68),0.50);animation:signal-ring-out 1.4s ease-out infinite;pointer-events:none;" aria-hidden="true"></div>`
+      + `<div style="position:absolute;inset:-7px;border-radius:50%;border:2px solid rgba(var(--danger-500-rgb,239,68,68),0.40);animation:signal-ring-out 1.4s ease-out 0.5s infinite;pointer-events:none;" aria-hidden="true"></div>`
     : '';
 
   const motionBadgeColors = { still: '#6b7280', walk: '#22c55e', run: '#f59e0b', vehicle: '#3b82f6' };
   const badgeColor = motionBadgeColors[motionClass] || '';
   const motionBadge = badgeColor && !isSelf && !isSos && presenceState !== 'gone'
-    ? `<div style="width:9px;height:9px;border-radius:50%;background:${badgeColor};border:1.5px solid rgba(8,8,20,0.9);position:absolute;bottom:-2px;right:-2px;pointer-events:none;"></div>`
+    ? `<div style="width:9px;height:9px;border-radius:50%;background:${badgeColor};border:1.5px solid rgba(8,8,20,0.9);position:absolute;bottom:-2px;right:-2px;pointer-events:none;" aria-hidden="true"></div>`
     : '';
 
   // Moon badge for quiet hours (top-left corner)
   const moonBadge = quietHoursActive && !isSelf && !isSos
-    ? `<div style="position:absolute;top:-4px;left:-4px;width:14px;height:14px;border-radius:50%;background:rgba(99,102,241,0.85);border:1.5px solid rgba(8,8,20,0.9);display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:8px;" title="Quiet Hours active">🌙</div>`
+    ? `<div style="position:absolute;top:-4px;left:-4px;width:14px;height:14px;border-radius:50%;background:rgba(99,102,241,0.85);border:1.5px solid rgba(8,8,20,0.9);display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:8px;" title="Quiet Hours active" aria-hidden="true">🌙</div>`
     : '';
 
   el.innerHTML =
-    `<div style="width:42px;height:42px;border-radius:50%;background:rgba(8,8,20,0.92);border:${ringBorder};box-shadow:${ringGlow};display:flex;align-items:center;justify-content:center;position:relative;opacity:${opacity};${animation}">`
+    `<div style="width:42px;height:42px;border-radius:50%;background:rgba(8,8,20,0.92);border:${ringBorder};box-shadow:${ringGlow};display:flex;align-items:center;justify-content:center;position:relative;opacity:${opacity};${animation}" aria-hidden="true">`
     + `<span style="font-family:Inter,sans-serif;font-size:13px;font-weight:800;color:${textColor};text-transform:uppercase;letter-spacing:-0.02em;user-select:none;">${escapeAttr(initials)}</span>`
     + sosSvg
     + motionBadge
     + moonBadge
     + `</div>`
-    + `<div style="width:2px;height:7px;background:${tailColor};border-radius:0 0 2px 2px;margin:0 auto;opacity:0.6;"></div>`;
+    + `<div style="width:2px;height:7px;background:${tailColor};border-radius:0 0 2px 2px;margin:0 auto;opacity:0.6;" aria-hidden="true"></div>`;
+
+  // Keyboard accessibility: make the marker reachable by Tab and activatable
+  // via Enter/Space so screen reader users can open the detail popup.
+  const stateLabel = _presenceLabels[presenceState] || 'unknown';
+  const nameLabel = displayName && displayName !== '?' ? displayName : 'Unknown';
+  const sosNote = isSos ? ', SOS active' : '';
+  const qhNote = quietHoursActive ? ', quiet hours' : '';
+  el.setAttribute('role', 'button');
+  el.setAttribute('tabindex', '0');
+  el.setAttribute('aria-label', `${nameLabel} — ${stateLabel}${sosNote}${qhNote}. Tap for details.`);
+  _attachMarkerKeyboard(el);
 
   return el;
 }
@@ -253,14 +292,19 @@ export function createCustomPinIcon(iconId, name) {
     const el = document.createElement('div');
     el.className = 'map-pin pin-custom';
     el.style.cssText = 'width:36px;height:50px;cursor:pointer;position:relative;display:flex;flex-direction:column;align-items:center;';
+    el.setAttribute('role', 'button');
+    el.setAttribute('tabindex', '0');
+    el.setAttribute('aria-label', name ? `${name} — saved place` : 'Saved place');
+    _attachMarkerKeyboard(el);
     el.innerHTML =
-      `<svg width="36" height="44" viewBox="0 0 36 44" xmlns="http://www.w3.org/2000/svg">`
+      `<svg width="36" height="44" viewBox="0 0 36 44" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">`
       + `<path d="M18 2C10.28 2 4 8.28 4 16c0 10.5 14 26 14 26S32 26.5 32 16C32 8.28 25.72 2 18 2z" fill="white" stroke="#4b5563" stroke-width="1.5"/>`
       + `<text x="18" y="20" text-anchor="middle" dominant-baseline="middle" font-size="15">${emoji}</text>`
       + `</svg>`;
     if (name) {
       const label = document.createElement('div');
       label.style.cssText = 'position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:10px;font-weight:700;color:#1e293b;background:rgba(255,255,255,0.92);padding:1px 6px;border-radius:4px;box-shadow:0 1px 4px rgba(0,0,0,0.15);max-width:120px;overflow:hidden;text-overflow:ellipsis;';
+      label.setAttribute('aria-hidden', 'true');
       label.textContent = name;
       el.appendChild(label);
     }

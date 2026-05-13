@@ -132,7 +132,7 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M4 15V5l5 3 3-4 3 4 5-3v10"/><line x1="4" y1="22" x2="4" y2="15" stroke="#fff" stroke-width="2"/></svg>
       </div>
       <div style="background:rgba(16,185,129,0.92);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;margin-top:3px;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 6px rgba(0,0,0,0.18);">${safeLabel}</div>
-      <div style="width:2px;height:7px;background:#10b981;margin-top:1px;border-radius:0 0 2px 2px;opacity:0.7;"></div>`;
+      <div style="width:2px;height:7px;background:var(--success-500,#10b981);margin-top:1px;border-radius:0 0 2px 2px;opacity:0.7;" aria-hidden="true"></div>`;
     return el;
   }
 
@@ -780,7 +780,7 @@
       const destEl = document.createElement('div');
       destEl.innerHTML = `<div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#ef4444,#dc2626);border:3px solid #fff;box-shadow:0 2px 16px rgba(239,68,68,0.5);display:flex;align-items:center;justify-content:center;">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 119.5 9 2.5 2.5 0 0112 11.5z"/></svg>
-      </div><div style="width:2px;height:10px;background:#ef4444;margin:0 auto;border-radius:0 0 2px 2px;opacity:0.6;"></div>`;
+      </div><div style="width:2px;height:10px;background:var(--danger-500,#ef4444);margin:0 auto;border-radius:0 0 2px 2px;opacity:0.6;" aria-hidden="true"></div>`;
       destEl.style.cssText = 'display:flex;flex-direction:column;align-items:center;';
       destMarker = new maplibregl.Marker({ element: destEl, anchor: 'bottom' })
         .setLngLat([nav.destLng, nav.destLat])
@@ -872,7 +872,9 @@
 
 </script>
 
-<div class="map-container" bind:this={mapContainer}></div>
+<div class="map-container" bind:this={mapContainer}
+     role="application"
+     aria-label="Live family location map. Use arrow keys to pan. Family member markers can be focused with Tab."></div>
 
 <!-- MERIDIAN: Map vignette — connects UI chrome to map visually -->
 <div class="map-vignette-top" aria-hidden="true"></div>
@@ -886,6 +888,8 @@
          class:chip-precise={acc <= 20}
          class:chip-ok={acc > 20 && acc <= 80}
          class:chip-rough={acc > 80}
+         aria-live="polite"
+         aria-atomic="true"
          aria-label="GPS accuracy {Math.round(acc)}m"
          style="top: {isMobile ? 'calc(var(--safe-top, 0px) + 116px)' : 'var(--space-3)'}; right: var(--space-3);">
       <span class="chip-dot" aria-hidden="true"></span>
@@ -894,6 +898,8 @@
   {/if}
   {#if $myLocation.speed != null && $myLocation.speed >= 4}
     <div class="map-float-chip chip-speed"
+         aria-live="polite"
+         aria-atomic="true"
          aria-label="Speed {Math.round($myLocation.speed)} km/h"
          style="top: {isMobile ? 'calc(var(--safe-top, 0px) + 152px)' : 'calc(var(--space-3) + 32px)'}; right: var(--space-3);">
       <span class="chip-dot" aria-hidden="true"></span>
@@ -1025,6 +1031,13 @@
     filter: drop-shadow(0 5px 12px rgba(0, 0, 0, 0.40));
     transform: scale(1.08);
   }
+  :global(.map-pin:focus-visible),
+  :global([role="button"].map-pin:focus-visible),
+  :global([role="button"][tabindex="0"]:focus-visible) {
+    outline: 3px solid var(--primary-500);
+    outline-offset: 3px;
+    border-radius: var(--radius-full);
+  }
   :global(.map-pin svg) {
     display: block;
   }
@@ -1055,7 +1068,7 @@
     width: 14px;
     height: 14px;
     border-radius: 50%;
-    background: #ef4444;
+    background: var(--danger-500, #ef4444);
     opacity: 0;
     transform: translate(-50%, 50%);
     animation: pin-ripple-sos 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
@@ -1072,7 +1085,7 @@
     width: 14px;
     height: 14px;
     border-radius: 50%;
-    background: #ef4444;
+    background: var(--danger-500, #ef4444);
     opacity: 0;
     transform: translate(-50%, 50%);
     animation: pin-ripple-sos 1.2s cubic-bezier(0.4, 0, 0.2, 1) 0.4s infinite;
@@ -1098,7 +1111,7 @@
 
   :global(.maplibregl-popup-content) {
     background: rgba(255, 255, 255, 0.96);
-    color: #1e293b;
+    color: var(--popup-text-val, #1e293b);
     border-radius: var(--radius-xl, 20px);
     box-shadow:
       0 12px 40px rgba(0, 0, 0, 0.22),
@@ -1140,21 +1153,21 @@
   /* Fix #1: increased base font sizes for readability on mobile */
   :global(.pu-wrap)  { min-width: 190px; font-size: 13px; line-height: 1.5; }
   :global(.pu-hdr)   { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
-  :global(.pu-name)  { font-family: var(--font-display); font-size: 15px; font-weight: 700; letter-spacing: -0.01em; color: #0f172a; }
+  :global(.pu-name)  { font-family: var(--font-display); font-size: 15px; font-weight: 700; letter-spacing: -0.01em; color: var(--popup-text-heading, #0f172a); }
   :global(.pu-status) { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 600; }
   :global(.pu-dot)   { width: 7px; height: 7px; border-radius: 50%; background: currentColor; display: inline-block; }
-  :global(.pu-online)  { color: #22c55e; }
-  :global(.pu-offline) { color: #9ca3af; }
+  :global(.pu-online)  { color: var(--success-500, #22c55e); }
+  :global(.pu-offline) { color: var(--gray-400, #9ca3af); }
   :global(.pu-grid)  { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 13px; }
-  :global(.pu-lbl)   { font-size: 12px; font-weight: 600; color: #64748b; }
-  :global(.pu-val)   { font-size: 13px; color: #1e293b; }
-  :global(.pu-good)  { color: #22c55e; font-weight: 600; }
-  :global(.pu-warn)  { color: #eab308; font-weight: 600; }
-  :global(.pu-danger){ color: #ef4444; font-weight: 600; }
+  :global(.pu-lbl)   { font-size: 12px; font-weight: 600; color: var(--popup-text-label, #64748b); }
+  :global(.pu-val)   { font-size: 13px; color: var(--popup-text-val, #1e293b); }
+  :global(.pu-good)  { color: var(--success-500, #22c55e); font-weight: 600; }
+  :global(.pu-warn)  { color: var(--warning-500, #eab308); font-weight: 600; }
+  :global(.pu-danger){ color: var(--danger-500, #ef4444); font-weight: 600; }
   :global(.pu-mono)  { font-family: monospace; font-size: 10px; }
   :global(.pu-badges){ margin-top: 6px; display: flex; flex-direction: column; gap: 3px; font-size: 10px; }
   :global(.pu-badge) { border-radius: 6px; padding: 3px 8px; font-weight: 500; border: 1px solid transparent; }
-  :global(.pu-badge-sos)    { background: rgba(220, 38, 38, 0.10); color: #dc2626; border-color: rgba(220, 38, 38, 0.25); font-weight: 700; }
+  :global(.pu-badge-sos)    { background: rgba(220, 38, 38, 0.10); color: var(--danger-600, #dc2626); border-color: rgba(220, 38, 38, 0.25); font-weight: 700; }
   :global(.pu-badge-geo)    { background: rgba(124, 58, 237, 0.10); color: #7c3aed; border-color: rgba(124, 58, 237, 0.25); }
   :global(.pu-badge-autoSos){ background: rgba(217, 119, 6, 0.10); color: #d97706; border-color: rgba(217, 119, 6, 0.25); }
   :global(.pu-badge-checkin){ background: rgba(8, 145, 178, 0.10); color: #0891b2; border-color: rgba(8, 145, 178, 0.25); }
@@ -1163,7 +1176,7 @@
   :global(.pu-feat-geo)    { color: #8b5cf6; }
   :global(.pu-feat-autoSos){ color: #f59e0b; }
   :global(.pu-feat-checkin){ color: #06b6d4; }
-  :global(.pu-rooms) { margin-top: 5px; font-size: 10px; color: #64748b; }
+  :global(.pu-rooms) { margin-top: 5px; font-size: 10px; color: var(--popup-text-label, #64748b); }
   :global(.pu-actions) { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,0.08); }
   :global(.pu-chat-btn) { display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 8px; background: rgba(99,102,241,0.10); border: 1px solid rgba(99,102,241,0.22); color: #6366f1; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 120ms; }
   :global(.pu-chat-btn:hover) { background: rgba(99,102,241,0.18); }

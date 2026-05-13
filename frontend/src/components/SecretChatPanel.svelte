@@ -11,6 +11,7 @@
   import { secretChats, lockSecretChat, storeDecrypted, secretChatPresence } from '../lib/stores/secretChat.js';
   import { otherUsers } from '../lib/stores/map.js';
   import { encryptMessage, decryptMessage } from '../lib/crypto.js';
+  import { compressImage } from '../lib/imageUtils.js';
   import { toasts } from '../lib/stores/toast.js';
   import { haptics } from '../lib/haptics.js';
   import EmojiPicker from './primitives/EmojiPicker.svelte';
@@ -299,45 +300,7 @@
   let photoSending = false;
   let attachMenuOpen = false;
 
-  const MAX_PHOTO_EDGE = 720;
-  const MAX_BINARY_BYTES = 100_000;
 
-  function compressImage(file) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      const url = URL.createObjectURL(file);
-      img.onload = () => {
-        URL.revokeObjectURL(url);
-        let { width, height } = img;
-        if (width > MAX_PHOTO_EDGE || height > MAX_PHOTO_EDGE) {
-          if (width >= height) { height = Math.round((height / width) * MAX_PHOTO_EDGE); width = MAX_PHOTO_EDGE; }
-          else { width = Math.round((width / height) * MAX_PHOTO_EDGE); height = MAX_PHOTO_EDGE; }
-        }
-        function encode(cvs, q) {
-          const webp = cvs.toDataURL('image/webp', q);
-          return webp.startsWith('data:image/webp') ? webp : cvs.toDataURL('image/jpeg', q);
-        }
-        const c0 = document.createElement('canvas');
-        c0.width = width; c0.height = height;
-        c0.getContext('2d').drawImage(img, 0, 0, width, height);
-        let result = encode(c0, 0.80);
-        let w = width, h = height;
-        for (let pass = 0; pass < 4 && result.length * 0.75 > MAX_BINARY_BYTES; pass++) {
-          const scale = Math.sqrt(MAX_BINARY_BYTES / (result.length * 0.75)) * 0.88;
-          w = Math.max(120, Math.round(w * scale)); h = Math.max(90, Math.round(h * scale));
-          const c = document.createElement('canvas');
-          c.width = w; c.height = h;
-          c.getContext('2d').drawImage(img, 0, 0, w, h);
-          result = encode(c, 0.72 - pass * 0.05);
-        }
-        const finalBinaryKB = Math.round((result.length * 0.75) / 1024);
-        if (result.length * 0.75 > MAX_BINARY_BYTES * 1.5) { reject({ tooLarge: true, sizeKB: finalBinaryKB }); return; }
-        resolve(result);
-      };
-      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image load failed')); };
-      img.src = url;
-    });
-  }
 
   function toggleAttachMenu() {
     attachMenuOpen = !attachMenuOpen;

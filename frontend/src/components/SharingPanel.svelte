@@ -987,17 +987,18 @@
   .member-locate-btn {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
+    gap: var(--space-1);
     background: none;
     border: 1px solid transparent;
     cursor: pointer;
     color: var(--text-secondary);
-    padding: 2px 6px;
+    padding: var(--space-2-5) var(--space-3);
+    min-height: 44px;
     border-radius: var(--radius-sm);
     font: inherit;
     font-size: var(--text-xs);
     transition: color 150ms, background 150ms, border-color 150ms;
-    line-height: 1.3;
+    touch-action: manipulation;
   }
   .member-locate-btn:hover {
     color: var(--primary-500);
@@ -1110,9 +1111,10 @@
   .btn-wa {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 5px var(--space-3);
-    background: #25D366;
+    gap: var(--space-1);
+    padding: var(--space-1-5) var(--space-3);
+    min-height: 36px;
+    background: var(--whatsapp-green, #25D366);
     color: #fff;
     border-radius: var(--radius-full);
     font-family: var(--font-display);
@@ -1125,7 +1127,7 @@
     white-space: nowrap;
   }
   .btn-wa:hover {
-    background: #128C7E;
+    background: var(--whatsapp-dark, #128C7E);
     transform: scale(1.04);
     box-shadow: 0 2px 12px rgba(37, 211, 102, 0.35);
   }
@@ -1230,7 +1232,7 @@
   .qa-icon-invite {
     background: linear-gradient(135deg, rgba(37,211,102,0.14), rgba(37,211,102,0.06));
     border: 1px solid rgba(37,211,102,0.22);
-    color: #25d366;
+    color: var(--whatsapp-green, #25d366);
   }
 
   /* ── My Code card ─────────────────────────────────────────────── */
@@ -1302,7 +1304,7 @@
   .my-code-btn--wa {
     border-color: rgba(37, 211, 102, 0.25);
     background: rgba(37, 211, 102, 0.07);
-    color: #25d366;
+    color: var(--whatsapp-green, #25d366);
   }
   .my-code-btn--wa:hover { background: rgba(37, 211, 102, 0.14); }
 
