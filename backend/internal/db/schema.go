@@ -78,6 +78,8 @@ func InitDB(db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_contacts_contact_id ON contacts(contact_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_live_tokens_expires ON live_tokens(expires_at) WHERE expires_at IS NOT NULL`,
 		`CREATE INDEX IF NOT EXISTS idx_guardianships_ward ON guardianships(ward_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_room_members_room_id ON room_members(room_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_room_members_user_id ON room_members(user_id)`,
 
 		// Additional columns (ALTER for compatibility with V2)
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_latitude DOUBLE PRECISION`,
@@ -174,6 +176,8 @@ func InitDB(db *sql.DB) error {
 			peer_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		)`,
+		// One stable link per (owner, peer) pair — upsert-safe migration guard
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_secret_chat_invites_pair ON secret_chat_invites(owner_id, peer_id)`,
 
 		// F3: Meeting point columns on rooms
 		`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS meeting_lat    DOUBLE PRECISION`,

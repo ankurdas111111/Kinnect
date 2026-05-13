@@ -294,15 +294,31 @@ func (h *Hub) handleCreateSecretChatInvite(c *Client, data json.RawMessage) {
 		return
 	}
 
-	token := generateLiveToken() // reuses same 22-char base64url impl from auth_events.go
+	// Reuse an existing token for this (owner, peer) pair so the share link is stable.
+	var token string
+	_ = h.pool.DB.QueryRowContext(context.Background(),
+		`SELECT token FROM secret_chat_invites WHERE owner_id = $1 AND peer_id = $2 LIMIT 1`,
+		user.UserID, p.PeerID,
+	).Scan(&token)
 
-	// Persist permanently to DB — survives server restarts.
-	// ON CONFLICT is a safety net for the astronomically unlikely token collision.
-	_, _ = h.pool.DB.ExecContext(context.Background(),
-		`INSERT INTO secret_chat_invites (token, owner_id, peer_id)
-		 VALUES ($1, $2, $3) ON CONFLICT (token) DO NOTHING`,
-		token, user.UserID, p.PeerID,
-	)
+	if token == "" {
+		// No existing link — create one.
+		token = generateLiveToken()
+		_, _ = h.pool.DB.ExecContext(context.Background(),
+			`INSERT INTO secret_chat_invites (token, owner_id, peer_id)
+			 VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+			token, user.UserID, p.PeerID,
+		)
+		// Re-read in case a concurrent insert won the race (pair constraint).
+		var existing string
+		if err := h.pool.DB.QueryRowContext(context.Background(),
+			`SELECT token FROM secret_chat_invites WHERE owner_id = $1 AND peer_id = $2 LIMIT 1`,
+			user.UserID, p.PeerID,
+		).Scan(&existing); err == nil && existing != "" {
+			token = existing
+		}
+	}
+
 	// ExpiresAt=0 signals "permanent" — the cleanup goroutine and pages.go both honour this.
 	h.Cache.AddSecretChatInvite(token, user.UserID, p.PeerID, 0)
 

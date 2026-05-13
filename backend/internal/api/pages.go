@@ -315,8 +315,8 @@ func (h *PagesHandler) MInvite(w http.ResponseWriter, r *http.Request) {
 }
 
 // MInviteReply handles POST /api/m/{token}.
-// Allows the invite recipient (peer) to send an encrypted reply without a session.
-// The token proves access; the PIN on the message is the security layer.
+// Requires an authenticated session — the logged-in user must be either the owner
+// or the peer of the invite. sender/receiver are derived from the session, not assumed.
 func (h *PagesHandler) MInviteReply(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
 	invite := h.secretChatInvite(r.Context(), token)
@@ -327,6 +327,25 @@ func (h *PagesHandler) MInviteReply(w http.ResponseWriter, r *http.Request) {
 	if invite.ExpiresAt != 0 && time.Now().UnixMilli() > invite.ExpiresAt {
 		h.cache.DeleteSecretChatInvite(token)
 		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "expired": true})
+		return
+	}
+
+	// Identify the caller from their session and enforce participation.
+	sess := auth.GetSession(r)
+	if sess == nil || sess.User == nil || sess.User.ID == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"ok": false, "error": "not_authenticated"})
+		return
+	}
+	callerID := sess.User.ID
+
+	var senderID, receiverID string
+	switch callerID {
+	case invite.OwnerID:
+		senderID, receiverID = invite.OwnerID, invite.PeerID
+	case invite.PeerID:
+		senderID, receiverID = invite.PeerID, invite.OwnerID
+	default:
+		writeJSON(w, http.StatusForbidden, map[string]any{"ok": false, "error": "not_participant"})
 		return
 	}
 
@@ -346,7 +365,7 @@ func (h *PagesHandler) MInviteReply(w http.ResponseWriter, r *http.Request) {
 	err := h.db.QueryRowContext(r.Context(),
 		`INSERT INTO secret_messages (sender_id, receiver_id, ciphertext, iv, salt)
 		 VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-		invite.PeerID, invite.OwnerID, body.Ciphertext, body.IV, body.Salt,
+		senderID, receiverID, body.Ciphertext, body.IV, body.Salt,
 	).Scan(&msgID)
 	if err != nil {
 		slog.Error("MInviteReply: insert failed", "error", err)
