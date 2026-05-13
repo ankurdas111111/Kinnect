@@ -1,5 +1,6 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onDestroy } from 'svelte';
+  import { apiGet } from '../lib/api.js';
   import { socket } from '../lib/socket.js';
   import { otherUsers, myLocation, walkDestination } from '../lib/stores/map.js';
   import { toasts } from '../lib/stores/toast.js';
@@ -54,37 +55,45 @@
     }
   }
 
-  // Listen for server events
-  socket.on('walkStarted', (data) => {
+  // Listen for server events — handlers stored so they can be removed in onDestroy
+  const onWalkStarted = (data) => {
     walkToken = data.token;
     destName = data.destName;
     step = 'active';
     starting = false;
     toasts.add('Walk With Me started');
-  });
-  socket.on('walkArrived', (data) => {
+  };
+  const onWalkArrived = (data) => {
     step = 'arrived';
     toasts.add(`You arrived safely at ${data.destName}!`);
-  });
-  socket.on('walkEnded', (data) => {
+  };
+  const onWalkEnded = (data) => {
     if (data.reason === 'arrived') {
       step = 'arrived';
     } else {
       step = 'pick';
       walkToken = null;
     }
-  });
-  socket.on('walkAlert', (data) => {
-    toasts.add(data.message, 'warning');
-  });
-  socket.on('walkError', (data) => {
-    starting = false;
-    toasts.add(data.message || 'Failed to start walk');
+  };
+  const onWalkAlert = (data) => { toasts.add(data.message, 'warning'); };
+  const onWalkError = (data) => { starting = false; toasts.add(data.message || 'Failed to start walk'); };
+
+  socket.on('walkStarted', onWalkStarted);
+  socket.on('walkArrived', onWalkArrived);
+  socket.on('walkEnded', onWalkEnded);
+  socket.on('walkAlert', onWalkAlert);
+  socket.on('walkError', onWalkError);
+
+  onDestroy(() => {
+    socket.off('walkStarted', onWalkStarted);
+    socket.off('walkArrived', onWalkArrived);
+    socket.off('walkEnded', onWalkEnded);
+    socket.off('walkAlert', onWalkAlert);
+    socket.off('walkError', onWalkError);
   });
 
   // Saved places for quick destination pick
   let savedPlaces = [];
-  import { apiGet } from '../lib/api.js';
   async function loadPlaces() {
     try {
       const data = await apiGet('/api/places');

@@ -2247,6 +2247,7 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
 }
 .spatial-subtab {
   flex: 1;
+  min-height: 44px;
   padding: 5px 8px;
   border: none;
   background: transparent;

@@ -497,7 +497,7 @@
 @media (max-width: 400px) {
   .auth-name-row {
     flex-direction: column;
-    gap: 0;
+    gap: var(--space-3);
   }
 }
 

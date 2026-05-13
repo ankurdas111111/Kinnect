@@ -255,9 +255,7 @@
       <ul class="ps-results">
         {#each results as r, i}
           <li>
-            <!-- svelte-ignore a11y-click-events-have-key-events -->
-            <!-- svelte-ignore a11y-no-static-element-interactions -->
-            <div class="ps-result" class:ps-result-hl={i === highlightIdx} on:click={() => selectPlace(r)}>
+            <button type="button" class="ps-result" class:ps-result-hl={i === highlightIdx} on:click={() => selectPlace(r)}>
               <div class="ps-result-icon">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
               </div>
@@ -265,7 +263,7 @@
                 <span class="ps-result-name">{r.name}</span>
                 {#if r.sub}<span class="ps-result-sub">{r.sub}</span>{/if}
               </div>
-            </div>
+            </button>
           </li>
         {/each}
       </ul>
@@ -348,6 +346,9 @@
     padding: 14px 16px 10px;
     background: rgba(59,130,246,0.12);
     border-bottom: 1px solid rgba(59,130,246,0.15);
+  }
+  .nav-turn-icon, .ps-step-icon {
+    font-family: 'Apple Color Emoji', 'Segoe UI Symbol', 'Noto Sans Symbols', system-ui, sans-serif;
   }
   .nav-turn-icon {
     width: 44px; height: 44px; border-radius: 12px;
@@ -432,7 +433,7 @@
   @keyframes ps-spin { to { transform: rotate(360deg); } }
 
   .ps-results { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: rgba(8,12,24,0.96); backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 4px; list-style: none; margin: 0; max-height: 300px; overflow-y: auto; box-shadow: 0 12px 40px rgba(0,0,0,0.5); }
-  .ps-result { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; min-height: 44px; border-radius: 10px; cursor: pointer; transition: background 0.1s; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  .ps-result { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; min-height: 44px; border-radius: 10px; cursor: pointer; transition: background 0.1s; touch-action: manipulation; -webkit-tap-highlight-color: transparent; background: transparent; border: none; width: 100%; text-align: left; }
   .ps-result:hover, .ps-result-hl { background: rgba(99,102,241,0.10); }
   .ps-result:active { background: rgba(99,102,241,0.18); }
   .ps-result-icon { color: rgba(99,102,241,0.55); flex-shrink: 0; margin-top: 1px; }
@@ -457,7 +458,7 @@
   .ps-summary-via { width: 100%; font-size: 11px; color: rgba(255,255,255,0.20); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   .ps-steps { list-style: none; margin: 0; padding: 0 10px; max-height: 180px; overflow-y: auto; border-top: 1px solid rgba(255,255,255,0.05); scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.06) transparent; }
-  .ps-step { display: flex; align-items: flex-start; gap: 10px; padding: 8px 4px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+  .ps-step { display: flex; align-items: center; gap: 10px; padding: 8px 4px; min-height: 44px; border-bottom: 1px solid rgba(255,255,255,0.03); }
   .ps-step:last-child { border-bottom: none; }
   .ps-step-icon { width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; background: rgba(99,102,241,0.10); color: var(--primary-300, #a5b4fc); font-size: 12px; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
   .ps-step-body { flex: 1; min-width: 0; }

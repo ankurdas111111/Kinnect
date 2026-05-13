@@ -38,7 +38,6 @@
 			lastUpdate.set(new Date().toLocaleTimeString());
 		} catch (e) {
 			error.set(`Health check failed: ${e.message}`);
-			console.error('Health fetch error:', e);
 		}
 	};
 
@@ -51,7 +50,6 @@
 			const data = await response.json();
 			diagnosticsData.set(data);
 		} catch (e) {
-			console.error('Diagnostics fetch error:', e);
 		}
 	};
 
@@ -72,7 +70,6 @@
 			});
 			metricsData.set(metrics);
 		} catch (e) {
-			console.error('Metrics fetch error:', e);
 		}
 	};
 

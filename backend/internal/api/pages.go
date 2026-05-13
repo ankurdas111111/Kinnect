@@ -252,6 +252,8 @@ func (h *PagesHandler) secretChatInvite(ctx context.Context, token string) *cach
 // MInvite handles GET /api/m/{token}.
 // No authentication required — ciphertext is worthless without the PIN,
 // so serving it publicly is safe. The PIN is the only security layer.
+// When a valid session is present, isParticipant is included in the response
+// so the frontend can reject sessions that are neither the owner nor the peer.
 func (h *PagesHandler) MInvite(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
 	invite := h.secretChatInvite(r.Context(), token)
@@ -263,6 +265,13 @@ func (h *PagesHandler) MInvite(w http.ResponseWriter, r *http.Request) {
 		h.cache.DeleteSecretChatInvite(token)
 		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "expired": true})
 		return
+	}
+
+	// Determine participant status when a session is present.
+	isParticipant := false
+	sess := auth.GetSession(r)
+	if sess != nil && sess.User != nil && sess.User.ID != "" {
+		isParticipant = sess.User.ID == invite.OwnerID || sess.User.ID == invite.PeerID
 	}
 
 	rows, err := h.db.QueryContext(r.Context(),
@@ -299,8 +308,9 @@ func (h *PagesHandler) MInvite(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ok":       true,
-		"messages": msgs,
+		"ok":            true,
+		"messages":      msgs,
+		"isParticipant": isParticipant,
 	})
 }
 

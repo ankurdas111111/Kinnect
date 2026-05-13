@@ -1223,6 +1223,7 @@
   }
   .sos-cancel-btn {
     flex: 1;
+    min-height: 44px;
     padding: 11px 16px;
     border-radius: var(--radius-lg);
     font-weight: 600;
@@ -1243,6 +1244,7 @@
   }
   .sos-send-btn {
     flex: 1;
+    min-height: 44px;
     padding: 11px 16px;
     border-radius: var(--radius-lg);
     font-weight: 800;

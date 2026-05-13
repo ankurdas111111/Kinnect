@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { push } from 'svelte-spa-router';
   import { authUser } from '../lib/stores/auth.js';
   import { toasts } from '../lib/stores/toast.js';
@@ -126,6 +126,10 @@
       // ignore parse errors
     }
   });
+  onDestroy(() => {
+    if (saveTimer) clearTimeout(saveTimer);
+  });
+
 
   // ── Emergency contact helpers ─────────────────────────────────────────────
   function addContact() {

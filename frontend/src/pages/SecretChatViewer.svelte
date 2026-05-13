@@ -6,17 +6,23 @@
   import { onMount, onDestroy, tick } from 'svelte';
   import { fade } from 'svelte/transition';
   import { decryptMessage, encryptMessage } from '../lib/crypto.js';
-  import { apiGet, apiPost } from '../lib/api.js';
+  import { apiGet, apiPost, fetchCsrf, clearCsrf } from '../lib/api.js';
   import EmojiPicker from '../components/primitives/EmojiPicker.svelte';
   import StickerPicker from '../components/primitives/StickerPicker.svelte';
 
   export let params = {};
   $: token = params.token || '';
 
-  // 'loading' | 'gate' | 'messages' | 'error'
+  // 'loading' | 'login' | 'gate' | 'messages' | 'error'
   let state = 'loading';
   let errorMsg = '';
   let errorAction = '';
+
+  // Login state (shown when no active session)
+  let loginEmail = '';
+  let loginPassword = '';
+  let loginError = '';
+  let loginLoading = false;
 
   // PIN state
   let pinDigits = [];
@@ -83,13 +89,8 @@
 
   const AUTO_LOCK_SECS = 30;
 
-  onMount(async () => {
-    if (!token) {
-      state = 'error';
-      errorMsg = 'Invalid link.';
-      errorAction = 'Ask the sender to create a new invite.';
-      return;
-    }
+  async function loadInvite() {
+    state = 'loading';
     try {
       const data = await apiGet(`/api/m/${token}`);
       if (!data.ok) {
@@ -106,8 +107,59 @@
         }
         return;
       }
+      if (data.isParticipant === false) {
+        state = 'error';
+        errorMsg = 'This note is not for this account.';
+        errorAction = "Make sure you're signed in to the right account.";
+        return;
+      }
       rawMessages = data.messages || [];
       state = 'gate';
+    } catch {
+      state = 'error';
+      errorMsg = 'Could not connect.';
+      errorAction = 'Check your connection and reload the page.';
+    }
+  }
+
+  async function doLogin() {
+    if (loginLoading || !loginEmail.trim() || !loginPassword) return;
+    loginError = '';
+    loginLoading = true;
+    try {
+      clearCsrf();
+      await fetchCsrf();
+      const res = await apiPost('/api/login', { email: loginEmail.trim(), password: loginPassword });
+      if (!res.ok) {
+        loginError = res.error || 'Incorrect email or password.';
+        loginLoading = false;
+        return;
+      }
+      // Refresh CSRF for the new session, then load the invite.
+      clearCsrf();
+      await fetchCsrf();
+      loginLoading = false;
+      await loadInvite();
+    } catch {
+      loginError = 'Could not connect — check your connection.';
+      loginLoading = false;
+    }
+  }
+
+  onMount(async () => {
+    if (!token) {
+      state = 'error';
+      errorMsg = 'Invalid link.';
+      errorAction = 'Ask the sender to create a new invite.';
+      return;
+    }
+    try {
+      const me = await apiGet('/api/me');
+      if (!me.ok || !me.userId) {
+        state = 'login';
+        return;
+      }
+      await loadInvite();
     } catch {
       state = 'error';
       errorMsg = 'Could not connect.';
@@ -125,43 +177,37 @@
     pinError = '';
     unlocking = true;
 
-    const results = [];
-    let pinValidated = false;
-    for (const m of rawMessages) {
-      let body = null;
-      if (m.fromOwner) {
-        try {
-          body = await decryptMessage(m.ciphertext, m.iv, m.salt, pin);
-          pinValidated = true;
-        } catch {
-          if (!pinValidated) {
-            pinError = 'Incorrect code — try again';
-            unlocking = false;
-            pinDigits = [];
-            triggerShake();
-            return;
-          }
-          // PIN validated but this message failed — leave body null (rare key-derivation edge case)
-        }
+    // Validate PIN against the first owner message only — we never auto-decrypt.
+    const validatorMsg = rawMessages.find(m => m.fromOwner);
+    if (validatorMsg) {
+      try {
+        await decryptMessage(validatorMsg.ciphertext, validatorMsg.iv, validatorMsg.salt, pin);
+      } catch {
+        pinError = 'Incorrect code — try again';
+        unlocking = false;
+        pinDigits = [];
+        triggerShake();
+        return;
       }
-      results.push({
-        id: m.createdAt + Math.random(),
-        body,
-        own: !m.fromOwner,
-        createdAt: m.createdAt,
-        raw: m.fromOwner ? m : null,
-        ciphertext: m.fromOwner ? m.ciphertext : null,
-      });
     }
 
+    // Build message list — all received (fromOwner) messages start locked (body: null).
+    const results = rawMessages.map(m => ({
+      id: m.createdAt + Math.random(),
+      body: null,
+      own: !m.fromOwner,
+      createdAt: m.createdAt,
+      raw: m.fromOwner ? m : null,
+      ciphertext: m.ciphertext,
+    }));
+
+    // Lock set: all received messages (they must be tapped individually to reveal).
+    lockedSet = new Set(results.filter(m => !m.own && m.raw).map(m => m.id));
     decrypted = results;
     gatePin = pin;
     pinDigits = [];
     unlocking = false;
     state = 'messages';
-    for (const m of decrypted) {
-      if (m.body !== null && !m.own) startAutoLock(m.id);
-    }
     await tick();
     if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
   }
@@ -209,9 +255,6 @@
     delete lockCountdowns[id];
     lockCountdowns = { ...lockCountdowns };
     lockedSet = new Set([...lockedSet, id]);
-    inlinePins = { ...inlinePins, [id]: '' };
-    inlineErrors = { ...inlineErrors, [id]: '' };
-    activeDecryptId = null;
     decrypted = decrypted.map(m => m.id === id ? { ...m, body: null } : m);
   }
 
@@ -443,6 +486,81 @@
       {#if errorAction}
         <p class="scv-err-action">{errorAction}</p>
       {/if}
+    </div>
+
+  <!-- ── Login ────────────────────────────────────────────────────── -->
+  {:else if state === 'login'}
+    <div class="scv-gate" role="main">
+      <div class="scv-gate-glow" aria-hidden="true"></div>
+      <div class="scv-gate-content">
+
+        <div class="scv-gate-icon" aria-hidden="true">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+        </div>
+
+        <div class="scv-gate-text">
+          <p class="scv-gate-title">Protected Note</p>
+          <p class="scv-gate-sub">Sign in to access this note.</p>
+        </div>
+
+        <div class="scv-login-form">
+          <div class="scv-login-field">
+            <label class="scv-sr" for="scv-login-email">Email address</label>
+            <input
+              id="scv-login-email"
+              class="scv-login-input"
+              type="email"
+              inputmode="email"
+              autocomplete="email"
+              autocorrect="off"
+              autocapitalize="none"
+              placeholder="Email"
+              bind:value={loginEmail}
+              disabled={loginLoading}
+              on:keydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('scv-login-pass')?.focus(); } }}
+            />
+          </div>
+          <div class="scv-login-field">
+            <label class="scv-sr" for="scv-login-pass">Password</label>
+            <input
+              id="scv-login-pass"
+              class="scv-login-input"
+              type="password"
+              autocomplete="current-password"
+              placeholder="Password"
+              bind:value={loginPassword}
+              disabled={loginLoading}
+              on:keydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); doLogin(); } }}
+            />
+          </div>
+          {#if loginError}
+            <p class="scv-pin-err" role="alert">{loginError}</p>
+          {/if}
+        </div>
+
+        <button
+          class="scv-gate-btn"
+          class:scv-gate-btn--ready={loginEmail.trim().length > 0 && loginPassword.length > 0}
+          on:click={doLogin}
+          disabled={loginLoading || !loginEmail.trim() || !loginPassword}
+          type="button"
+        >
+          {#if loginLoading}
+            <div class="scv-gate-spinner" aria-hidden="true"></div>
+            <span>Signing in…</span>
+          {:else}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+              <polyline points="10 17 15 12 10 7"/>
+              <line x1="15" y1="12" x2="3" y2="12"/>
+            </svg>
+            <span>Continue</span>
+          {/if}
+        </button>
+
+      </div>
     </div>
 
   <!-- ── Gate ─────────────────────────────────────────────────────── -->
@@ -1750,6 +1868,46 @@
     to   { opacity: 1; transform: translateY(0) scale(1); }
   }
 
+  /* ── Login form ─────────────────────────────────────────────────── */
+  .scv-login-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3, 12px);
+    width: 100%;
+  }
+
+  .scv-login-field {
+    width: 100%;
+    position: relative;
+  }
+
+  .scv-login-input {
+    width: 100%;
+    box-sizing: border-box;
+    height: 48px;
+    padding: 0 var(--space-4, 16px);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1.5px solid var(--scv-border, rgba(255, 255, 255, 0.07));
+    border-radius: var(--radius-lg, 12px);
+    color: rgba(255, 255, 255, 0.9);
+    font-family: var(--font-sans, 'Nunito', sans-serif);
+    font-size: var(--text-sm, 0.875rem);
+    font-weight: 500;
+    caret-color: var(--scv-accent);
+    outline: none;
+    transition: border-color 150ms ease, background 150ms ease;
+  }
+  .scv-login-input::placeholder {
+    color: rgba(255, 255, 255, 0.28);
+  }
+  .scv-login-input:focus {
+    border-color: var(--scv-border-accent, rgba(20, 184, 166, 0.4));
+    background: rgba(20, 184, 166, 0.05);
+  }
+  .scv-login-input:disabled {
+    opacity: 0.5;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .scv::before { animation: none; }
     .scv::after  { animation: none; }
@@ -1762,5 +1920,6 @@
     .scv-gate-icon { animation: none; }
     .scv-pin-dot { transition: none; }
     .scv-panic { animation: none; }
+    .scv-login-input { transition: none; }
   }
 </style>
