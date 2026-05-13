@@ -1,9 +1,9 @@
 <svelte:head>
-  <title>Kinnect — Secret Message</title>
+  <title>Note</title>
 </svelte:head>
 
 <script>
-  import { onMount, tick } from 'svelte';
+  import { onMount, onDestroy, tick } from 'svelte';
   import { fade } from 'svelte/transition';
   import { decryptMessage, encryptMessage } from '../lib/crypto.js';
   import { apiGet, apiPost } from '../lib/api.js';
@@ -56,9 +56,6 @@
     pinError = '';
     gatePin = '';
     decrypted = [];
-    activeDecryptId = null;
-    inlinePins = {};
-    inlineErrors = {};
     lockedSet = new Set();
     for (const id of Object.keys(lockIntervals)) clearInterval(lockIntervals[id]);
     lockIntervals = {};
@@ -80,11 +77,6 @@
     if (e.key === 'Enter') { e.preventDefault(); unlock(); }
   }
 
-  // Per-message inline decrypt
-  let activeDecryptId = null;
-  let inlinePins = {};
-  let inlineErrors = {};
-  let inlineUnlocking = {};
   let lockedSet = new Set();
   let lockCountdowns = {};
   let lockIntervals = {};
@@ -122,38 +114,54 @@
       errorAction = 'Check your connection and reload the page.';
     }
   });
+  onDestroy(() => {
+    if (_pinShakeTimer) clearTimeout(_pinShakeTimer);
+    for (const id of Object.keys(lockIntervals)) clearInterval(lockIntervals[id]);
+  });
+
 
   async function unlock() {
     if (unlocking || pin.length < 4) return;
     pinError = '';
     unlocking = true;
 
-    const firstOwnerMsg = rawMessages.find(m => m.fromOwner);
-    if (firstOwnerMsg) {
-      try {
-        await decryptMessage(firstOwnerMsg.ciphertext, firstOwnerMsg.iv, firstOwnerMsg.salt, pin);
-      } catch {
-        pinError = 'Incorrect PIN — try again';
-        unlocking = false;
-        pinDigits = [];
-        triggerShake();
-        return;
+    const results = [];
+    let pinValidated = false;
+    for (const m of rawMessages) {
+      let body = null;
+      if (m.fromOwner) {
+        try {
+          body = await decryptMessage(m.ciphertext, m.iv, m.salt, pin);
+          pinValidated = true;
+        } catch {
+          if (!pinValidated) {
+            pinError = 'Incorrect code — try again';
+            unlocking = false;
+            pinDigits = [];
+            triggerShake();
+            return;
+          }
+          // PIN validated but this message failed — leave body null (rare key-derivation edge case)
+        }
       }
+      results.push({
+        id: m.createdAt + Math.random(),
+        body,
+        own: !m.fromOwner,
+        createdAt: m.createdAt,
+        raw: m.fromOwner ? m : null,
+        ciphertext: m.fromOwner ? m.ciphertext : null,
+      });
     }
 
-    const results = rawMessages.map(m => ({
-      id: m.createdAt + Math.random(),
-      body: null,
-      own: !m.fromOwner,
-      createdAt: m.createdAt,
-      raw: m.fromOwner ? m : null,
-      ciphertext: m.fromOwner ? m.ciphertext : null,
-    }));
     decrypted = results;
     gatePin = pin;
     pinDigits = [];
     unlocking = false;
     state = 'messages';
+    for (const m of decrypted) {
+      if (m.body !== null && !m.own) startAutoLock(m.id);
+    }
     await tick();
     if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
   }
@@ -169,33 +177,17 @@
     return { ...msg, groupFirst: !samePrev, groupLast: !sameNext };
   });
 
-  // ── Per-message inline decrypt ────────────────────────────────
-  function toggleInline(id) {
-    activeDecryptId = activeDecryptId === id ? null : id;
-    inlinePins = { ...inlinePins, [id]: '' };
-    inlineErrors = { ...inlineErrors, [id]: '' };
-  }
-
-  function inlinePinInput(e, id) {
-    inlinePins = { ...inlinePins, [id]: e.target.value.replace(/\D/g, '') };
-  }
-
-  async function decryptOne(msg) {
-    const p = inlinePins[msg.id] ?? '';
-    if (!p || p.length < 4 || inlineUnlocking[msg.id]) return;
-    inlineErrors = { ...inlineErrors, [msg.id]: '' };
-    inlineUnlocking = { ...inlineUnlocking, [msg.id]: true };
+  // ── Per-message tap-to-redecrypt (uses stored gatePin — no re-entry needed) ──
+  async function decryptMsg(msg) {
+    if (!msg.raw || !gatePin) return;
     try {
-      const plain = await decryptMessage(msg.raw.ciphertext, msg.raw.iv, msg.raw.salt, p);
+      const plain = await decryptMessage(msg.raw.ciphertext, msg.raw.iv, msg.raw.salt, gatePin);
       decrypted = decrypted.map(m => m.id === msg.id ? { ...m, body: plain } : m);
-      activeDecryptId = null;
       lockedSet.delete(msg.id);
       lockedSet = new Set(lockedSet);
       startAutoLock(msg.id);
     } catch {
-      inlineErrors = { ...inlineErrors, [msg.id]: 'Wrong PIN — try again' };
-    } finally {
-      inlineUnlocking = { ...inlineUnlocking, [msg.id]: false };
+      // PIN changed externally — silently ignore; message stays locked
     }
   }
 
@@ -238,12 +230,77 @@
   }
 
   // ── Reply ─────────────────────────────────────────────────────
+  let photoInputEl;
+
+  async function sendDirectReply(text) {
+    if (!text || gatePin.length < 4) return;
+    try {
+      const { ciphertext, iv, salt } = await encryptMessage(text, gatePin);
+      const data = await apiPost(`/api/m/${token}`, { ciphertext, iv, salt });
+      if (!data.ok) return;
+      decrypted = [...decrypted, {
+        id: Date.now(),
+        body: text,
+        own: true,
+        createdAt: new Date().toISOString(),
+        ciphertext,
+      }];
+      replySent = true;
+      await tick();
+      if (!userScrolledUp && messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
+    } catch { /* silently drop */ }
+  }
+
+  async function compressImage(file) {
+    const MAX_EDGE = 720;
+    const MAX_BYTES = 100_000;
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        let { width, height } = img;
+        if (width > MAX_EDGE || height > MAX_EDGE) {
+          const ratio = Math.min(MAX_EDGE / width, MAX_EDGE / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        let quality = 0.82;
+        const tryEncode = () => {
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          const bytes = Math.ceil((dataUrl.length - dataUrl.indexOf(',') - 1) * 0.75);
+          if (bytes <= MAX_BYTES || quality <= 0.3) { resolve(dataUrl); return; }
+          quality -= 0.15;
+          tryEncode();
+        };
+        tryEncode();
+      };
+      img.onerror = reject;
+      img.src = url;
+    });
+  }
+
+  async function handlePhotoSelect(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    try {
+      const dataUrl = await compressImage(file);
+      await sendDirectReply(`[photo:${dataUrl}]`);
+    } catch { replyError = 'Could not attach photo.'; }
+  }
+
   async function sendReply() {
     if (sending || !replyText.trim() || gatePin.length < 4) return;
     replyError = '';
     sending = true;
+    const text = replyText.trim();
     try {
-      const { ciphertext, iv, salt } = await encryptMessage(replyText.trim(), gatePin);
+      const { ciphertext, iv, salt } = await encryptMessage(text, gatePin);
       const data = await apiPost(`/api/m/${token}`, { ciphertext, iv, salt });
       if (!data.ok) {
         replyError = data.expired
@@ -253,7 +310,7 @@
       }
       decrypted = [...decrypted, {
         id: Date.now(),
-        body: null,
+        body: text,
         own: true,
         createdAt: new Date().toISOString(),
         ciphertext,
@@ -344,7 +401,6 @@
     state = 'gate';
     gatePin = '';
     decrypted = [];
-    activeDecryptId = null;
     for (const id of Object.keys(lockIntervals)) clearInterval(lockIntervals[id]);
     lockIntervals = {};
     lockCountdowns = {};
@@ -362,7 +418,7 @@
 <div class="scv">
   <!-- ── Loading ──────────────────────────────────────────────────── -->
   {#if state === 'loading'}
-    <div class="scv-center" role="status" aria-label="Loading secure message">
+    <div class="scv-center" role="status" aria-label="Loading">
       <div class="scv-loading-icon" aria-hidden="true">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="11" width="18" height="11" rx="2"/>
@@ -370,7 +426,7 @@
         </svg>
         <div class="scv-spinner" aria-hidden="true"></div>
       </div>
-      <p class="scv-loading-text">Loading secure message…</p>
+      <p class="scv-loading-text">Loading…</p>
     </div>
 
   <!-- ── Error ────────────────────────────────────────────────────── -->
@@ -397,13 +453,13 @@
 
         <div class="scv-gate-icon" aria-hidden="true">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
           </svg>
         </div>
 
         <div class="scv-gate-text">
-          <p class="scv-gate-title">Encrypted Message</p>
-          <p class="scv-gate-sub">Someone shared a secret message with you via Kinnect. Enter the access code to read it.</p>
+          <p class="scv-gate-title">Protected Note</p>
+          <p class="scv-gate-sub">Enter the access code to view this note.</p>
         </div>
 
         <!-- PIN dot visualizer -->
@@ -463,14 +519,10 @@
                 <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
               {/if}
             </svg>
-            <span>{pin.length >= 4 ? 'Open Message' : 'Enter code above'}</span>
+            <span>{pin.length >= 4 ? 'View Note' : 'Enter code above'}</span>
           {/if}
         </button>
 
-        <p class="scv-gate-footer">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          End-to-end encrypted · Powered by Kinnect
-        </p>
       </div>
     </div>
 
@@ -489,19 +541,7 @@
           </svg>
         </button>
 
-        <div class="scv-header-lock" aria-hidden="true">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="11" width="18" height="11" rx="2"/>
-            <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
-          </svg>
-        </div>
-
-        <div class="scv-header-info">
-          <h1 class="scv-header-title">Secret Chat</h1>
-          <p class="scv-header-sub">End-to-end encrypted</p>
-        </div>
-
-        <span class="scv-e2e-badge" aria-label="End-to-end encrypted">E2E</span>
+        <div class="scv-header-spacer"></div>
 
         <button
           class="scv-icon-btn scv-panic-btn"
@@ -538,7 +578,6 @@
         {/if}
 
         {#each groupedDecrypted as msg, i (msg.id)}
-          {@const showInline = activeDecryptId === msg.id}
           {@const isDecrypted = !msg.own && msg.body !== null && !lockedSet.has(msg.id)}
           {@const label = dateLabel(msg.createdAt, i > 0 ? groupedDecrypted[i-1].createdAt : null)}
           {@const likelyPhoto = !msg.own && !isDecrypted && isLikelyPhoto(msg)}
@@ -560,15 +599,22 @@
                 class:scv-bubble--grp-first={msg.groupFirst}
                 class:scv-bubble--grp-last={msg.groupLast}
                 class:scv-bubble--grp-mid={!msg.groupFirst && !msg.groupLast}
-                aria-label="Encrypted message sent"
-                title="End-to-end encrypted"
+                class:scv-bubble--photo={msg.body && parsePhoto(msg.body) !== null}
               >
-                <span class="scv-cipher-text" aria-hidden="true">
-                  {msg.ciphertext ? ciphertextGibberish(msg.ciphertext) : fakeGibberish(msg.createdAt)}
-                </span>
-                <span class="scv-lock-icon" aria-hidden="true">
-                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                </span>
+                {#if msg.body && parsePhoto(msg.body)}
+                  <img src={parsePhoto(msg.body)} class="msg-photo" alt="Photo" loading="lazy" />
+                {:else if msg.body && parseGif(msg.body)}
+                  <img src={parseGif(msg.body)} class="msg-sticker" alt="Sticker" loading="lazy" />
+                {:else if msg.body}
+                  <p class="scv-body">{msg.body}</p>
+                {:else}
+                  <span class="scv-cipher-text" aria-hidden="true">
+                    {msg.ciphertext ? ciphertextGibberish(msg.ciphertext) : fakeGibberish(msg.createdAt)}
+                  </span>
+                  <span class="scv-lock-icon" aria-hidden="true">
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  </span>
+                {/if}
               </div>
               {#if msg.groupLast}
                 <time class="scv-time" datetime={msg.createdAt}>{clockTime(msg.createdAt)}</time>
@@ -607,14 +653,12 @@
               <!-- Locked received message -->
               <button
                 class="scv-bubble scv-bubble--locked"
-                class:scv-bubble--locked-active={showInline}
                 class:scv-bubble--grp-first={msg.groupFirst}
                 class:scv-bubble--grp-last={msg.groupLast}
                 class:scv-bubble--grp-mid={!msg.groupFirst && !msg.groupLast}
                 class:scv-bubble--locked-photo={likelyPhoto}
-                on:click={() => toggleInline(msg.id)}
-                aria-expanded={showInline}
-                aria-label={likelyPhoto ? 'Encrypted photo — tap to enter PIN and decrypt' : 'Encrypted message — tap to enter PIN and decrypt'}
+                on:click={() => decryptMsg(msg)}
+                aria-label={likelyPhoto ? 'Locked photo — tap to reveal' : 'Locked message — tap to reveal'}
                 type="button"
               >
                 {#if likelyPhoto}
@@ -641,38 +685,6 @@
                   <span class="scv-ago">{timeAgo(msg.createdAt)}</span>
                 {/if}
               </button>
-
-              {#if showInline}
-                <div class="scv-inline-decrypt" transition:fade={{ duration: 100 }}>
-                  <label class="scv-sr" for="scv-ipin-{msg.id}">Sender's PIN to decrypt</label>
-                  <input
-                    id="scv-ipin-{msg.id}"
-                    class="scv-inline-pin"
-                    type="password"
-                    inputmode="numeric"
-                    pattern="[0-9]*"
-                    maxlength="8"
-                    placeholder="Sender's PIN"
-                    value={inlinePins[msg.id] ?? ''}
-                    on:input={(e) => inlinePinInput(e, msg.id)}
-                    on:keydown={(e) => e.key === 'Enter' && decryptOne(msg)}
-                    disabled={inlineUnlocking[msg.id]}
-                    autocomplete="off"
-                    autofocus
-                  />
-                  <button
-                    class="scv-inline-btn"
-                    on:click={() => decryptOne(msg)}
-                    disabled={inlineUnlocking[msg.id] || (inlinePins[msg.id] ?? '').length < 4}
-                    type="button"
-                  >
-                    {inlineUnlocking[msg.id] ? '…' : 'Unlock'}
-                  </button>
-                  {#if inlineErrors[msg.id]}
-                    <span class="scv-inline-err" role="alert">{inlineErrors[msg.id]}</span>
-                  {/if}
-                </div>
-              {/if}
 
               {#if msg.groupLast}
                 <time class="scv-time" datetime={msg.createdAt}>{clockTime(msg.createdAt)}</time>
@@ -738,13 +750,34 @@
             </svg>
           </button>
 
-          <label class="scv-sr" for="scv-reply">Secret reply</label>
+          <button
+            class="scv-compose-icon-btn"
+            on:click={() => photoInputEl?.click()}
+            aria-label="Attach photo"
+            type="button"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg>
+          </button>
+          <input
+            bind:this={photoInputEl}
+            type="file"
+            accept="image/*"
+            class="scv-sr"
+            tabindex="-1"
+            aria-hidden="true"
+            on:change={handlePhotoSelect}
+          />
+
+          <label class="scv-sr" for="scv-reply">Reply</label>
           <textarea
             id="scv-reply"
             class="scv-compose-text"
             rows="1"
             maxlength="2000"
-            placeholder="Type a secret reply…"
+            placeholder="Write a reply…"
             bind:value={replyText}
             bind:this={replyTextEl}
             on:keydown={handleReplyKeydown}
@@ -755,7 +788,7 @@
             class:scv-send-btn--active={replyText.trim().length > 0}
             on:click={sendReply}
             disabled={sending || !replyText.trim()}
-            aria-label="Send encrypted reply"
+            aria-label="Send reply"
             type="button"
           >
             {#if sending}
@@ -768,10 +801,6 @@
         {#if replyError}
           <p class="scv-reply-err" role="alert">{replyError}</p>
         {/if}
-        <p class="scv-compose-hint">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          End-to-end encrypted
-        </p>
       </footer>
 
       <!-- Pickers outside compose to avoid backdrop-filter bug on iOS -->
@@ -784,7 +813,7 @@
       <StickerPicker
         open={stickerOpen}
         anchor={stickerAnchor}
-        on:pick={(e) => { replyText += e.detail; stickerOpen = false; }}
+        on:pick={(e) => { stickerOpen = false; sendDirectReply(e.detail); }}
         on:close={() => stickerOpen = false}
       />
     </div>
@@ -1151,16 +1180,6 @@
     flex-shrink: 0;
   }
 
-  .scv-gate-footer {
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: var(--space-1-5, 6px);
-    font-size: var(--text-2xs, 0.6875rem);
-    font-family: var(--font-sans, 'Nunito', sans-serif);
-    color: rgba(255, 255, 255, 0.18);
-  }
-
   /* ── Messages view ─────────────────────────────────────────────── */
   .scv-view {
     width: 100%;
@@ -1185,50 +1204,7 @@
     padding-top: max(var(--space-3, 12px), env(safe-area-inset-top, 0px));
   }
 
-  .scv-header-lock {
-    color: var(--scv-accent);
-    display: flex;
-    align-items: center;
-    flex-shrink: 0;
-  }
-
-  .scv-header-info {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .scv-header-title {
-    font-size: var(--text-base, 1rem);
-    font-weight: 700;
-    font-family: var(--font-sans, 'Nunito', sans-serif);
-    color: rgba(255, 255, 255, 0.92);
-    margin: 0;
-  }
-
-  .scv-header-sub {
-    font-size: var(--text-xs, 0.75rem);
-    font-family: var(--font-sans, 'Nunito', sans-serif);
-    color: rgba(255, 255, 255, 0.35);
-    margin: 0;
-  }
-
-  .scv-e2e-badge {
-    font-size: var(--text-2xs, 0.6875rem);
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--scv-accent);
-    background: var(--scv-accent-subtle);
-    border: 1px solid var(--scv-border-accent);
-    padding: 2px var(--space-1-5, 6px);
-    border-radius: var(--radius-full, 9999px);
-    white-space: nowrap;
-    flex-shrink: 0;
-    font-family: var(--font-sans, 'Nunito', sans-serif);
-  }
+  .scv-header-spacer { flex: 1; }
 
   .scv-back-btn,
   .scv-icon-btn {
@@ -1542,80 +1518,6 @@
     padding: 0 var(--space-0-5, 2px);
   }
 
-  /* Inline decrypt */
-  .scv-inline-decrypt {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2, 8px);
-    flex-wrap: nowrap;
-    margin-top: var(--space-1, 4px);
-    padding: var(--space-2, 8px) var(--space-2-5, 10px);
-    background: var(--scv-accent-subtle);
-    border: 1px solid var(--scv-border-accent);
-    border-radius: var(--radius-lg, 14px);
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
-  }
-
-  .scv-inline-pin {
-    flex: 1;
-    min-width: 0;
-    padding: var(--space-2-5, 10px);
-    border-radius: var(--radius-sm2, 8px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(0, 0, 0, 0.35);
-    color: rgba(255, 255, 255, 0.92);
-    font-size: var(--text-base, 1rem);
-    letter-spacing: 0.25em;
-    text-align: center;
-    outline: none;
-    font-family: var(--font-mono, 'JetBrains Mono', monospace);
-    -webkit-appearance: none;
-    min-height: 44px;
-    touch-action: manipulation;
-    transition: border-color var(--duration-fast, 100ms);
-  }
-  .scv-inline-pin:focus {
-    border-color: var(--scv-accent);
-    box-shadow: 0 0 0 2px var(--scv-accent-subtle);
-  }
-  @media (max-width: 767px) { .scv-inline-pin { font-size: 18px; } }
-
-  .scv-inline-btn {
-    padding: var(--space-2-5, 10px) var(--space-4, 16px);
-    border-radius: var(--radius-sm2, 8px);
-    border: none;
-    background: var(--scv-accent);
-    color: #fff;
-    font-size: var(--text-xs, 0.75rem);
-    font-weight: 700;
-    font-family: var(--font-sans, 'Nunito', sans-serif);
-    cursor: pointer;
-    min-height: 44px;
-    flex-shrink: 0;
-    white-space: nowrap;
-    touch-action: manipulation;
-    transition: background var(--duration-fast, 100ms), transform var(--duration-fast, 100ms);
-  }
-  .scv-inline-btn:hover:not(:disabled) {
-    background: var(--primary-400, #2dd4bf);
-    transform: scale(1.02);
-  }
-  .scv-inline-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-  .scv-inline-btn:focus-visible {
-    outline: 2px solid var(--scv-accent);
-    outline-offset: 2px;
-  }
-
-  .scv-inline-err {
-    font-size: var(--text-2xs, 0.6875rem);
-    font-family: var(--font-sans, 'Nunito', sans-serif);
-    color: var(--danger-400, #f87171);
-    width: 100%;
-    font-weight: 500;
-  }
-
   .scv-sent-notice {
     display: flex;
     align-items: center;
@@ -1731,16 +1633,6 @@
     border-top-color: #fff;
     border-radius: var(--radius-full, 9999px);
     animation: scv-spin 0.7s linear infinite;
-  }
-
-  .scv-compose-hint {
-    display: flex;
-    align-items: center;
-    gap: var(--space-1-5, 6px);
-    margin: 0;
-    font-size: var(--text-2xs, 0.6875rem);
-    font-family: var(--font-sans, 'Nunito', sans-serif);
-    color: rgba(255, 255, 255, 0.16);
   }
 
   .scv-reply-err {
