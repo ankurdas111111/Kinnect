@@ -458,17 +458,11 @@
   <div class="scv-panic" on:click={restoreFromPanic}></div>
 {/if}
 
-<div class="scv">
+<div class="scv" class:scv--plain={state !== 'messages'}>
   <!-- ── Loading ──────────────────────────────────────────────────── -->
   {#if state === 'loading'}
     <div class="scv-center" role="status" aria-label="Loading">
-      <div class="scv-loading-icon" aria-hidden="true">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="11" width="18" height="11" rx="2"/>
-          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-        </svg>
-        <div class="scv-spinner" aria-hidden="true"></div>
-      </div>
+      <div class="scv-spinner scv-spinner--solo" aria-hidden="true"></div>
       <p class="scv-loading-text">Loading…</p>
     </div>
 
@@ -491,18 +485,10 @@
   <!-- ── Login ────────────────────────────────────────────────────── -->
   {:else if state === 'login'}
     <div class="scv-gate" role="main">
-      <div class="scv-gate-glow" aria-hidden="true"></div>
       <div class="scv-gate-content">
 
-        <div class="scv-gate-icon" aria-hidden="true">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-          </svg>
-        </div>
-
         <div class="scv-gate-text">
-          <p class="scv-gate-title">Protected Note</p>
-          <p class="scv-gate-sub">Sign in to access this note.</p>
+          <p class="scv-gate-title">Sign in</p>
         </div>
 
         <div class="scv-login-form">
@@ -566,18 +552,10 @@
   <!-- ── Gate ─────────────────────────────────────────────────────── -->
   {:else if state === 'gate'}
     <div class="scv-gate" role="main">
-      <div class="scv-gate-glow" aria-hidden="true"></div>
       <div class="scv-gate-content">
 
-        <div class="scv-gate-icon" aria-hidden="true">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-          </svg>
-        </div>
-
         <div class="scv-gate-text">
-          <p class="scv-gate-title">Protected Note</p>
-          <p class="scv-gate-sub">Enter the access code to view this note.</p>
+          <p class="scv-gate-title">Enter your passcode</p>
         </div>
 
         <!-- PIN dot visualizer -->
@@ -592,7 +570,7 @@
         </div>
 
         <div class="scv-pin-wrap">
-          <label class="scv-sr" for="scv-gate-pin">Access code — minimum 4 digits</label>
+          <label class="scv-sr" for="scv-gate-pin">Passcode — minimum 4 digits</label>
           <input
             id="scv-gate-pin"
             bind:this={pinInputEl}
@@ -602,7 +580,7 @@
             inputmode="numeric"
             pattern="\d*"
             maxlength="8"
-            placeholder="Access code"
+            placeholder="Passcode"
             autocomplete="one-time-code"
             autocorrect="off"
             autocapitalize="none"
@@ -629,15 +607,9 @@
             <span>Opening…</span>
           {:else}
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              {#if pin.length >= 4}
-                <rect x="3" y="11" width="18" height="11" rx="2"/>
-                <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
-              {:else}
-                <rect x="3" y="11" width="18" height="11" rx="2"/>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-              {/if}
+              <polyline points="9 18 15 12 9 6"/>
             </svg>
-            <span>{pin.length >= 4 ? 'View Note' : 'Enter code above'}</span>
+            <span>{pin.length >= 4 ? 'Continue' : 'Enter passcode above'}</span>
           {/if}
         </button>
 
@@ -681,7 +653,7 @@
         on:scroll={handleMessagesScroll}
         role="log"
         aria-live="polite"
-        aria-label="Secret chat messages"
+        aria-label="Messages"
       >
         {#if groupedDecrypted.length === 0}
           <div class="scv-empty" role="status">
@@ -1004,6 +976,10 @@
     to   { background-position: 0 56px, 48px 0; }
   }
 
+  /* Strip all encryption / cyber tells before PIN entry */
+  .scv--plain::before,
+  .scv--plain::after { display: none; }
+
   .scv > * { position: relative; z-index: 1; }
 
   /* ── Loading / error ───────────────────────────────────────────── */
@@ -1016,24 +992,23 @@
     padding: var(--space-8, 32px);
   }
 
-  .scv-loading-icon {
-    position: relative;
-    width: 64px; height: 64px;
-    border-radius: var(--radius-full, 9999px);
-    background: var(--scv-accent-subtle);
-    border: 1px solid var(--scv-border-accent);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--scv-accent);
-  }
-
   .scv-spinner {
     position: absolute;
     inset: -4px;
     border-radius: var(--radius-full, 9999px);
     border: 2px solid transparent;
     border-top-color: var(--scv-accent);
+    animation: scv-spin 0.8s linear infinite;
+  }
+
+  /* Standalone spinner — no icon container, no teal circle */
+  .scv-spinner--solo {
+    position: relative;
+    inset: unset;
+    width: 32px; height: 32px;
+    border-radius: var(--radius-full, 9999px);
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    border-top-color: rgba(255, 255, 255, 0.55);
     animation: scv-spin 0.8s linear infinite;
   }
 
