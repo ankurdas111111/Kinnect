@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log/slog"
@@ -8,15 +9,10 @@ import (
 )
 
 // InitDB creates the schema if it does not exist. Matches backend-v2 schema.
-func InitDB(db *sql.DB) error {
-	// Extensions: non-fatal — Aiven free tier restricts CREATE EXTENSION to
-	// superuser; gen_random_uuid() is built-in since PG 13 without pgcrypto.
-	for _, ext := range []string{"pgcrypto", "uuid-ossp"} {
-		if _, err := db.Exec(`CREATE EXTENSION IF NOT EXISTS "` + ext + `"`); err != nil {
-			slog.Warn("CREATE EXTENSION skipped (non-fatal)", "ext", ext, "error", err)
-		}
-	}
-
+// ctx is used for all DDL statements — a hang (e.g. Aiven DDL lock) surfaces
+// as a context-deadline error instead of blocking forever.
+// gen_random_uuid() is built-in since PG 13; no pgcrypto/uuid-ossp needed.
+func InitDB(ctx context.Context, db *sql.DB) error {
 	statements := []string{
 
 		`CREATE TABLE IF NOT EXISTS users (
@@ -274,7 +270,7 @@ func InitDB(db *sql.DB) error {
 	}
 
 	for i, stmt := range statements {
-		if _, err := db.Exec(stmt); err != nil {
+		if _, err := db.ExecContext(ctx, stmt); err != nil {
 			// Truncate the statement for the error log so it's readable
 			preview := stmt
 			if len(preview) > 120 {

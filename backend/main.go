@@ -35,9 +35,12 @@ func main() {
 	defer pool.Close()
 
 	fmt.Fprintln(os.Stderr, "STARTUP: running InitDB")
-	if err := db.InitDB(pool.DB); err != nil {
-		fmt.Fprintf(os.Stderr, "STARTUP FATAL: InitDB failed: %v\n", err)
-		slog.Error("Failed to initialize database schema", "error", err)
+	initDBCtx, initDBCancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	initDBErr := db.InitDB(initDBCtx, pool.DB)
+	initDBCancel()
+	if initDBErr != nil {
+		fmt.Fprintf(os.Stderr, "STARTUP FATAL: InitDB failed: %v\n", initDBErr)
+		slog.Error("Failed to initialize database schema", "error", initDBErr)
 		os.Exit(1)
 	}
 	fmt.Fprintln(os.Stderr, "STARTUP: InitDB OK")
