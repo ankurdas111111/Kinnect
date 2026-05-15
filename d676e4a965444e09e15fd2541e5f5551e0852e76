@@ -1,0 +1,19 @@
+Dockerfile.backend
+  e9bbfaa6-af99-488c-8b2c-1f7332b9c03f:2026-05-15T19:25:12.374Z 17
+backend/internal/ws/webrtc_events.go
+  7de64d90-40c3-48ae-915e-56a5f10fc345:2026-05-13T20:35:44.872Z 1,3,5-13,15-18,20-27,29-36,38-45,47-54,56-63,65-71,73-79
+  7de64d90-40c3-48ae-915e-56a5f10fc345:2026-05-13T20:44:32.764Z 14,19,37,55,72
+frontend/src/components/IncomingCallOverlay.svelte
+  7de64d90-40c3-48ae-915e-56a5f10fc345:2026-05-13T20:42:31.432Z 1-3,5-9,11-14,16-18,20-35,37-40,42-47,49-55,57-73,75-78,80-92,94-100,102-105,107-110,112-118,120-125,127-132,134-144,146-150,152,154-158,160,162-167
+frontend/src/components/WalkieTalkieButton.svelte
+  7de64d90-40c3-48ae-915e-56a5f10fc345:2026-05-13T20:42:06.107Z 1-10,12,14,16-18,20,22-24,26-29,31-34,36-44,46-66,68-85,87-96,98-101,103-106,108-112,114-120,122-125,127-144,146-149,151-164,166-168,170-175,177-181
+frontend/src/components/primitives/ParticleField.svelte
+  71991640-f7e7-4f0c-9907-e5c43680362c:2026-05-15T18:52:55.743Z 1-18,20-24,26-31,33-42,44-61,63-70,72-77,79,81-86
+frontend/src/lib/gyroscope.js
+  71991640-f7e7-4f0c-9907-e5c43680362c:2026-05-15T18:52:55.743Z 1-10,12-19,21,23,25-27,29-35,37-39,41-44,46-48,50-51,53-55,57-59,61-62,64,66-70,72-74,76-93,95-106
+frontend/src/lib/stores/webrtc.js
+  7de64d90-40c3-48ae-915e-56a5f10fc345:2026-05-13T20:40:07.515Z 1,3-4,6-7,9-10
+frontend/src/lib/webrtc.js
+  7de64d90-40c3-48ae-915e-56a5f10fc345:2026-05-13T20:40:41.679Z 1-9,11-19,21-24,26-30,32,34-40,42-49,51-58,60-65,67,69-74,76-78,80-83,85-86,88-97,99,101-105,107-110,112-114,116-117,119-129,131,133-137,139-143,145,147-154,156,158-159,161-163,165-177,179-186,188-189,191-201
+---
+{"schema_version": "authorship/3.0.0", "base_commit_sha": "HEAD~1", "prompts": {"e9bbfaa6-af99-488c-8b2c-1f7332b9c03f:2026-05-15T19:25:12.374Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 1, "overriden_lines": 0}, "7de64d90-40c3-48ae-915e-56a5f10fc345:2026-05-13T20:35:44.872Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 74, "overriden_lines": 0}, "7de64d90-40c3-48ae-915e-56a5f10fc345:2026-05-13T20:44:32.764Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 74, "overriden_lines": 0}, "7de64d90-40c3-48ae-915e-56a5f10fc345:2026-05-13T20:42:31.432Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 145, "overriden_lines": 0}, "7de64d90-40c3-48ae-915e-56a5f10fc345:2026-05-13T20:42:06.107Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 159, "overriden_lines": 0}, "71991640-f7e7-4f0c-9907-e5c43680362c:2026-05-15T18:52:55.743Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 78, "overriden_lines": 0}, "7de64d90-40c3-48ae-915e-56a5f10fc345:2026-05-13T20:40:07.515Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 7, "overriden_lines": 0}, "7de64d90-40c3-48ae-915e-56a5f10fc345:2026-05-13T20:40:41.679Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 169, "overriden_lines": 0}}}
