@@ -181,6 +181,15 @@ func InitDB(ctx context.Context, db *sql.DB) error {
 			peer_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		)`,
+		// Dedup guard: remove duplicate (owner_id, peer_id) rows before creating
+		// the unique index. Keeps the most-recently-created token per pair.
+		// Safe to re-run: no-op if there are no duplicates.
+		`DELETE FROM secret_chat_invites
+			WHERE token NOT IN (
+				SELECT DISTINCT ON (owner_id, peer_id) token
+				FROM secret_chat_invites
+				ORDER BY owner_id, peer_id, created_at DESC
+			)`,
 		// One stable link per (owner, peer) pair — upsert-safe migration guard
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_secret_chat_invites_pair ON secret_chat_invites(owner_id, peer_id)`,
 
