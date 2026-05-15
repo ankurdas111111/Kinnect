@@ -1,0 +1,4 @@
+backend/go.mod
+  e9bbfaa6-af99-488c-8b2c-1f7332b9c03f:2026-05-15T21:12:45.444Z 3
+---
+{"schema_version": "authorship/3.0.0", "base_commit_sha": "HEAD~1", "prompts": {"e9bbfaa6-af99-488c-8b2c-1f7332b9c03f:2026-05-15T21:12:45.444Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 1, "overriden_lines": 0}}}
