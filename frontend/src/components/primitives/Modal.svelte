@@ -1,6 +1,6 @@
 <script>
   import { createEventDispatcher, onMount, onDestroy, tick } from 'svelte';
-  import { fade, scale } from 'svelte/transition';
+  import { fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
 
   export let open = false;
@@ -93,7 +93,7 @@
     class="modal-backdrop"
     class:urgent
     on:click={onBackdropClick}
-    transition:fade={{ duration: 150 }}
+    transition:fade={{ duration: 180 }}
     role="presentation"
   >
     <div
@@ -105,7 +105,6 @@
       aria-modal="true"
       aria-labelledby={title ? titleId : undefined}
       aria-label={title ? undefined : 'Modal dialog'}
-      transition:scale={{ start: 0.95, duration: 200, easing: cubicOut }}
     >
       {#if title}
         <div class="modal-header">
@@ -132,29 +131,60 @@
     position: fixed;
     inset: 0;
     z-index: var(--z-modal, 5000);
-    background: rgba(0, 0, 0, 0.55);
+    background: rgba(0, 0, 0, 0.62);
     display: flex;
     align-items: center;
     justify-content: center;
     padding: var(--space-4);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(8px) saturate(1.4);
+    -webkit-backdrop-filter: blur(8px) saturate(1.4);
     overscroll-behavior: none;
   }
 
   .modal-backdrop.urgent {
-    background: rgba(185, 28, 28, 0.20);
+    background: rgba(185, 28, 28, 0.22);
+    backdrop-filter: blur(10px) saturate(1.6);
+    -webkit-backdrop-filter: blur(10px) saturate(1.6);
   }
 
+  /* 3D spring entrance — rises from depth plane */
   .modal-card {
-    background: var(--surface-2);
-    border: 1px solid var(--border-default);
+    background: var(--glass-3d, rgba(15, 15, 30, 0.85));
+    border: 1px solid var(--glass-3d-border, rgba(255,255,255,0.10));
+    border-top-color: rgba(255,255,255,0.16);
     border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-xl);
+    box-shadow:
+      var(--elevation-4),
+      var(--glass-3d-inner),
+      0 0 0 1px rgba(255,255,255,0.04);
+    backdrop-filter: var(--glass-3d-blur, blur(28px) saturate(1.8));
+    -webkit-backdrop-filter: var(--glass-3d-blur, blur(28px) saturate(1.8));
     overflow: hidden;
     max-height: 90vh;
     display: flex;
     flex-direction: column;
+    /* 3D spring entrance animation */
+    animation: modal-3d-arrive 480ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    transform-style: preserve-3d;
+    position: relative;
+  }
+
+  /* Subtle top-edge glow line */
+  .modal-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 10%; right: 10%;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(20, 184, 166, 0.70) 35%,
+      rgba(16, 185, 129, 0.60) 65%,
+      transparent 100%
+    );
+    box-shadow: 0 0 8px rgba(20, 184, 166, 0.40);
+    border-radius: 0 0 2px 2px;
+    pointer-events: none;
   }
 
   .modal-card.sm { width: 340px; max-width: 100%; }
@@ -162,13 +192,33 @@
   .modal-card.lg { width: 560px; max-width: 100%; }
 
   .modal-card.urgent {
-    border-color: var(--danger-500);
-    animation: urgent-pulse 2s ease-in-out infinite;
+    border-color: rgba(239, 68, 68, 0.40);
+    border-top-color: rgba(239, 68, 68, 0.55);
+    animation: modal-3d-arrive 480ms cubic-bezier(0.34, 1.56, 0.64, 1) both,
+               urgent-glow-pulse 2.2s ease-in-out 500ms infinite;
   }
 
-  @keyframes urgent-pulse {
-    0%, 100% { box-shadow: var(--shadow-xl), 0 0 0 0 rgba(239, 68, 68, 0.3); }
-    50% { box-shadow: var(--shadow-xl), 0 0 0 8px rgba(239, 68, 68, 0); }
+  .modal-card.urgent::before {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(239, 68, 68, 0.80) 35%,
+      rgba(239, 68, 68, 0.65) 65%,
+      transparent 100%
+    );
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.55);
+  }
+
+  @keyframes urgent-glow-pulse {
+    0%, 100% {
+      box-shadow: var(--elevation-4), var(--glass-3d-inner), 0 0 0 1px rgba(239,68,68,0.25);
+    }
+    50% {
+      box-shadow: var(--elevation-4), var(--glass-3d-inner),
+                  0 0 0 1px rgba(239,68,68,0.45),
+                  0 0 24px rgba(239,68,68,0.22),
+                  0 0 48px rgba(239,68,68,0.10);
+    }
   }
 
   .modal-header {
@@ -179,14 +229,16 @@
   }
 
   .modal-title {
+    font-family: var(--font-display);
     font-size: var(--text-xl);
     font-weight: 700;
     color: var(--text-primary);
+    letter-spacing: -0.02em;
     margin: 0;
   }
 
   .modal-title.urgent {
-    color: var(--danger-500);
+    color: var(--danger-400);
   }
 
   .modal-close {
@@ -197,6 +249,7 @@
     padding: var(--space-4) var(--space-6);
     overflow-y: auto;
     flex: 1;
+    -webkit-overflow-scrolling: touch;
   }
 
   .modal-footer {
@@ -229,9 +282,12 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
+    .modal-card {
+      animation: none;
+    }
     .modal-card.urgent {
       animation: none;
-      box-shadow: var(--shadow-xl), 0 0 0 3px var(--danger-500);
+      box-shadow: var(--elevation-4), 0 0 0 2px var(--danger-500);
     }
   }
 </style>

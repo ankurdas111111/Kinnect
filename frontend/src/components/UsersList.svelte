@@ -415,9 +415,10 @@
       </div>
     {:else}
       <div class="vlist-region">
-        <VirtualList items={userList} itemHeight={88} let:item={user}>
+        <VirtualList items={userList} itemHeight={88} let:item={user} let:index>
           <div
-            class="user-item user-item-btn stagger-item animate-slide-up"
+            class="user-item user-item-btn user-depth-card"
+            style="--stagger-i: {Math.min(index, 8)}"
             class:user-sos={user.sos?.active}
             class:user-offline={user.online === false}
             role="button"
@@ -812,6 +813,12 @@
     min-height: 76px;
   }
 
+  /* 3D stagger entrance — index-driven delay via CSS custom property */
+  .user-depth-card {
+    animation: item-pop-in 300ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation-delay: calc(var(--stagger-i, 0) * 35ms);
+  }
+
   .user-item-btn {
     width: 100%;
     background: none;
@@ -835,7 +842,7 @@
 
   .user-item-btn:active {
     background: var(--surface-active);
-    transform: scale(0.96);
+    transform: scale(0.97) translateZ(-2px);
     transition-duration: 60ms;
   }
 
@@ -883,7 +890,8 @@
   }
 
   .user-item-btn:hover .user-avatar {
-    transform: scale(1.05);
+    transform: scale(1.08) translateZ(4px);
+    filter: brightness(1.12);
   }
 
   /* Self avatar — gradient + strong glow */
@@ -978,12 +986,13 @@
     font-weight: 700;
     color: var(--success-500);
     background: rgba(16, 185, 129, 0.12);
-    border: 1px solid rgba(16, 185, 129, 0.25);
+    border: 1px solid rgba(16, 185, 129, 0.30);
     border-radius: var(--radius-full);
     padding: 2px 7px 2px 5px;
     line-height: 1.3;
     flex-shrink: 0;
     letter-spacing: 0.02em;
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.22), inset 0 1px 0 rgba(255,255,255,0.10);
   }
 
   .you-badge-dot {
@@ -1010,7 +1019,10 @@
     line-height: 1.3;
     flex-shrink: 0;
     letter-spacing: 0.04em;
-    box-shadow: 0 0 8px rgba(239, 68, 68, 0.45);
+    box-shadow:
+      0 0 8px rgba(239, 68, 68, 0.55),
+      0 0 16px rgba(239, 68, 68, 0.30),
+      inset 0 1px 0 rgba(255,255,255,0.20);
     animation: sos-urgent-pulse 1s ease-in-out infinite;
   }
 
@@ -1494,4 +1506,11 @@
   }
   .delete-confirm-btn:hover { background: rgba(239, 68, 68, 0.20); }
   .delete-confirm-btn:active { transform: scale(0.97); transition-duration: 60ms; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .user-depth-card {
+      animation: none;
+      animation-delay: 0ms;
+    }
+  }
 </style>

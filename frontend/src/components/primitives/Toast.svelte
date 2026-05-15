@@ -1,5 +1,5 @@
 <script>
-  import { fly, fade } from 'svelte/transition';
+  import { fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { toasts } from '../../lib/stores/toast.js';
 
@@ -11,9 +11,7 @@
   }
 
   // ── Swipe-to-dismiss (horizontal pointer drag) ──────────────────────────
-  // Two-phase: no capture until 5px horizontal movement, then capture to
-  // track the full swipe even if pointer leaves the element.
-  const _drag = new Map(); // pointerId → { id, el, startX, captured }
+  const _drag = new Map();
 
   function onSwipeDown(e, id) {
     _drag.set(e.pointerId, { id, el: e.currentTarget, startX: e.clientX, captured: false });
@@ -40,7 +38,6 @@
     d.el.style.transition = '';
     const dx = e.clientX - d.startX;
     if (d.captured && Math.abs(dx) > 80) {
-      // Fly off in swipe direction then remove
       const dir = dx > 0 ? '110%' : '-110%';
       d.el.style.transition = 'transform 180ms cubic-bezier(0.4,0,1,1), opacity 180ms ease-out';
       d.el.style.transform = `translateX(${dir}) rotate(${dx > 0 ? 6 : -6}deg)`;
@@ -66,7 +63,6 @@
   {#each $toasts as toast (toast.id)}
     <div
       class="toast toast-{toast.type}"
-      in:fly={{ y: -30, duration: 250, easing: cubicOut }}
       out:fade={{ duration: 150 }}
       role="status"
       on:pointerdown={(e) => onSwipeDown(e, toast.id)}
@@ -108,7 +104,7 @@
     }
   }
 
-  /* Premium toast — glass surface with colored left accent bar */
+  /* 2026 premium toast — glass surface + neon accent + spring entrance */
   .toast {
     cursor: grab;
     user-select: none;
@@ -118,15 +114,16 @@
     gap: var(--space-3);
     padding: var(--space-3) var(--space-4);
     border-radius: var(--radius-lg);
-    /* Richer glass — stronger backdrop, tinted surface */
-    background: var(--glass-bg-strong, rgba(12, 12, 28, 0.94));
-    border: 1px solid var(--glass-border);
+    /* Deep glass with richer backdrop */
+    background: var(--glass-bg-strong, rgba(9, 10, 22, 0.95));
+    border: 1px solid var(--glass-3d-border, rgba(255,255,255,0.10));
+    border-top-color: rgba(255,255,255,0.14);
     box-shadow:
-      var(--shadow-xl),
-      0 0 0 1px rgba(255, 255, 255, 0.04),
-      inset 0 1px 0 rgba(255, 255, 255, 0.07);
-    backdrop-filter: blur(24px) saturate(1.8);
-    -webkit-backdrop-filter: blur(24px) saturate(1.8);
+      var(--elevation-4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.18);
+    backdrop-filter: blur(28px) saturate(1.9);
+    -webkit-backdrop-filter: blur(28px) saturate(1.9);
     font-family: var(--font-display);
     font-size: var(--text-sm);
     font-weight: 500;
@@ -134,31 +131,90 @@
     pointer-events: auto;
     position: relative;
     overflow: hidden;
-    /* Left accent bar — colored glow instead of top progress bar */
+    /* Neon left accent bar */
     border-left: 3px solid transparent;
-    animation: card-rise 220ms var(--ease-out) both;
+    /* 2026 spring entrance */
+    animation: toast-spring-in 360ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
   }
 
-  /* Type-specific left accent + icon colors */
-  .toast-info    { border-left-color: var(--primary-500); }
-  .toast-success { border-left-color: var(--success-500); }
-  .toast-error   { border-left-color: var(--danger-500); }
-  .toast-warning { border-left-color: var(--warning-500); }
+  /* Shimmer sweep on new toast */
+  .toast::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      105deg,
+      transparent 20%,
+      rgba(255,255,255,0.07) 45%,
+      rgba(255,255,255,0.05) 55%,
+      transparent 80%
+    );
+    transform: translateX(-120%);
+    pointer-events: none;
+    animation: holo-travel 1.8s ease-out 200ms both;
+    border-radius: inherit;
+  }
+
+  /* Type-specific neon left accent + glow */
+  .toast-info {
+    border-left-color: var(--primary-500);
+    box-shadow:
+      var(--elevation-4),
+      inset 0 1px 0 rgba(255,255,255,0.08),
+      -2px 0 12px rgba(20,184,166,0.25);
+  }
+  .toast-success {
+    border-left-color: var(--success-500);
+    box-shadow:
+      var(--elevation-4),
+      inset 0 1px 0 rgba(255,255,255,0.08),
+      -2px 0 14px rgba(16,185,129,0.30);
+  }
+  .toast-error {
+    border-left-color: var(--danger-500);
+    box-shadow:
+      var(--elevation-4),
+      inset 0 1px 0 rgba(255,255,255,0.08),
+      -2px 0 14px rgba(239,68,68,0.32);
+  }
+  .toast-warning {
+    border-left-color: var(--warning-500);
+    box-shadow:
+      var(--elevation-4),
+      inset 0 1px 0 rgba(255,255,255,0.08),
+      -2px 0 12px rgba(245,158,11,0.28);
+  }
 
   .toast-icon {
     flex-shrink: 0;
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: var(--radius-sm);
   }
 
-  .toast-info .toast-icon    { background: rgba(99,102,241,0.16);  color: var(--primary-400); }
-  .toast-success .toast-icon { background: rgba(16,185,129,0.16);  color: var(--success-400); }
-  .toast-error .toast-icon   { background: rgba(239,68,68,0.16);   color: var(--danger-400);  }
-  .toast-warning .toast-icon { background: rgba(245,158,11,0.16);  color: var(--warning-400); }
+  .toast-info .toast-icon    {
+    background: rgba(20,184,166,0.16);
+    color: var(--primary-400);
+    box-shadow: 0 0 8px rgba(20,184,166,0.20);
+  }
+  .toast-success .toast-icon {
+    background: rgba(16,185,129,0.16);
+    color: var(--success-400);
+    box-shadow: 0 0 8px rgba(16,185,129,0.22);
+  }
+  .toast-error .toast-icon   {
+    background: rgba(239,68,68,0.16);
+    color: var(--danger-400);
+    box-shadow: 0 0 8px rgba(239,68,68,0.24);
+  }
+  .toast-warning .toast-icon {
+    background: rgba(245,158,11,0.16);
+    color: var(--warning-400);
+    box-shadow: 0 0 8px rgba(245,158,11,0.20);
+  }
 
   .toast-message {
     flex: 1;
@@ -189,26 +245,46 @@
     background: var(--surface-hover);
   }
 
-  /* Progress bar — bottom, 3px, matches accent color */
+  /* Neon progress bar at bottom */
   .toast-progress {
     position: absolute;
     bottom: 0;
-    left: 3px; /* start after left accent border */
+    left: 3px;
     right: 0;
     height: 2px;
     transform-origin: left;
     animation: toast-progress linear forwards;
-    opacity: 0.6;
     border-radius: 0 0 var(--radius-lg) 0;
   }
 
-  .toast-info .toast-progress    { background: var(--primary-500); }
-  .toast-success .toast-progress { background: var(--success-500); }
-  .toast-error .toast-progress   { background: var(--danger-500); }
-  .toast-warning .toast-progress { background: var(--warning-500); }
+  .toast-info .toast-progress    {
+    background: linear-gradient(90deg, var(--primary-500), var(--primary-400));
+    box-shadow: 0 0 4px rgba(20,184,166,0.50);
+  }
+  .toast-success .toast-progress {
+    background: linear-gradient(90deg, var(--success-500), var(--success-400));
+    box-shadow: 0 0 4px rgba(16,185,129,0.50);
+  }
+  .toast-error .toast-progress   {
+    background: linear-gradient(90deg, var(--danger-500), var(--danger-400));
+    box-shadow: 0 0 4px rgba(239,68,68,0.50);
+  }
+  .toast-warning .toast-progress {
+    background: linear-gradient(90deg, var(--warning-500), var(--warning-400));
+    box-shadow: 0 0 4px rgba(245,158,11,0.50);
+  }
 
   @keyframes toast-progress {
     from { transform: scaleX(1); }
-    to { transform: scaleX(0); }
+    to   { transform: scaleX(0); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .toast {
+      animation: none;
+    }
+    .toast::after {
+      animation: none;
+    }
   }
 </style>

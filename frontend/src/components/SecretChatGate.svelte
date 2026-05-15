@@ -1,5 +1,25 @@
 <script>
-  import { createEventDispatcher, onMount } from 'svelte';
+  /**
+   * SecretChatGate — PIN entry screen before secret chat is accessible.
+   *
+   * Props:
+   *   peerName   — display name of the chat partner
+   *   unlocking  — true while parent is processing the PIN
+   *   error      — error string from parent (cleared on next submit)
+   *
+   * Events:
+   *   submit(pin: string) — dispatched when user hits Open / Enter
+   *
+   * Imperative API (via bind:this):
+   *   triggerShake()   — animate the input on wrong PIN
+   *   triggerSuccess() — animate the icon on correct PIN
+   *
+   * iOS notes:
+   *   - Input font-size is fixed at 26px (above the 16px iOS auto-zoom threshold).
+   *   - onMount focuses after 120ms to allow the animation to settle first.
+   *   - No onMount without onDestroy — _shakeTimer is cleared in onDestroy.
+   */
+  import { createEventDispatcher, onMount, onDestroy } from 'svelte';
   import { haptics } from '../lib/haptics.js';
 
   const dispatch = createEventDispatcher();
@@ -19,6 +39,10 @@
 
   onMount(() => {
     setTimeout(() => pinInputEl?.focus(), 120);
+  });
+
+  onDestroy(() => {
+    clearTimeout(_shakeTimer);
   });
 
   function handleInput(e) {
@@ -55,30 +79,37 @@
   <div class="gate-glow" aria-hidden="true"></div>
 
   <div class="gate-content" class:gate-content--success={unlockSuccess}>
-    <!-- Lock icon with glow ring -->
-    <div class="gate-icon" class:gate-icon--success={unlockSuccess} aria-hidden="true">
-      {#if unlockSuccess}
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="11" width="18" height="11" rx="2"/>
-          <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
-        </svg>
-      {:else}
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="11" width="18" height="11" rx="2"/>
-          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-        </svg>
-      {/if}
+    <!-- Animated lock icon with concentric glow rings -->
+    <div class="gate-icon-wrap" aria-hidden="true">
+      <div class="gate-icon-ring gate-icon-ring--outer"></div>
+      <div class="gate-icon-ring gate-icon-ring--inner"></div>
+      <div class="gate-icon" class:gate-icon--success={unlockSuccess}>
+        {#if unlockSuccess}
+          <!-- Unlocked padlock -->
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2"/>
+            <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
+          </svg>
+        {:else}
+          <!-- Locked padlock -->
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+        {/if}
+      </div>
     </div>
 
+    <!-- Title + description -->
     <div class="gate-text">
-      <p class="gate-title">Secret Chat</p>
+      <h2 class="gate-title">Secret Chat</h2>
       <p class="gate-sub">
-        End-to-end encrypted with <strong>{peerName}</strong>.<br>
-        Only your PIN opens this conversation.
+        Encrypted with <strong>{peerName}</strong>.<br>
+        Only your PIN unlocks this conversation.
       </p>
     </div>
 
-    <!-- PIN dot indicators -->
+    <!-- PIN dot visualizer — shows progress without revealing digits -->
     <div class="gate-dots" aria-hidden="true" role="presentation">
       {#each Array(8) as _, i}
         <span
@@ -89,6 +120,7 @@
       {/each}
     </div>
 
+    <!-- Hidden PIN input -->
     <div class="gate-input-wrap">
       <label class="sr-only" for="gate-pin">Enter PIN — minimum 4 digits</label>
       <input
@@ -109,13 +141,15 @@
         aria-describedby={error ? 'gate-pin-err' : 'gate-pin-hint'}
         disabled={unlocking}
       />
+
       {#if error}
-        <p class="gate-error" id="gate-pin-err" role="alert">{error}</p>
+        <p class="gate-field-err" id="gate-pin-err" role="alert">{error}</p>
       {:else}
-        <p class="gate-hint" id="gate-pin-hint">Minimum 4 digits</p>
+        <p class="gate-hint" id="gate-pin-hint">4–8 digits</p>
       {/if}
     </div>
 
+    <!-- Open button -->
     <button
       class="gate-btn"
       class:gate-btn--ready={pinReady}
@@ -125,10 +159,10 @@
       aria-label={pinReady ? 'Open secret chat' : 'Enter at least 4 digits'}
     >
       {#if unlocking}
-        <span class="gate-btn-spinner" aria-hidden="true"></span>
+        <span class="gate-btn-ring" aria-hidden="true"></span>
         <span>Opening…</span>
       {:else}
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           {#if pinReady}
             <rect x="3" y="11" width="18" height="11" rx="2"/>
             <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
@@ -141,14 +175,19 @@
       {/if}
     </button>
 
+    <!-- Crypto footer note -->
     <p class="gate-footer" aria-hidden="true">
-      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <rect x="3" y="11" width="18" height="11" rx="2"/>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
       AES-GCM encrypted · PBKDF2 key derivation
     </p>
   </div>
 </div>
 
 <style>
+  /* ── Gate shell ──────────────────────────────────────────────── */
   .gate {
     flex: 1;
     display: flex;
@@ -158,9 +197,10 @@
     position: relative;
     overflow: hidden;
     min-height: 0;
+    /* Consume the parent's flex space without affecting its scroll container */
   }
 
-  /* ── Hex texture background ── */
+  /* ── Hex texture background ─────────────────────────────────── */
   .gate-hex-bg {
     position: absolute;
     inset: 0;
@@ -195,6 +235,7 @@
     to   { background-position: 0 56px, 48px 0, 0 56px; }
   }
 
+  /* ── Ambient glow ─────────────────────────────────────────── */
   .gate-glow {
     position: absolute;
     inset: 0;
@@ -207,9 +248,10 @@
 
   @keyframes gate-glow-breathe {
     0%, 100% { opacity: 1; }
-    50% { opacity: 0.55; }
+    50%       { opacity: 0.55; }
   }
 
+  /* ── Content block ────────────────────────────────────────── */
   .gate-content {
     position: relative;
     z-index: 1;
@@ -218,15 +260,15 @@
     align-items: center;
     gap: var(--space-5, 20px);
     width: 100%;
-    max-width: 280px;
+    max-width: 300px;
     padding: var(--space-6, 24px) var(--space-4, 16px) var(--space-8, 32px);
     text-align: center;
     animation: gate-content-in 0.4s var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
   }
 
   @keyframes gate-content-in {
-    from { opacity: 0; transform: translateY(20px) scale(0.96); }
-    to   { opacity: 1; transform: translateY(0)   scale(1); }
+    from { opacity: 0; transform: translateY(24px) scale(0.95); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
   }
 
   .gate-content--success {
@@ -234,48 +276,85 @@
   }
 
   @keyframes gate-content-out {
-    to { opacity: 0; transform: translateY(-16px) scale(0.97); }
+    to { opacity: 0; transform: translateY(-20px) scale(0.96); }
   }
 
-  /* ── Lock icon ── */
-  .gate-icon {
-    width: 88px; height: 88px;
-    border-radius: var(--radius-full, 9999px);
-    background: var(--chat-accent-subtle);
-    border: 1px solid var(--chat-border-accent);
+  /* ── Lock icon with concentric rings ─────────────────────── */
+  .gate-icon-wrap {
+    position: relative;
+    width: 96px;
+    height: 96px;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--chat-accent);
-    box-shadow:
-      0 0 0 14px rgba(20, 184, 166, 0.04),
-      0 0 0 28px rgba(20, 184, 166, 0.02),
-      0 0 48px rgba(20, 184, 166, 0.24);
+    flex-shrink: 0;
+  }
+
+  .gate-icon-ring {
+    position: absolute;
+    border-radius: var(--radius-full, 9999px);
+    border: 1px solid var(--chat-border-accent, rgba(20, 184, 166, 0.22));
+  }
+
+  .gate-icon-ring--outer {
+    inset: 0;
+    background: rgba(20, 184, 166, 0.04);
+    animation: gate-ring-pulse 3s ease-in-out infinite;
+  }
+
+  .gate-icon-ring--inner {
+    inset: 12px;
+    background: rgba(20, 184, 166, 0.07);
+    animation: gate-ring-pulse 3s ease-in-out infinite 0.5s;
+  }
+
+  @keyframes gate-ring-pulse {
+    0%, 100% { transform: scale(1);    opacity: 0.8; }
+    50%       { transform: scale(1.06); opacity: 0.5; }
+  }
+
+  .gate-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: var(--radius-full, 9999px);
+    background: var(--chat-accent-subtle, rgba(20, 184, 166, 0.08));
+    border: 1px solid var(--chat-border-accent, rgba(20, 184, 166, 0.22));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--chat-accent, #14b8a6);
+    position: relative;
+    z-index: 1;
+    box-shadow: 0 0 32px rgba(20, 184, 166, 0.2);
     animation: gate-icon-breathe 5s ease-in-out infinite;
-    transition: box-shadow 0.4s var(--ease-out), color 0.3s;
+    transition: box-shadow 0.4s var(--ease-out), color 0.3s, background 0.3s, border-color 0.3s;
     flex-shrink: 0;
   }
 
   @keyframes gate-icon-breathe {
-    0%, 100% { box-shadow: 0 0 0 14px rgba(20,184,166,0.05), 0 0 0 28px rgba(20,184,166,0.02), 0 0 48px rgba(20,184,166,0.24); }
-    50%       { box-shadow: 0 0 0 20px rgba(20,184,166,0.03), 0 0 0 38px rgba(20,184,166,0.01), 0 0 72px rgba(20,184,166,0.35); }
+    0%, 100% { box-shadow: 0 0 24px rgba(20, 184, 166, 0.20); }
+    50%       { box-shadow: 0 0 48px rgba(20, 184, 166, 0.36); }
   }
 
   .gate-icon--success {
     color: var(--success-400, #34d399);
     border-color: rgba(52, 211, 153, 0.35);
     background: rgba(52, 211, 153, 0.08);
-    animation: gate-icon-success-pulse 0.5s var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1));
+    animation: gate-icon-success 0.5s var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1));
   }
 
-  @keyframes gate-icon-success-pulse {
+  @keyframes gate-icon-success {
     0%   { transform: scale(1); }
-    40%  { transform: scale(1.15); }
+    40%  { transform: scale(1.2); }
     100% { transform: scale(1); }
   }
 
-  /* ── Text ── */
-  .gate-text { display: flex; flex-direction: column; gap: var(--space-2, 8px); }
+  /* ── Text ─────────────────────────────────────────────────── */
+  .gate-text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2, 8px);
+  }
 
   .gate-title {
     margin: 0;
@@ -299,37 +378,41 @@
     font-weight: 600;
   }
 
-  /* ── PIN dot visualizer ── */
+  /* ── PIN dot visualizer ───────────────────────────────────── */
   .gate-dots {
     display: flex;
     gap: var(--space-2, 8px);
     align-items: center;
-    height: 12px;
+    height: 14px;
   }
 
   .gate-dot {
-    width: 8px; height: 8px;
+    width: 8px;
+    height: 8px;
     border-radius: var(--radius-full, 9999px);
     background: rgba(255, 255, 255, 0.12);
     border: 1px solid rgba(255, 255, 255, 0.18);
-    transition: background 0.15s var(--ease-out), transform 0.15s var(--ease-spring, cubic-bezier(0.34,1.56,0.64,1)), box-shadow 0.15s;
+    transition:
+      background 0.15s var(--ease-out),
+      transform  0.15s var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)),
+      box-shadow 0.15s;
     flex-shrink: 0;
   }
 
   .gate-dot--filled {
-    background: var(--chat-accent);
+    background: var(--chat-accent, #14b8a6);
     border-color: transparent;
     box-shadow: 0 0 8px rgba(20, 184, 166, 0.5);
   }
 
   .gate-dot--active {
-    transform: scale(1.25);
+    transform: scale(1.3);
   }
 
-  /* ── Input ── */
+  /* ── PIN input ────────────────────────────────────────────── */
   .gate-input-wrap {
     width: 100%;
-    max-width: 240px;
+    max-width: 260px;
     display: flex;
     flex-direction: column;
     gap: var(--space-1-5, 6px);
@@ -338,22 +421,24 @@
 
   .gate-pin-input {
     width: 100%;
-    padding: var(--space-4, 16px) var(--space-4, 16px);
+    padding: var(--space-4, 16px);
     background: rgba(255, 255, 255, 0.04);
-    border: 1px solid var(--chat-border-accent);
+    border: 1px solid var(--chat-border-accent, rgba(20, 184, 166, 0.22));
     border-radius: var(--radius-lg, 14px);
     color: rgba(255, 255, 255, 0.92);
+    /* 26px > 16px iOS threshold — no auto-zoom, deliberate vault weight */
     font-size: 26px;
     letter-spacing: 0.4em;
     text-align: center;
     font-family: var(--font-mono, 'JetBrains Mono', monospace);
     outline: none;
     transition: border-color 0.2s, box-shadow 0.2s;
-    caret-color: var(--chat-accent);
+    caret-color: var(--chat-accent, #14b8a6);
     -webkit-appearance: none;
     appearance: none;
-    min-height: 60px;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+    min-height: 64px;
+    box-sizing: border-box;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
   }
 
   .gate-pin-input::placeholder {
@@ -364,8 +449,8 @@
   }
 
   .gate-pin-input:focus {
-    border-color: var(--chat-accent);
-    box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.12), inset 0 1px 0 rgba(255,255,255,0.04);
+    border-color: var(--chat-accent, #14b8a6);
+    box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.04);
   }
 
   @keyframes gate-shake {
@@ -383,7 +468,7 @@
     box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.12);
   }
 
-  .gate-error {
+  .gate-field-err {
     margin: 0;
     font-size: var(--text-xs, 0.75rem);
     font-family: var(--font-sans, 'Nunito', sans-serif);
@@ -398,16 +483,16 @@
     color: rgba(255, 255, 255, 0.18);
   }
 
-  /* ── Unlock button ── */
+  /* ── Open button ──────────────────────────────────────────── */
   .gate-btn {
     width: 100%;
-    max-width: 240px;
+    max-width: 260px;
     padding: var(--space-4, 16px);
     border-radius: var(--radius-lg, 14px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.10);
     background: rgba(255, 255, 255, 0.05);
     color: rgba(255, 255, 255, 0.35);
-    font-size: var(--text-sm, 0.875rem);
+    font-size: var(--text-base, 1rem);
     font-weight: 700;
     font-family: var(--font-sans, 'Nunito', sans-serif);
     cursor: pointer;
@@ -423,7 +508,7 @@
   .gate-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
   .gate-btn:focus-visible {
-    outline: 2px solid var(--chat-accent);
+    outline: 2px solid var(--chat-accent, #14b8a6);
     outline-offset: 2px;
   }
 
@@ -443,44 +528,57 @@
     transform: scale(0.97);
   }
 
-  .gate-btn-spinner {
-    width: 16px; height: 16px;
+  /* ── Button spinner ───────────────────────────────────────── */
+  .gate-btn-ring {
+    width: 16px;
+    height: 16px;
     border: 2px solid rgba(255, 255, 255, 0.3);
     border-top-color: #fff;
     border-radius: var(--radius-full, 9999px);
-    animation: spin 0.7s linear infinite;
+    animation: gate-spin 0.7s linear infinite;
     flex-shrink: 0;
   }
 
-  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes gate-spin { to { transform: rotate(360deg); } }
 
+  /* ── Footer note ──────────────────────────────────────────── */
   .gate-footer {
     margin: 0;
     display: flex;
     align-items: center;
     gap: var(--space-1-5, 6px);
-    font-size: 10px;
+    font-size: var(--text-2xs, 0.6875rem);
     font-family: var(--font-mono, 'JetBrains Mono', monospace);
     color: rgba(255, 255, 255, 0.14);
     letter-spacing: 0.03em;
   }
 
+  /* ── Accessibility ────────────────────────────────────────── */
   .sr-only {
-    position: absolute; width: 1px; height: 1px;
-    padding: 0; margin: -1px; overflow: hidden;
-    clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 
+  /* ── Reduced motion ───────────────────────────────────────── */
   @media (prefers-reduced-motion: reduce) {
-    .gate-hex-bg { animation: none; }
-    .gate-glow { animation: none; }
-    .gate-content { animation: none; }
+    .gate-hex-bg    { animation: none; }
+    .gate-glow      { animation: none; }
+    .gate-content   { animation: none; }
     .gate-content--success { animation: none; }
-    .gate-icon { animation: none; }
+    .gate-icon-ring { animation: none; }
+    .gate-icon      { animation: none; }
     .gate-icon--success { animation: none; }
-    .gate-dot { transition: none; }
+    .gate-dot       { transition: none; }
     .gate-pin-input--shake { animation: none; }
-    .gate-btn { transition: none; }
+    .gate-btn       { transition: none; }
     .gate-btn--ready:hover { transform: none; }
+    .gate-btn-ring  { animation: none; }
   }
 </style>

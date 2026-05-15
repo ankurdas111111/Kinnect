@@ -235,14 +235,15 @@
     height: 90vh;
     height: 90dvh;
     z-index: var(--z-panel);
-    /* 3D glass sheet with depth */
+    /* 3D glass sheet with enhanced depth */
     background: var(--glass-3d);
     border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
     border: 1px solid var(--glass-3d-border);
     border-bottom: none;
-    border-top-color: rgba(255, 255, 255, 0.20);
+    border-top-color: rgba(255, 255, 255, 0.18);
     box-shadow:
       var(--elevation-5),
+      0 -1px 0 rgba(20, 184, 166, 0.20),
       inset 0 1px 0 rgba(255, 255, 255, 0.15),
       inset 0 -1px 0 rgba(0, 0, 0, 0.05);
     backdrop-filter: var(--glass-3d-blur);
@@ -254,6 +255,26 @@
     will-change: transform;
     touch-action: none;
     transform-style: preserve-3d;
+    position: relative;
+  }
+
+  /* Neon top-edge glow line — teal brand accent */
+  .sheet::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 15%; right: 15%;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(20, 184, 166, 0.65) 30%,
+      rgba(45, 212, 191, 0.55) 70%,
+      transparent 100%
+    );
+    box-shadow: 0 0 8px rgba(20, 184, 166, 0.40), 0 0 16px rgba(20, 184, 166, 0.18);
+    border-radius: 0 0 2px 2px;
+    pointer-events: none;
+    z-index: 2;
   }
 
   .sheet-handle-area {

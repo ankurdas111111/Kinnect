@@ -247,6 +247,7 @@
 
 <style>
   .person-card {
+    animation: depth-card-arrive 380ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
     background: var(--glass-3d, rgba(255,255,255,0.65));
     backdrop-filter: var(--glass-3d-blur, blur(24px) saturate(2.0));
     -webkit-backdrop-filter: var(--glass-3d-blur, blur(24px) saturate(2.0));
@@ -431,23 +432,56 @@
     transform: perspective(400px) translateZ(4px) scale(1.05);
   }
 
-  /* SOS: expanding shadow ring — doesn't cover initials */
+  /* SOS: 2026 neon danger ring — double expanding ring */
   .avatar-sos {
-    animation: sos-shadow-pulse 1.1s ease-out infinite;
+    animation: sos-neon-ring 1.1s ease-out infinite;
   }
-  @keyframes sos-shadow-pulse {
-    0%   { box-shadow: 0 4px 12px rgba(0,0,0,0.15), inset 0 2px 4px rgba(255,255,255,0.15), 0 0 0 0 rgba(239,68,68,0.55); }
-    70%  { box-shadow: 0 4px 12px rgba(0,0,0,0.15), inset 0 2px 4px rgba(255,255,255,0.15), 0 0 0 14px rgba(239,68,68,0); }
-    100% { box-shadow: 0 4px 12px rgba(0,0,0,0.15), inset 0 2px 4px rgba(255,255,255,0.15), 0 0 0 0 rgba(239,68,68,0); }
+  @keyframes sos-neon-ring {
+    0% {
+      box-shadow:
+        0 4px 12px rgba(0,0,0,0.15),
+        inset 0 2px 4px rgba(255,255,255,0.15),
+        0 0 0 0 rgba(239,68,68,0.70),
+        0 0 12px rgba(239,68,68,0.35);
+    }
+    60% {
+      box-shadow:
+        0 4px 12px rgba(0,0,0,0.15),
+        inset 0 2px 4px rgba(255,255,255,0.15),
+        0 0 0 10px rgba(239,68,68,0.05),
+        0 0 24px rgba(239,68,68,0.50),
+        0 0 48px rgba(239,68,68,0.22);
+    }
+    100% {
+      box-shadow:
+        0 4px 12px rgba(0,0,0,0.15),
+        inset 0 2px 4px rgba(255,255,255,0.15),
+        0 0 0 14px rgba(239,68,68,0),
+        0 0 12px rgba(239,68,68,0.30);
+    }
   }
 
-  /* Online: slow breathing glow — Heartbeat Halo */
+  /* Online: 2026 neon glow halo — multi-layer ring */
   .avatar-live {
-    animation: heartbeat-halo var(--pulse-duration, 1.5s) ease-in-out infinite;
+    animation: neon-halo-live 2.5s ease-in-out infinite;
   }
-  @keyframes heartbeat-halo {
-    0%, 100% { box-shadow: 0 4px 12px rgba(0,0,0,0.15), inset 0 2px 4px rgba(255,255,255,0.15), 0 0 0 rgba(16,185,129,0); }
-    50%       { box-shadow: 0 4px 12px rgba(0,0,0,0.15), inset 0 2px 4px rgba(255,255,255,0.15), 0 0 14px rgba(16,185,129,0.45); }
+  @keyframes neon-halo-live {
+    0%, 100% {
+      box-shadow:
+        0 4px 12px rgba(0,0,0,0.15),
+        inset 0 2px 4px rgba(255,255,255,0.15),
+        0 0 0 2px rgba(16,185,129,0.45),
+        0 0 10px rgba(16,185,129,0.22),
+        0 0 24px rgba(16,185,129,0.10);
+    }
+    50% {
+      box-shadow:
+        0 4px 12px rgba(0,0,0,0.15),
+        inset 0 2px 4px rgba(255,255,255,0.15),
+        0 0 0 3px rgba(16,185,129,0.65),
+        0 0 16px rgba(16,185,129,0.40),
+        0 0 36px rgba(16,185,129,0.18);
+    }
   }
 
   .avatar-offline {
@@ -497,6 +531,8 @@
     height: 6px;
     border-radius: 50%;
     flex-shrink: 0;
+    /* Neon glow dot for live activity */
+    box-shadow: 0 0 4px currentColor;
   }
 
   /* ── F4: Location label badge ──────────────────────────────────────────── */

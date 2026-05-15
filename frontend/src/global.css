@@ -2432,3 +2432,400 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
     transform: none !important;
   }
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   2026 SPATIAL NEON DEPTH — Animation & Effect Additions
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── New CSS Custom Properties for 2026 effects ───────────────────────── */
+:root {
+  /* Aurora mesh — animated gradient orbs */
+  --aurora-teal:   rgba(20, 184, 166, 0.18);
+  --aurora-emerald: rgba(16, 185, 129, 0.14);
+  --aurora-cyan:   rgba(6, 182, 212, 0.12);
+  --aurora-primary: rgba(20, 184, 166, 0.20);
+
+  /* Neon glow multi-layer — for status dots and live indicators */
+  --neon-live-sm:  0 0 8px rgba(16,185,129,0.7), 0 0 20px rgba(16,185,129,0.35), 0 0 40px rgba(16,185,129,0.14);
+  --neon-live-lg:  0 0 12px rgba(16,185,129,0.8), 0 0 30px rgba(16,185,129,0.45), 0 0 60px rgba(16,185,129,0.20);
+  --neon-sos-sm:   0 0 10px rgba(239,68,68,0.75), 0 0 24px rgba(239,68,68,0.40), 0 0 48px rgba(239,68,68,0.18);
+  --neon-sos-lg:   0 0 16px rgba(239,68,68,0.85), 0 0 36px rgba(239,68,68,0.50), 0 0 72px rgba(239,68,68,0.25);
+  --neon-brand-sm: 0 0 8px rgba(20,184,166,0.65), 0 0 20px rgba(20,184,166,0.32), 0 0 40px rgba(20,184,166,0.14);
+  --neon-brand-lg: 0 0 12px rgba(20,184,166,0.80), 0 0 28px rgba(20,184,166,0.42), 0 0 56px rgba(20,184,166,0.20);
+  --neon-warn-sm:  0 0 8px rgba(245,158,11,0.70), 0 0 20px rgba(245,158,11,0.35), 0 0 40px rgba(245,158,11,0.14);
+
+  /* Holographic shimmer gradient for active/premium surfaces */
+  --holo-shimmer: linear-gradient(
+    105deg,
+    transparent 20%,
+    rgba(255,255,255,0.10) 35%,
+    rgba(20,184,166,0.12) 50%,
+    rgba(255,255,255,0.10) 65%,
+    transparent 80%
+  );
+
+  /* Particle field tokens */
+  --particle-size-sm: 2px;
+  --particle-size-md: 3px;
+  --particle-opacity-base: 0.25;
+
+  /* Gyroscope parallax depth layers */
+  --gyro-layer-1: translateX(calc(var(--gyro-x, 0) * 0.5px)) translateY(calc(var(--gyro-y, 0) * 0.5px));
+  --gyro-layer-2: translateX(calc(var(--gyro-x, 0) * 1.2px)) translateY(calc(var(--gyro-y, 0) * 1.2px));
+  --gyro-layer-3: translateX(calc(var(--gyro-x, 0) * 2.5px)) translateY(calc(var(--gyro-y, 0) * 2.5px));
+
+  /* Enhanced spring durations for 2026 feel */
+  --spring-panel:  380ms;
+  --spring-card:   280ms;
+  --spring-small:  220ms;
+  --spring-micro:  140ms;
+}
+
+/* ── 2026 Keyframes ──────────────────────────────────────────────────────── */
+
+/* Aurora orb drift — slow organic mesh movement */
+@keyframes aurora-drift-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  20%       { transform: translate(60px, -40px) scale(1.06); }
+  40%       { transform: translate(30px, 80px) scale(0.97); }
+  60%       { transform: translate(-50px, 30px) scale(1.04); }
+  80%       { transform: translate(20px, -20px) scale(1.02); }
+}
+
+@keyframes aurora-drift-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25%       { transform: translate(-70px, 50px) scale(1.08); }
+  50%       { transform: translate(-20px, 100px) scale(0.94); }
+  75%       { transform: translate(60px, -30px) scale(1.05); }
+}
+
+@keyframes aurora-drift-3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(40px, -60px) scale(1.10); }
+  66%       { transform: translate(-30px, 40px) scale(0.96); }
+}
+
+/* Neon pulse — multi-ring glow that breathes */
+@keyframes neon-breathe-live {
+  0%, 100% {
+    box-shadow: 0 0 6px rgba(16,185,129,0.6), 0 0 16px rgba(16,185,129,0.25);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(16,185,129,0.9), 0 0 30px rgba(16,185,129,0.45), 0 0 60px rgba(16,185,129,0.18);
+    transform: scale(1.12);
+  }
+}
+
+@keyframes neon-breathe-sos {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(239,68,68,0.7), 0 0 20px rgba(239,68,68,0.35);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(239,68,68,1.0), 0 0 40px rgba(239,68,68,0.60), 0 0 80px rgba(239,68,68,0.28);
+    transform: scale(1.20);
+  }
+}
+
+@keyframes neon-breathe-brand {
+  0%, 100% {
+    box-shadow: 0 0 6px rgba(20,184,166,0.5), 0 0 16px rgba(20,184,166,0.20);
+  }
+  50% {
+    box-shadow: 0 0 10px rgba(20,184,166,0.80), 0 0 26px rgba(20,184,166,0.38), 0 0 52px rgba(20,184,166,0.16);
+  }
+}
+
+/* Holographic shimmer sweep — travels across surface */
+@keyframes holo-travel {
+  0%   { transform: translateX(-120%); opacity: 0; }
+  5%   { opacity: 1; }
+  95%  { opacity: 1; }
+  100% { transform: translateX(220%); opacity: 0; }
+}
+
+/* 3D modal entrance — spring with depth */
+@keyframes modal-3d-arrive {
+  0% {
+    transform: perspective(1000px) scale(0.82) translateY(28px) rotateX(6deg);
+    opacity: 0;
+    filter: blur(8px);
+  }
+  55% {
+    transform: perspective(1000px) scale(1.02) translateY(-4px) rotateX(-1deg);
+    opacity: 1;
+    filter: blur(0);
+  }
+  80% {
+    transform: perspective(1000px) scale(0.99) translateY(1px) rotateX(0.5deg);
+  }
+  100% {
+    transform: perspective(1000px) scale(1) translateY(0) rotateX(0);
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+/* 3D sheet arrival — rises with perspective tilt */
+@keyframes sheet-3d-spring {
+  0% {
+    transform: perspective(1200px) translateY(80px) rotateX(8deg) scale(0.94);
+    opacity: 0;
+  }
+  55% {
+    transform: perspective(1200px) translateY(-8px) rotateX(-1.5deg) scale(1.01);
+    opacity: 1;
+  }
+  80% {
+    transform: perspective(1200px) translateY(2px) rotateX(0.5deg) scale(1.00);
+  }
+  100% {
+    transform: perspective(1200px) translateY(0) rotateX(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* Stagger pop-in for list items */
+@keyframes item-pop-in {
+  0% {
+    transform: perspective(800px) translateY(16px) translateZ(-20px) scale(0.94);
+    opacity: 0;
+    filter: blur(3px);
+  }
+  65% {
+    transform: perspective(800px) translateY(-3px) translateZ(2px) scale(1.01);
+    opacity: 1;
+    filter: blur(0);
+  }
+  100% {
+    transform: perspective(800px) translateY(0) translateZ(0) scale(1);
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+/* Particle float — ambient background particles */
+@keyframes particle-float {
+  0%, 100% {
+    transform: translateY(0) translateX(0) scale(1);
+    opacity: var(--particle-opacity-base, 0.25);
+  }
+  33% {
+    transform: translateY(-12px) translateX(6px) scale(1.2);
+    opacity: 0.4;
+  }
+  66% {
+    transform: translateY(-6px) translateX(-8px) scale(0.9);
+    opacity: 0.18;
+  }
+}
+
+/* Spatial depth card — rises from depth plane on enter */
+@keyframes depth-card-arrive {
+  0% {
+    transform: perspective(900px) translateZ(-60px) translateY(20px) scale(0.88);
+    opacity: 0;
+    filter: blur(6px);
+  }
+  60% {
+    transform: perspective(900px) translateZ(4px) translateY(-3px) scale(1.01);
+    opacity: 1;
+    filter: blur(0);
+  }
+  100% {
+    transform: perspective(900px) translateZ(0) translateY(0) scale(1);
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+/* Toast spring-in — from top right, spring settle */
+@keyframes toast-spring-in {
+  0% {
+    transform: translateX(120%) rotate(4deg) scale(0.88);
+    opacity: 0;
+  }
+  55% {
+    transform: translateX(-8px) rotate(-0.5deg) scale(1.02);
+    opacity: 1;
+  }
+  75% {
+    transform: translateX(3px) rotate(0.2deg) scale(1.00);
+  }
+  100% {
+    transform: translateX(0) rotate(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* Gradient hue rotate — animated brand color rotation */
+@keyframes gradient-hue-drift {
+  0%   { filter: hue-rotate(0deg); }
+  50%  { filter: hue-rotate(18deg); }
+  100% { filter: hue-rotate(0deg); }
+}
+
+/* Ripple expand — for touch feedback */
+@keyframes ripple-expand {
+  0%   { transform: translate(-50%, -50%) scale(0); opacity: 0.5; }
+  100% { transform: translate(-50%, -50%) scale(4); opacity: 0; }
+}
+
+/* Status chip breathe — live/active indicators */
+@keyframes chip-breathe {
+  0%, 100% { transform: scale(1); box-shadow: var(--neon-live-sm); }
+  50%       { transform: scale(1.06); box-shadow: var(--neon-live-lg); }
+}
+
+@keyframes chip-breathe-sos {
+  0%, 100% { transform: scale(1); box-shadow: var(--neon-sos-sm); }
+  50%       { transform: scale(1.10); box-shadow: var(--neon-sos-lg); }
+}
+
+/* Attention wiggle — for notification dots */
+@keyframes wiggle-attention {
+  0%, 100% { transform: rotate(0deg); }
+  20%       { transform: rotate(-8deg); }
+  40%       { transform: rotate(8deg); }
+  60%       { transform: rotate(-5deg); }
+  80%       { transform: rotate(5deg); }
+}
+
+/* Border glow rotate — premium card border animation */
+@keyframes border-glow-rotate {
+  0%   { box-shadow: 0 0 0 1px rgba(20,184,166,0.25), 0 0 20px rgba(20,184,166,0.10); }
+  25%  { box-shadow: 0 0 0 1px rgba(6,182,212,0.28), 0 0 20px rgba(6,182,212,0.12); }
+  50%  { box-shadow: 0 0 0 1px rgba(16,185,129,0.25), 0 0 20px rgba(16,185,129,0.10); }
+  75%  { box-shadow: 0 0 0 1px rgba(20,184,166,0.22), 0 0 20px rgba(20,184,166,0.08); }
+  100% { box-shadow: 0 0 0 1px rgba(20,184,166,0.25), 0 0 20px rgba(20,184,166,0.10); }
+}
+
+/* ── 2026 Utility Classes ─────────────────────────────────────────────────── */
+
+/* Neon glow utilities */
+.neon-live   { box-shadow: var(--neon-live-sm); }
+.neon-sos    { box-shadow: var(--neon-sos-sm); }
+.neon-brand  { box-shadow: var(--neon-brand-sm); }
+.neon-warn   { box-shadow: var(--neon-warn-sm); }
+
+/* Animated neon breathing */
+.animate-neon-live    { animation: neon-breathe-live  2.5s ease-in-out infinite; }
+.animate-neon-sos     { animation: neon-breathe-sos   1.4s ease-in-out infinite; }
+.animate-neon-brand   { animation: neon-breathe-brand 3s ease-in-out infinite; }
+.animate-chip-breathe { animation: chip-breathe       2.5s ease-in-out infinite; }
+.animate-chip-sos     { animation: chip-breathe-sos   1.4s ease-in-out infinite; }
+.animate-wiggle       { animation: wiggle-attention   0.6s ease-in-out; }
+.animate-border-glow  { animation: border-glow-rotate 4s ease-in-out infinite; }
+.animate-hue-drift    { animation: gradient-hue-drift 8s ease-in-out infinite; }
+
+/* New 3D entrance utilities */
+.animate-modal-arrive { animation: modal-3d-arrive    500ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.animate-sheet-spring { animation: sheet-3d-spring    440ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.animate-depth-arrive { animation: depth-card-arrive  380ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.animate-item-pop     { animation: item-pop-in        320ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.animate-toast-spring { animation: toast-spring-in    360ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+/* Gyroscope parallax layers — set --gyro-x, --gyro-y via JS */
+.gyro-layer-1 { transform: var(--gyro-layer-1); }
+.gyro-layer-2 { transform: var(--gyro-layer-2); }
+.gyro-layer-3 { transform: var(--gyro-layer-3); }
+
+/* Holographic shimmer surface */
+.holo-surface {
+  position: relative;
+  overflow: hidden;
+}
+.holo-surface::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--holo-shimmer);
+  pointer-events: none;
+  animation: holo-travel 4s ease-in-out infinite;
+  border-radius: inherit;
+}
+
+/* Aurora ambient background — use on page containers */
+.aurora-mesh {
+  position: relative;
+  overflow: hidden;
+}
+.aurora-mesh::before,
+.aurora-mesh::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(70px);
+  will-change: transform;
+}
+.aurora-mesh::before {
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, var(--aurora-teal) 0%, transparent 65%);
+  top: -200px; left: -100px;
+  animation: aurora-drift-1 24s ease-in-out infinite;
+}
+.aurora-mesh::after {
+  width: 450px; height: 450px;
+  background: radial-gradient(circle, var(--aurora-emerald) 0%, transparent 65%);
+  bottom: -100px; right: -80px;
+  animation: aurora-drift-2 30s ease-in-out infinite;
+}
+
+/* Enhanced stagger with depth — for 2026 list arrivals */
+.stagger-3d > *:nth-child(1)  { animation: item-pop-in 320ms cubic-bezier(0.34,1.56,0.64,1) 0ms   both; }
+.stagger-3d > *:nth-child(2)  { animation: item-pop-in 320ms cubic-bezier(0.34,1.56,0.64,1) 40ms  both; }
+.stagger-3d > *:nth-child(3)  { animation: item-pop-in 320ms cubic-bezier(0.34,1.56,0.64,1) 80ms  both; }
+.stagger-3d > *:nth-child(4)  { animation: item-pop-in 320ms cubic-bezier(0.34,1.56,0.64,1) 120ms both; }
+.stagger-3d > *:nth-child(5)  { animation: item-pop-in 320ms cubic-bezier(0.34,1.56,0.64,1) 160ms both; }
+.stagger-3d > *:nth-child(6)  { animation: item-pop-in 320ms cubic-bezier(0.34,1.56,0.64,1) 200ms both; }
+.stagger-3d > *:nth-child(n+7){ animation: item-pop-in 320ms cubic-bezier(0.34,1.56,0.64,1) 240ms both; }
+
+/* Ripple touch feedback — add .ripple class + position:relative + overflow:hidden */
+.ripple {
+  position: relative;
+  overflow: hidden;
+}
+.ripple::after {
+  content: '';
+  position: absolute;
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.20);
+  top: var(--ripple-y, 50%);
+  left: var(--ripple-x, 50%);
+  transform: translate(-50%, -50%) scale(0);
+  opacity: 0;
+  pointer-events: none;
+}
+.ripple:active::after {
+  animation: ripple-expand 500ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* ── 2026 reduced-motion additions ─────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .animate-neon-live,
+  .animate-neon-sos,
+  .animate-neon-brand,
+  .animate-chip-breathe,
+  .animate-chip-sos,
+  .animate-wiggle,
+  .animate-border-glow,
+  .animate-hue-drift,
+  .animate-modal-arrive,
+  .animate-sheet-spring,
+  .animate-depth-arrive,
+  .animate-item-pop,
+  .animate-toast-spring,
+  .holo-surface::after,
+  .aurora-mesh::before,
+  .aurora-mesh::after,
+  .stagger-3d > * {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+}

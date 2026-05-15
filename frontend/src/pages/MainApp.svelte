@@ -48,6 +48,7 @@
   import { isIgnoringBatteryOptimizations, requestIgnoreBatteryOptimizations } from '../lib/batteryOptimization.js';
   import { rideShare } from '../lib/stores/rideShare.js';
   import * as trackingNotif from '../lib/trackingNotification.js';
+  import { startGyroscope, stopGyroscope } from '../lib/gyroscope.js';
 
   let activePanel = null;
   let sidebarTab = 'info';
@@ -605,6 +606,8 @@
     const profileInterval = setInterval(pushProfile, 30000);
     checkMobile();
     window.addEventListener('resize', debouncedCheckMobile);
+    // Start gyroscope for CSS parallax layers on mobile (no-op on desktop/reduced-motion)
+    startGyroscope();
     setOnlineStatus(typeof navigator !== 'undefined' ? navigator.onLine : true);
     setSocketConnected(socket.connected);
     setBufferedCount(bufferSize());
@@ -719,6 +722,7 @@
       mounted = false;
       clearInterval(profileInterval);
       stopTracking();
+      stopGyroscope();
       window.removeEventListener('resize', debouncedCheckMobile);
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);

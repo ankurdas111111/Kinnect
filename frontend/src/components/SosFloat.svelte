@@ -49,7 +49,7 @@
     class:sf-expanded={expanded}
     role="complementary"
     aria-label="Live emergency card for {current.user?.displayName || 'SOS user'}"
-    in:fly={{ y: 20, duration: 300, easing: cubicOut }}
+    in:fly={{ y: 30, duration: 380, easing: cubicOut }}
     out:fly={{ y: 20, duration: 200, easing: cubicOut }}
   >
     <!-- ── Collapsed pill ───────────────────────────────────────── -->
@@ -190,16 +190,35 @@
     width: min(300px, calc(100vw - 96px));
     border-radius: var(--radius-xl);
     overflow: hidden;
-    /* urgent red glass */
-    background: rgba(10, 4, 4, 0.88);
-    border: 1px solid rgba(239, 68, 68, 0.35);
+    /* urgent neon glass */
+    background: rgba(8, 3, 3, 0.92);
+    border: 1px solid rgba(239, 68, 68, 0.40);
+    border-top-color: rgba(255, 80, 80, 0.55);
     box-shadow:
-      0 8px 32px rgba(239, 68, 68, 0.22),
-      0 2px 8px rgba(0, 0, 0, 0.45),
-      inset 0 1px 0 rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(24px) saturate(1.4);
-    -webkit-backdrop-filter: blur(24px) saturate(1.4);
-    animation: sf-mount-glow 1.2s var(--ease-out) both;
+      0 0 0 1px rgba(239, 68, 68, 0.15),
+      0 8px 32px rgba(239, 68, 68, 0.28),
+      0 2px 8px rgba(0, 0, 0, 0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.10);
+    backdrop-filter: blur(28px) saturate(1.6);
+    -webkit-backdrop-filter: blur(28px) saturate(1.6);
+    animation: sf-mount-glow 1.2s var(--ease-out) both, sf-neon-pulse 2.4s ease-in-out 1.2s infinite;
+  }
+
+  @keyframes sf-neon-pulse {
+    0%, 100% {
+      box-shadow:
+        0 0 0 1px rgba(239, 68, 68, 0.15),
+        0 8px 32px rgba(239, 68, 68, 0.28),
+        0 2px 8px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 rgba(255, 255, 255, 0.10);
+    }
+    50% {
+      box-shadow:
+        0 0 0 2px rgba(239, 68, 68, 0.28),
+        0 8px 48px rgba(239, 68, 68, 0.40),
+        0 2px 8px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 rgba(255, 255, 255, 0.10);
+    }
   }
 
   @keyframes sf-mount-glow {
@@ -267,12 +286,15 @@
     height: 8px;
     border-radius: 50%;
     background: #ef4444;
-    box-shadow: 0 0 6px rgba(239, 68, 68, 0.7);
+    box-shadow:
+      0 0 6px rgba(239, 68, 68, 0.80),
+      0 0 12px rgba(239, 68, 68, 0.45),
+      0 0 20px rgba(239, 68, 68, 0.20);
     animation: sf-pulse 1.2s ease-in-out infinite;
   }
   @keyframes sf-pulse {
-    0%, 100% { transform: scale(1); opacity: 1; }
-    50%       { transform: scale(1.5); opacity: 0.6; }
+    0%, 100% { transform: scale(1);    opacity: 1;   box-shadow: 0 0 6px rgba(239,68,68,0.80), 0 0 12px rgba(239,68,68,0.45); }
+    50%       { transform: scale(1.55); opacity: 0.75; box-shadow: 0 0 10px rgba(239,68,68,0.90), 0 0 22px rgba(239,68,68,0.60), 0 0 36px rgba(239,68,68,0.25); }
   }
 
   /* Blood type badge */
@@ -286,12 +308,13 @@
     padding: 0 6px;
     border-radius: 6px;
     background: rgba(239, 68, 68, 0.22);
-    border: 1px solid rgba(239, 68, 68, 0.45);
+    border: 1px solid rgba(239, 68, 68, 0.50);
     color: #fca5a5;
     font-size: 11px;
     font-weight: 800;
     letter-spacing: 0.03em;
     font-variant-numeric: tabular-nums;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.35), inset 0 1px 0 rgba(255,255,255,0.12);
   }
 
   .sf-name {
@@ -497,6 +520,15 @@
     font-weight: 600;
   }
   .sf-phone-link:hover { text-decoration: underline; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sf {
+      animation: none;
+    }
+    .sf-pulse {
+      animation: none;
+    }
+  }
 
   .sf-more-note {
     font-size: 11px;

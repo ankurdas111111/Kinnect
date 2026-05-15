@@ -151,7 +151,26 @@
 </script>
 
 <div class="auth-page page-enter">
+  <!-- 2026 Aurora Mesh Background -->
   <div class="auth-bg"><div class="auth-bg-blob"></div></div>
+  <div class="auth-aurora-orb auth-aurora-orb-1" aria-hidden="true"></div>
+  <div class="auth-aurora-orb auth-aurora-orb-2" aria-hidden="true"></div>
+  <div class="auth-aurora-orb auth-aurora-orb-3" aria-hidden="true"></div>
+  <div class="auth-grid-overlay" aria-hidden="true"></div>
+  <div class="auth-particles" aria-hidden="true">
+    <span class="auth-particle large"></span>
+    <span class="auth-particle"></span>
+    <span class="auth-particle"></span>
+    <span class="auth-particle large"></span>
+    <span class="auth-particle"></span>
+    <span class="auth-particle"></span>
+    <span class="auth-particle large"></span>
+    <span class="auth-particle"></span>
+    <span class="auth-particle"></span>
+    <span class="auth-particle large"></span>
+    <span class="auth-particle"></span>
+    <span class="auth-particle"></span>
+  </div>
 
   <div class="auth-brand">
     <div class="auth-brand-inner">

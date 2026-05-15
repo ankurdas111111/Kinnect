@@ -308,18 +308,49 @@
     width: 72px;
     height: 72px;
     border-radius: 50%;
-    background: rgba(239, 68, 68, 0.15);
-    border: 2px solid rgba(239, 68, 68, 0.45);
+    background: radial-gradient(circle at 35% 35%, rgba(239,68,68,0.25) 0%, rgba(239,68,68,0.12) 100%);
+    border: 2px solid rgba(239, 68, 68, 0.55);
+    border-top-color: rgba(255, 80, 80, 0.80);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--danger-500);
-    animation: sos-urgent-pulse 1.2s ease infinite;
+    color: var(--danger-400);
+    position: relative;
+    animation: sos-neon-ring 1.4s ease-in-out infinite;
     flex-shrink: 0;
     box-shadow:
-      0 0 0 8px rgba(239, 68, 68, 0.08),
-      0 0 0 16px rgba(239, 68, 68, 0.04),
-      0 0 32px rgba(239, 68, 68, 0.25);
+      0 0 0 6px rgba(239, 68, 68, 0.12),
+      0 0 0 12px rgba(239, 68, 68, 0.06),
+      0 0 0 20px rgba(239, 68, 68, 0.03),
+      0 0 40px rgba(239, 68, 68, 0.35),
+      inset 0 1px 0 rgba(255,255,255,0.15);
+  }
+
+  /* Outer ring expander — radiates outward every pulse */
+  .alert-sos-icon::before {
+    content: '';
+    position: absolute;
+    inset: -14px;
+    border-radius: 50%;
+    border: 2px solid rgba(239, 68, 68, 0.35);
+    animation: sos-ring-radiate 1.4s ease-out infinite;
+    pointer-events: none;
+  }
+
+  /* Second ring — offset by half period for continuous effect */
+  .alert-sos-icon::after {
+    content: '';
+    position: absolute;
+    inset: -14px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(239, 68, 68, 0.20);
+    animation: sos-ring-radiate 1.4s ease-out 0.7s infinite;
+    pointer-events: none;
+  }
+
+  @keyframes sos-ring-radiate {
+    0%   { transform: scale(1);    opacity: 0.8; }
+    100% { transform: scale(1.55); opacity: 0;   }
   }
 
   .alert-body {
@@ -349,9 +380,25 @@
     letter-spacing: 0.01em;
   }
 
-  .narrative-chip.motion  { background: rgba(245,158,11,0.15);  color: var(--warning-500);  border: 1px solid rgba(245,158,11,0.25); }
-  .narrative-chip.battery { background: rgba(16,185,129,0.12);  color: var(--success-500);  border: 1px solid rgba(16,185,129,0.20); }
-  .narrative-chip.trigger { background: rgba(239,68,68,0.12);   color: var(--danger-500);   border: 1px solid rgba(239,68,68,0.20); }
+  .narrative-chip.motion  {
+    background: rgba(245,158,11,0.15);
+    color: var(--warning-500);
+    border: 1px solid rgba(245,158,11,0.30);
+    box-shadow: 0 0 6px rgba(245,158,11,0.20);
+  }
+  .narrative-chip.battery {
+    background: rgba(16,185,129,0.12);
+    color: var(--success-500);
+    border: 1px solid rgba(16,185,129,0.25);
+    box-shadow: 0 0 6px rgba(16,185,129,0.18);
+  }
+  .narrative-chip.trigger {
+    background: rgba(239,68,68,0.12);
+    color: var(--danger-500);
+    border: 1px solid rgba(239,68,68,0.28);
+    box-shadow: 0 0 6px rgba(239,68,68,0.22);
+    animation: chip-breathe-sos 1.8s ease-in-out infinite;
+  }
 
   /* ── Medical Card (Feature 9) ────────────────────────────────────────────── */
   .med-card {
@@ -401,9 +448,10 @@
     width: 28px;
     height: 28px;
     border-radius: var(--radius-sm);
-    background: rgba(239, 68, 68, 0.12);
+    background: rgba(239, 68, 68, 0.14);
     color: var(--danger-500);
     flex-shrink: 0;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.25);
   }
 
   .med-card-title {
@@ -531,7 +579,12 @@
     .alert-shake-wrapper.shaking :global(.modal-backdrop) {
       animation: none;
     }
-    .alert-sos-icon {
+    .alert-sos-icon,
+    .alert-sos-icon::before,
+    .alert-sos-icon::after {
+      animation: none;
+    }
+    .narrative-chip.trigger {
       animation: none;
     }
   }

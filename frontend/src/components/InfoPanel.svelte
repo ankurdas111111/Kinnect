@@ -1273,9 +1273,13 @@
     user-select: none;
   }
   .gps-live-card.is-tracking {
-    border-color: rgba(16, 185, 129, 0.30);
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.07) 0%, transparent 60%);
-    box-shadow: 0 0 20px rgba(16, 185, 129, 0.08);
+    border-color: rgba(16, 185, 129, 0.35);
+    border-top-color: rgba(16, 185, 129, 0.55);
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.09) 0%, transparent 65%);
+    box-shadow:
+      0 0 20px rgba(16, 185, 129, 0.12),
+      0 0 0 1px rgba(16, 185, 129, 0.08),
+      inset 0 1px 0 rgba(16, 185, 129, 0.12);
   }
   .gps-accuracy-label {
     font-family: var(--font-display);
@@ -1305,6 +1309,10 @@
   }
   .gps-ping.active {
     background: var(--success-500);
+    box-shadow:
+      0 0 6px rgba(16, 185, 129, 0.75),
+      0 0 12px rgba(16, 185, 129, 0.40),
+      0 0 20px rgba(16, 185, 129, 0.18);
     animation: gps-pulse 2.2s ease-in-out infinite;
   }
   .gps-ping.active::before {
@@ -1312,7 +1320,7 @@
     position: absolute;
     inset: -4px;
     border-radius: 50%;
-    background: rgba(16, 185, 129, 0.28);
+    background: rgba(16, 185, 129, 0.22);
     animation: gps-ring 2.2s ease-out infinite;
   }
   @keyframes gps-pulse {
@@ -1371,13 +1379,17 @@
     align-items: center;
     justify-content: center;
     gap: 0;
-    background: rgba(99, 102, 241, 0.09);
-    border: 1px solid rgba(99, 102, 241, 0.16);
+    background: rgba(99, 102, 241, 0.10);
+    border: 1px solid rgba(99, 102, 241, 0.22);
+    border-top-color: rgba(129, 140, 248, 0.35);
     border-radius: var(--radius-md);
     padding: var(--space-1-5) var(--space-3);
     flex-shrink: 0;
     min-width: 52px;
     text-align: center;
+    box-shadow:
+      0 0 10px rgba(99, 102, 241, 0.14),
+      inset 0 1px 0 rgba(255,255,255,0.08);
   }
   .speed-num {
     font-size: var(--text-xl);
@@ -1440,14 +1452,36 @@
 
   /* ── Identity Card ──────────────────────────────────────────────── */
   .identity-card {
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.07) 0%, rgba(139, 92, 246, 0.03) 100%);
-    border: 1px solid rgba(99, 102, 241, 0.15);
-    border-top-color: rgba(99, 102, 241, 0.28);
+    background: linear-gradient(135deg, rgba(20, 184, 166, 0.06) 0%, rgba(99, 102, 241, 0.04) 60%, transparent 100%);
+    border: 1px solid rgba(20, 184, 166, 0.18);
+    border-top-color: rgba(45, 212, 191, 0.32);
     border-radius: var(--radius-xl);
     padding: var(--space-4);
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
+    position: relative;
+    box-shadow:
+      0 0 16px rgba(20, 184, 166, 0.08),
+      inset 0 1px 0 rgba(45, 212, 191, 0.10);
+    overflow: hidden;
+  }
+
+  /* Shimmer sweep on identity card */
+  .identity-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      105deg,
+      transparent 30%,
+      rgba(20,184,166,0.06) 50%,
+      transparent 70%
+    );
+    transform: translateX(-100%);
+    pointer-events: none;
+    animation: holo-travel 6s ease-in-out 2s infinite;
+    border-radius: inherit;
   }
   .identity-body {
     display: flex;
@@ -1461,6 +1495,9 @@
     font-weight: 700;
     letter-spacing: 0.08em;
     color: var(--primary-400);
+    text-shadow:
+      0 0 10px rgba(20, 184, 166, 0.55),
+      0 0 24px rgba(20, 184, 166, 0.25);
   }
   .identity-meta {
     font-size: 11px;
