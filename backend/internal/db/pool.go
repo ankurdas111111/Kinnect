@@ -11,9 +11,12 @@ import (
 )
 
 const (
-	maxOpenConns    = 30 // was 10 — sized for concurrent WS handlers under real load
-	maxIdleConns    = 15
-	connMaxIdleTime = 2 * time.Minute // was 30s — reduce reconnect churn
+	// Aiven free tier hard-caps at 20 total connections; ~3 are reserved
+	// for Aiven internals, leaving ~17 usable. Keep well under that to
+	// survive Render restarts leaving stale connections in TIME_WAIT.
+	maxOpenConns    = 10
+	maxIdleConns    = 5
+	connMaxIdleTime = 90 * time.Second // recycle idle conns quickly to free slots
 	connMaxLifetime = 5 * time.Minute
 )
 
