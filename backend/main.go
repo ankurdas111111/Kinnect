@@ -35,12 +35,25 @@ func main() {
 	defer pool.Close()
 
 	fmt.Fprintln(os.Stderr, "STARTUP: running InitDB")
-	initDBCtx, initDBCancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	initDBErr := db.InitDB(initDBCtx, pool.DB)
-	initDBCancel()
-	if initDBErr != nil {
-		fmt.Fprintf(os.Stderr, "STARTUP FATAL: InitDB failed: %v\n", initDBErr)
-		slog.Error("Failed to initialize database schema", "error", initDBErr)
+	// Run InitDB in a goroutine so we can enforce a hard wall-clock timeout
+	// independent of context/driver cancellation. Aiven may run PgBouncer which
+	// drops cancel requests, so ExecContext alone cannot guarantee we exit.
+	// Wall-clock select guarantees exit ≤ 45s — well inside Render's deploy window.
+	initDBResult := make(chan error, 1)
+	go func() {
+		initDBCtx, initDBCancel := context.WithTimeout(context.Background(), 40*time.Second)
+		defer initDBCancel()
+		initDBResult <- db.InitDB(initDBCtx, pool.DB)
+	}()
+	select {
+	case initDBErr := <-initDBResult:
+		if initDBErr != nil {
+			fmt.Fprintf(os.Stderr, "STARTUP FATAL: InitDB failed: %v\n", initDBErr)
+			slog.Error("Failed to initialize database schema", "error", initDBErr)
+			os.Exit(1)
+		}
+	case <-time.After(45 * time.Second):
+		fmt.Fprintf(os.Stderr, "STARTUP FATAL: InitDB timed out after 45s — DDL lock or DB unavailable\n")
 		os.Exit(1)
 	}
 	fmt.Fprintln(os.Stderr, "STARTUP: InitDB OK")

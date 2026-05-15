@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"os"
 	"strings"
 )
 
@@ -270,13 +271,15 @@ func InitDB(ctx context.Context, db *sql.DB) error {
 	}
 
 	for i, stmt := range statements {
+		// Log BEFORE executing — if we hang, the last printed index tells us which
+		// statement blocked. Use os.Stderr (unbuffered) so it flushes before exit.
+		preview := strings.TrimSpace(stmt)
+		if len(preview) > 80 {
+			preview = preview[:80] + "..."
+		}
+		fmt.Fprintf(os.Stderr, "InitDB: stmt %d: %s\n", i, preview)
+
 		if _, err := db.ExecContext(ctx, stmt); err != nil {
-			// Truncate the statement for the error log so it's readable
-			preview := stmt
-			if len(preview) > 120 {
-				preview = preview[:120] + "..."
-			}
-			preview = strings.TrimSpace(preview)
 			slog.Error("schema init: statement failed", "stmt_index", i, "stmt_preview", preview, "error", err)
 			return fmt.Errorf("schema init stmt %d (%s): %w", i, preview, err)
 		}
