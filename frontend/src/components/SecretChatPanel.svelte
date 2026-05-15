@@ -174,7 +174,7 @@
   }
 
   $: chat = $secretChats.get(peerId) ?? { messages: [], locked: true, decryptedMessages: new Map() };
-  $: myId = $authUser?.userId;
+  $: myId = $authUser?.userId ?? '';
   $: sortedMsgs = [...chat.messages].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
   $: groupedMsgs = sortedMsgs.map((msg, i) => {

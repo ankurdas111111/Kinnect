@@ -412,6 +412,11 @@ export function setupSocketHandlers() {
   socket.on('secretMsgSent', (msg) => {
     if (!msg || !msg.receiverId) return;
     const myId = get(authUser)?.userId;
+    // Guard: if auth store hasn't resolved yet, myId is undefined.
+    // A message stored with senderId:undefined would be indistinguishable
+    // from a received message (msg.senderId !== myId → always true).
+    // Drop and rely on the secretMsgsHistory fetch to backfill instead.
+    if (!myId) return;
     addSecretMessage(msg.receiverId, { ...msg, senderId: myId });
   });
   socket.on('secretMsgsHistory', (data) => {
