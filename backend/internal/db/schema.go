@@ -3,13 +3,21 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
+	"strings"
 )
 
 // InitDB creates the schema if it does not exist. Matches backend-v2 schema.
 func InitDB(db *sql.DB) error {
+	// Extensions: non-fatal — Aiven free tier restricts CREATE EXTENSION to
+	// superuser; gen_random_uuid() is built-in since PG 13 without pgcrypto.
+	for _, ext := range []string{"pgcrypto", "uuid-ossp"} {
+		if _, err := db.Exec(`CREATE EXTENSION IF NOT EXISTS "` + ext + `"`); err != nil {
+			slog.Warn("CREATE EXTENSION skipped (non-fatal)", "ext", ext, "error", err)
+		}
+	}
+
 	statements := []string{
-		`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`,
-		`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`,
 
 		`CREATE TABLE IF NOT EXISTS users (
 			id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -265,9 +273,16 @@ func InitDB(db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_position_history_user_ts ON position_history(user_id, ts DESC)`,
 	}
 
-	for _, stmt := range statements {
+	for i, stmt := range statements {
 		if _, err := db.Exec(stmt); err != nil {
-			return fmt.Errorf("schema init: %w", err)
+			// Truncate the statement for the error log so it's readable
+			preview := stmt
+			if len(preview) > 120 {
+				preview = preview[:120] + "..."
+			}
+			preview = strings.TrimSpace(preview)
+			slog.Error("schema init: statement failed", "stmt_index", i, "stmt_preview", preview, "error", err)
+			return fmt.Errorf("schema init stmt %d (%s): %w", i, preview, err)
 		}
 	}
 	return nil

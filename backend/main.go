@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -33,10 +34,13 @@ func main() {
 	}
 	defer pool.Close()
 
+	fmt.Fprintln(os.Stderr, "STARTUP: running InitDB")
 	if err := db.InitDB(pool.DB); err != nil {
+		fmt.Fprintf(os.Stderr, "STARTUP FATAL: InitDB failed: %v\n", err)
 		slog.Error("Failed to initialize database schema", "error", err)
 		os.Exit(1)
 	}
+	fmt.Fprintln(os.Stderr, "STARTUP: InitDB OK")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -56,6 +60,7 @@ func main() {
 				break
 			}
 			if i == maxPingAttempts {
+				fmt.Fprintf(os.Stderr, "STARTUP FATAL: DB not ready after %d retries: %v\n", maxPingAttempts, err)
 				slog.Error("Database not ready after retries", "attempts", maxPingAttempts, "error", err)
 				os.Exit(1)
 			}
@@ -69,13 +74,16 @@ func main() {
 	// contacts, and guardianships are visible immediately after deployment/restart.
 	// The prior "lazy load" approach was a stub that loaded nothing, causing all
 	// relationship data to appear missing until the process was restarted with activity.
+	fmt.Fprintln(os.Stderr, "STARTUP: running LoadAll")
 	startupCtx, startupCancel := context.WithTimeout(ctx, 30*time.Second)
 	result, err := db.LoadAll(startupCtx, pool.DB)
 	startupCancel()
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "STARTUP FATAL: LoadAll failed: %v\n", err)
 		slog.Error("Failed to load data from database", "error", err)
 		os.Exit(1)
 	}
+	fmt.Fprintln(os.Stderr, "STARTUP: LoadAll OK")
 
 	c := cache.New()
 	c.Init(result)
