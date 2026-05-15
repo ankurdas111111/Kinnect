@@ -50,7 +50,7 @@
   on:scroll={onScroll}
 >
   <div class="virtual-spacer" style="height:{totalHeight}px; position:relative;">
-    {#each visibleItems as { item, index, top } (index)}
+    {#each visibleItems as { item, index, top } (item.socketId ?? item.id ?? index)}
       <div
         class="virtual-item"
         style="position:absolute;top:{top}px;left:0;right:0;height:{itemHeight}px;"

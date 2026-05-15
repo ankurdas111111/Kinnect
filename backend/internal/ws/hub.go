@@ -186,6 +186,11 @@ func (h *Hub) buildEventHandlers() map[string]func(*Client, json.RawMessage) {
 		"getRoomNotes":         h.handleGetRoomNotes,
 		"getDailyActivity":     h.handleGetDailyActivity,
 		"getRecentTrail":       h.handleGetRecentTrail,
+		// WebRTC signaling relay — server is a pure relay, audio is peer-to-peer
+		"webrtc:offer":         h.handleWebRTCOffer,
+		"webrtc:answer":        h.handleWebRTCAnswer,
+		"webrtc:ice":           h.handleWebRTCIce,
+		"webrtc:hangup":        h.handleWebRTCHangup,
 	}
 }
 

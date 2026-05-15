@@ -482,7 +482,17 @@
   }
   function onPointerUp() { isDragging = false; }
 
-  onMount(() => { rafId = requestAnimationFrame(tick); });
+  onMount(() => {
+    let started = false;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && !started) {
+        started = true;
+        rafId = requestAnimationFrame(tick);
+      }
+    }, { threshold: 0.1 });
+    if (canvas) observer.observe(canvas);
+    return () => observer.disconnect();
+  });
   onDestroy(() => { if (rafId) cancelAnimationFrame(rafId); });
 </script>
 

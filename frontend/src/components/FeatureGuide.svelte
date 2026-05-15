@@ -66,6 +66,18 @@
       ],
     },
     {
+      icon: 'walkie',
+      tab: 'People',
+      title: 'Walkie-Talkie',
+      desc: 'Push-to-talk voice calls with any family member — no phone call needed.',
+      steps: [
+        'Tap any family member\'s card on the map to open their details',
+        'Tap the "Talk" button — they\'ll get an incoming call notification',
+        'Once connected, hold the button to speak and release to listen',
+        'Works instantly between contacts — no setup, no phone number needed',
+      ],
+    },
+    {
       icon: 'sos',
       tab: 'Safety',
       title: 'SOS Emergency Alert',
@@ -133,6 +145,7 @@
     sos: 'M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z M12 9v4 M12 17h.01',
     geofence: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
     profile: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z',
+    walkie: 'M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z M19 10v2a7 7 0 0 1-14 0v-2 M12 19v4 M8 23h8',
   };
 </script>
 

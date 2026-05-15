@@ -454,8 +454,15 @@
 </script>
 
 {#if panicMode}
-  <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div class="scv-panic" on:click={restoreFromPanic}></div>
+  <div
+    class="scv-panic"
+    role="alertdialog"
+    aria-label="Screen blanked for privacy. Tap or press Enter to restore."
+    aria-live="assertive"
+    tabindex="0"
+    on:click={restoreFromPanic}
+    on:keydown={(e) => (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') && restoreFromPanic()}
+  ></div>
 {/if}
 
 <div class="scv" class:scv--plain={state !== 'messages'}>
@@ -484,7 +491,7 @@
 
   <!-- ── Login ────────────────────────────────────────────────────── -->
   {:else if state === 'login'}
-    <div class="scv-gate" role="main">
+    <div class="scv-gate" role="region" aria-label="Authentication">
       <div class="scv-gate-content">
 
         <div class="scv-gate-text">
@@ -551,7 +558,7 @@
 
   <!-- ── Gate ─────────────────────────────────────────────────────── -->
   {:else if state === 'gate'}
-    <div class="scv-gate" role="main">
+    <div class="scv-gate" role="region" aria-label="Authentication">
       <div class="scv-gate-content">
 
         <div class="scv-gate-text">
@@ -1672,7 +1679,10 @@
     border: 1px solid rgba(255, 255, 255, 0.09);
     background: rgba(255, 255, 255, 0.04);
     color: rgba(255, 255, 255, 0.92);
-    font-size: var(--text-sm, 0.875rem);
+    /* 16px minimum on all screen sizes: iOS Safari/Chrome checks the computed
+       font-size at pointerdown — before any media query transition — and zooms
+       the page if it is below 16px. The @media override is therefore too late. */
+    font-size: 16px;
     line-height: var(--leading-relaxed, 1.625);
     outline: none;
     font-family: var(--font-sans, 'Nunito', sans-serif);
@@ -1688,7 +1698,6 @@
     box-shadow: 0 0 0 3px var(--scv-accent-subtle);
   }
   .scv-compose-text::placeholder { color: rgba(255, 255, 255, 0.2); }
-  @media (max-width: 767px) { .scv-compose-text { font-size: 16px; } }
 
   .scv-send-btn {
     width: 44px; height: 44px;
@@ -1866,7 +1875,9 @@
     border-radius: var(--radius-lg, 12px);
     color: rgba(255, 255, 255, 0.9);
     font-family: var(--font-sans, 'Nunito', sans-serif);
-    font-size: var(--text-sm, 0.875rem);
+    /* 16px minimum prevents iOS Safari/Chrome from auto-zooming the page
+       when this input receives focus — any value below 16px triggers zoom. */
+    font-size: 16px;
     font-weight: 500;
     caret-color: var(--scv-accent);
     outline: none;

@@ -14,20 +14,19 @@ export default defineConfig({
     // Vite does not automatically detect it (e.g. if the import becomes deeply
     // dynamic). It checks first so it never duplicates what Vite already added.
     {
-      name: 'inject-maplibre-preload',
+      name: 'inject-critical-preloads',
       transformIndexHtml(html, ctx) {
         if (!ctx.bundle) return html;
-        const maplibreChunk = Object.values(ctx.bundle).find(
-          chunk => chunk.type === 'chunk' && chunk.name === 'maplibre'
-        );
-        if (!maplibreChunk) return html;
-        // maplibreChunk.fileName may already include "assets/" prefix
-        const fileName = maplibreChunk.fileName.replace(/^assets\//, '');
-        const assetPath = `/assets/${fileName}`;
-        // Skip if Vite already injected a modulepreload for this chunk
-        if (html.includes(assetPath)) return html;
-        const tag = `<link rel="modulepreload" href="${assetPath}" crossorigin />`;
-        return html.replace('</head>', `${tag}\n</head>`);
+        const chunks = Object.values(ctx.bundle);
+        let result = html;
+        for (const chunkName of ['maplibre', 'socket']) {
+          const chunk = chunks.find(c => c.type === 'chunk' && c.name === chunkName);
+          if (!chunk) continue;
+          const assetPath = `/assets/${chunk.fileName.replace(/^assets\//, '')}`;
+          if (result.includes(assetPath)) continue;
+          result = result.replace('</head>', `<link rel="modulepreload" href="${assetPath}" crossorigin />\n</head>`);
+        }
+        return result;
       }
     }
   ],

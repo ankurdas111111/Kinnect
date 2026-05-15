@@ -36,8 +36,20 @@
   $: isAdmin = $authUser && $authUser.role === 'admin';
 
   // Sort: SOS first, then online (with location) → online (no location) → offline
-  $: userList = Array.from($otherUsers.values())
-    .sort((a, b) => {
+  // Pre-compute distances once per reactive run to avoid O(n log n) calculateDistance calls in comparator
+  $: userList = (() => {
+    const users = Array.from($otherUsers.values());
+    const distCache = new Map();
+    if ($myLocation?.latitude != null) {
+      for (const u of users) {
+        if (u.latitude != null && u.longitude != null) {
+          distCache.set(u.socketId, calculateDistance(
+            $myLocation.latitude, $myLocation.longitude, u.latitude, u.longitude
+          ));
+        }
+      }
+    }
+    return users.sort((a, b) => {
       if (a.sos?.active && !b.sos?.active) return -1;
       if (!a.sos?.active && b.sos?.active) return 1;
       if (a.online !== false && b.online === false) return -1;
@@ -48,13 +60,12 @@
         if (aHasLoc && !bHasLoc) return -1;
         if (!aHasLoc && bHasLoc) return 1;
         if ($myLocation && aHasLoc && bHasLoc) {
-          const da = calculateDistance($myLocation.latitude, $myLocation.longitude, a.latitude, a.longitude);
-          const db = calculateDistance($myLocation.latitude, $myLocation.longitude, b.latitude, b.longitude);
-          return da - db;
+          return (distCache.get(a.socketId) ?? Infinity) - (distCache.get(b.socketId) ?? Infinity);
         }
       }
       return 0;
     });
+  })();
 
   function onlineStatus(user) {
     if (user.online === false) {

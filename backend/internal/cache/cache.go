@@ -100,9 +100,10 @@ type ActiveUser struct {
 	LastWaypointAt int64 // UnixMilli; 0 = never written
 
 	// Intelligence fields (computed on each position update)
-	LastAttestAt  int64   // unix ms — last manual attestation; 0 = never
-	MovementPhase string  // "stationary" | "walking" | "driving" | "transit"
-	SafetyScore   float64 // 0–100, recomputed on each position update
+	LastAttestAt      int64   // unix ms — last manual attestation; 0 = never
+	MovementPhase     string  // "stationary" | "walking" | "driving" | "transit"
+	SafetyScore       float64 // 0–100, recomputed on each position update
+	LastSafetyScoreAt int64   // unix ms — throttle ComputeSafetyScore to at most 1/sec
 
 	// Consumer context fields
 	ActivityContext    string        // "At Home" | "Walking" | "In Transit" | "" (computed each position update)

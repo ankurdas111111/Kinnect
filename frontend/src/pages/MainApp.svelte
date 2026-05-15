@@ -20,6 +20,7 @@
   import SettingsPanel from '../components/SettingsPanel.svelte';
   import SavedPlacesPanel from '../components/SavedPlacesPanel.svelte';
   import AlertOverlay from '../components/AlertOverlay.svelte';
+  import IncomingCallOverlay from '../components/IncomingCallOverlay.svelte';
   import BottomSheet from '../components/primitives/BottomSheet.svelte';
   import BottomTabBar from '../components/primitives/BottomTabBar.svelte';
   import MapFab from '../components/primitives/MapFab.svelte';
@@ -905,6 +906,7 @@
     >{liveAnnouncement}</div>
 
     <AlertOverlay />
+    <IncomingCallOverlay />
 
     <!-- Secret encrypted chat overlay -->
     {#if secretChatPeer}

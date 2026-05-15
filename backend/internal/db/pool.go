@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	maxOpenConns    = 10 // keep in sync with config/limits.go:MaxDatabaseConnections
-	maxIdleConns    = 3
-	connMaxIdleTime = 30 * time.Second
+	maxOpenConns    = 30 // was 10 — sized for concurrent WS handlers under real load
+	maxIdleConns    = 15
+	connMaxIdleTime = 2 * time.Minute // was 30s — reduce reconnect churn
 	connMaxLifetime = 5 * time.Minute
 )
 

@@ -49,7 +49,7 @@
   }
 </script>
 
-<div class="gate" role="main" aria-label="Secret chat PIN gate">
+<div class="gate" role="region" aria-label="Secret chat PIN gate">
   <!-- Encrypted-space background texture -->
   <div class="gate-hex-bg" aria-hidden="true"></div>
   <div class="gate-glow" aria-hidden="true"></div>

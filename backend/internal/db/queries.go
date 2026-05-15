@@ -571,43 +571,48 @@ func GetUserByID(ctx context.Context, db *sql.DB, userID string) (*UserCacheEntr
 	}, nil
 }
 
-// GetRoomByID loads a single room from the database by ID (for lazy loading)
+// GetRoomByID loads a single room from the database by ID (for lazy loading).
+// Uses a single LEFT JOIN to avoid the N+1 two-query pattern.
 func GetRoomByID(ctx context.Context, db *sql.DB, roomID string) (*RoomEntry, error) {
-	var id, code, name string
-	var createdBy sql.NullString
-	var createdAt int64
-
-	err := db.QueryRowContext(ctx,
-		`SELECT id, code, name, created_by, created_at FROM rooms WHERE id = $1`,
-		roomID).Scan(&id, &code, &name, &createdBy, &createdAt)
-
+	rows, err := db.QueryContext(ctx, `
+		SELECT r.id, r.code, r.name, r.created_by, r.created_at, rm.user_id
+		FROM rooms r
+		LEFT JOIN room_members rm ON rm.room_id = r.id
+		WHERE r.id = $1
+	`, roomID)
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
-	// Load room members
-	memberRows, err := db.QueryContext(ctx,
-		`SELECT user_id FROM room_members WHERE room_id = $1`,
-		roomID)
-	if err != nil {
-		return nil, err
-	}
-	defer memberRows.Close()
-
+	var entry *RoomEntry
 	members := make(map[string]bool)
-	for memberRows.Next() {
-		var userID string
-		if err := memberRows.Scan(&userID); err != nil {
+	for rows.Next() {
+		var id, code, name string
+		var createdBy sql.NullString
+		var createdAt int64
+		var memberID sql.NullString
+		if err := rows.Scan(&id, &code, &name, &createdBy, &createdAt, &memberID); err != nil {
 			return nil, err
 		}
-		members[userID] = true
+		if entry == nil {
+			entry = &RoomEntry{
+				DbID:      id,
+				Name:      name,
+				CreatedBy: createdBy.String,
+				CreatedAt: createdAt,
+			}
+		}
+		if memberID.Valid {
+			members[memberID.String] = true
+		}
 	}
-
-	return &RoomEntry{
-		DbID:      id,
-		Name:      name,
-		CreatedBy: createdBy.String,
-		CreatedAt: createdAt,
-		Members:   members,
-	}, nil
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if entry == nil {
+		return nil, sql.ErrNoRows
+	}
+	entry.Members = members
+	return entry, nil
 }

@@ -213,8 +213,8 @@ func (h *Hub) handlePosition(c *Client, data json.RawMessage) {
 		}
 	}
 
-	// ── Safety score (recomputed on every position update) ───────────────────
-	{
+	// ── Safety score (throttled to 1/sec per user) ───────────────────────────
+	if now-user.LastSafetyScoreAt >= 1000 {
 		checkInOverdueAt := int64(0)
 		if user.CheckIn.Enabled && user.CheckIn.IntervalMin > 0 && user.CheckIn.LastCheckInAt > 0 {
 			checkInOverdueAt = user.CheckIn.LastCheckInAt +
@@ -236,6 +236,7 @@ func (h *Hub) handlePosition(c *Client, data json.RawMessage) {
 			user.MotionClass,
 		)
 		user.SafetyScore = sc.Total
+		user.LastSafetyScoreAt = now
 	}
 
 	if shouldWritePositionToDB(user, pos.Latitude, pos.Longitude, pos.Speed) {

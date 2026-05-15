@@ -658,18 +658,31 @@
     });
   }
 
-  // Update cluster GeoJSON whenever user positions change
+  // Snapshot of last-rendered cluster positions — skip rebuild if nothing moved
+  let _clusterPosSnapshot = new Map(); // socketId → 'lat,lng,sos,online'
+
+  // Update cluster GeoJSON only when user positions actually change
   $: if (map && map.getSource('users-cluster')) {
-    const features = [];
+    let dirty = false;
     for (const user of $otherUsers.values()) {
-      if (user.latitude == null || user.longitude == null || user.online === false) continue;
-      features.push({
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: [user.longitude, user.latitude] },
-        properties: { name: user.displayName || 'User', sos: !!user.sos?.active },
-      });
+      const key = `${user.latitude},${user.longitude},${!!user.sos?.active},${user.online !== false}`;
+      if (_clusterPosSnapshot.get(user.socketId) !== key) { dirty = true; break; }
     }
-    map.getSource('users-cluster').setData({ type: 'FeatureCollection', features });
+    // Also rebuild if a user was removed
+    if (!dirty && _clusterPosSnapshot.size !== $otherUsers.size) dirty = true;
+    if (dirty) {
+      const features = [];
+      for (const user of $otherUsers.values()) {
+        if (user.latitude == null || user.longitude == null || user.online === false) continue;
+        features.push({
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [user.longitude, user.latitude] },
+          properties: { name: user.displayName || 'User', sos: !!user.sos?.active },
+        });
+        _clusterPosSnapshot.set(user.socketId, `${user.latitude},${user.longitude},${!!user.sos?.active},${user.online !== false}`);
+      }
+      map.getSource('users-cluster').setData({ type: 'FeatureCollection', features });
+    }
   }
 
   // ── Place search fly-to ──────────────────────────────────────────────

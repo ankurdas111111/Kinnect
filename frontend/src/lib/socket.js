@@ -19,6 +19,7 @@ import { bumpHubBadge } from './stores/hubBadge.js';
 import { addSecretMessage, setSecretMessages, removeSecretMessage, updateSecretMessageSeen, secretChatPresence } from './stores/secretChat.js';
 import { getShareOrigin } from './env.js';
 import { geofenceLog, proximityAlerts } from './stores/places.js';
+import { incomingOffer } from './stores/webrtc.js';
 import { dailyActivity } from './stores/activity.js';
 import { recentTrailResult } from './stores/trail.js';
 import { arrivalProjections } from './stores/arrivals.js';
@@ -894,6 +895,11 @@ export function setupSocketHandlers() {
     });
   }
 
+  // ── WebRTC signaling relay ─────────────────────────────────────────────────
+  // Only the offer sets the store (triggers IncomingCallOverlay).
+  // answer/ice/hangup are handled by webrtc.js initWebRTCSocketHandlers().
+  socket.on('webrtc:offer', (data) => { incomingOffer.set(data); });
+
   // All handlers registered -- now connect
   socket.connect();
 }
@@ -990,4 +996,21 @@ export function emitGetDailyActivity(userId) {
 // ── F10: Trail emit ────────────────────────────────────────────────────────
 export function emitGetRecentTrail(targetUserId, windowMinutes) {
   socket.emit('getRecentTrail', { targetUserId, windowMinutes: windowMinutes || 60 });
+}
+
+// ── WebRTC signaling emit helpers ─────────────────────────────────────────
+export function emitWebRTCOffer(targetUserID, sdp) {
+  socket.emit('webrtc:offer', { targetUserID, sdp });
+}
+
+export function emitWebRTCAnswer(targetUserID, sdp) {
+  socket.emit('webrtc:answer', { targetUserID, sdp });
+}
+
+export function emitWebRTCIce(targetUserID, candidate) {
+  socket.emit('webrtc:ice', { targetUserID, candidate });
+}
+
+export function emitWebRTCHangup(targetUserID) {
+  socket.emit('webrtc:hangup', { targetUserID });
 }

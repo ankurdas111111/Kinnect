@@ -234,7 +234,6 @@
           on:keydown={(e) => e.key === 'Enter' && dispatch('decryptOne', msg)}
           disabled={inlineUnlocking}
           autocomplete="off"
-          autofocus
           aria-describedby={inlineError ? `inline-err-${msg.id}` : undefined}
         />
         <button

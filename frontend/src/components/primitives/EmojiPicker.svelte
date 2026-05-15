@@ -10,7 +10,10 @@
   let wrapEl;
   let pickerReady = false;
 
-  // Position the picker above/near the anchor button
+  // Position the picker above/near the anchor button.
+  // On iOS Chrome the virtual keyboard shifts the visual viewport — we must
+  // account for window.visualViewport.offsetTop so that position:fixed coords
+  // match what the browser actually renders.
   function reposition() {
     if (!wrapEl || !anchor) return;
     const ab = anchor.getBoundingClientRect();
@@ -18,21 +21,46 @@
     const ph = wrapEl.offsetHeight || 400;
     const vw = window.innerWidth;
 
-    // Prefer above the anchor
-    let top = ab.top - ph - 8;
-    if (top < 8) top = ab.bottom + 8; // flip below if not enough space
+    // On iOS Chrome when the keyboard is visible, visualViewport.offsetTop is
+    // non-zero and shifts the coordinate system for position:fixed elements.
+    const vpOffsetTop = window.visualViewport?.offsetTop ?? 0;
 
+    // Prefer above the anchor; flip below if there is not enough room.
+    let top = ab.top - ph - 8;
+    if (top < 8) top = ab.bottom + 8;
+
+    // Clamp horizontally inside the viewport.
     let left = ab.right - pw;
     if (left < 8) left = 8;
     if (left + pw > vw - 8) left = vw - pw - 8;
 
-    wrapEl.style.top  = top  + 'px';
+    // Correct for the visual-viewport offset so the picker lands at the right
+    // pixel under the keyboard on iOS Chrome/Safari.
+    wrapEl.style.top  = (top  + vpOffsetTop) + 'px';
     wrapEl.style.left = left + 'px';
   }
 
+  // Close on outside click/tap.
+  function onDocClick(e) {
+    if (!open) return;
+    if (wrapEl && !wrapEl.contains(e.target) && anchor && !anchor.contains(e.target)) {
+      dispatch('close');
+    }
+  }
+
+  // Single onMount: load the custom element and register the document listener.
+  // Previously there were two separate onMount calls; Svelte runs all of them
+  // but the split caused a subtle registration-order issue on iOS where the
+  // async import delayed pickerReady while the click listener was already live.
+  // Merged into one callback for deterministic sequencing.
   onMount(async () => {
+    document.addEventListener('pointerdown', onDocClick, true);
     await import('emoji-picker-element');
     pickerReady = true;
+  });
+
+  onDestroy(() => {
+    document.removeEventListener('pointerdown', onDocClick, true);
   });
 
   $: if (open && pickerReady && wrapEl) {
@@ -43,17 +71,6 @@
     const emoji = e.detail?.emoji?.unicode;
     if (emoji) dispatch('pick', emoji);
   }
-
-  // Close on outside click
-  function onDocClick(e) {
-    if (!open) return;
-    if (wrapEl && !wrapEl.contains(e.target) && anchor && !anchor.contains(e.target)) {
-      dispatch('close');
-    }
-  }
-
-  onMount(() => { document.addEventListener('pointerdown', onDocClick, true); });
-  onDestroy(() => { document.removeEventListener('pointerdown', onDocClick, true); });
 </script>
 
 {#if open && pickerReady}

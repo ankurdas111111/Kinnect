@@ -107,11 +107,14 @@
     if (!scpEl) return;
     const vv = window.visualViewport;
     if (!vv) return;
-    const kbH = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    // On iOS Chrome/Safari the visual viewport height already excludes the
+    // on-screen keyboard. vv.offsetTop accounts for page scroll (not keyboard)
+    // so we must NOT subtract it — doing so over-shifts the panel on Chrome.
+    const kbH = Math.max(0, window.innerHeight - vv.height);
     keyboardOffset = kbH > 50 ? kbH : 0;
   }
 
-  $: if (gateOpen && scpEl) { keyboardOffset = 0; }
+  // keyboardOffset is managed solely by onVVChange; no reactive override needed.
 
   // Compose state
   let composeText = '';
@@ -228,6 +231,7 @@
     sessionPin = '';
     gateOpen = false;
     clearInterval(autoLockTimerId);
+    clearTimeout(_typingTimer);   // prevent post-unmount emitPresence calls
     for (const id of Object.values(lockIntervals)) clearInterval(id);
     window.visualViewport?.removeEventListener('resize', onVVChange);
     window.visualViewport?.removeEventListener('scroll', onVVChange);
@@ -258,11 +262,20 @@
   }
 
   // ── Per-message inline decrypt ─────────────────────────────────
-  function toggleInline(msgId) {
+  async function toggleInline(msgId) {
     activeDecryptId = activeDecryptId === msgId ? null : msgId;
     inlinePins = { ...inlinePins, [msgId]: '' };
     inlineErrors = { ...inlineErrors, [msgId]: '' };
     touchAutoLock();
+    if (activeDecryptId === msgId) {
+      // Focus the PIN input imperatively after Svelte renders it.
+      // Using autofocus on the element causes a double keyboard-flash on iOS
+      // Chrome/Safari because the virtual keyboard fires twice (element insert
+      // + focus event). Waiting one tick and calling focus() once is correct.
+      await tick();
+      const el = document.getElementById(`inline-${msgId}`);
+      el?.focus();
+    }
   }
 
   function handleInlinePinInput(e) {
@@ -958,7 +971,17 @@
   }
 
   @media (max-width: 767px) {
-    .scp-backdrop { align-items: flex-end; padding: 0; }
+    .scp-backdrop {
+      align-items: flex-end;
+      padding: 0;
+      /* Disable backdrop-filter on mobile: on iOS Chrome a position:fixed
+         element with backdrop-filter creates a new containing block for ALL
+         position:fixed descendants (lightbox, emoji picker, panic overlay).
+         Those then clip to the panel rect instead of the viewport.
+         The rgba background provides the scrim without the containing-block bug. */
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
   }
 
   /* ── Panel shell ───────────────────────────────────────────── */
@@ -968,7 +991,11 @@
     background: var(--chat-bg);
     border: 1px solid var(--chat-border-accent);
     border-radius: var(--radius-xl, 20px);
-    overflow: hidden;
+    /* overflow:hidden removed — it + will-change:transform created a containing
+       block for position:fixed children (lightbox, emoji picker) on iOS Chrome,
+       clipping them to the panel rect. Border-radius clipping is applied only
+       to the messages area via overflow:clip (see scp-msgs below). */
+    overflow: clip;
     width: 100%;
     max-width: 440px;
     height: min(86dvh, 660px);
@@ -977,7 +1004,10 @@
       0 0 0 1px rgba(20, 184, 166, 0.08),
       inset 0 1px 0 rgba(255, 255, 255, 0.06);
     position: relative;
-    will-change: transform;
+    /* will-change:transform removed — it promoted the panel to a compositing
+       layer which on iOS makes it a containing block for position:fixed children,
+       causing the same clipping as overflow:hidden. The keyboard translateY
+       animation works fine without this hint. */
   }
 
   /* Ambient teal mesh */
@@ -998,8 +1028,15 @@
     .scp {
       max-width: 100%;
       border-radius: var(--radius-2xl, 24px) var(--radius-2xl, 24px) 0 0;
+      /* svh = small viewport height (excludes browser chrome + keyboard).
+         dvh does not update when the virtual keyboard opens on iOS Chrome;
+         svh is stable and prevents the panel overflowing behind the keyboard.
+         Fallback to 90dvh for browsers that do not support svh yet. */
       height: 90dvh;
-      padding-bottom: max(var(--space-4, 16px), env(safe-area-inset-bottom, 0px));
+      height: 90svh;
+      /* Removed padding-bottom: the footer already applies
+         max(16px, env(safe-area-inset-bottom)) — applying it here too
+         double-stacks the safe-area inset and cuts off the compose bar. */
       animation: scp-slide-up 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
     }
   }
@@ -1205,11 +1242,13 @@
   main.scp-msgs {
     flex: 1;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch; /* momentum scroll on iOS Safari/Chrome */
     padding: var(--space-4, 16px) var(--space-4, 16px) var(--space-2-5, 10px);
     display: flex;
     flex-direction: column;
     gap: var(--space-1, 4px);
     overscroll-behavior: contain;
+    min-height: 0; /* required for flex children to shrink below their content height on iOS */
   }
   main.scp-msgs::-webkit-scrollbar { width: 3px; }
   main.scp-msgs::-webkit-scrollbar-thumb {
@@ -1464,19 +1503,20 @@
     border: 1px solid rgba(255, 255, 255, 0.09);
     background: rgba(255, 255, 255, 0.04);
     color: rgba(255, 255, 255, 0.92);
-    font-size: var(--text-sm, 0.875rem);
+    /* 16px on all sizes: iOS checks font-size at pointerdown, before any
+       media query transition runs — the @media override fires too late. */
+    font-size: 16px;
     line-height: var(--leading-relaxed, 1.625);
     outline: none;
     font-family: var(--font-sans, 'Nunito', sans-serif);
     transition: border-color 0.1s, box-shadow 0.1s;
     -webkit-appearance: none;
-    field-sizing: content;
+    field-sizing: content;  /* auto-grows on supporting browsers */
     max-height: 120px;
-    overflow-y: auto;
+    overflow-y: auto;       /* scroll fallback when field-sizing unsupported */
     min-height: 44px;
     box-sizing: border-box;
   }
-  @media (max-width: 767px) { .scp-compose-text { font-size: 16px; } }
   .scp-compose-text:focus { border-color: var(--chat-border-accent); box-shadow: 0 0 0 3px var(--chat-accent-subtle); }
   .scp-compose-text::placeholder { color: rgba(255, 255, 255, 0.2); }
 

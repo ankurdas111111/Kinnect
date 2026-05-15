@@ -1,6 +1,8 @@
 <script>
   import { onDestroy } from 'svelte';
   import { getUserColor, getUserColorLight } from '../lib/getUserColor.js';
+  import WalkieTalkieButton from './WalkieTalkieButton.svelte';
+  import { callState, callPeer } from '../lib/stores/webrtc.js';
   import FreshnessChip from './primitives/FreshnessChip.svelte';
   import TiltCard from './primitives/TiltCard.svelte';
   import { focusUser, myLocation } from '../lib/stores/map.js';
@@ -63,6 +65,10 @@
     _prevLat = user?.lat ?? null;
     _prevLng = user?.lng ?? null;
   }
+
+  $: pttActive =
+    ($callState === 'calling' || $callState === 'connected') &&
+    $callPeer?.userID === user?.userId;
 
   onDestroy(() => {
     if (_coordFlashTimer) clearTimeout(_coordFlashTimer);
@@ -220,16 +226,21 @@
     {/if}
 
     <!-- Actions -->
-    <div class="card-actions">
-      <button class="btn btn-primary btn-sm action-btn" on:click={locateOnMap} disabled={!user.lat}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-        Locate
-      </button>
-      <button class="btn btn-secondary btn-sm action-btn" on:click={copyCoords} disabled={!user.lat}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-        Copy
-      </button>
-    </div>
+    {#if pttActive}
+      <WalkieTalkieButton {user} />
+    {:else}
+      <div class="card-actions">
+        <button class="btn btn-primary btn-sm action-btn" on:click={locateOnMap} disabled={!user.lat}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          Locate
+        </button>
+        <button class="btn btn-secondary btn-sm action-btn" on:click={copyCoords} disabled={!user.lat}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          Copy
+        </button>
+        <WalkieTalkieButton {user} />
+      </div>
+    {/if}
   </div>
 </TiltCard>
 {/if}
