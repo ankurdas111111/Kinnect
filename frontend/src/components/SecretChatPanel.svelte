@@ -14,10 +14,9 @@
   import { compressImage } from '../lib/imageUtils.js';
   import { toasts } from '../lib/stores/toast.js';
   import { haptics } from '../lib/haptics.js';
-  import EmojiPicker from './primitives/EmojiPicker.svelte';
-  import StickerPicker from './primitives/StickerPicker.svelte';
   import SecretChatGate from './SecretChatGate.svelte';
   import SecretChatMessage from './SecretChatMessage.svelte';
+  import SecretChatCompose from './SecretChatCompose.svelte';
 
   export let peerId;
   export let peerName = 'Contact';
@@ -116,26 +115,19 @@
 
   // keyboardOffset is managed solely by onVVChange; no reactive override needed.
 
-  // Compose state
-  let composeText = '';
+  // Compose state (compose UI lives in SecretChatCompose; parent owns crypto + socket)
   let sending = false;
+  let photoSending = false;
   let copyDone = false;
   let messagesEl;
-  let composeTextEl;
-  let emojiOpen = false;
-  let emojiAnchor;
-  let stickerOpen = false;
-  let stickerAnchor;
   let panicMode = false;
   let panicGlitching = false;
 
   // Delete confirmation — two-tap
   let deletingMsgId = null;
 
-  // Typing indicator
-  let isTyping = false;
-  let _typingTimer = null;
-  let peerTyping = false; // derived from presence + compose activity heuristic
+  // Peer typing indicator (derived from presence)
+  let peerTyping = false;
 
   // Seen receipt pulse — tracks which msg IDs recently got seen
   let seenPulseIds = new Set();
@@ -231,7 +223,6 @@
     sessionPin = '';
     gateOpen = false;
     clearInterval(autoLockTimerId);
-    clearTimeout(_typingTimer);   // prevent post-unmount emitPresence calls
     for (const id of Object.values(lockIntervals)) clearInterval(id);
     window.visualViewport?.removeEventListener('resize', onVVChange);
     window.visualViewport?.removeEventListener('scroll', onVVChange);
@@ -307,29 +298,8 @@
     }
   }
 
-  // ── Photo sending ─────────────────────────────────────────────
-  let photoInputEl;
-  let cameraInputEl;
-  let photoSending = false;
-  let attachMenuOpen = false;
-
-
-
-  function toggleAttachMenu() {
-    attachMenuOpen = !attachMenuOpen;
-    if (attachMenuOpen) {
-      const close = (e) => {
-        if (!e.target.closest?.('.scp-attach-wrap')) attachMenuOpen = false;
-        document.removeEventListener('click', close, true);
-      };
-      setTimeout(() => document.addEventListener('click', close, true), 0);
-    }
-  }
-
-  async function handlePhotoSelect(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = '';
+  // ── Photo sending (called by SecretChatCompose dispatch) ──────
+  async function handlePhotoFromCompose(file) {
     if (!sessionPin) { toasts.error('Enter your PIN before sending a photo'); return; }
     if (file.size > 15 * 1024 * 1024) { toasts.error('Photo too large — max 15 MB'); return; }
     photoSending = true;
@@ -352,8 +322,7 @@
   }
 
   // ── Compose ───────────────────────────────────────────────────
-  async function send() {
-    const text = composeText.trim();
+  async function sendFromCompose(text) {
     if (!text || !sessionPin || sending) return;
     sending = true;
     haptics.tap?.();
@@ -361,10 +330,8 @@
     try {
       const { ciphertext, iv, salt } = await encryptMessage(text, sessionPin);
       socket.emit('sendSecretMsg', { receiverId: peerId, ciphertext, iv, salt });
-      composeText = '';
       await tick();
       scrollToBottom();
-      isTyping = false;
     } catch {
       toasts.error('Failed to send — check your connection');
     } finally {
@@ -372,23 +339,22 @@
     }
   }
 
-  function handleComposeKeydown(e) {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  async function sendStickerFromCompose(tag) {
+    if (!sessionPin || sending) return;
+    sending = true;
+    haptics.tap?.();
     touchAutoLock();
-    // Typing indicator heuristic
-    if (!isTyping) {
-      isTyping = true;
-      emitPresence(true);
+    try {
+      const payload = `[sticker:${tag}]`;
+      const { ciphertext, iv, salt } = await encryptMessage(payload, sessionPin);
+      socket.emit('sendSecretMsg', { receiverId: peerId, ciphertext, iv, salt });
+      await tick();
+      scrollToBottom();
+    } catch {
+      toasts.error('Failed to send sticker — check your connection');
+    } finally {
+      sending = false;
     }
-    clearTimeout(_typingTimer);
-    _typingTimer = setTimeout(() => { isTyping = false; }, 2000);
-  }
-
-  function handleComposeInput() {
-    touchAutoLock();
-    if (!isTyping) { isTyping = true; emitPresence(true); }
-    clearTimeout(_typingTimer);
-    _typingTimer = setTimeout(() => { isTyping = false; }, 2000);
   }
 
   function scrollToBottom() {
@@ -548,7 +514,7 @@
   {#if gateOpen}
     <div
       class="scp-autolock-bar"
-      style="width: {autoLockProgress}%; opacity: {autoLockProgress < 30 ? 1 : 0.35}"
+      style="transform: scaleX({autoLockProgress / 100}); opacity: {autoLockProgress < 30 ? 1 : 0.35}"
       aria-hidden="true"
     ></div>
   {/if}
@@ -734,172 +700,16 @@
     {/if}
 
     <!-- ── Compose ─────────────────────────────────────────── -->
-    <footer class="scp-compose">
-      <div class="scp-compose-inner">
-        <!-- Panic button -->
-        <button
-          class="scp-compose-icon-btn scp-compose-icon-btn--panic"
-          on:click={triggerPanic}
-          aria-label="Blank screen for privacy"
-          title="Blank screen"
-          type="button"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-            <line x1="1" y1="1" x2="23" y2="23"/>
-          </svg>
-        </button>
-
-        <button
-          class="scp-compose-icon-btn"
-          bind:this={emojiAnchor}
-          on:click={() => { emojiOpen = !emojiOpen; stickerOpen = false; haptics.tap?.(); }}
-          aria-label="Open emoji picker"
-          aria-expanded={emojiOpen}
-          aria-haspopup="true"
-          type="button"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
-            <line x1="9" y1="9" x2="9.01" y2="9"/>
-            <line x1="15" y1="9" x2="15.01" y2="9"/>
-          </svg>
-        </button>
-
-        <button
-          class="scp-compose-icon-btn"
-          bind:this={stickerAnchor}
-          on:click={() => { stickerOpen = !stickerOpen; emojiOpen = false; haptics.tap?.(); }}
-          aria-label="Open sticker picker"
-          aria-expanded={stickerOpen}
-          aria-haspopup="true"
-          type="button"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-          </svg>
-        </button>
-
-        <!-- Attachment menu -->
-        <input bind:this={photoInputEl} type="file" accept="image/*" style="display:none" on:change={handlePhotoSelect} aria-hidden="true" tabindex="-1" />
-        <input bind:this={cameraInputEl} type="file" accept="image/*" capture="environment" style="display:none" on:change={handlePhotoSelect} aria-hidden="true" tabindex="-1" />
-        <div class="scp-attach-wrap">
-          <button
-            class="scp-compose-icon-btn"
-            class:scp-compose-icon-btn--loading={photoSending}
-            class:scp-compose-icon-btn--active={attachMenuOpen}
-            on:click={toggleAttachMenu}
-            aria-label="Send encrypted photo"
-            aria-expanded={attachMenuOpen}
-            aria-haspopup="menu"
-            type="button"
-            disabled={photoSending || !sessionPin}
-          >
-            {#if photoSending}
-              <div class="scp-mini-spinner" aria-hidden="true"></div>
-            {:else}
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                <circle cx="12" cy="13" r="4"/>
-              </svg>
-            {/if}
-          </button>
-          {#if attachMenuOpen}
-            <div class="scp-attach-menu" role="menu" aria-label="Photo source">
-              <button class="scp-attach-item" type="button" role="menuitem" on:click={() => { attachMenuOpen = false; cameraInputEl?.click(); }}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                Take Photo
-              </button>
-              <button class="scp-attach-item" type="button" role="menuitem" on:click={() => { attachMenuOpen = false; photoInputEl?.click(); }}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                Choose from Gallery
-              </button>
-            </div>
-          {/if}
-        </div>
-
-        <label class="scp-sr" for="scp-compose-text">Secret message to {peerFirst}</label>
-        <textarea
-          id="scp-compose-text"
-          class="scp-compose-text"
-          rows="1"
-          maxlength="2000"
-          placeholder="Message {peerFirst}…"
-          bind:value={composeText}
-          bind:this={composeTextEl}
-          on:keydown={handleComposeKeydown}
-          on:input={handleComposeInput}
-          disabled={sending}
-        ></textarea>
-
-        <!-- Voice note placeholder -->
-        <button
-          class="scp-compose-icon-btn scp-compose-icon-btn--voice"
-          title="Voice notes coming soon"
-          aria-label="Voice notes — coming soon"
-          type="button"
-          disabled
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-            <line x1="12" y1="19" x2="12" y2="23"/>
-            <line x1="8" y1="23" x2="16" y2="23"/>
-          </svg>
-        </button>
-
-        <button
-          class="scp-send-btn"
-          class:scp-send-btn--active={composeText.trim().length > 0}
-          on:click={send}
-          disabled={sending || !composeText.trim()}
-          aria-label="Send encrypted message"
-          type="button"
-        >
-          {#if sending}
-            <div class="scp-send-ring" aria-hidden="true"></div>
-          {:else}
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-          {/if}
-        </button>
-      </div>
-
-      <div class="scp-compose-meta">
-        <p class="scp-compose-hint" aria-hidden="true">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          End-to-end encrypted
-        </p>
-        {#if composeText.length > 1800}
-          <span class="scp-char-count" class:scp-char-count--warn={composeText.length > 1950} aria-live="polite">{2000 - composeText.length} remaining</span>
-        {/if}
-      </div>
-    </footer>
-
-    <!-- Pickers outside compose — avoids backdrop-filter containing-block iOS bug -->
-    <EmojiPicker
-      open={emojiOpen}
-      anchor={emojiAnchor}
-      on:pick={(e) => { composeText += e.detail; emojiOpen = false; setTimeout(() => composeTextEl?.focus(), 50); }}
-      on:close={() => emojiOpen = false}
-    />
-    <StickerPicker
-      open={stickerOpen}
-      anchor={stickerAnchor}
-      on:pick={async (e) => {
-        const tag = e.detail;
-        stickerOpen = false;
-        if (!sessionPin) { toasts.error('Enter your PIN before sending a sticker'); return; }
-        haptics.tap?.();
-        try {
-          const { ciphertext, iv, salt } = await encryptMessage(tag, sessionPin);
-          socket.emit('sendSecretMsg', { receiverId: peerId, ciphertext, iv, salt });
-        } catch {
-          toasts.error('Failed to send sticker');
-        }
-      }}
-      on:close={() => stickerOpen = false}
+    <SecretChatCompose
+      peerFirst={peerFirst}
+      sending={sending}
+      photoSending={photoSending}
+      hasPin={!!sessionPin}
+      on:sendText={(e) => sendFromCompose(e.detail)}
+      on:sendPhoto={(e) => handlePhotoFromCompose(e.detail)}
+      on:sendSticker={(e) => sendStickerFromCompose(e.detail)}
+      on:panic={triggerPanic}
+      on:typing={(e) => { if (e.detail) emitPresence(true); touchAutoLock(); }}
     />
   {/if}
 </div>
@@ -1061,9 +871,11 @@
   .scp-autolock-bar {
     position: absolute;
     top: 0; left: 0;
+    width: 100%; /* full width — scaleX controls visible extent */
     height: 2px;
     background: linear-gradient(90deg, var(--chat-accent) 0%, rgba(6, 182, 212, 0.7) 100%);
-    transition: width 1s linear, opacity 0.5s;
+    transform-origin: left center;
+    transition: transform 1s linear, opacity 0.5s;
     z-index: 10;
     border-radius: 0 2px 2px 0;
     pointer-events: none;
@@ -1445,179 +1257,6 @@
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
   }
 
-  /* ── Compose ─────────────────────────────────────────────── */
-  footer.scp-compose {
-    padding: var(--space-2-5, 10px) var(--space-4, 16px) max(var(--space-4, 16px), env(safe-area-inset-bottom, 0px));
-    border-top: 1px solid var(--chat-border);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1-5, 6px);
-    flex-shrink: 0;
-    background: rgba(0, 0, 0, 0.3);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-  }
-
-  .scp-compose-inner {
-    display: flex;
-    align-items: flex-end;
-    gap: var(--space-1-5, 6px);
-  }
-
-  .scp-compose-icon-btn {
-    width: 44px; height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: none;
-    border: none;
-    color: rgba(255, 255, 255, 0.3);
-    cursor: pointer;
-    border-radius: var(--radius-sm2, 8px);
-    flex-shrink: 0;
-    transition: color 0.1s, background 0.1s;
-    touch-action: manipulation;
-  }
-  .scp-compose-icon-btn:hover { color: rgba(255, 255, 255, 0.7); background: rgba(255, 255, 255, 0.07); }
-  .scp-compose-icon-btn:focus-visible { outline: 2px solid var(--chat-accent); outline-offset: 2px; }
-  .scp-compose-icon-btn:disabled { opacity: 0.22; cursor: not-allowed; }
-  .scp-compose-icon-btn--panic:hover { color: var(--danger-400, #f87171); background: rgba(248, 113, 113, 0.07); }
-  .scp-compose-icon-btn--panic { color: rgba(255, 255, 255, 0.16); }
-  .scp-compose-icon-btn--voice { color: rgba(255, 255, 255, 0.14); cursor: not-allowed; }
-  .scp-compose-icon-btn--loading { cursor: wait; }
-  .scp-compose-icon-btn--active { color: var(--chat-accent); background: var(--chat-accent-subtle); }
-
-  .scp-mini-spinner {
-    width: 15px; height: 15px;
-    border: 2px solid rgba(255, 255, 255, 0.15);
-    border-top-color: var(--chat-accent);
-    border-radius: var(--radius-full, 9999px);
-    animation: scp-spin 0.7s linear infinite;
-  }
-
-  .scp-compose-text {
-    flex: 1;
-    resize: none;
-    padding: var(--space-2-5, 10px) var(--space-3, 12px);
-    border-radius: var(--radius-lg, 14px);
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    background: rgba(255, 255, 255, 0.04);
-    color: rgba(255, 255, 255, 0.92);
-    /* 16px on all sizes: iOS checks font-size at pointerdown, before any
-       media query transition runs — the @media override fires too late. */
-    font-size: 16px;
-    line-height: var(--leading-relaxed, 1.625);
-    outline: none;
-    font-family: var(--font-sans, 'Nunito', sans-serif);
-    transition: border-color 0.1s, box-shadow 0.1s;
-    -webkit-appearance: none;
-    field-sizing: content;  /* auto-grows on supporting browsers */
-    max-height: 120px;
-    overflow-y: auto;       /* scroll fallback when field-sizing unsupported */
-    min-height: 44px;
-    box-sizing: border-box;
-  }
-  .scp-compose-text:focus { border-color: var(--chat-border-accent); box-shadow: 0 0 0 3px var(--chat-accent-subtle); }
-  .scp-compose-text::placeholder { color: rgba(255, 255, 255, 0.2); }
-
-  .scp-send-btn {
-    width: 44px; height: 44px;
-    border-radius: var(--radius-lg, 14px);
-    border: none;
-    background: rgba(255, 255, 255, 0.07);
-    color: rgba(255, 255, 255, 0.28);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    transition: transform 0.1s, box-shadow 0.2s, background 0.2s, color 0.2s;
-    touch-action: manipulation;
-  }
-  .scp-send-btn--active {
-    background: linear-gradient(135deg, var(--primary-400, #2dd4bf) 0%, var(--primary-600, #0d9488) 100%);
-    color: #fff;
-    box-shadow: 0 2px 12px rgba(20, 184, 166, 0.4);
-  }
-  .scp-send-btn--active:hover { transform: scale(1.06); box-shadow: 0 4px 20px rgba(20, 184, 166, 0.6); }
-  .scp-send-btn--active:active { transform: scale(0.93); }
-  .scp-send-btn:disabled { opacity: 0.28; cursor: not-allowed; box-shadow: none; }
-  .scp-send-btn:focus-visible { outline: 2px solid var(--chat-accent); outline-offset: 2px; }
-
-  .scp-send-ring {
-    width: 16px; height: 16px;
-    border: 2px solid rgba(255, 255, 255, 0.25);
-    border-top-color: #fff;
-    border-radius: var(--radius-full, 9999px);
-    animation: scp-spin 0.7s linear infinite;
-  }
-
-  /* ── Attach menu ─────────────────────────────────────────── */
-  .scp-attach-wrap { position: relative; }
-
-  .scp-attach-menu {
-    position: absolute;
-    bottom: calc(100% + 6px);
-    left: 50%;
-    transform: translateX(-50%);
-    background: var(--chat-elevated, #0f0f20);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: var(--radius-lg, 14px);
-    padding: var(--space-1, 4px);
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 160px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
-    animation: scp-pop 0.15s var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
-    z-index: 10;
-  }
-
-  .scp-attach-item {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2, 8px);
-    padding: var(--space-2-5, 10px) var(--space-3, 12px);
-    background: none;
-    border: none;
-    border-radius: var(--radius-sm2, 8px);
-    color: rgba(255, 255, 255, 0.8);
-    font-size: var(--text-xs, 0.75rem);
-    font-weight: 500;
-    font-family: var(--font-sans, 'Nunito', sans-serif);
-    cursor: pointer;
-    white-space: nowrap;
-    min-height: 44px;
-    transition: background 0.1s, color 0.1s;
-  }
-  .scp-attach-item:hover { background: rgba(255, 255, 255, 0.07); color: #fff; }
-  .scp-attach-item:focus-visible { outline: 2px solid var(--chat-accent); outline-offset: 2px; }
-
-  /* ── Compose meta ────────────────────────────────────────── */
-  .scp-compose-meta {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .scp-compose-hint {
-    display: flex;
-    align-items: center;
-    gap: var(--space-1-5, 6px);
-    margin: 0;
-    font-size: var(--text-2xs, 0.6875rem);
-    font-family: var(--font-sans, 'Nunito', sans-serif);
-    color: rgba(255, 255, 255, 0.14);
-  }
-
-  .scp-char-count {
-    font-size: var(--text-2xs, 0.6875rem);
-    font-family: var(--font-mono, 'JetBrains Mono', monospace);
-    color: rgba(255, 255, 255, 0.3);
-    font-variant-numeric: tabular-nums;
-    transition: color 0.2s;
-  }
-  .scp-char-count--warn { color: var(--danger-400, #f87171); }
 
   /* ── Photo lightbox ──────────────────────────────────────── */
   .lightbox-backdrop {
@@ -1679,19 +1318,6 @@
     color: rgba(255, 255, 255, 0.25);
   }
 
-  /* ── Utility ─────────────────────────────────────────────── */
-  .scp-sr {
-    position: absolute; width: 1px; height: 1px;
-    padding: 0; margin: -1px; overflow: hidden;
-    clip: rect(0,0,0,0); white-space: nowrap; border: 0;
-  }
-
-  @keyframes scp-spin  { to { transform: rotate(360deg); } }
-  @keyframes scp-pop {
-    from { opacity: 0; transform: translateX(-50%) scale(0.88) translateY(6px); }
-    to   { opacity: 1; transform: translateX(-50%) scale(1)    translateY(0);   }
-  }
-
   /* ── prefers-reduced-motion ──────────────────────────────── */
   @media (prefers-reduced-motion: reduce) {
     .scp-glitch { animation: none; }
@@ -1703,7 +1329,6 @@
     .typing-dot { animation: none; }
     .scp-skel-bubble { animation: none; }
     .scp-scroll-fab:hover { transform: none; }
-    .scp-send-btn--active:hover { transform: none; }
     .lightbox-img { animation: none; }
   }
 </style>

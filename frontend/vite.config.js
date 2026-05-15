@@ -52,7 +52,7 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     minify: 'esbuild',
-    cssCodeSplit: false,
+    cssCodeSplit: true,
     rollupOptions: {
       // Background geolocation is a native-only Capacitor plugin with no JS dist.
       // It is injected by the native shell at runtime — mark as external so Rollup
@@ -64,9 +64,19 @@ export default defineConfig({
           if (id.includes('maplibre-gl')) return 'maplibre';
           if (id.includes('socket.io-client')) return 'socket';
           if (id.includes('node_modules/svelte')) return 'svelte-runtime';
+          // Crypto is loaded only by secret chat — keep it in its own chunk
+          if (id.includes('/lib/crypto')) return 'lib-crypto';
+          // Secret chat surface (viewer + panel + message + gate) in one async chunk
+          if (id.includes('/pages/SecretChatViewer')) return 'page-m';
+          if (
+            id.includes('/components/SecretChatPanel') ||
+            id.includes('/components/SecretChatMessage') ||
+            id.includes('/components/SecretChatGate') ||
+            id.includes('/components/SecretChatCompose') ||
+            id.includes('/components/SecretChatInlineDecrypt')
+          ) return 'page-m';
           if (id.includes('/pages/LiveViewer')) return 'page-live';
           if (id.includes('/pages/WatchViewer')) return 'page-watch';
-          if (id.includes('/pages/SecretChatViewer')) return 'page-m';
           if (id.includes('/pages/Monitoring')) return 'page-monitoring';
         }
       },
