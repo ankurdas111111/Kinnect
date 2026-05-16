@@ -7,12 +7,14 @@
   import Register from './pages/Register.svelte';
   import MainApp from './pages/MainApp.svelte';
   import Monitoring from './pages/Monitoring.svelte';
+  import Landing from './pages/Landing.svelte';
   import Toast from './components/primitives/Toast.svelte';
 
   // Heavy pages are lazy-loaded so the initial bundle only contains
   // what is needed for Login, Register, and the main app shell.
   const routes = {
     '/': MainApp,
+    '/landing': Landing,
     '/dashboard': wrap({ asyncComponent: () => import('./pages/FamilyDashboard.svelte') }),
     '/login': Login,
     '/register': Register,

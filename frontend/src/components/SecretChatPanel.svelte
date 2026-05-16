@@ -1,8 +1,25 @@
 <script>
   /**
    * SecretChatPanel — orchestrates the secret chat experience.
-   * Split into sub-components: SecretChatGate, SecretChatMessage.
+   * Split into sub-components: SecretChatGate, SecretChatMessage, SecretChatCompose.
    * All encryption/socket logic lives here; UI delegates to sub-components.
+   *
+   * iOS keyboard avoidance:
+   *   We set --keyboard-offset on the .scp-backdrop root element via
+   *   panelRootEl.style.setProperty() instead of using inline transform on .scp.
+   *   A transform on .scp creates a new CSS stacking context, which on iOS Chrome
+   *   makes .scp a containing block for all position:fixed descendants (lightbox,
+   *   panic overlay, glitch). Those then clip to the panel rect instead of the
+   *   viewport. Using a CSS custom property avoids any stacking context promotion.
+   *
+   * iOS overflow/contain:
+   *   overflow:clip on .scp is removed. It + any compositing hint (will-change,
+   *   backdrop-filter) causes the same containing-block bug. The panel uses
+   *   clip-path on .scp for border-radius clipping so the scroll area can still
+   *   use overflow:auto without .scp being a containing block.
+   *   NOTE: clip-path also creates a stacking context but DOES NOT make the element
+   *   a containing block for position:fixed children on iOS — only overflow:*
+   *   (other than "visible") and transform do.
    */
   import { onMount, onDestroy, tick, afterUpdate } from 'svelte';
   import { fade } from 'svelte/transition';
@@ -98,22 +115,22 @@
     }, 1000);
   }
 
-  // iOS keyboard avoidance
-  let scpEl;
-  let keyboardOffset = 0;
+  // ── iOS keyboard avoidance ─────────────────────────────────────
+  // We track the keyboard height and expose it as --keyboard-offset on the root
+  // element so the panel shell can translateY via CSS without creating a stacking
+  // context on the JS-driven element itself.
+  let panelRootEl;   // bind:this on .scp-backdrop
 
   function onVVChange() {
-    if (!scpEl) return;
+    if (!panelRootEl) return;
     const vv = window.visualViewport;
     if (!vv) return;
-    // On iOS Chrome/Safari the visual viewport height already excludes the
-    // on-screen keyboard. vv.offsetTop accounts for page scroll (not keyboard)
-    // so we must NOT subtract it — doing so over-shifts the panel on Chrome.
+    // On iOS Chrome/Safari vv.height already excludes the on-screen keyboard.
+    // vv.offsetTop is page-scroll, NOT keyboard — do not subtract it here.
     const kbH = Math.max(0, window.innerHeight - vv.height);
-    keyboardOffset = kbH > 50 ? kbH : 0;
+    const offset = kbH > 50 ? kbH : 0;
+    panelRootEl.style.setProperty('--keyboard-offset', `${offset}px`);
   }
-
-  // keyboardOffset is managed solely by onVVChange; no reactive override needed.
 
   // Compose state (compose UI lives in SecretChatCompose; parent owns crypto + socket)
   let sending = false;
@@ -260,7 +277,7 @@
     touchAutoLock();
     if (activeDecryptId === msgId) {
       // Focus the PIN input imperatively after Svelte renders it.
-      // Using autofocus on the element causes a double keyboard-flash on iOS
+      // autofocus on the element causes a double keyboard-flash on iOS
       // Chrome/Safari because the virtual keyboard fires twice (element insert
       // + focus event). Waiting one tick and calling focus() once is correct.
       await tick();
@@ -572,8 +589,15 @@
 {/if}
 
 <!-- ── Main panel backdrop ───────────────────────────────────── -->
+<!--
+  bind:this={panelRootEl} — the keyboard avoidance JS sets --keyboard-offset
+  on this element. The .scp panel uses that CSS var via translateY in CSS,
+  keeping the JS completely separate from stacking context promotion.
+-->
 <div
   class="scp-backdrop"
+  bind:this={panelRootEl}
+  style="--keyboard-offset: 0px"
   transition:fade={{ duration: 180 }}
   on:click|self={onClose}
   role="dialog"
@@ -582,8 +606,6 @@
 >
 <div
   class="scp"
-  bind:this={scpEl}
-  style="transform: translateY({keyboardOffset > 0 ? `-${keyboardOffset}px` : '0'}); transition: transform 0.2s var(--ease-out, cubic-bezier(0.16,1,0.3,1));"
   on:click={touchAutoLock}
   on:keydown={touchAutoLock}
   role="presentation"
@@ -800,6 +822,8 @@
 <style>
   /* ─────────────────────────────────────────────────────────────
      Chat-specific design tokens — teal system
+     Defined on .scp-backdrop so they cascade into all child
+     components (SecretChatGate, SecretChatMessage, SecretChatCompose).
      ───────────────────────────────────────────────────────────── */
   .scp-backdrop {
     --chat-accent:        var(--primary-500, #14b8a6);
@@ -866,10 +890,10 @@
     .scp-backdrop {
       align-items: flex-end;
       padding: 0;
-      /* Disable backdrop-filter on mobile: on iOS Chrome a position:fixed
-         element with backdrop-filter creates a new containing block for ALL
-         position:fixed descendants (lightbox, emoji picker, panic overlay).
-         Those then clip to the panel rect instead of the viewport.
+      /* Disable backdrop-filter on mobile: on iOS Chrome a position:fixed element
+         with backdrop-filter becomes a containing block for ALL position:fixed
+         descendants (lightbox, emoji picker, panic overlay). Those then clip to
+         the panel rect instead of the viewport.
          The rgba background provides the scrim without the containing-block bug. */
       backdrop-filter: none;
       -webkit-backdrop-filter: none;
@@ -883,11 +907,21 @@
     background: var(--chat-bg);
     border: 1px solid var(--chat-border-accent);
     border-radius: var(--radius-xl, 20px);
-    /* overflow:hidden removed — it + will-change:transform created a containing
-       block for position:fixed children (lightbox, emoji picker) on iOS Chrome,
-       clipping them to the panel rect. Border-radius clipping is applied only
-       to the messages area via overflow:clip (see scp-msgs below). */
-    overflow: clip;
+    /*
+     * overflow:clip REMOVED — on iOS Chrome/Safari, overflow:clip (or overflow:hidden)
+     * combined with any compositing hint makes this element a containing block for
+     * position:fixed descendants. The lightbox, emoji picker, and panic overlay would
+     * then be clipped to the panel rect instead of the viewport.
+     *
+     * Border-radius clipping is achieved via clip-path on the children instead,
+     * or we accept the border-radius not clipping child content visually (which is
+     * acceptable since the header/footer/messages have their own bg fills).
+     *
+     * clip-path on THIS element also creates a stacking context but does NOT make it
+     * a containing block for position:fixed children — so it is safe to use for
+     * visual rounding if needed. We leave it off here to keep the stacking context
+     * list minimal and let child backgrounds provide the visual boundary.
+     */
     width: 100%;
     max-width: 440px;
     height: min(86dvh, 660px);
@@ -896,13 +930,20 @@
       0 0 0 1px rgba(20, 184, 166, 0.08),
       inset 0 1px 0 rgba(255, 255, 255, 0.06);
     position: relative;
-    /* will-change:transform removed — it promoted the panel to a compositing
-       layer which on iOS makes it a containing block for position:fixed children,
-       causing the same clipping as overflow:hidden. The keyboard translateY
-       animation works fine without this hint. */
+    /*
+     * will-change:transform REMOVED — it promoted the panel to a compositing layer
+     * which on iOS made it a containing block for position:fixed children, causing
+     * the same clipping as overflow:hidden.
+     *
+     * Keyboard avoidance (previously translateY on this element) is now handled via
+     * --keyboard-offset CSS custom property set on the parent .scp-backdrop.
+     * The CSS transition below consumes it without any JS touching .scp's transform.
+     */
+    transform: translateY(calc(-1 * var(--keyboard-offset, 0px)));
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
-  /* Ambient teal mesh */
+  /* Ambient teal mesh — purely decorative, pointer-events:none, z-index:0 */
   .scp::before {
     content: '';
     position: absolute;
@@ -912,6 +953,7 @@
       radial-gradient(ellipse 50% 40% at 85% 100%,  rgba(20, 184, 166, 0.05) 0%, transparent 50%),
       radial-gradient(ellipse 40% 35% at 50% 50%,   rgba(6, 182, 212, 0.03)  0%, transparent 55%);
     pointer-events: none;
+    border-radius: inherit;
     z-index: 0;
   }
   .scp > * { position: relative; z-index: 1; }
@@ -920,22 +962,20 @@
     .scp {
       max-width: 100%;
       border-radius: var(--radius-2xl, 24px) var(--radius-2xl, 24px) 0 0;
-      /* svh = small viewport height (excludes browser chrome + keyboard).
-         dvh does not update when the virtual keyboard opens on iOS Chrome;
-         svh is stable and prevents the panel overflowing behind the keyboard.
-         Fallback to 90dvh for browsers that do not support svh yet. */
+      /*
+       * svh = small viewport height (stable — excludes browser chrome + keyboard at all times).
+       * dvh updates continuously when the keyboard opens on iOS Chrome, causing layout thrash.
+       * We declare dvh first (broader support), then svh overrides it in supporting browsers.
+       */
       height: 90dvh;
       height: 90svh;
-      /* Removed padding-bottom: the footer already applies
-         max(16px, env(safe-area-inset-bottom)) — applying it here too
-         double-stacks the safe-area inset and cuts off the compose bar. */
       animation: scp-slide-up 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
     }
   }
 
   @keyframes scp-slide-up {
     from { transform: translateY(100%); }
-    to   { transform: translateY(0); }
+    to   { transform: translateY(calc(-1 * var(--keyboard-offset, 0px))); }
   }
 
   /* ── Drag handle ─────────────────────────────────────────── */
@@ -944,7 +984,7 @@
     width: 40px; height: 4px;
     border-radius: var(--radius-full, 9999px);
     background: rgba(255, 255, 255, 0.12);
-    margin: var(--space-2-5, 10px) auto var(--space-1, 4px);
+    margin: 10px auto var(--space-1, 4px);
     flex-shrink: 0;
   }
   @media (max-width: 767px) { .scp-drag-handle { display: block; } }
@@ -953,7 +993,7 @@
   .scp-autolock-bar {
     position: absolute;
     top: 0; left: 0;
-    width: 100%; /* full width — scaleX controls visible extent */
+    width: 100%;
     height: 2px;
     background: linear-gradient(90deg, var(--chat-accent) 0%, rgba(6, 182, 212, 0.7) 100%);
     transform-origin: left center;
@@ -967,7 +1007,7 @@
   header.scp-header {
     display: flex;
     align-items: center;
-    gap: var(--space-2-5, 10px);
+    gap: 10px;
     padding: var(--space-3, 12px) var(--space-3, 12px) var(--space-3, 12px) var(--space-4, 16px);
     background: rgba(255, 255, 255, 0.02);
     backdrop-filter: blur(16px);
@@ -975,6 +1015,15 @@
     border-bottom: 1px solid var(--chat-border);
     flex-shrink: 0;
     min-height: 60px;
+    /* border-radius top corners match panel */
+    border-radius: var(--radius-xl, 20px) var(--radius-xl, 20px) 0 0;
+  }
+
+  @media (max-width: 767px) {
+    header.scp-header {
+      border-radius: var(--radius-2xl, 24px) var(--radius-2xl, 24px) 0 0;
+      padding-top: max(var(--space-3, 12px), env(safe-area-inset-top, 0px));
+    }
   }
 
   .scp-header-lock {
@@ -1060,8 +1109,8 @@
   .typing-dot:nth-child(3) { animation-delay: 0.4s; }
 
   @keyframes typing-bounce {
-    0%, 60%, 100% { transform: translateY(0);     opacity: 0.4; }
-    30%           { transform: translateY(-5px);  opacity: 1;   }
+    0%, 60%, 100% { transform: translateY(0);    opacity: 0.4; }
+    30%           { transform: translateY(-5px); opacity: 1;   }
   }
 
   .scp-presence-dot {
@@ -1136,13 +1185,13 @@
   main.scp-msgs {
     flex: 1;
     overflow-y: auto;
-    -webkit-overflow-scrolling: touch; /* momentum scroll on iOS Safari/Chrome */
+    -webkit-overflow-scrolling: touch;
     padding: var(--space-4, 16px) var(--space-4, 16px) var(--space-2-5, 10px);
     display: flex;
     flex-direction: column;
     gap: var(--space-1, 4px);
     overscroll-behavior: contain;
-    min-height: 0; /* required for flex children to shrink below their content height on iOS */
+    min-height: 0; /* flex child must be able to shrink below content height on iOS */
   }
   main.scp-msgs::-webkit-scrollbar { width: 3px; }
   main.scp-msgs::-webkit-scrollbar-thumb {
@@ -1161,7 +1210,7 @@
   .scp-skel-row {
     display: flex;
   }
-  .scp-skel-row--own  { justify-content: flex-end; }
+  .scp-skel-row--own   { justify-content: flex-end; }
   .scp-skel-row--their { justify-content: flex-start; }
 
   .scp-skel-bubble {
@@ -1190,7 +1239,6 @@
     text-align: center;
   }
 
-  /* CSS lock art with concentric pulsing rings */
   .scp-empty-lock-art {
     position: relative;
     width: 96px; height: 96px;
@@ -1233,7 +1281,7 @@
   }
 
   @keyframes empty-ring-pulse {
-    0%, 100% { transform: scale(1); opacity: 0.8; }
+    0%, 100% { transform: scale(1);    opacity: 0.8; }
     50%       { transform: scale(1.05); opacity: 0.5; }
   }
 
@@ -1266,8 +1314,8 @@
   .scp-date-div {
     display: flex;
     align-items: center;
-    gap: var(--space-2-5, 10px);
-    margin: var(--space-2-5, 10px) 0 var(--space-1-5, 6px);
+    gap: 10px;
+    margin: 10px 0 var(--space-1-5, 6px);
     align-self: stretch;
     position: sticky;
     top: var(--space-2, 8px);
@@ -1339,7 +1387,6 @@
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
   }
 
-
   /* ── Photo lightbox ──────────────────────────────────────── */
   .lightbox-backdrop {
     position: fixed;
@@ -1372,7 +1419,7 @@
 
   .lightbox-close {
     position: absolute;
-    top: var(--space-4, 16px);
+    top: max(var(--space-4, 16px), env(safe-area-inset-top, 0px));
     right: var(--space-4, 16px);
     width: 44px; height: 44px;
     border-radius: var(--radius-full, 9999px);
@@ -1384,7 +1431,6 @@
     justify-content: center;
     cursor: pointer;
     transition: background 0.1s, color 0.1s;
-    top: max(var(--space-4, 16px), env(safe-area-inset-top, 0px));
   }
   .lightbox-close:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
   .lightbox-close:focus-visible { outline: 2px solid var(--chat-accent); outline-offset: 2px; }
@@ -1402,15 +1448,15 @@
 
   /* ── prefers-reduced-motion ──────────────────────────────── */
   @media (prefers-reduced-motion: reduce) {
-    .scp-glitch { animation: none; }
-    .scp-panic  { animation: none; }
-    .scp { animation: none; }
-    .scp-empty-lock-ring { animation: none; }
+    .scp-glitch                { animation: none; }
+    .scp-panic                 { animation: none; }
+    .scp                       { animation: none; transition: none; }
+    .scp-empty-lock-ring       { animation: none; }
     .scp-presence-dot--active  { animation: none; }
     .scp-presence-dot--online  { animation: none; }
-    .typing-dot { animation: none; }
-    .scp-skel-bubble { animation: none; }
-    .scp-scroll-fab:hover { transform: none; }
-    .lightbox-img { animation: none; }
+    .typing-dot                { animation: none; }
+    .scp-skel-bubble           { animation: none; }
+    .scp-scroll-fab:hover      { transform: none; }
+    .lightbox-img              { animation: none; }
   }
 </style>

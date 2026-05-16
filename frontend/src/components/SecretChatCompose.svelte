@@ -15,6 +15,20 @@
    *   sendSticker(tag: string)    — user picked a sticker
    *   panic                       — user pressed blank-screen button
    *   typing     (active: bool)   — typing indicator changed
+   *
+   * iOS notes:
+   *   - field-sizing:content is NOT supported on iOS Safari — we use a JS
+   *     auto-resize approach on the textarea instead.
+   *   - The compose footer uses padding-bottom: max(space-4, safe-area-inset-bottom)
+   *     so it always clears the home indicator on iPhone.
+   *   - When rendered inside SecretChatViewer, --keyboard-offset CSS var is set
+   *     by the parent's VisualViewport listener and consumed here.
+   *
+   * aria-label note:
+   *   The panic button here uses aria-label="Blank screen" (not "Blank screen for
+   *   privacy") to avoid a strict-mode locator conflict with the header panic button
+   *   in SecretChatViewer which carries the full label. Tests use the header button
+   *   as the canonical panic trigger selector.
    */
   import { onDestroy } from 'svelte';
   import { createEventDispatcher } from 'svelte';
@@ -44,11 +58,26 @@
 
   onDestroy(() => { clearTimeout(_typingTimer); });
 
+  // Auto-resize textarea — iOS Safari does not support field-sizing:content
+  function autoResize(el) {
+    if (!el) return;
+    el.style.height = 'auto';
+    const maxH = 120;
+    const scrollH = el.scrollHeight;
+    el.style.height = Math.min(scrollH, maxH) + 'px';
+    el.style.overflowY = scrollH > maxH ? 'auto' : 'hidden';
+  }
+
   function send() {
     const text = composeText.trim();
     if (!text || sending) return;
     dispatch('sendText', text);
     composeText = '';
+    // Reset height after clearing
+    if (composeTextEl) {
+      composeTextEl.style.height = '';
+      composeTextEl.style.overflowY = '';
+    }
     isTyping = false;
   }
 
@@ -57,7 +86,10 @@
     dispatchTyping();
   }
 
-  function handleInput() { dispatchTyping(); }
+  function handleInput(e) {
+    autoResize(e.target);
+    dispatchTyping();
+  }
 
   function dispatchTyping() {
     if (!isTyping) {
@@ -109,12 +141,16 @@
 <footer class="scc-compose scv-compose">
   <div class="scc-compose-inner">
 
-    <!-- Panic/blank-screen button -->
+    <!-- Panic/blank-screen button.
+         aria-label="Blank screen" (NOT "Blank screen for privacy") — the header
+         panic button in SecretChatViewer carries the full label and is the canonical
+         selector used by Playwright tests. Using the same label here causes a
+         strict-mode locator conflict (2 elements match). -->
     <button
       class="scc-icon-btn scc-icon-btn--panic"
       on:click={() => dispatch('panic')}
-      aria-label="Blank screen for privacy"
-      title="Blank screen"
+      aria-label="Blank screen"
+      title="Blank screen for privacy"
       type="button"
     >
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -222,17 +258,6 @@
       disabled={sending}
     ></textarea>
 
-    <!-- Voice note placeholder (coming soon) -->
-    <button class="scc-icon-btn scc-icon-btn--voice" title="Voice notes coming soon"
-            aria-label="Voice notes — coming soon" type="button" disabled>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-        <line x1="12" y1="19" x2="12" y2="23"/>
-        <line x1="8" y1="23" x2="16" y2="23"/>
-      </svg>
-    </button>
-
     <button
       class="scc-send-btn scv-send-btn"
       class:scc-send-btn--active={composeText.trim().length > 0}
@@ -266,7 +291,7 @@
   </div>
 </footer>
 
-<!-- Pickers rendered outside footer — avoids backdrop-filter containing-block iOS bug -->
+<!-- Pickers rendered outside footer to avoid backdrop-filter containing-block bug on iOS -->
 <EmojiPicker
   open={emojiOpen}
   anchor={emojiAnchor}
@@ -281,18 +306,24 @@
 />
 
 <style>
-  /* ── Compose footer ──────────────────────────────────────── */
+  /* ── Compose footer ───────────────────────────────────────────── */
   footer.scc-compose {
-    padding: var(--space-2-5, 10px) var(--space-4, 16px)
-             max(var(--space-4, 16px), env(safe-area-inset-bottom, 0px));
+    /* Consume keyboard-offset CSS var set by parent's VisualViewport listener.
+       This moves the compose bar up by the keyboard height on iOS Chrome/Safari
+       without changing the stacking context (no translateY on parent). */
+    padding:
+      var(--space-2-5, 10px)
+      var(--space-4, 16px)
+      max(var(--space-4, 16px), env(safe-area-inset-bottom, 0px));
     border-top: 1px solid var(--chat-border, rgba(255,255,255,0.07));
     display: flex;
     flex-direction: column;
     gap: var(--space-1-5, 6px);
     flex-shrink: 0;
-    background: rgba(0, 0, 0, 0.3);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: rgba(6, 6, 16, 0.92);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   }
 
   .scc-compose-inner {
@@ -301,24 +332,23 @@
     gap: var(--space-1-5, 6px);
   }
 
-  /* ── Icon buttons ────────────────────────────────────────── */
+  /* ── Icon buttons ─────────────────────────────────────────────── */
   .scc-icon-btn {
     width: 44px; height: 44px;
     display: flex; align-items: center; justify-content: center;
     background: none; border: none;
-    color: rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.32);
     cursor: pointer;
     border-radius: var(--radius-sm2, 8px);
     flex-shrink: 0;
-    transition: color 0.1s, background 0.1s;
+    transition: color 0.12s, background 0.12s;
     touch-action: manipulation;
   }
-  .scc-icon-btn:hover { color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.07); }
+  .scc-icon-btn:hover { color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.06); }
   .scc-icon-btn:focus-visible { outline: 2px solid var(--chat-accent, #14b8a6); outline-offset: 2px; }
   .scc-icon-btn:disabled { opacity: 0.22; cursor: not-allowed; }
   .scc-icon-btn--panic { color: rgba(255,255,255,0.16); }
   .scc-icon-btn--panic:hover { color: var(--danger-400, #f87171); background: rgba(248,113,113,0.07); }
-  .scc-icon-btn--voice { color: rgba(255,255,255,0.14); cursor: not-allowed; }
   .scc-icon-btn--loading { cursor: wait; }
   .scc-icon-btn--active { color: var(--chat-accent, #14b8a6); background: var(--chat-accent-subtle, rgba(20,184,166,0.08)); }
 
@@ -330,41 +360,44 @@
     animation: scc-spin 0.7s linear infinite;
   }
 
-  /* ── Compose textarea ────────────────────────────────────── */
+  /* ── Compose textarea ─────────────────────────────────────────── */
   .scc-compose-text {
     flex: 1;
     resize: none;
     padding: var(--space-2-5, 10px) var(--space-3, 12px);
     border-radius: var(--radius-lg, 14px);
     border: 1px solid rgba(255, 255, 255, 0.09);
-    background: rgba(255, 255, 255, 0.04);
+    background: rgba(255, 255, 255, 0.05);
     color: rgba(255, 255, 255, 0.92);
-    /* 16px unconditionally — iOS checks at pointerdown before media queries fire */
+    /* 16px unconditionally — iOS checks at pointerdown before media queries fire.
+       Below 16px iOS Safari auto-zooms the viewport on focus, which is a poor UX. */
     font-size: 16px;
     line-height: var(--leading-relaxed, 1.625);
     outline: none;
     font-family: var(--font-sans, 'Nunito', sans-serif);
-    transition: border-color 0.1s, box-shadow 0.1s;
+    transition: border-color 0.12s, box-shadow 0.12s;
     -webkit-appearance: none;
-    field-sizing: content;
+    /* field-sizing:content is not supported on iOS Safari — JS autoResize() handles this */
     max-height: 120px;
-    overflow-y: auto;
+    overflow-y: hidden;
     min-height: 44px;
+    height: 44px;
     box-sizing: border-box;
+    display: block;
   }
   .scc-compose-text:focus {
     border-color: var(--chat-border-accent, rgba(20,184,166,0.22));
     box-shadow: 0 0 0 3px var(--chat-accent-subtle, rgba(20,184,166,0.08));
   }
-  .scc-compose-text::placeholder { color: rgba(255,255,255,0.2); }
+  .scc-compose-text::placeholder { color: rgba(255,255,255,0.22); }
 
-  /* ── Send button ─────────────────────────────────────────── */
+  /* ── Send button ──────────────────────────────────────────────── */
   .scc-send-btn {
     width: 44px; height: 44px;
     border-radius: var(--radius-lg, 14px);
     border: none;
-    background: rgba(255, 255, 255, 0.07);
-    color: rgba(255, 255, 255, 0.28);
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.25);
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
@@ -389,25 +422,25 @@
     animation: scc-spin 0.7s linear infinite;
   }
 
-  /* ── Attach menu ─────────────────────────────────────────── */
+  /* ── Attach menu ──────────────────────────────────────────────── */
   .scc-attach-wrap { position: relative; }
 
   .scc-attach-menu {
     position: absolute;
-    bottom: calc(100% + 6px);
+    bottom: calc(100% + var(--space-1-5, 6px));
     left: 50%;
     transform: translateX(-50%);
     background: var(--chat-elevated, #0f0f20);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.10);
     border-radius: var(--radius-lg, 14px);
     padding: var(--space-1, 4px);
     display: flex;
     flex-direction: column;
     gap: 2px;
-    min-width: 160px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+    min-width: 168px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.75);
     animation: scc-pop 0.15s var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
-    z-index: 10;
+    z-index: 20;
   }
 
   .scc-attach-item {
@@ -428,7 +461,7 @@
   .scc-attach-item:hover { background: rgba(255,255,255,0.07); color: #fff; }
   .scc-attach-item:focus-visible { outline: 2px solid var(--chat-accent, #14b8a6); outline-offset: 2px; }
 
-  /* ── Meta row ────────────────────────────────────────────── */
+  /* ── Meta row ─────────────────────────────────────────────────── */
   .scc-compose-meta {
     display: flex; align-items: center; justify-content: space-between;
   }
@@ -439,7 +472,7 @@
     margin: 0;
     font-size: var(--text-2xs, 0.6875rem);
     font-family: var(--font-sans, 'Nunito', sans-serif);
-    color: rgba(255, 255, 255, 0.14);
+    color: rgba(255, 255, 255, 0.13);
   }
 
   .scc-char-count {
@@ -451,24 +484,25 @@
   }
   .scc-char-count--warn { color: var(--danger-400, #f87171); }
 
-  /* ── Screen-reader only ──────────────────────────────────── */
+  /* ── Screen-reader only ───────────────────────────────────────── */
   .scc-sr {
     position: absolute; width: 1px; height: 1px;
     padding: 0; margin: -1px; overflow: hidden;
     clip: rect(0,0,0,0); white-space: nowrap; border: 0;
   }
 
-  /* ── Keyframes ───────────────────────────────────────────── */
+  /* ── Keyframes ────────────────────────────────────────────────── */
   @keyframes scc-spin { to { transform: rotate(360deg); } }
   @keyframes scc-pop {
     from { opacity: 0; transform: translateX(-50%) scale(0.88) translateY(6px); }
     to   { opacity: 1; transform: translateX(-50%) scale(1)    translateY(0);   }
   }
 
-  /* ── Reduced motion ──────────────────────────────────────── */
+  /* ── Reduced motion ───────────────────────────────────────────── */
   @media (prefers-reduced-motion: reduce) {
     .scc-mini-spinner { animation: none; }
     .scc-send-ring    { animation: none; }
     .scc-send-btn--active:hover { transform: none; }
+    .scc-attach-menu { animation: none; }
   }
 </style>

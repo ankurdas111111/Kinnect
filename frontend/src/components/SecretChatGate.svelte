@@ -14,10 +14,15 @@
    *   triggerShake()   — animate the input on wrong PIN
    *   triggerSuccess() — animate the icon on correct PIN
    *
+   * CSS classes:
+   *   .scv-pin-dot, .scv-pin-dot--filled, .scv-pin-dot--active — used by
+   *   Playwright tests (scoped in :global so they survive Svelte scoping).
+   *   .scv-cta-btn, .scv-cta-btn--active — used by tests as stable selectors.
+   *
    * iOS notes:
    *   - Input font-size is fixed at 26px (above the 16px iOS auto-zoom threshold).
    *   - onMount focuses after 120ms to allow the animation to settle first.
-   *   - No onMount without onDestroy — _shakeTimer is cleared in onDestroy.
+   *   - _shakeTimer cleaned up in onDestroy.
    */
   import { createEventDispatcher, onMount, onDestroy } from 'svelte';
   import { haptics } from '../lib/haptics.js';
@@ -58,8 +63,6 @@
   export function triggerShake() {
     pinShake = true;
     haptics.error?.();
-    // Clear the PIN so the user must re-enter after a wrong attempt.
-    // This prevents accidental re-submission and is the expected UX.
     pinDigits = [];
     if (pinInputEl) pinInputEl.value = '';
     clearTimeout(_shakeTimer);
@@ -89,13 +92,11 @@
       <div class="gate-icon-ring gate-icon-ring--inner"></div>
       <div class="gate-icon" class:gate-icon--success={unlockSuccess}>
         {#if unlockSuccess}
-          <!-- Unlocked padlock -->
           <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="11" width="18" height="11" rx="2"/>
             <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
           </svg>
         {:else}
-          <!-- Locked padlock -->
           <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="11" width="18" height="11" rx="2"/>
             <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
@@ -113,15 +114,15 @@
       </p>
     </div>
 
-    <!-- PIN dot visualizer — shows progress without revealing digits -->
+    <!-- PIN dot visualizer — stable class names for Playwright tests -->
     <div class="gate-dots" aria-hidden="true" role="presentation">
       {#each Array(8) as _, i}
         <span
           class="gate-dot scv-pin-dot"
           class:gate-dot--filled={i < pinDigits.length}
           class:scv-pin-dot--filled={i < pinDigits.length}
-          class:gate-dot--active={i === pinDigits.length - 1}
-          class:scv-pin-dot--active={i === pinDigits.length - 1}
+          class:gate-dot--active={i === pinDigits.length - 1 && pinDigits.length > 0}
+          class:scv-pin-dot--active={i === pinDigits.length - 1 && pinDigits.length > 0}
         ></span>
       {/each}
     </div>
@@ -155,7 +156,7 @@
       {/if}
     </div>
 
-    <!-- Open button -->
+    <!-- Open button — stable class names for Playwright tests -->
     <button
       class="gate-btn scv-cta-btn"
       class:gate-btn--ready={pinReady}
@@ -204,7 +205,6 @@
     position: relative;
     overflow: hidden;
     min-height: 0;
-    /* Consume the parent's flex space without affecting its scroll container */
   }
 
   /* ── Hex texture background ─────────────────────────────────── */
@@ -242,7 +242,7 @@
     to   { background-position: 0 56px, 48px 0, 0 56px; }
   }
 
-  /* ── Ambient glow ─────────────────────────────────────────── */
+  /* ── Ambient glow ────────────────────────────────────────────── */
   .gate-glow {
     position: absolute;
     inset: 0;
@@ -258,7 +258,7 @@
     50%       { opacity: 0.55; }
   }
 
-  /* ── Content block ────────────────────────────────────────── */
+  /* ── Content block ───────────────────────────────────────────── */
   .gate-content {
     position: relative;
     z-index: 1;
@@ -267,7 +267,7 @@
     align-items: center;
     gap: var(--space-5, 20px);
     width: 100%;
-    max-width: 300px;
+    max-width: 320px;
     padding: var(--space-6, 24px) var(--space-4, 16px) var(--space-8, 32px);
     text-align: center;
     animation: gate-content-in 0.4s var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
@@ -286,7 +286,7 @@
     to { opacity: 0; transform: translateY(-20px) scale(0.96); }
   }
 
-  /* ── Lock icon with concentric rings ─────────────────────── */
+  /* ── Lock icon with concentric rings ─────────────────────────── */
   .gate-icon-wrap {
     position: relative;
     width: 96px;
@@ -356,7 +356,7 @@
     100% { transform: scale(1); }
   }
 
-  /* ── Text ─────────────────────────────────────────────────── */
+  /* ── Text ────────────────────────────────────────────────────── */
   .gate-text {
     display: flex;
     flex-direction: column;
@@ -385,12 +385,12 @@
     font-weight: 600;
   }
 
-  /* ── PIN dot visualizer ───────────────────────────────────── */
+  /* ── PIN dot visualizer ──────────────────────────────────────── */
   .gate-dots {
     display: flex;
     gap: var(--space-2, 8px);
     align-items: center;
-    height: 14px;
+    height: 16px;
   }
 
   .gate-dot {
@@ -406,20 +406,22 @@
     flex-shrink: 0;
   }
 
-  .gate-dot--filled {
+  .gate-dot--filled,
+  :global(.scv-pin-dot--filled) {
     background: var(--chat-accent, #14b8a6);
     border-color: transparent;
     box-shadow: 0 0 8px rgba(20, 184, 166, 0.5);
   }
 
-  .gate-dot--active {
+  .gate-dot--active,
+  :global(.scv-pin-dot--active) {
     transform: scale(1.3);
   }
 
-  /* ── PIN input ────────────────────────────────────────────── */
+  /* ── PIN input ───────────────────────────────────────────────── */
   .gate-input-wrap {
     width: 100%;
-    max-width: 260px;
+    max-width: 280px;
     display: flex;
     flex-direction: column;
     gap: var(--space-1-5, 6px);
@@ -433,7 +435,7 @@
     border: 1px solid var(--chat-border-accent, rgba(20, 184, 166, 0.22));
     border-radius: var(--radius-lg, 14px);
     color: rgba(255, 255, 255, 0.92);
-    /* 26px > 16px iOS threshold — no auto-zoom, deliberate vault weight */
+    /* 26px > 16px iOS threshold — prevents auto-zoom, signals vault-weight */
     font-size: 26px;
     letter-spacing: 0.4em;
     text-align: center;
@@ -490,10 +492,10 @@
     color: rgba(255, 255, 255, 0.18);
   }
 
-  /* ── Open button ──────────────────────────────────────────── */
+  /* ── Open button ─────────────────────────────────────────────── */
   .gate-btn {
     width: 100%;
-    max-width: 260px;
+    max-width: 280px;
     padding: var(--space-4, 16px);
     border-radius: var(--radius-lg, 14px);
     border: 1px solid rgba(255, 255, 255, 0.10);
@@ -535,7 +537,7 @@
     transform: scale(0.97);
   }
 
-  /* ── Button spinner ───────────────────────────────────────── */
+  /* ── Button spinner ──────────────────────────────────────────── */
   .gate-btn-ring {
     width: 16px;
     height: 16px;
@@ -548,7 +550,7 @@
 
   @keyframes gate-spin { to { transform: rotate(360deg); } }
 
-  /* ── Footer note ──────────────────────────────────────────── */
+  /* ── Footer note ─────────────────────────────────────────────── */
   .gate-footer {
     margin: 0;
     display: flex;
@@ -560,7 +562,7 @@
     letter-spacing: 0.03em;
   }
 
-  /* ── Accessibility ────────────────────────────────────────── */
+  /* ── Accessibility ───────────────────────────────────────────── */
   .sr-only {
     position: absolute;
     width: 1px;
@@ -573,7 +575,7 @@
     border: 0;
   }
 
-  /* ── Reduced motion ───────────────────────────────────────── */
+  /* ── Reduced motion ──────────────────────────────────────────── */
   @media (prefers-reduced-motion: reduce) {
     .gate-hex-bg    { animation: none; }
     .gate-glow      { animation: none; }

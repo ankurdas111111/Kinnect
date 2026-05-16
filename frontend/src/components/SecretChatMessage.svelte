@@ -202,14 +202,15 @@
       class:bubble--photo={parsePhoto(plain) !== null}
     >
       {#if parsePhoto(plain)}
-        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
         <img
           src={parsePhoto(plain)}
           class="msg-photo"
-          alt="Photo from {peerFirst}"
+          alt="Photo from {peerFirst} — tap to expand"
           loading="lazy"
-          role="img"
+          role="button"
+          tabindex="0"
           on:click={() => dispatch('photoExpand', parsePhoto(plain))}
+          on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && dispatch('photoExpand', parsePhoto(plain))}
         />
       {:else if parseGif(plain)}
         <img src={parseGif(plain)} class="msg-sticker" alt="Sticker from {peerFirst}" loading="lazy" />

@@ -30,7 +30,7 @@
   import OnboardingOverlay from '../components/OnboardingOverlay.svelte';
   import PulseButton from '../components/primitives/PulseButton.svelte';
   import SosFloat from '../components/SosFloat.svelte';
-  import SosParticleBurst from '../components/SosParticleBurst.svelte';
+  import SosParticleBurst from '../components/primitives/SosParticleBurst.svelte';
   import SecretChatPanel from '../components/SecretChatPanel.svelte';
   import HubSpotlight from '../components/HubSpotlight.svelte';
   import FeatureGuide from '../components/FeatureGuide.svelte';
