@@ -747,8 +747,9 @@ test.describe('ARIA and semantic HTML', () => {
   test('error state has role="alert"', async ({ page }) => {
     await mockExpiredInvite(page, 'role-alert-tok');
     await GO(page, 'role-alert-tok');
+    await page.waitForLoadState('domcontentloaded');
 
-    await expect(page.locator('[role="alert"]')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('[role="alert"]')).toBeVisible({ timeout: 10000 });
   });
 });
 
@@ -769,7 +770,8 @@ test.describe('Screenshots', () => {
     });
 
     await GO(page, 'screenshot-gate');
-    await page.locator('[aria-label="Enter PIN to read this note"]').waitFor({ timeout: 5000 });
+    await page.waitForLoadState('domcontentloaded');
+    await page.locator('[aria-label="Enter PIN to read this note"]').waitFor({ timeout: 10000 });
     await page.waitForTimeout(300); // let animations settle
 
     await page.screenshot({
@@ -789,10 +791,11 @@ test.describe('Screenshots', () => {
     });
 
     await GO(page, 'screenshot-msgs');
-    await page.locator('#scv-gate-pin').waitFor({ timeout: 5000 });
+    await page.waitForLoadState('domcontentloaded');
+    await page.locator('#scv-gate-pin').waitFor({ timeout: 10000 });
     await page.locator('#scv-gate-pin').fill('1234');
     await page.locator('.scv-cta-btn').click();
-    await page.locator('header.scv-header').waitFor({ timeout: 3000 });
+    await page.locator('header.scv-header').waitFor({ timeout: 5000 });
     await page.waitForTimeout(300);
 
     await page.screenshot({

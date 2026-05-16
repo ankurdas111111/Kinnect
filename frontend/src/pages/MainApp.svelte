@@ -30,6 +30,7 @@
   import OnboardingOverlay from '../components/OnboardingOverlay.svelte';
   import PulseButton from '../components/primitives/PulseButton.svelte';
   import SosFloat from '../components/SosFloat.svelte';
+  import SosParticleBurst from '../components/SosParticleBurst.svelte';
   import SecretChatPanel from '../components/SecretChatPanel.svelte';
   import HubSpotlight from '../components/HubSpotlight.svelte';
   import FeatureGuide from '../components/FeatureGuide.svelte';
@@ -54,6 +55,7 @@
   let sidebarTab = 'info';
   let sidebarCollapsed = false;
   let sosConfirmOpen = false;
+  let sosParticleBurstActive = false;
   let batteryPromptOpen = false;
 
   // Feature 7: Panic Mode — read from localStorage (set in SettingsPanel)
@@ -924,6 +926,9 @@
     <!-- Persistent emergency float card — appears above SOS FAB when a network member has active SOS + medical data -->
     <SosFloat />
 
+    <!-- Particle burst confirmation — fires once when user sends their own SOS -->
+    <SosParticleBurst active={sosParticleBurstActive} on:done={() => sosParticleBurstActive = false} />
+
     <!-- First-run Hub discovery coach mark (desktop only, shows once) -->
     <HubSpotlight />
 
@@ -969,7 +974,7 @@
           <p class="sos-confirm-desc">Everyone connected to you will be notified right away. They'll see your live location until you're safe.</p>
           <div class="sos-confirm-actions">
             <button class="btn btn-ghost sos-cancel-btn" on:click={() => sosConfirmOpen = false}>Cancel</button>
-            <button class="btn btn-danger sos-send-btn" on:click={() => { haptics.sos(); socket.emit('triggerSOS', { reason: 'SOS', medicalCard: getMedicalSnapshot() }); sosConfirmOpen = false; }}>Yes, send SOS</button>
+            <button class="btn btn-danger sos-send-btn" on:click={() => { haptics.sos(); socket.emit('triggerSOS', { reason: 'SOS', medicalCard: getMedicalSnapshot() }); sosConfirmOpen = false; sosParticleBurstActive = true; }}>Yes, send SOS</button>
           </div>
         </div>
       </div>

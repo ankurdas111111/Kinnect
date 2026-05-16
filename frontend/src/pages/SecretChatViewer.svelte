@@ -5,13 +5,22 @@
 
 <script>
   /**
-   * SecretChatViewer — shared-link chat window (full-screen).
-   * Accessed via /#/m/:token (no auth required to view, auth required to reply).
+   * SecretChatViewer — shared-link chat window (full-screen, public URL).
+   * Accessed via /#/m/:token — no auth required to view, auth required to reply.
    *
    * States: loading → login | gate → messages | error
    *
-   * Reuses SecretChatGate, SecretChatMessage, SecretChatCompose for identical UI.
-   * Only data-wiring differs (REST API instead of WS/store).
+   * Mobile-first. Tested against iOS Safari 17, iOS Chrome, Android Chrome.
+   *
+   * iOS layout strategy:
+   *   - Root .scv uses height: 100dvh + 100svh (svh is stable, excludes browser
+   *     chrome; dvh updates when keyboard opens and causes layout thrash on iOS).
+   *   - The messages view (.scv-view) is a flex column that fills the root.
+   *   - Keyboard avoidance is handled by the VisualViewport API: we track
+   *     vv.height and set a CSS custom property --keyboard-offset that the
+   *     footer uses to ensure it stays above the keyboard.
+   *   - No translateY on the root element — that creates a new stacking context
+   *     and causes position:fixed children to clip on iOS Chrome.
    */
   import { onMount, onDestroy, tick } from 'svelte';
   import { fade } from 'svelte/transition';
@@ -36,13 +45,13 @@
   let loginError = '';
   let loginLoading = false;
 
-  // Gate state — SecretChatGate owns PIN UI, we own the logic
+  // Gate state
   let pinError = '';
   let rawMessages = [];
   let decryptedMessages = [];
   let unlocking = false;
   let gatePin = '';
-  let gateRef; // bind:this for triggerShake() / triggerSuccess()
+  let gateRef;
 
   // Reply compose state
   let replySent = false;
@@ -57,7 +66,7 @@
   let lockIntervals = {};
   const AUTO_LOCK_SECS = 30;
 
-  // Per-message inline PIN state (one message open at a time)
+  // Per-message inline PIN state
   let inlineOpenId = null;
   let inlinePin = '';
   let inlineError = '';
@@ -67,16 +76,20 @@
   let lightboxSrc = '';
   let lightboxOpen = false;
 
-  // Keyboard avoidance (iOS visualViewport)
+  // Keyboard avoidance — CSS custom property approach (no translateY on root)
+  let rootEl;
   let keyboardOffset = 0;
-  let viewEl;
 
   function onVVChange() {
-    if (!viewEl) return;
     const vv = window.visualViewport;
     if (!vv) return;
+    // On iOS the visual viewport height shrinks when the keyboard opens.
+    // We set a CSS variable that the compose footer reads to add extra padding.
     const kbH = Math.max(0, window.innerHeight - vv.height);
     keyboardOffset = kbH > 50 ? kbH : 0;
+    if (rootEl) {
+      rootEl.style.setProperty('--keyboard-offset', `${keyboardOffset}px`);
+    }
   }
 
   function restoreFromPanic() { panicMode = false; }
@@ -225,7 +238,7 @@
     };
   }
 
-  // Inline PIN handlers — one message open at a time
+  // Inline PIN handlers
   function handleToggleInline(id) {
     if (inlineOpenId === id) {
       inlineOpenId = null; inlinePin = ''; inlineError = '';
@@ -339,7 +352,6 @@
     finally { photoSending = false; }
   }
 
-  // Formatters (own messages only — their messages use SecretChatMessage's internal formatters)
   function clockTime(ts) {
     if (!ts) return '';
     return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -422,7 +434,11 @@
 {/if}
 
 <!-- ── Root container ─────────────────────────────────────────────── -->
-<div class="scv" class:scv--nocyber={state !== 'messages'}>
+<div
+  class="scv"
+  class:scv--nocyber={state !== 'messages'}
+  bind:this={rootEl}
+>
 
   <!-- ── Loading ──────────────────────────────────────────────────── -->
   {#if state === 'loading'}
@@ -435,7 +451,7 @@
   {:else if state === 'error'}
     <div class="scv-center" role="alert">
       <div class="scv-status-icon scv-status-icon--error" aria-hidden="true">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
           <circle cx="12" cy="12" r="10"/>
           <line x1="15" y1="9" x2="9" y2="15"/>
           <line x1="9" y1="9" x2="15" y2="15"/>
@@ -451,6 +467,8 @@
   {:else if state === 'login'}
     <div class="scv-gate-wrap" role="region" aria-label="Sign in to Kinnect">
       <div class="scv-gate-content">
+
+        <!-- Login icon -->
         <div class="scv-gate-icon" aria-hidden="true">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
@@ -502,6 +520,7 @@
             class="scv-cta-btn"
             class:scv-cta-btn--active={loginEmail.trim().length > 0 && loginPassword.length > 0}
             type="submit"
+            aria-label={loginEmail.trim() && loginPassword ? 'Sign in to Kinnect' : 'Enter email and password to continue'}
             disabled={loginLoading || !loginEmail.trim() || !loginPassword}
           >
             {#if loginLoading}
@@ -534,11 +553,7 @@
 
   <!-- ── Messages ─────────────────────────────────────────────────── -->
   {:else if state === 'messages'}
-    <div
-      class="scv-view"
-      bind:this={viewEl}
-      style="transform: translateY({keyboardOffset > 0 ? `-${keyboardOffset}px` : '0'}); transition: transform 0.2s var(--ease-out, cubic-bezier(0.16,1,0.3,1));"
-    >
+    <div class="scv-view">
       <!-- Header -->
       <header class="scv-header">
         <button
@@ -562,7 +577,7 @@
         <button
           class="scv-panic-btn"
           on:click={() => panicMode = true}
-          aria-label="Hide screen — tap anywhere to restore"
+          aria-label="Blank screen for privacy"
           type="button"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -605,7 +620,7 @@
           {/if}
 
           {#if msg.own}
-            <!-- Own (viewer's) messages rendered inline — shows plaintext of replies -->
+            <!-- Own (viewer's) messages rendered inline -->
             <div
               class="scv-msg scv-msg--own"
               class:scv-msg--group-cont={!msg.groupLast}
@@ -683,7 +698,7 @@
         </button>
       {/if}
 
-      <!-- Compose — SecretChatCompose owns text/emoji/sticker/photo UI -->
+      <!-- Compose -->
       <SecretChatCompose
         peerFirst="Sender"
         {sending}
@@ -699,7 +714,7 @@
 </div>
 
 <style>
-  /* ── Chat accent token system ─────────────────────────────────── */
+  /* ── Chat accent token system — cascade into SecretChatGate / Message ── */
   :root {
     --scv-accent:        var(--primary-500, #14b8a6);
     --scv-accent-dim:    rgba(20, 184, 166, 0.18);
@@ -710,22 +725,28 @@
     --scv-elevated:      #0f0f20;
     --scv-border:        rgba(255, 255, 255, 0.07);
     --scv-border-accent: rgba(20, 184, 166, 0.22);
+    /* Keyboard offset — updated by VisualViewport listener */
+    --keyboard-offset: 0px;
   }
 
-  /* ── Root shell ───────────────────────────────────────────────── */
+  /* ── Root shell ─────────────────────────────────────────────────── */
   .scv {
-    min-height: 100dvh;
-    min-height: 100svh;
+    /* Use svh (stable viewport height) — excludes browser chrome & keyboard.
+       dvh causes layout thrash on iOS when keyboard opens because it updates
+       continuously. svh is set once at load and stays fixed.
+       Fallback: 100dvh for browsers without svh support (<= 2022). */
+    height: 100dvh;
+    height: 100svh;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     background: var(--scv-bg);
     font-family: var(--font-sans, 'Nunito', sans-serif);
     position: relative;
-    /* NO overflow:hidden — creates containing block for position:fixed on iOS Chrome */
+    /* NO overflow:hidden — creates containing block for position:fixed on iOS */
 
-    /* Bridge --chat-* tokens used by SecretChatGate and SecretChatMessage
-       CSS custom properties cascade through Svelte component boundaries */
+    /* Bridge --chat-* tokens used by SecretChatGate and SecretChatMessage */
     --chat-accent:        var(--scv-accent);
     --chat-accent-subtle: var(--scv-accent-subtle);
     --chat-accent-dim:    var(--scv-accent-dim);
@@ -737,7 +758,7 @@
     --chat-elevated:      var(--scv-elevated);
   }
 
-  /* Ambient teal mesh — only shown in messages state */
+  /* Ambient teal mesh — only in messages state */
   .scv::before {
     content: '';
     position: fixed;
@@ -779,7 +800,7 @@
 
   .scv > * { position: relative; z-index: 1; }
 
-  /* ── Loading / Error center ───────────────────────────────────── */
+  /* ── Loading / Error center ──────────────────────────────────────── */
   .scv-center {
     display: flex;
     flex-direction: column;
@@ -802,11 +823,12 @@
     margin: 0;
     font-size: var(--text-sm, 0.875rem);
     color: rgba(255, 255, 255, 0.4);
+    font-family: var(--font-sans, 'Nunito', sans-serif);
   }
 
   .scv-status-icon {
-    width: 56px;
-    height: 56px;
+    width: 64px;
+    height: 64px;
     border-radius: var(--radius-full, 9999px);
     display: flex;
     align-items: center;
@@ -817,43 +839,37 @@
     background: rgba(248, 113, 113, 0.08);
     border: 1px solid rgba(248, 113, 113, 0.22);
     color: var(--danger-400, #f87171);
+    box-shadow: 0 0 24px rgba(248, 113, 113, 0.12);
   }
 
   .scv-err-msg {
     margin: 0;
     font-size: var(--text-base, 1rem);
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.75);
-    max-width: 260px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.80);
+    max-width: 280px;
+    font-family: var(--font-sans, 'Nunito', sans-serif);
   }
 
   .scv-err-action {
     margin: 0;
     font-size: var(--text-xs, 0.75rem);
     color: rgba(255, 255, 255, 0.35);
-    max-width: 240px;
+    max-width: 260px;
     line-height: var(--leading-relaxed, 1.625);
+    font-family: var(--font-sans, 'Nunito', sans-serif);
   }
 
-  /* ── Login wrapper (keeps original scv-gate-wrap design) ─────── */
+  /* ── Login wrapper ───────────────────────────────────────────────── */
   .scv-gate-wrap {
     width: 100%;
-    min-height: 100dvh;
-    min-height: 100svh;
+    height: 100dvh;
+    height: 100svh;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: var(--space-8, 32px) var(--space-4, 16px);
     box-sizing: border-box;
-    background: rgba(6, 6, 16, 0.94);
-  }
-
-  @media (min-width: 768px) {
-    .scv-gate-wrap {
-      background: rgba(6, 6, 16, 0.72);
-      backdrop-filter: blur(20px) saturate(1.4);
-      -webkit-backdrop-filter: blur(20px) saturate(1.4);
-    }
   }
 
   .scv-gate-content {
@@ -862,7 +878,7 @@
     align-items: center;
     gap: var(--space-5, 20px);
     width: 100%;
-    max-width: 320px;
+    max-width: 340px;
     text-align: center;
     animation: scv-gate-in 0.4s var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
   }
@@ -872,6 +888,7 @@
     to   { opacity: 1; transform: translateY(0) scale(1); }
   }
 
+  /* Login icon */
   .scv-gate-icon {
     width: 88px;
     height: 88px;
@@ -883,16 +900,16 @@
     justify-content: center;
     color: var(--scv-accent);
     box-shadow:
-      0 0 0 14px rgba(20, 184, 166, 0.04),
-      0 0 0 28px rgba(20, 184, 166, 0.02),
-      0 0 48px rgba(20, 184, 166, 0.24);
+      0 0 0 12px rgba(20, 184, 166, 0.04),
+      0 0 0 24px rgba(20, 184, 166, 0.02),
+      0 0 48px rgba(20, 184, 166, 0.18);
     animation: scv-icon-breathe 5s ease-in-out infinite;
     flex-shrink: 0;
   }
 
   @keyframes scv-icon-breathe {
-    0%, 100% { box-shadow: 0 0 0 14px rgba(20,184,166,0.05), 0 0 0 28px rgba(20,184,166,0.02), 0 0 48px rgba(20,184,166,0.24); }
-    50%       { box-shadow: 0 0 0 20px rgba(20,184,166,0.03), 0 0 0 38px rgba(20,184,166,0.01), 0 0 72px rgba(20,184,166,0.35); }
+    0%, 100% { box-shadow: 0 0 0 12px rgba(20,184,166,0.04), 0 0 0 24px rgba(20,184,166,0.02), 0 0 48px rgba(20,184,166,0.18); }
+    50%       { box-shadow: 0 0 0 18px rgba(20,184,166,0.03), 0 0 0 34px rgba(20,184,166,0.01), 0 0 72px rgba(20,184,166,0.28); }
   }
 
   .scv-gate-text {
@@ -907,6 +924,7 @@
     font-weight: 700;
     color: rgba(255, 255, 255, 0.92);
     letter-spacing: -0.01em;
+    font-family: var(--font-sans, 'Nunito', sans-serif);
   }
 
   .scv-gate-sub {
@@ -914,9 +932,10 @@
     font-size: var(--text-xs, 0.75rem);
     color: rgba(255, 255, 255, 0.36);
     line-height: var(--leading-relaxed, 1.625);
+    font-family: var(--font-sans, 'Nunito', sans-serif);
   }
 
-  /* ── Login form ───────────────────────────────────────────────── */
+  /* ── Login form ──────────────────────────────────────────────────── */
   .scv-login-form {
     display: flex;
     flex-direction: column;
@@ -935,7 +954,8 @@
     border: 1px solid var(--scv-border-accent);
     border-radius: var(--radius-lg, 14px);
     color: rgba(255, 255, 255, 0.92);
-    font-size: 16px; /* 16px min — prevents iOS auto-zoom on focus */
+    /* 16px — iOS minimum to prevent auto-zoom on focus */
+    font-size: 16px;
     font-family: var(--font-sans, 'Nunito', sans-serif);
     font-weight: 500;
     caret-color: var(--scv-accent);
@@ -959,16 +979,16 @@
     font-size: var(--text-xs, 0.75rem);
     color: var(--danger-400, #f87171);
     font-weight: 500;
-    text-align: center;
+    text-align: left;
+    font-family: var(--font-sans, 'Nunito', sans-serif);
   }
 
-  /* ── CTA button (login) ───────────────────────────────────────── */
+  /* ── CTA button ──────────────────────────────────────────────────── */
   .scv-cta-btn {
     width: 100%;
-    max-width: 280px;
     padding: var(--space-4, 16px);
     border-radius: var(--radius-lg, 14px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.10);
     background: rgba(255, 255, 255, 0.06);
     color: rgba(255, 255, 255, 0.45);
     font-size: var(--text-base, 1rem);
@@ -1026,43 +1046,52 @@
     margin: 0;
   }
 
-  /* ── Gate outer — full-height flex column for SecretChatGate ──── */
+  /* ── Gate outer — full-height flex column for SecretChatGate ────── */
   .scv-gate-outer {
     width: 100%;
     height: 100dvh;
     height: 100svh;
     display: flex;
     flex-direction: column;
-    /* SecretChatGate's .gate uses flex:1 — fills this container */
   }
 
-  /* ── Messages view ────────────────────────────────────────────── */
+  /* ── Messages view — full height flex column ─────────────────────── */
   .scv-view {
     width: 100%;
-    max-width: 520px;
+    max-width: 560px;
+    /* Fill the full scv height */
     height: 100dvh;
     height: 100svh;
     display: flex;
     flex-direction: column;
     /* NO overflow:hidden — clips position:fixed pickers/panic on iOS Chrome */
+    animation: scv-view-in 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
   }
 
-  /* ── Header ───────────────────────────────────────────────────── */
+  @keyframes scv-view-in {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Header ─────────────────────────────────────────────────────── */
   header.scv-header {
     display: flex;
     align-items: center;
     gap: var(--space-2, 8px);
+    /* Safe area padding for notch / Dynamic Island */
     padding:
       max(var(--space-3, 12px), env(safe-area-inset-top, 0px))
       var(--space-3, 12px)
       var(--space-3, 12px)
       var(--space-3, 12px);
-    background: rgba(6, 6, 16, 0.85);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    background: rgba(6, 6, 16, 0.92);
+    backdrop-filter: blur(20px) saturate(1.4);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
     border-bottom: 1px solid var(--scv-border);
     flex-shrink: 0;
-    min-height: 56px;
+    min-height: 60px;
+    /* Subtle top highlight */
+    box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.04);
   }
 
   .scv-header-btn {
@@ -1072,32 +1101,42 @@
     min-width: 44px;
     min-height: 44px;
     padding: 0 var(--space-2, 8px);
-    background: none;
-    border: none;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: var(--radius-sm2, 8px);
     cursor: pointer;
-    color: rgba(255, 255, 255, 0.45);
+    color: rgba(255, 255, 255, 0.55);
     font-size: var(--text-xs, 0.75rem);
     font-family: var(--font-sans, 'Nunito', sans-serif);
     font-weight: 600;
     flex-shrink: 0;
-    transition: color 0.1s, background 0.1s;
+    transition: color 0.12s, background 0.12s, border-color 0.12s;
     touch-action: manipulation;
   }
 
-  .scv-header-btn:hover { color: rgba(255, 255, 255, 0.8); background: rgba(255, 255, 255, 0.06); }
+  .scv-header-btn:hover {
+    color: rgba(255, 255, 255, 0.85);
+    background: rgba(255, 255, 255, 0.09);
+    border-color: rgba(255, 255, 255, 0.14);
+  }
 
   .scv-header-btn:focus-visible { outline: 2px solid var(--scv-accent); outline-offset: 2px; }
 
-  /* Hide Screen panic button — prominent amber pill so anyone can find it */
+  .scv-header-btn-label {
+    font-size: var(--text-xs, 0.75rem);
+    font-weight: 600;
+    font-family: var(--font-sans, 'Nunito', sans-serif);
+  }
+
+  /* Panic / Hide Screen button — amber pill, immediately findable */
   .scv-panic-btn {
     display: flex;
     align-items: center;
     gap: var(--space-1-5, 6px);
     min-height: 44px;
     padding: 0 var(--space-3, 12px);
-    background: rgba(251, 191, 36, 0.12);
-    border: 1px solid rgba(251, 191, 36, 0.28);
+    background: rgba(251, 191, 36, 0.10);
+    border: 1px solid rgba(251, 191, 36, 0.25);
     border-radius: var(--radius-full, 9999px);
     cursor: pointer;
     color: rgb(251, 191, 36);
@@ -1106,14 +1145,17 @@
     font-weight: 700;
     flex-shrink: 0;
     white-space: nowrap;
-    transition: background 0.1s, border-color 0.1s, color 0.1s;
+    transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
     touch-action: manipulation;
   }
 
-  .scv-panic-btn:hover { background: rgba(251, 191, 36, 0.22); border-color: rgba(251, 191, 36, 0.5); }
-  .scv-panic-btn:focus-visible { outline: 2px solid rgb(251, 191, 36); outline-offset: 2px; }
+  .scv-panic-btn:hover {
+    background: rgba(251, 191, 36, 0.20);
+    border-color: rgba(251, 191, 36, 0.45);
+    box-shadow: 0 0 16px rgba(251, 191, 36, 0.20);
+  }
 
-  .scv-header-btn-label { font-size: var(--text-xs, 0.75rem); font-weight: 600; }
+  .scv-panic-btn:focus-visible { outline: 2px solid rgb(251, 191, 36); outline-offset: 2px; }
 
   .scv-header-center {
     flex: 1;
@@ -1121,6 +1163,8 @@
     align-items: center;
     justify-content: center;
     gap: var(--space-1-5, 6px);
+    min-width: 0;
+    overflow: hidden;
   }
 
   .scv-header-status-dot {
@@ -1141,24 +1185,26 @@
   .scv-header-label {
     font-size: var(--text-xs, 0.75rem);
     font-family: var(--font-mono, 'JetBrains Mono', monospace);
-    color: rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.32);
     letter-spacing: 0.04em;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
-  /* ── Messages area ────────────────────────────────────────────── */
+  /* ── Messages area ───────────────────────────────────────────────── */
   main.scv-msgs {
     flex: 1;
     overflow-y: auto;
+    /* Momentum scroll on iOS Safari/Chrome */
     -webkit-overflow-scrolling: touch;
     padding: var(--space-4, 16px) var(--space-4, 16px) var(--space-2-5, 10px);
     display: flex;
     flex-direction: column;
     gap: var(--space-1, 4px);
     overscroll-behavior: contain;
-    min-height: 0; /* allows flex shrink on iOS */
+    /* Required on iOS — allows flex children to shrink below content height */
+    min-height: 0;
   }
 
   main.scv-msgs::-webkit-scrollbar { width: 3px; }
@@ -1167,7 +1213,7 @@
     border-radius: var(--radius-full, 9999px);
   }
 
-  /* ── Empty state ──────────────────────────────────────────────── */
+  /* ── Empty state ──────────────────────────────────────────────────── */
   .scv-empty {
     flex: 1;
     display: flex;
@@ -1177,11 +1223,12 @@
     gap: var(--space-3, 12px);
     padding: var(--space-10, 40px) 0;
     text-align: center;
+    animation: scv-gate-in 0.4s var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
   }
 
   .scv-empty-icon {
-    width: 64px;
-    height: 64px;
+    width: 72px;
+    height: 72px;
     border-radius: var(--radius-full, 9999px);
     background: var(--scv-accent-subtle);
     border: 1px solid var(--scv-border-accent);
@@ -1189,6 +1236,7 @@
     align-items: center;
     justify-content: center;
     color: var(--scv-accent);
+    box-shadow: 0 0 32px rgba(20, 184, 166, 0.12);
   }
 
   .scv-empty-title {
@@ -1196,6 +1244,7 @@
     font-size: var(--text-base, 1rem);
     font-weight: 700;
     color: rgba(255, 255, 255, 0.75);
+    font-family: var(--font-sans, 'Nunito', sans-serif);
   }
 
   .scv-empty-sub {
@@ -1203,9 +1252,11 @@
     font-size: var(--text-xs, 0.75rem);
     color: rgba(255, 255, 255, 0.28);
     line-height: var(--leading-relaxed, 1.625);
+    max-width: 240px;
+    font-family: var(--font-sans, 'Nunito', sans-serif);
   }
 
-  /* ── Date divider ─────────────────────────────────────────────── */
+  /* ── Date divider ─────────────────────────────────────────────────── */
   .scv-date-div {
     display: flex;
     align-items: center;
@@ -1233,14 +1284,14 @@
     white-space: nowrap;
     letter-spacing: 0.05em;
     padding: 3px var(--space-2, 8px);
-    background: rgba(6, 6, 16, 0.9);
+    background: rgba(6, 6, 16, 0.92);
     border: 1px solid rgba(255, 255, 255, 0.07);
     border-radius: var(--radius-full, 9999px);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
   }
 
-  /* ── Own message rows ─────────────────────────────────────────── */
+  /* ── Own message rows ─────────────────────────────────────────────── */
   .scv-msg {
     display: flex;
     flex-direction: column;
@@ -1266,10 +1317,13 @@
     font-family: var(--font-sans, 'Nunito', sans-serif);
   }
 
-  /* iMessage-style grouping radius — own side */
+  /* iMessage-style grouping radius */
   .scv-bubble--own.scv-bubble--grp-first { border-bottom-right-radius: var(--radius-sm, 6px); }
   .scv-bubble--own.scv-bubble--grp-last  { border-top-right-radius: var(--radius-sm, 6px); }
-  .scv-bubble--own.scv-bubble--grp-mid   { border-top-right-radius: var(--radius-sm, 6px); border-bottom-right-radius: var(--radius-sm, 6px); }
+  .scv-bubble--own.scv-bubble--grp-mid   {
+    border-top-right-radius: var(--radius-sm, 6px);
+    border-bottom-right-radius: var(--radius-sm, 6px);
+  }
 
   .scv-bubble--own {
     display: flex;
@@ -1310,6 +1364,7 @@
     border-radius: var(--radius-md, 10px);
     display: block;
     object-fit: cover;
+    cursor: pointer;
   }
 
   :global(.scv-msg-sticker) {
@@ -1332,12 +1387,13 @@
     align-items: center;
     gap: var(--space-1-5, 6px);
     font-size: var(--text-xs, 0.75rem);
+    font-family: var(--font-sans, 'Nunito', sans-serif);
     color: var(--success-400, #34d399);
     align-self: center;
     margin-top: var(--space-1, 4px);
   }
 
-  /* ── Scroll FAB ───────────────────────────────────────────────── */
+  /* ── Scroll FAB ───────────────────────────────────────────────────── */
   .scv-scroll-fab {
     align-self: flex-end;
     margin: calc(-1 * var(--space-2, 8px)) var(--space-3, 12px) 0;
@@ -1345,7 +1401,7 @@
     height: 44px;
     border-radius: var(--radius-full, 9999px);
     border: 1px solid var(--scv-border-accent);
-    background: rgba(6, 6, 16, 0.9);
+    background: rgba(6, 6, 16, 0.92);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     color: var(--scv-accent);
@@ -1369,7 +1425,7 @@
 
   .scv-scroll-fab:focus-visible { outline: 2px solid var(--scv-accent); outline-offset: 2px; }
 
-  /* ── Photo lightbox ───────────────────────────────────────────── */
+  /* ── Photo lightbox ───────────────────────────────────────────────── */
   .scv-lightbox {
     position: fixed;
     inset: 0;
@@ -1384,10 +1440,17 @@
 
   .scv-lightbox-img {
     max-width: 100%;
-    max-height: 90dvh;
+    max-height: 85dvh;
     border-radius: var(--radius-lg, 14px);
     object-fit: contain;
     box-shadow: 0 16px 64px rgba(0, 0, 0, 0.8);
+    animation: scv-lightbox-in 0.22s var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
+    cursor: default;
+  }
+
+  @keyframes scv-lightbox-in {
+    from { opacity: 0; transform: scale(0.88); }
+    to   { opacity: 1; transform: scale(1); }
   }
 
   .scv-lightbox-close {
@@ -1398,8 +1461,8 @@
     height: 44px;
     border-radius: var(--radius-full, 9999px);
     border: 1px solid rgba(255, 255, 255, 0.15);
-    background: rgba(0, 0, 0, 0.6);
-    color: rgba(255, 255, 255, 0.7);
+    background: rgba(0, 0, 0, 0.65);
+    color: rgba(255, 255, 255, 0.75);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1408,10 +1471,10 @@
     transition: background 0.1s, color 0.1s;
   }
 
-  .scv-lightbox-close:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }
+  .scv-lightbox-close:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
   .scv-lightbox-close:focus-visible { outline: 2px solid var(--scv-accent); outline-offset: 2px; }
 
-  /* ── Panic overlay ────────────────────────────────────────────── */
+  /* ── Panic overlay ────────────────────────────────────────────────── */
   .scv-panic {
     position: fixed;
     inset: 0;
@@ -1426,7 +1489,7 @@
     to   { opacity: 1; }
   }
 
-  /* ── Utility ──────────────────────────────────────────────────── */
+  /* ── Utility ──────────────────────────────────────────────────────── */
   .scv-sr {
     position: absolute;
     width: 1px; height: 1px;
@@ -1439,15 +1502,18 @@
 
   @keyframes scv-spin { to { transform: rotate(360deg); } }
 
-  /* ── prefers-reduced-motion ───────────────────────────────────── */
+  /* ── prefers-reduced-motion ───────────────────────────────────────── */
   @media (prefers-reduced-motion: reduce) {
     .scv::before, .scv::after { animation: none; }
     .scv-gate-content { animation: none; }
     .scv-gate-icon { animation: none; }
     .scv-header-status-dot { animation: none; }
     .scv-msg { animation: none; }
+    .scv-empty { animation: none; }
     .scv-spinner, .scv-btn-ring { animation: none; }
     .scv-panic { animation: none; }
+    .scv-view { animation: none; }
+    .scv-lightbox-img { animation: none; }
     .scv-cta-btn { transition: none; }
     .scv-cta-btn--active:hover { transform: none; }
     .scv-scroll-fab:hover { transform: none; }

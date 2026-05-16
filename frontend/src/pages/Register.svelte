@@ -5,6 +5,8 @@
   import { COUNTRY_CODES, COUNTRY_MAP, validateMobileLength } from '../lib/countryCodes.js';
   import { toasts } from '../lib/stores/toast.js';
   import { onMount } from 'svelte';
+  import AnimatedMeshBackground from '../components/primitives/AnimatedMeshBackground.svelte';
+  import KineticText from '../components/primitives/KineticText.svelte';
 
   let showPassword = false;
   let showConfirm = false;
@@ -151,26 +153,8 @@
 </script>
 
 <div class="auth-page page-enter">
-  <!-- 2026 Aurora Mesh Background -->
-  <div class="auth-bg"><div class="auth-bg-blob"></div></div>
-  <div class="auth-aurora-orb auth-aurora-orb-1" aria-hidden="true"></div>
-  <div class="auth-aurora-orb auth-aurora-orb-2" aria-hidden="true"></div>
-  <div class="auth-aurora-orb auth-aurora-orb-3" aria-hidden="true"></div>
-  <div class="auth-grid-overlay" aria-hidden="true"></div>
-  <div class="auth-particles" aria-hidden="true">
-    <span class="auth-particle large"></span>
-    <span class="auth-particle"></span>
-    <span class="auth-particle"></span>
-    <span class="auth-particle large"></span>
-    <span class="auth-particle"></span>
-    <span class="auth-particle"></span>
-    <span class="auth-particle large"></span>
-    <span class="auth-particle"></span>
-    <span class="auth-particle"></span>
-    <span class="auth-particle large"></span>
-    <span class="auth-particle"></span>
-    <span class="auth-particle"></span>
-  </div>
+  <!-- 2026 Animated Mesh Background — conic mesh + aurora orbs + particles -->
+  <AnimatedMeshBackground variant="brand" grid={true} particles={true} />
 
   <div class="auth-brand">
     <div class="auth-brand-inner">
@@ -208,7 +192,15 @@
         </svg>
       </div>
       <div class="auth-brand-badge">Kinnect = Kin + Connect</div>
-      <h1>Join your<br>family network</h1>
+      <!-- KineticText — per-character spring entrance for the brand headline -->
+      <KineticText
+        text="Join your family network"
+        tag="h1"
+        delay={120}
+        stagger={36}
+        className="auth-brand-h1"
+        once={true}
+      />
       <p>Know where your family is, anytime. Private, secure, always free.</p>
       <ul class="auth-brand-features">
         <li><span class="feature-check" aria-hidden="true"></span> See your family on a live map</li>
@@ -401,6 +393,16 @@
 
 <style>
   @import '../styles/auth.css';
+
+  /* KineticText headline — matches auth.css h1 sizing but uses span chars */
+  :global(.auth-brand-h1) {
+    font-size: clamp(2rem, 3.5vw, 2.75rem);
+    font-weight: 800;
+    color: var(--auth-page-text, #ffffff);
+    line-height: 1.15;
+    letter-spacing: -0.03em;
+    margin-bottom: var(--space-4);
+  }
 
   /* Decorative location-pin cluster */
   .auth-brand-deco {
