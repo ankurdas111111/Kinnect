@@ -1222,7 +1222,7 @@
     top: calc(var(--safe-top, 0px) + 92px);
     left: 50%;
     transform: translateX(-50%);
-    z-index: 1000;
+    z-index: var(--z-panel, 1000);
     display: flex;
     gap: 6px;
     flex-wrap: wrap;

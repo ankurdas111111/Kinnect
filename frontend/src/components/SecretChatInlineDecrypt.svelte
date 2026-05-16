@@ -118,7 +118,7 @@
     border-radius: var(--radius-sm2, 8px);
     border: none;
     background: var(--chat-accent, #14b8a6);
-    color: #fff;
+    color: var(--text-on-primary);
     font-size: var(--text-xs, 0.75rem);
     font-weight: 700;
     font-family: var(--font-sans, 'Nunito', sans-serif);

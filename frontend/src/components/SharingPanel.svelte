@@ -1115,7 +1115,7 @@
     padding: var(--space-1-5) var(--space-3);
     min-height: 36px;
     background: var(--whatsapp-green, #25D366);
-    color: #fff;
+    color: var(--text-on-primary);
     border-radius: var(--radius-full);
     font-family: var(--font-display);
     font-size: var(--text-xs);
@@ -1153,7 +1153,7 @@
   .pending-admin-info { display: flex; flex-direction: column; gap: 1px; }
   .pending-admin-actions { display: flex; gap: var(--space-1); flex-shrink: 0; }
   .vote-count { color: var(--text-secondary); }
-  .badge-danger { background: var(--danger-500); color: #fff; }
+  .badge-danger { background: var(--danger-500); color: var(--text-on-primary); }
   .btn-xs {
     font-size: var(--text-2xs);
     padding: 2px 8px;

@@ -252,7 +252,7 @@
 <style>
   .sp-wrap {
     position: fixed;
-    z-index: 9999;
+    z-index: var(--z-topmost, 9000);
     width: 300px;
     /* Teal-tinted dark surface — matches SecretChatPanel token system */
     background: #0a0a18;

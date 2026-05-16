@@ -500,7 +500,7 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: var(--space-1);
     min-width: 0;
   }
 
@@ -518,7 +518,7 @@
   .activity-status {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-1);
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.01em;
@@ -539,7 +539,7 @@
   .location-label-badge {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
+    gap: var(--space-1);
     font-size: 10px;
     font-weight: 600;
     color: var(--primary-500, #14b8a6);
@@ -580,7 +580,7 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
-    padding: 10px 14px;
+    padding: var(--space-3) var(--space-4);
     background: var(--surface-1);
     /* 3D inset stat cells */
     box-shadow:

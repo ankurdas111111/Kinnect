@@ -28,6 +28,11 @@ export default defineConfig({
     video: 'on-first-retry',
     // Global timeout per action
     actionTimeout: 8000,
+    // Block service workers so page.route() intercepts API calls reliably.
+    // The sw.js network-first handler for /api/* routes intercepts fetch() calls
+    // before Playwright's route handlers can see them, causing mocked routes to
+    // fall through to the (non-running) backend and return 500 during tests.
+    serviceWorkers: 'block',
   },
 
   projects: [

@@ -60,7 +60,10 @@ export function confirmOptimisticMessage(peerId, confirmedMsg) {
       copy.set(peerId, { ...base, messages: [confirmedMsg] });
       return copy;
     }
-    const pendingIdx = chat.messages.findIndex((msg) => msg.pending === true);
+    // Messages are stored newest-first (prepended). The server ACKs in FIFO
+    // order — the oldest in-flight message is confirmed first. findLastIndex
+    // finds the earliest-sent pending slot, which is the correct match.
+    const pendingIdx = chat.messages.findLastIndex((msg) => msg.pending === true);
     if (pendingIdx === -1) {
       // No pending slot — just prepend (shouldn't normally happen)
       const msgs = [confirmedMsg, ...chat.messages].slice(0, 50);

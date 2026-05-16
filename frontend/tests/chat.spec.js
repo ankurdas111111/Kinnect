@@ -44,7 +44,7 @@ const GO = (page, token = 'test-token-fake') =>
 
 /** Fake a valid /api/m/:token response with some messages */
 async function mockValidInvite(page, token = 'test-token-valid', messages = []) {
-  await page.route(`**/api/m/${token}`, (route) => {
+  await page.route((url) => url.href.includes(`/api/m/${token}`), (route) => {
     route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -93,7 +93,7 @@ async function mockExpiredInvite(page, token = 'expired-token') {
       body: JSON.stringify({ ok: true, userId: 'user-123' }),
     });
   });
-  await page.route(`**/api/m/${token}`, (route) => {
+  await page.route((url) => url.href.includes(`/api/m/${token}`), (route) => {
     route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -138,7 +138,7 @@ test.describe('SecretChatViewer', () => {
         body: JSON.stringify({ ok: true, userId: 'user-123' }),
       });
     });
-    await page.route('**/api/m/**', (route) => {
+    await page.route((url) => url.href.includes('/api/m/'), (route) => {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -172,7 +172,7 @@ test.describe('SecretChatViewer', () => {
         body: JSON.stringify({ ok: true, userId: 'user-123' }),
       });
     });
-    await page.route('**/api/m/**', (route) => {
+    await page.route((url) => url.href.includes('/api/m/'), (route) => {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -187,7 +187,7 @@ test.describe('SecretChatViewer', () => {
   // ── 1d. Login gate ───────────────────────────────────────────────────
   test('shows login gate when user is not authenticated', async ({ page }) => {
     await mockLoggedOut(page);
-    await page.route('**/api/m/**', (route) => {
+    await page.route((url) => url.href.includes('/api/m/'), (route) => {
       // Should not be called — login gate shown before invite load
       route.fulfill({ status: 401, body: '{}' });
     });
@@ -214,7 +214,7 @@ test.describe('SecretChatViewer', () => {
 
   test('login CTA button is disabled until both fields are filled', async ({ page }) => {
     await mockLoggedOut(page);
-    await page.route('**/api/m/**', (route) => route.abort());
+    await page.route((url) => url.href.includes('/api/m/'), (route) => route.abort());
     await GO(page);
 
     await page.locator('[aria-label="Sign in to Kinnect"]').waitFor({ timeout: 5000 });
@@ -300,7 +300,7 @@ test.describe('SecretChatViewer', () => {
         body: JSON.stringify({ ok: true, userId: 'user-123' }),
       });
     });
-    await page.route('**/api/m/valid-msg-tok', (route) => {
+    await page.route((url) => url.href.includes('/api/m/valid-msg-tok'), (route) => {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -356,7 +356,7 @@ test.describe('SecretChatViewer', () => {
         body: JSON.stringify({ ok: true, userId: 'user-123' }),
       });
     });
-    await page.route('**/api/m/target-tok', (route) => {
+    await page.route((url) => url.href.includes('/api/m/target-tok'), (route) => {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -381,7 +381,7 @@ test.describe('SecretChatViewer', () => {
     await page.route('**/api/me', (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, userId: 'user-123' }) });
     });
-    await page.route('**/api/m/panic-tok', (route) => {
+    await page.route((url) => url.href.includes('/api/m/panic-tok'), (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, isParticipant: true, messages: [] }) });
     });
 
@@ -411,7 +411,7 @@ test.describe('SecretChatViewer', () => {
     await page.route('**/api/me', (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, userId: 'user-123' }) });
     });
-    await page.route('**/api/m/empty-tok', (route) => {
+    await page.route((url) => url.href.includes('/api/m/empty-tok'), (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, isParticipant: true, messages: [] }) });
     });
 
@@ -431,7 +431,7 @@ test.describe('SecretChatViewer', () => {
     await page.route('**/api/me', (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, userId: 'user-123' }) });
     });
-    await page.route('**/api/m/back-tok', (route) => {
+    await page.route((url) => url.href.includes('/api/m/back-tok'), (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, isParticipant: true, messages: [] }) });
     });
 
@@ -453,7 +453,7 @@ test.describe('SecretChatViewer', () => {
     await page.route('**/api/me', (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, userId: 'user-123' }) });
     });
-    await page.route('**/api/m/compose-tok', (route) => {
+    await page.route((url) => url.href.includes('/api/m/compose-tok'), (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, isParticipant: true, messages: [] }) });
     });
 
@@ -480,7 +480,7 @@ test.describe('SecretChatViewer', () => {
     await page.route('**/api/me', (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, userId: 'user-123' }) });
     });
-    await page.route('**/api/m/rotate-tok', (route) => {
+    await page.route((url) => url.href.includes('/api/m/rotate-tok'), (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, isParticipant: true, messages: [] }) });
     });
 
@@ -510,7 +510,7 @@ test.describe('SecretChatViewer', () => {
     await page.route('**/api/me', (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, userId: 'user-123' }) });
     });
-    await page.route('**/api/m/emoji-rotate-tok', (route) => {
+    await page.route((url) => url.href.includes('/api/m/emoji-rotate-tok'), (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, isParticipant: true, messages: [] }) });
     });
 
@@ -567,7 +567,7 @@ test.describe('PIN Gate accessibility', () => {
     await page.route('**/api/me', (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, userId: 'user-123' }) });
     });
-    await page.route('**/api/m/dot-tok', (route) => {
+    await page.route((url) => url.href.includes('/api/m/dot-tok'), (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, isParticipant: true, messages: [] }) });
     });
     await GO(page, 'dot-tok');
@@ -590,7 +590,7 @@ test.describe('PIN Gate accessibility', () => {
     await page.route('**/api/me', (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, userId: 'user-123' }) });
     });
-    await page.route('**/api/m/enter-tok', (route) => {
+    await page.route((url) => url.href.includes('/api/m/enter-tok'), (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, isParticipant: true, messages: [] }) });
     });
     await GO(page, 'enter-tok');
@@ -609,7 +609,7 @@ test.describe('PIN Gate accessibility', () => {
     await page.route('**/api/me', (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, userId: 'user-123' }) });
     });
-    await page.route('**/api/m/aria-tok', (route) => {
+    await page.route((url) => url.href.includes('/api/m/aria-tok'), (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, isParticipant: true, messages: [] }) });
     });
     await GO(page, 'aria-tok');
@@ -638,7 +638,7 @@ test.describe('iOS auto-zoom prevention', () => {
 
   test('login form inputs are exactly 16px or larger', async ({ page }) => {
     await mockLoggedOut(page);
-    await page.route('**/api/m/**', (route) => route.abort());
+    await page.route((url) => url.href.includes('/api/m/'), (route) => route.abort());
     await GO(page);
     await page.locator('[aria-label="Sign in to Kinnect"]').waitFor({ timeout: 5000 });
 
@@ -654,7 +654,7 @@ test.describe('iOS auto-zoom prevention', () => {
     await page.route('**/api/me', (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, userId: 'user-123' }) });
     });
-    await page.route('**/api/m/fsz-tok', (route) => {
+    await page.route((url) => url.href.includes('/api/m/fsz-tok'), (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, isParticipant: true, messages: [] }) });
     });
     await GO(page, 'fsz-tok');
@@ -670,7 +670,7 @@ test.describe('iOS auto-zoom prevention', () => {
     await page.route('**/api/me', (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, userId: 'user-123' }) });
     });
-    await page.route('**/api/m/compose-fsz-tok', (route) => {
+    await page.route((url) => url.href.includes('/api/m/compose-fsz-tok'), (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, isParticipant: true, messages: [] }) });
     });
 
@@ -697,7 +697,7 @@ test.describe('ARIA and semantic HTML', () => {
     await page.route('**/api/me', (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, userId: 'user-123' }) });
     });
-    await page.route('**/api/m/log-tok', (route) => {
+    await page.route((url) => url.href.includes('/api/m/log-tok'), (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, isParticipant: true, messages: [] }) });
     });
     await GO(page, 'log-tok');
@@ -714,7 +714,7 @@ test.describe('ARIA and semantic HTML', () => {
     await page.route('**/api/me', (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, userId: 'user-123' }) });
     });
-    await page.route('**/api/m/gate-aria-tok', (route) => {
+    await page.route((url) => url.href.includes('/api/m/gate-aria-tok'), (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, isParticipant: true, messages: [] }) });
     });
     await GO(page, 'gate-aria-tok');
@@ -727,7 +727,7 @@ test.describe('ARIA and semantic HTML', () => {
     await page.route('**/api/me', (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, userId: 'user-123' }) });
     });
-    await page.route('**/api/m/panic-aria-tok', (route) => {
+    await page.route((url) => url.href.includes('/api/m/panic-aria-tok'), (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, isParticipant: true, messages: [] }) });
     });
 
@@ -764,7 +764,7 @@ test.describe('Screenshots', () => {
     await page.route('**/api/me', (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, userId: 'user-123' }) });
     });
-    await page.route('**/api/m/screenshot-gate', (route) => {
+    await page.route((url) => url.href.includes('/api/m/screenshot-gate'), (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, isParticipant: true, messages: [] }) });
     });
 
@@ -784,7 +784,7 @@ test.describe('Screenshots', () => {
     await page.route('**/api/me', (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, userId: 'user-123' }) });
     });
-    await page.route('**/api/m/screenshot-msgs', (route) => {
+    await page.route((url) => url.href.includes('/api/m/screenshot-msgs'), (route) => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, isParticipant: true, messages: [] }) });
     });
 
@@ -819,7 +819,7 @@ test.describe('Screenshots', () => {
     test.skip(testInfo.project.name !== 'iPhone SE', 'Screenshot test for iPhone SE only');
 
     await mockLoggedOut(page);
-    await page.route('**/api/m/**', (route) => route.abort());
+    await page.route((url) => url.href.includes('/api/m/'), (route) => route.abort());
     await GO(page);
     await page.locator('[aria-label="Sign in to Kinnect"]').waitFor({ timeout: 5000 });
     await page.waitForTimeout(300);

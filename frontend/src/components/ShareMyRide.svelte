@@ -435,7 +435,7 @@
     background: rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
-    z-index: 5200;
+    z-index: var(--z-modal, 5000);
     touch-action: none;
   }
 
@@ -444,7 +444,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 5201;
+    z-index: calc(var(--z-modal, 5000) + 1);
     background: var(--surface-2, rgba(18, 18, 36, 0.98));
     backdrop-filter: blur(32px) saturate(1.8);
     -webkit-backdrop-filter: blur(32px) saturate(1.8);

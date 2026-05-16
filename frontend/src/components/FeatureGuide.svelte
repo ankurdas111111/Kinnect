@@ -219,7 +219,7 @@
   .guide-overlay {
     position: fixed;
     inset: 0;
-    z-index: 9999;
+    z-index: var(--z-topmost, 9000);
     background: rgba(0, 0, 0, 0.65);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);

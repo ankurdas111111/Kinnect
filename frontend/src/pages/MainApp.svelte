@@ -1420,7 +1420,7 @@
       left: 10px;
       right: 10px;
       transform: none;
-      z-index: 2500; /* above mobile navbar (2000) */
+      z-index: calc(var(--z-navbar, 2000) + 500); /* above mobile navbar, below overlay */
     }
     .place-search-overlay :global(.ps-wrap) {
       width: 100%;

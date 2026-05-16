@@ -47,13 +47,13 @@
   <div
     class="tab-pill"
     aria-hidden="true"
-    style="left: 4px; transform: translateX({pillOffset}%)"
+    style="left: calc(4px + {activeIndex} * 20%)"
   ></div>
   <!-- Pill glow layer — separate element so it can have blur without affecting pill content -->
   <div
     class="tab-pill-glow"
     aria-hidden="true"
-    style="left: 4px; transform: translateX({pillOffset}%)"
+    style="left: calc(4px + {activeIndex} * 20%)"
   ></div>
 
   <button
@@ -216,7 +216,9 @@
     border-radius: var(--radius-lg);
     pointer-events: none;
     /* Spring physics slide */
-    transition: transform 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    /* Transition left for accurate tab-aligned positioning.
+       left: calc(4px + N * 20%) positions exactly at tab slot center. */
+    transition: left 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
     z-index: 0;
     /* Holographic shimmer — traveling highlight */
     overflow: hidden;
@@ -248,7 +250,7 @@
     bottom: calc(7px + var(--safe-bottom, 0px));
     border-radius: var(--radius-lg);
     pointer-events: none;
-    transition: transform 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: left 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
     z-index: 0;
     box-shadow:
       0 4px 20px rgba(20, 184, 166, 0.38),

@@ -86,7 +86,7 @@
 <style>
   .ep-wrap {
     position: fixed;
-    z-index: 9999;
+    z-index: var(--z-topmost, 9000);
     border-radius: var(--radius-xl, 20px);
     overflow: hidden;
     box-shadow:

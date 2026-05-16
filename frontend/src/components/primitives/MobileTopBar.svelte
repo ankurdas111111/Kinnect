@@ -80,13 +80,13 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 8px;
-    gap: 8px;
+    margin-bottom: var(--space-2);
+    gap: var(--space-2);
   }
 
   .title-wrap h1 {
     margin: 0;
-    font-size: 19px;
+    font-size: var(--text-xl);
     line-height: 1.2;
     letter-spacing: 0.01em;
   }
@@ -100,7 +100,7 @@
   .top-actions {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-2);
     flex-shrink: 0;
   }
 

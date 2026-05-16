@@ -209,9 +209,10 @@
     color: rgba(255,255,255,0.30); margin-bottom: 6px;
   }
   .wwm-hint { font-size: 11px; color: rgba(255,255,255,0.25); margin: 0; }
-  .wwm-places { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+  .wwm-places { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-bottom: var(--space-2); }
   .wwm-place {
-    padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 600;
+    padding: var(--space-2) var(--space-3); border-radius: 8px; font-size: 11px; font-weight: 600;
+    min-height: 44px; display: flex; align-items: center;
     background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
     color: rgba(255,255,255,0.6); cursor: pointer;
     transition: background 0.15s, border-color 0.15s;
@@ -230,10 +231,11 @@
   }
   .wwm-input:focus { border-color: rgba(99,102,241,0.4); }
   .wwm-input::placeholder { color: rgba(255,255,255,0.2); }
-  .wwm-watchers { display: flex; flex-wrap: wrap; gap: 5px; }
+  .wwm-watchers { display: flex; flex-wrap: wrap; gap: var(--space-1); }
   .wwm-watcher {
-    display: flex; align-items: center; gap: 5px;
-    padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 600;
+    display: flex; align-items: center; gap: var(--space-1);
+    padding: var(--space-2) var(--space-3); border-radius: 8px; font-size: 11px; font-weight: 600;
+    min-height: 44px;
     background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
     color: rgba(255,255,255,0.6); cursor: pointer;
     transition: all 0.15s;
@@ -246,9 +248,10 @@
   }
   .wwm-w-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
   .wwm-start {
-    width: 100%; padding: 11px; border-radius: 12px; font-size: 13px; font-weight: 700;
+    width: 100%; padding: var(--space-3); border-radius: 12px; font-size: 13px; font-weight: 700;
+    min-height: 44px;
     background: linear-gradient(135deg, var(--primary-500, #6366f1), var(--primary-600, #4f46e5));
-    color: #fff; border: none; cursor: pointer;
+    color: var(--text-on-primary); border: none; cursor: pointer;
     transition: transform 0.1s, box-shadow 0.2s;
     box-shadow: 0 2px 12px rgba(99,102,241,0.3);
   }
@@ -268,14 +271,16 @@
   @keyframes wwm-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(99,102,241,0.2)} 50%{box-shadow:0 0 0 12px rgba(99,102,241,0)} }
   .wwm-actions { display: flex; gap: 8px; margin-top: 16px; justify-content: center; }
   .wwm-share {
-    padding: 8px 16px; border-radius: 10px; font-size: 12px; font-weight: 700;
+    padding: var(--space-2) var(--space-4); border-radius: 10px; font-size: 12px; font-weight: 700;
+    min-height: 44px; display: flex; align-items: center;
     background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.3);
     color: var(--primary-300, #a5b4fc); cursor: pointer;
   }
   .wwm-end {
-    padding: 8px 16px; border-radius: 10px; font-size: 12px; font-weight: 700;
+    padding: var(--space-2) var(--space-4); border-radius: 10px; font-size: 12px; font-weight: 700;
+    min-height: 44px; display: flex; align-items: center;
     background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.25);
-    color: #f87171; cursor: pointer;
+    color: var(--danger-400, #f87171); cursor: pointer;
   }
 
   /* Arrived state */
@@ -288,9 +293,10 @@
   }
   @keyframes wwm-arrive-bounce { 0%{transform:scale(0)} 100%{transform:scale(1)} }
   .wwm-done {
-    margin-top: 16px; padding: 10px 24px; border-radius: 12px;
+    margin-top: var(--space-4); padding: var(--space-3) var(--space-6); border-radius: 12px;
+    min-height: 44px; display: flex; align-items: center; justify-content: center;
     font-size: 13px; font-weight: 700;
     background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3);
-    color: #34d399; cursor: pointer;
+    color: var(--success-400, #34d399); cursor: pointer;
   }
 </style>

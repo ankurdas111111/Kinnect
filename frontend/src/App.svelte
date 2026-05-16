@@ -59,8 +59,12 @@
     position: fixed;
     top: var(--space-3, 12px);
     left: var(--space-3, 12px);
-    z-index: 99999;
+    z-index: var(--z-topmost, 9000);
     padding: var(--space-2, 8px) var(--space-4, 16px);
+    /* 44px minimum touch target (WCAG 2.5.5 / Kinnect design rules) */
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
     background: var(--primary-500, #14b8a6);
     color: var(--text-on-primary, #ffffff);
     font-family: var(--font-display, system-ui, sans-serif);

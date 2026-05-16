@@ -134,7 +134,7 @@
     min-height: 44px;
     padding: var(--space-2, 8px) var(--space-4, 16px);
     background: var(--brand-primary, #14b8a6);
-    color: #fff;
+    color: var(--text-on-primary);
     border: none;
     border-radius: var(--radius-md, 8px);
     font-size: var(--text-sm, 13px);

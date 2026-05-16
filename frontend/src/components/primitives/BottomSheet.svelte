@@ -255,7 +255,7 @@
     will-change: transform;
     touch-action: none;
     transform-style: preserve-3d;
-    position: relative;
+    /* NOTE: position:fixed declared above — do not add position:relative here */
   }
 
   /* Neon top-edge glow line — teal brand accent */

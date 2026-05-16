@@ -98,34 +98,36 @@
   }
 
   // ── Socket listeners ───────────────────────────────────────────────────────
+  // Named handler refs are required so socket.off() removes only THIS component's
+  // listeners. Without refs, socket.off('eventName') strips ALL handlers for that
+  // event — including the global ones registered in socket.js — silently breaking
+  // check-in alerts for the entire session.
+  const _onCheckInRequest = () => {
+    addLog('request', 'Check-in reminder sent');
+  };
+  const _onCheckInUpdate = (data) => {
+    if (data?.userId === $authUser?.userId) {
+      lastCheckInAt = data.lastCheckInAt;
+      mySafetyStatus.update(s => ({ ...s, checkIn: { ...s.checkIn, lastCheckInAt: data.lastCheckInAt } }));
+      addLog('ok', `Check-in recorded at ${formatTime(data.lastCheckInAt)}`);
+      updateCountdown();
+    }
+  };
+  const _onCheckInMissed = () => {
+    addLog('missed', 'Missed check-in — your family was notified');
+  };
+
   onMount(() => {
     countdownInterval = setInterval(() => updateCountdown(), 1000);
-
-    socket.on('checkInRequest', () => {
-      addLog('request', 'Check-in reminder sent');
-    });
-
-    socket.on('checkInUpdate', (data) => {
-      if (data?.userId === $authUser?.userId) {
-        lastCheckInAt = data.lastCheckInAt;
-        mySafetyStatus.update(s => ({ ...s, checkIn: { ...s.checkIn, lastCheckInAt: data.lastCheckInAt } }));
-        addLog('ok', `Check-in recorded at ${formatTime(data.lastCheckInAt)}`);
-        updateCountdown();
-      }
-    });
-
-    socket.on('checkInMissed', () => {
-      addLog('missed', 'Missed check-in — your family was notified');
-    });
-
-    return () => {
-      socket.off('checkInRequest');
-      socket.off('checkInUpdate');
-      socket.off('checkInMissed');
-    };
+    socket.on('checkInRequest', _onCheckInRequest);
+    socket.on('checkInUpdate', _onCheckInUpdate);
+    socket.on('checkInMissed', _onCheckInMissed);
   });
 
   onDestroy(() => {
+    socket.off('checkInRequest', _onCheckInRequest);
+    socket.off('checkInUpdate', _onCheckInUpdate);
+    socket.off('checkInMissed', _onCheckInMissed);
     unsubStatus();
     if (countdownInterval) clearInterval(countdownInterval);
   });

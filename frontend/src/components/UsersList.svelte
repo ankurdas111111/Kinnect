@@ -1309,7 +1309,8 @@
     background: rgba(0, 0, 0, 0.45);
     backdrop-filter: blur(3px);
     -webkit-backdrop-filter: blur(3px);
-    z-index: 5400;
+    /* Was z:5400 hardcoded. Using --z-modal so sheet layer is tokenized. */
+    z-index: var(--z-modal, 5000);
     touch-action: none;
   }
 
@@ -1318,7 +1319,8 @@
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 5401;
+    /* Was z:5401 hardcoded. Using --z-modal + 1 to sit above its backdrop. */
+    z-index: calc(var(--z-modal, 5000) + 1);
     background: var(--surface-2, rgba(20, 20, 40, 0.98));
     backdrop-filter: blur(32px) saturate(1.8);
     -webkit-backdrop-filter: blur(32px) saturate(1.8);

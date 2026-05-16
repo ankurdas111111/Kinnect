@@ -184,9 +184,9 @@
     const results = rawMessages.map(m => ({
       id: m.createdAt + Math.random(),
       body: null,
-      own: !m.fromOwner,
+      own: m.fromOwner,
       createdAt: m.createdAt,
-      raw: m.fromOwner ? m : null,
+      raw: !m.fromOwner ? m : null,
       ciphertext: m.ciphertext,
     }));
 
@@ -217,7 +217,7 @@
       ciphertext: msg.raw?.ciphertext || msg.ciphertext || '',
       iv: msg.raw?.iv || null,
       salt: msg.raw?.salt || null,
-      senderId: '_sender_',
+      senderId: msg.own ? '_owner_' : '_sender_',
       seenAt: null,
       createdAt: msg.createdAt,
       groupFirst: msg.groupFirst,
@@ -648,7 +648,7 @@
               {lockedSet}
               lockCountdown={lockCountdowns[msg.id] ?? null}
               deletingMsgId={null}
-              myId=""
+              myId="_owner_"
               peerFirst="Sender"
               seenPulse={false}
               on:toggleInline={(e) => handleToggleInline(e.detail)}
@@ -1373,7 +1373,7 @@
   .scv-lightbox {
     position: fixed;
     inset: 0;
-    z-index: 99998;
+    z-index: calc(var(--z-topmost, 9000) - 1);
     background: rgba(0, 0, 0, 0.92);
     display: flex;
     align-items: center;
@@ -1416,7 +1416,7 @@
     position: fixed;
     inset: 0;
     background: #000;
-    z-index: 99999;
+    z-index: var(--z-topmost, 9000);
     cursor: default;
     animation: scv-panic-on 0.15s ease-out both;
   }

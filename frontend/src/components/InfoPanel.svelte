@@ -1754,7 +1754,7 @@
   .qr-backdrop {
     position: fixed;
     inset: 0;
-    z-index: 6000;
+    z-index: var(--z-modal, 5000);
     background: rgba(5, 5, 18, 0.72);
     backdrop-filter: blur(8px) saturate(1.4);
     display: flex;
@@ -1847,7 +1847,9 @@
 
   /* Walk With Me modal */
   .wwm-overlay {
-    position: fixed; inset: 0; z-index: 60;
+    /* Was z:60 — dangerously low, buried under panels/sheets.
+       Modal overlays must be at --z-modal tier. */
+    position: fixed; inset: 0; z-index: var(--z-modal, 5000);
     background: rgba(0,0,0,0.55);
     display: flex; align-items: center; justify-content: center;
     animation: wwm-fade-in 0.2s ease;

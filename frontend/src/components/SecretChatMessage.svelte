@@ -38,7 +38,7 @@
 
   $: decrypted = !isOwn && plain !== null && !lockedSet?.has(msg.id);
   $: isLocked = !isOwn && !decrypted;
-  $: unread = msg.senderId !== myId && !msg.seenAt;
+  $: unread = !!myId && myId !== '_owner_' && msg.senderId !== myId && !msg.seenAt;
   $: likelyPhoto = isLocked && isLikelyPhotoMsg(msg.ciphertext);
 
   const GIF_RE   = /^\[gif:(https?:\/\/[^\]]+)\]$/;

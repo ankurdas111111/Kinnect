@@ -180,7 +180,7 @@
   .cpd-backdrop {
     position: fixed;
     inset: 0;
-    z-index: 6000;
+    z-index: var(--z-modal, 5000);
     background: rgba(0, 0, 0, 0.45);
     display: flex;
     align-items: center;

@@ -51,7 +51,9 @@
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.4);
-    z-index: 999;
+    /* Was z:999 = same as BottomSheet backdrop (--z-panel - 1).
+       Incoming call must appear above the bottom sheet, so use overlay tier. */
+    z-index: calc(var(--z-overlay, 3000) - 1);
   }
 
   .call-sheet {
@@ -59,7 +61,9 @@
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 1000;
+    /* Was z:1000 = --z-panel, same layer as BottomSheet — causes stacking conflict.
+       Incoming call is safety-critical; must render above bottom sheet. */
+    z-index: var(--z-overlay, 3000);
     padding: var(--space-6, 24px) var(--space-5, 20px);
     padding-bottom: max(var(--space-6, 24px), env(safe-area-inset-bottom));
     background: var(--bg-card, #1e2435);

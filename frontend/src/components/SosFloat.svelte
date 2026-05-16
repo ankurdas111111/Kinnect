@@ -184,9 +184,9 @@
   .sf {
     position: fixed;
     left: var(--space-4, 16px);
-    /* sit above the SOS FAB (52px tall) + its spacing */
-    bottom: calc(52px + var(--space-4, 16px) * 2 + 4px);
-    z-index: calc(var(--z-panel, 100) + 1);
+    /* sit above the SOS FAB (52px tall) + its spacing + safe-area-inset-bottom */
+    bottom: calc(52px + var(--space-4, 16px) * 2 + 4px + env(safe-area-inset-bottom, 0px));
+    z-index: calc(var(--z-panel, 1000) + 1);
     width: min(300px, calc(100vw - 96px));
     border-radius: var(--radius-xl);
     overflow: hidden;

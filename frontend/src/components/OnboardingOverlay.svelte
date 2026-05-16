@@ -146,7 +146,7 @@
     background: rgba(0, 0, 0, 0.45);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    z-index: 9000;
+    z-index: var(--z-topmost, 9000);
     display: flex;
     align-items: center;
     justify-content: center;

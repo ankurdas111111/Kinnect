@@ -22,7 +22,7 @@
     top: calc(var(--safe-top, 0px) + var(--navbar-height, 56px));
     left: var(--space-4);
     right: var(--space-4);
-    z-index: 2500;
+    z-index: calc(var(--z-navbar, 2000) + 500); /* above navbar, below overlay */
     display: flex;
     align-items: center;
     justify-content: center;

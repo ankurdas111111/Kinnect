@@ -148,7 +148,7 @@
   .inv-backdrop {
     position: fixed;
     inset: 0;
-    z-index: 6000;
+    z-index: var(--z-modal, 5000);
     background: rgba(0,0,0,0.5);
     backdrop-filter: blur(3px);
     -webkit-backdrop-filter: blur(3px);
@@ -160,10 +160,10 @@
   .inv-sheet {
     width: 100%;
     max-width: 480px;
-    background: #13131f;
+    background: var(--surface-1);
     border: 1px solid rgba(255,255,255,0.07);
     border-radius: 20px 20px 0 0;
-    padding: 0 0 env(safe-area-inset-bottom, 16px);
+    padding: 0 0 max(var(--space-4, 16px), env(safe-area-inset-bottom, 0px));
     display: flex;
     flex-direction: column;
     gap: 0;
@@ -192,7 +192,7 @@
     border-radius: 50%;
     background: rgba(74,222,128,0.09);
     border: 1px solid rgba(74,222,128,0.18);
-    color: #4ade80;
+    color: var(--success-400, #4ade80);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -205,8 +205,8 @@
     margin: 0;
     font-size: 15px;
     font-weight: 700;
-    color: #e2e8f0;
-    font-family: system-ui, sans-serif;
+    color: var(--text-primary);
+    font-family: var(--font-body, system-ui), sans-serif;
   }
 
   .inv-sub {
@@ -243,7 +243,7 @@
   }
 
   .inv-preview-wa-icon {
-    color: #25d366;
+    color: var(--whatsapp-green, #25d366);
     flex-shrink: 0;
     margin-top: 1px;
   }
@@ -288,7 +288,7 @@
   .inv-code-value {
     font-size: 15px;
     font-weight: 700;
-    color: #e2e8f0;
+    color: var(--text-primary);
     font-family: system-ui, monospace, sans-serif;
     letter-spacing: 0.1em;
   }

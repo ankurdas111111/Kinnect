@@ -58,6 +58,10 @@
   export function triggerShake() {
     pinShake = true;
     haptics.error?.();
+    // Clear the PIN so the user must re-enter after a wrong attempt.
+    // This prevents accidental re-submission and is the expected UX.
+    pinDigits = [];
+    if (pinInputEl) pinInputEl.value = '';
     clearTimeout(_shakeTimer);
     _shakeTimer = setTimeout(() => { pinShake = false; }, 520);
   }
@@ -73,7 +77,7 @@
   }
 </script>
 
-<div class="gate" role="region" aria-label="Secret chat PIN gate">
+<div class="gate" role="region" aria-label="Enter PIN to read this note">
   <!-- Encrypted-space background texture -->
   <div class="gate-hex-bg" aria-hidden="true"></div>
   <div class="gate-glow" aria-hidden="true"></div>
@@ -113,18 +117,20 @@
     <div class="gate-dots" aria-hidden="true" role="presentation">
       {#each Array(8) as _, i}
         <span
-          class="gate-dot"
+          class="gate-dot scv-pin-dot"
           class:gate-dot--filled={i < pinDigits.length}
+          class:scv-pin-dot--filled={i < pinDigits.length}
           class:gate-dot--active={i === pinDigits.length - 1}
+          class:scv-pin-dot--active={i === pinDigits.length - 1}
         ></span>
       {/each}
     </div>
 
     <!-- Hidden PIN input -->
     <div class="gate-input-wrap">
-      <label class="sr-only" for="gate-pin">Enter PIN — minimum 4 digits</label>
+      <label class="sr-only" for="scv-gate-pin">Enter PIN — minimum 4 digits</label>
       <input
-        id="gate-pin"
+        id="scv-gate-pin"
         bind:this={pinInputEl}
         class="gate-pin-input"
         class:gate-pin-input--shake={pinShake}
@@ -151,12 +157,13 @@
 
     <!-- Open button -->
     <button
-      class="gate-btn"
+      class="gate-btn scv-cta-btn"
       class:gate-btn--ready={pinReady}
+      class:scv-cta-btn--active={pinReady}
       on:click={submit}
       disabled={unlocking || !pinReady}
       type="button"
-      aria-label={pinReady ? 'Open secret chat' : 'Enter at least 4 digits'}
+      aria-label={pinReady ? 'Open note' : 'Enter at least 4 digits'}
     >
       {#if unlocking}
         <span class="gate-btn-ring" aria-hidden="true"></span>

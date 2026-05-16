@@ -106,7 +106,7 @@
 </script>
 
 <!-- ── Compose footer ───────────────────────────────────────── -->
-<footer class="scc-compose">
+<footer class="scc-compose scv-compose">
   <div class="scc-compose-inner">
 
     <!-- Panic/blank-screen button -->
@@ -208,9 +208,9 @@
       {/if}
     </div>
 
-    <label class="scc-sr" for="scc-compose-text">Secret message to {peerFirst}</label>
+    <label class="scc-sr" for="scv-reply">Secret message to {peerFirst}</label>
     <textarea
-      id="scc-compose-text"
+      id="scv-reply"
       class="scc-compose-text"
       rows="1"
       maxlength="2000"
@@ -234,8 +234,9 @@
     </button>
 
     <button
-      class="scc-send-btn"
+      class="scc-send-btn scv-send-btn"
       class:scc-send-btn--active={composeText.trim().length > 0}
+      class:scv-send-btn--active={composeText.trim().length > 0}
       on:click={send}
       disabled={sending || !composeText.trim()}
       aria-label="Send encrypted message"

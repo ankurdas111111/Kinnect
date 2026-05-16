@@ -72,9 +72,14 @@
   }
   .virtual-spacer {
     position: relative;
-    overflow: hidden;
+    /* overflow:hidden removed — was clipping absolutely positioned children
+       (presence rings, badges, SOS indicators) that extend outside row bounds */
+    overflow: visible;
   }
   .virtual-item {
-    overflow: hidden;
+    /* overflow:hidden removed — was clipping presence rings, badges, and other
+       absolutely positioned children that extend outside the fixed-height row.
+       Clip is still effective via the virtual-list container overflow:hidden. */
+    overflow: visible;
   }
 </style>

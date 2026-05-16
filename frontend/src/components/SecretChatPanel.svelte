@@ -322,6 +322,9 @@
     touchAutoLock();
     const tempMsg = makeOptimisticMsg('[photo]');
     addOptimisticMessage(peerId, tempMsg);
+    // Store a sentinel so retryFailedMsg finds non-null plaintext and gives a
+    // helpful "cannot retry photo" message rather than hitting the null fallback.
+    storeDecrypted(peerId, tempMsg.id, '[photo]');
     await tick();
     scrollToBottom();
     try {
@@ -374,6 +377,8 @@
     const payload = `[sticker:${tag}]`;
     const tempMsg = makeOptimisticMsg(payload);
     addOptimisticMessage(peerId, tempMsg);
+    // Store plaintext keyed to tempId so retry can re-encrypt if the send fails.
+    storeDecrypted(peerId, tempMsg.id, payload);
     await tick();
     scrollToBottom();
     try {
@@ -400,6 +405,14 @@
       toasts.error('Cannot retry — original message lost. Please type it again.');
       return;
     }
+    // Photos cannot be retried — the raw data URL is not persisted (only the
+    // '[photo]' sentinel is stored). Remove the ghost bubble and ask user to
+    // re-attach. Stickers with a [sticker:tag] payload CAN be retried normally.
+    if (plaintext === '[photo]') {
+      removeSecretMessageByTempId(peerId, tempId);
+      toasts.error('Photo send failed — please re-attach the photo to retry.');
+      return;
+    }
     // Flip bubble back to pending state while we re-encrypt
     secretChats.update((m) => {
       const copy = new Map(m);
@@ -412,6 +425,8 @@
       return copy;
     });
     sending = true;
+    await tick();
+    scrollToBottom();
     try {
       const { ciphertext, iv, salt } = await encryptMessage(plaintext, sessionPin);
       socket.emit('sendSecretMsg', { receiverId: peerId, ciphertext, iv, salt });

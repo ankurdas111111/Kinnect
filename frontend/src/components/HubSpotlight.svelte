@@ -121,7 +121,7 @@
   .hs-overlay {
     position: fixed;
     inset: 0;
-    z-index: 99900;
+    z-index: calc(var(--z-topmost, 9000) - 100);
     /* No background — the hole's box-shadow creates the vignette */
   }
 
