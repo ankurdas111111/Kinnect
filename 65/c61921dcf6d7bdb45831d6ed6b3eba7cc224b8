@@ -1,0 +1,20 @@
+frontend/src/components/SecretChatCompose.svelte
+  b781a2d7-dace-49ac-baae-41be37475d41:2026-05-16T18:34:57.306Z 350,392,475
+frontend/src/components/SecretChatGate.svelte
+  b781a2d7-dace-49ac-baae-41be37475d41:2026-05-16T18:34:36.677Z 379,384,434-435,454-456,492,501-503,517,565-570,572-575,577-580,582-584,586-588,590-593,595-599,601-606,608-611,613-616,618-621
+frontend/src/components/SecretChatPanel.svelte
+  b781a2d7-dace-49ac-baae-41be37475d41:2026-05-16T18:36:38.026Z 1058,1060,1089,1119
+frontend/src/components/primitives/AnimatedMeshBackground.svelte
+  71991640-f7e7-4f0c-9907-e5c43680362c:2026-05-16T18:32:26.283Z 4,7-8,10-16,18,126-128,132-133,237
+frontend/src/components/primitives/KineticText.svelte
+  71991640-f7e7-4f0c-9907-e5c43680362c:2026-05-16T18:32:26.283Z 9-20,59-61,74,78,87
+frontend/src/components/primitives/MagneticButton.svelte
+  71991640-f7e7-4f0c-9907-e5c43680362c:2026-05-16T18:32:26.283Z 15-20,101-103,116-119,121-122,124-128
+frontend/src/pages/Login.svelte
+  71991640-f7e7-4f0c-9907-e5c43680362c:2026-05-16T18:32:26.283Z 74,116,119,126-127,297,371
+frontend/src/pages/Register.svelte
+  71991640-f7e7-4f0c-9907-e5c43680362c:2026-05-16T18:32:26.283Z 55,105,107,118,146,149,156-157,265-281,326,398,450,468-471
+frontend/src/styles/auth.css
+  71991640-f7e7-4f0c-9907-e5c43680362c:2026-05-16T18:32:26.283Z 274-275,339,739-741,745-746,805-808,810,818-822,825-826,857-858,860-866,868-877,880-881,884,888-890,892-899,901-906,908-912,914-918,920-928,930-934,936-942,952,957,962-979
+---
+{"schema_version": "authorship/3.0.0", "base_commit_sha": "HEAD~1", "prompts": {"b781a2d7-dace-49ac-baae-41be37475d41:2026-05-16T18:34:57.306Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 3, "overriden_lines": 0}, "b781a2d7-dace-49ac-baae-41be37475d41:2026-05-16T18:34:36.677Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 59, "overriden_lines": 0}, "b781a2d7-dace-49ac-baae-41be37475d41:2026-05-16T18:36:38.026Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 4, "overriden_lines": 0}, "71991640-f7e7-4f0c-9907-e5c43680362c:2026-05-16T18:32:26.283Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 17, "overriden_lines": 0}}}
