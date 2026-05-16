@@ -77,27 +77,68 @@
   class:msg--group-cont={!msg.groupLast}
 >
 
-  <!-- ── Own message (encrypted stub) ─────────────────────────── -->
+  <!-- ── Own message (encrypted stub / pending / failed) ──────── -->
   {#if isOwn}
     <div
       class="bubble bubble--own"
       class:bubble--grp-first={msg.groupFirst}
       class:bubble--grp-last={msg.groupLast}
       class:bubble--grp-mid={!msg.groupFirst && !msg.groupLast}
-      title="End-to-end encrypted — only {peerFirst} can decrypt"
-      aria-label="Encrypted message sent"
+      class:bubble--pending={msg.pending}
+      class:bubble--failed={msg.failed}
+      title={msg.pending ? 'Sending…' : msg.failed ? 'Failed to send — tap retry' : `End-to-end encrypted — only ${peerFirst} can decrypt`}
+      aria-label={msg.pending ? 'Sending message' : msg.failed ? 'Message failed to send' : 'Encrypted message sent'}
     >
-      <span class="cipher-text" aria-hidden="true">{ciphertextGibberish(msg.ciphertext)}</span>
-      <span class="lock-icon" aria-hidden="true">
-        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="11" width="18" height="11" rx="2"/>
-          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-        </svg>
-      </span>
+      {#if msg.pending}
+        <span class="cipher-text cipher-text--pending" aria-hidden="true">···</span>
+        <span class="status-icon" aria-hidden="true">
+          <!-- Clock icon for in-flight -->
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+        </span>
+      {:else if msg.failed}
+        <span class="cipher-text cipher-text--failed" aria-hidden="true">···</span>
+        <span class="status-icon status-icon--failed" aria-hidden="true">
+          <!-- Warning icon for failed -->
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </span>
+      {:else}
+        <span class="cipher-text" aria-hidden="true">{ciphertextGibberish(msg.ciphertext)}</span>
+        <span class="lock-icon" aria-hidden="true">
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+        </span>
+      {/if}
     </div>
 
-    <!-- Meta: time + read receipt -->
-    {#if msg.groupLast}
+    <!-- Retry button — only shown on failed messages -->
+    {#if msg.failed}
+      <div class="retry-row">
+        <button
+          class="retry-btn"
+          on:click={() => dispatch('retry', msg.id)}
+          aria-label="Retry sending message"
+          type="button"
+        >
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="1 4 1 10 7 10"/>
+            <path d="M3.51 15a9 9 0 1 0 .49-3.51"/>
+          </svg>
+          Retry
+        </button>
+      </div>
+    {/if}
+
+    <!-- Meta: time + read receipt (only for confirmed messages) -->
+    {#if msg.groupLast && !msg.pending && !msg.failed}
       <div class="meta meta--own">
         <time class="msg-time" datetime={msg.createdAt}>{clockTime(msg.createdAt)}</time>
         <span
@@ -123,31 +164,33 @@
       </div>
     {/if}
 
-    <!-- Delete action — visible on hover (0.4 opacity on touch devices) -->
-    <div class="msg-actions" role="group" aria-label="Message actions">
-      <button
-        class="delete-btn"
-        class:delete-btn--confirm={deletingMsgId === msg.id}
-        on:click={() => dispatch('delete', msg.id)}
-        aria-label={deletingMsgId === msg.id ? 'Tap again to confirm delete' : 'Delete message'}
-        type="button"
-      >
-        {#if deletingMsgId === msg.id}
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-            <line x1="12" y1="9" x2="12" y2="13"/>
-            <line x1="12" y1="17" x2="12.01" y2="17"/>
-          </svg>
-          Confirm delete
-        {:else}
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-            <polyline points="3 6 5 6 21 6"/>
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
-          </svg>
-          Delete
-        {/if}
-      </button>
-    </div>
+    <!-- Delete action — hidden for pending/failed messages -->
+    {#if !msg.pending && !msg.failed}
+      <div class="msg-actions" role="group" aria-label="Message actions">
+        <button
+          class="delete-btn"
+          class:delete-btn--confirm={deletingMsgId === msg.id}
+          on:click={() => dispatch('delete', msg.id)}
+          aria-label={deletingMsgId === msg.id ? 'Tap again to confirm delete' : 'Delete message'}
+          type="button"
+        >
+          {#if deletingMsgId === msg.id}
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            Confirm delete
+          {:else}
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+            </svg>
+            Delete
+          {/if}
+        </button>
+      </div>
+    {/if}
 
   <!-- ── Received + decrypted ──────────────────────────────────── -->
   {:else if decrypted}
@@ -676,6 +719,89 @@
   .delete-btn--confirm { color: var(--danger-400, #f87171); background: rgba(248, 113, 113, 0.12); }
   .delete-btn:focus-visible { outline: 2px solid var(--danger-400, #f87171); outline-offset: 2px; }
 
+  /* ── Pending / failed bubble states ─────────────────────────── */
+  .bubble--pending {
+    opacity: 0.55;
+    background: linear-gradient(
+      135deg,
+      rgba(20, 184, 166, 0.08) 0%,
+      rgba(20, 184, 166, 0.04) 100%
+    );
+    border-color: rgba(20, 184, 166, 0.14);
+    animation: pending-pulse 1.4s ease-in-out infinite;
+  }
+
+  @keyframes pending-pulse {
+    0%, 100% { opacity: 0.45; }
+    50%       { opacity: 0.7; }
+  }
+
+  .bubble--failed {
+    background: linear-gradient(
+      135deg,
+      rgba(248, 113, 113, 0.12) 0%,
+      rgba(248, 113, 113, 0.06) 100%
+    );
+    border-color: rgba(248, 113, 113, 0.3);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 2px 8px rgba(248, 113, 113, 0.12);
+  }
+
+  .cipher-text--pending {
+    color: rgba(20, 184, 166, 0.35);
+    letter-spacing: 0.18em;
+  }
+
+  .cipher-text--failed {
+    color: rgba(248, 113, 113, 0.5);
+    letter-spacing: 0.18em;
+  }
+
+  .status-icon {
+    color: rgba(20, 184, 166, 0.4);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+  }
+
+  .status-icon--failed {
+    color: rgba(248, 113, 113, 0.7);
+  }
+
+  /* Retry row — appears below the failed bubble */
+  .retry-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 2px;
+  }
+
+  .retry-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1, 4px);
+    padding: var(--space-1, 4px) var(--space-2, 8px);
+    border-radius: var(--radius-sm2, 8px);
+    border: 1px solid rgba(248, 113, 113, 0.3);
+    background: rgba(248, 113, 113, 0.06);
+    color: rgba(248, 113, 113, 0.8);
+    font-size: var(--text-2xs, 0.6875rem);
+    font-family: var(--font-sans, 'Nunito', sans-serif);
+    cursor: pointer;
+    transition: color 0.1s, background 0.1s, border-color 0.1s;
+    touch-action: manipulation;
+    min-height: 44px;
+  }
+
+  .retry-btn:hover {
+    color: #f87171;
+    background: rgba(248, 113, 113, 0.12);
+    border-color: rgba(248, 113, 113, 0.5);
+  }
+
+  .retry-btn:focus-visible {
+    outline: 2px solid #f87171;
+    outline-offset: 2px;
+  }
+
   /* ── Accessibility ───────────────────────────────────────────── */
   .sr-only {
     position: absolute;
@@ -694,6 +820,7 @@
     .msg          { animation: none; }
     .unread-pulse { animation: none; }
     .tick--pulse  { animation: none; }
-    .relock-btn, .delete-btn { transition: none; }
+    .bubble--pending { animation: none; opacity: 0.6; }
+    .relock-btn, .delete-btn, .retry-btn { transition: none; }
   }
 </style>

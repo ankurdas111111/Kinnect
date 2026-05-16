@@ -16,7 +16,7 @@ import { notifySOS, notifyProximitySOS, notifyGuardianRequest, notifyBatteryLow,
 import { rideShare } from './stores/rideShare.js';
 import { crowdMode } from './stores/crowdMode.js';
 import { bumpHubBadge } from './stores/hubBadge.js';
-import { addSecretMessage, setSecretMessages, removeSecretMessage, updateSecretMessageSeen, secretChatPresence } from './stores/secretChat.js';
+import { addSecretMessage, confirmOptimisticMessage, setSecretMessages, removeSecretMessage, updateSecretMessageSeen, secretChatPresence } from './stores/secretChat.js';
 import { getShareOrigin } from './env.js';
 import { geofenceLog, proximityAlerts } from './stores/places.js';
 import { incomingOffer } from './stores/webrtc.js';
@@ -417,7 +417,8 @@ export function setupSocketHandlers() {
     // from a received message (msg.senderId !== myId → always true).
     // Drop and rely on the secretMsgsHistory fetch to backfill instead.
     if (!myId) return;
-    addSecretMessage(msg.receiverId, { ...msg, senderId: myId });
+    // Replace the optimistic pending message with the server-confirmed one.
+    confirmOptimisticMessage(msg.receiverId, { ...msg, senderId: myId });
   });
   socket.on('secretMsgsHistory', (data) => {
     if (!data || !data.peerId) return;

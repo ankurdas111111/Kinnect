@@ -43,9 +43,11 @@ func (h *Hub) handleSendSecretMsg(c *Client, data json.RawMessage) {
 		return
 	}
 
-	// Persist to DB.
+	// Persist to DB with a hard timeout so a slow Aiven connection can't hang the hub goroutine.
 	var msgID int64
-	err := h.pool.DB.QueryRowContext(context.Background(),
+	dbCtx, dbCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer dbCancel()
+	err := h.pool.DB.QueryRowContext(dbCtx,
 		`INSERT INTO secret_messages (sender_id, receiver_id, ciphertext, iv, salt)
 		 VALUES ($1, $2, $3, $4, $5) RETURNING id`,
 		user.UserID, p.ReceiverID, p.Ciphertext, p.IV, p.Salt,

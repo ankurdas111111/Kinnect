@@ -8,7 +8,7 @@
   import { fade } from 'svelte/transition';
   import { socket, markSecretMsgSeen, createSecretChatInvite } from '../lib/socket.js';
   import { authUser } from '../lib/stores/auth.js';
-  import { secretChats, lockSecretChat, storeDecrypted, secretChatPresence } from '../lib/stores/secretChat.js';
+  import { secretChats, lockSecretChat, storeDecrypted, secretChatPresence, addOptimisticMessage, failOptimisticMessage, removeSecretMessageByTempId } from '../lib/stores/secretChat.js';
   import { otherUsers } from '../lib/stores/map.js';
   import { encryptMessage, decryptMessage } from '../lib/crypto.js';
   import { compressImage } from '../lib/imageUtils.js';
@@ -298,12 +298,32 @@
     }
   }
 
+  // ── Helpers ───────────────────────────────────────────────────
+  function makeOptimisticMsg(plaintext) {
+    return {
+      id: -Date.now(),
+      senderId: myId,
+      receiverId: peerId,
+      ciphertext: '',
+      iv: '',
+      salt: '',
+      createdAt: new Date().toISOString(),
+      pending: true,
+      _plaintext: plaintext,
+    };
+  }
+
   // ── Photo sending (called by SecretChatCompose dispatch) ──────
   async function handlePhotoFromCompose(file) {
     if (!sessionPin) { toasts.error('Enter your PIN before sending a photo'); return; }
     if (file.size > 15 * 1024 * 1024) { toasts.error('Photo too large — max 15 MB'); return; }
     photoSending = true;
     haptics.tap?.();
+    touchAutoLock();
+    const tempMsg = makeOptimisticMsg('[photo]');
+    addOptimisticMessage(peerId, tempMsg);
+    await tick();
+    scrollToBottom();
     try {
       const dataUrl = await compressImage(file);
       const payload = `[photo:${dataUrl}]`;
@@ -311,6 +331,7 @@
       socket.emit('sendSecretMsg', { receiverId: peerId, ciphertext, iv, salt });
       haptics.confirm?.();
     } catch (err) {
+      failOptimisticMessage(peerId, tempMsg.id);
       if (err && err.tooLarge) {
         toasts.error(`Photo still too large (${err.sizeKB} KB). Use a simpler image.`);
       } else {
@@ -327,12 +348,18 @@
     sending = true;
     haptics.tap?.();
     touchAutoLock();
+    // Show the message immediately — before the expensive PBKDF2 encryption runs.
+    const tempMsg = makeOptimisticMsg(text);
+    addOptimisticMessage(peerId, tempMsg);
+    // Store plaintext keyed to tempId so retry can re-encrypt if needed.
+    storeDecrypted(peerId, tempMsg.id, text);
+    await tick();
+    scrollToBottom();
     try {
       const { ciphertext, iv, salt } = await encryptMessage(text, sessionPin);
       socket.emit('sendSecretMsg', { receiverId: peerId, ciphertext, iv, salt });
-      await tick();
-      scrollToBottom();
     } catch {
+      failOptimisticMessage(peerId, tempMsg.id);
       toasts.error('Failed to send — check your connection');
     } finally {
       sending = false;
@@ -344,14 +371,53 @@
     sending = true;
     haptics.tap?.();
     touchAutoLock();
+    const payload = `[sticker:${tag}]`;
+    const tempMsg = makeOptimisticMsg(payload);
+    addOptimisticMessage(peerId, tempMsg);
+    await tick();
+    scrollToBottom();
     try {
-      const payload = `[sticker:${tag}]`;
       const { ciphertext, iv, salt } = await encryptMessage(payload, sessionPin);
       socket.emit('sendSecretMsg', { receiverId: peerId, ciphertext, iv, salt });
-      await tick();
-      scrollToBottom();
     } catch {
+      failOptimisticMessage(peerId, tempMsg.id);
       toasts.error('Failed to send sticker — check your connection');
+    } finally {
+      sending = false;
+    }
+  }
+
+  /** Re-send a failed message using its stored plaintext. */
+  async function retryFailedMsg(tempId) {
+    if (!sessionPin || sending) return;
+    const failedMsg = chat.messages.find((m) => m.id === tempId);
+    if (!failedMsg) return;
+    // Read plaintext from decryptedMessages (stored at optimistic-add time)
+    const plaintext = chat.decryptedMessages.get(tempId) ?? failedMsg._plaintext;
+    if (!plaintext) {
+      // No plaintext to re-encrypt — just remove the ghost bubble
+      removeSecretMessageByTempId(peerId, tempId);
+      toasts.error('Cannot retry — original message lost. Please type it again.');
+      return;
+    }
+    // Flip bubble back to pending state while we re-encrypt
+    secretChats.update((m) => {
+      const copy = new Map(m);
+      const c = copy.get(peerId);
+      if (!c) return copy;
+      const msgs = c.messages.map((msg) =>
+        msg.id === tempId ? { ...msg, failed: false, pending: true } : msg
+      );
+      copy.set(peerId, { ...c, messages: msgs });
+      return copy;
+    });
+    sending = true;
+    try {
+      const { ciphertext, iv, salt } = await encryptMessage(plaintext, sessionPin);
+      socket.emit('sendSecretMsg', { receiverId: peerId, ciphertext, iv, salt });
+    } catch {
+      failOptimisticMessage(peerId, tempId);
+      toasts.error('Retry failed — check your connection');
     } finally {
       sending = false;
     }
@@ -677,6 +743,7 @@
           on:decryptOne={(e) => decryptOne(e.detail)}
           on:inlinePinInput={handleInlinePinInput}
           on:photoExpand={(e) => openLightbox(e.detail)}
+          on:retry={(e) => retryFailedMsg(e.detail)}
         />
       {/each}
     </main>
@@ -735,7 +802,7 @@
   .scp-glitch {
     position: fixed;
     inset: 0;
-    z-index: 99998;
+    z-index: calc(var(--z-topmost, 9000) - 1);
     animation: scp-glitch 0.22s linear forwards;
     pointer-events: none;
   }
@@ -756,7 +823,7 @@
     position: fixed;
     inset: 0;
     background: #000;
-    z-index: 99999;
+    z-index: var(--z-topmost, 9000);
     cursor: default;
     animation: scp-panic-on 0.15s var(--ease-out) both;
   }
