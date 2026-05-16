@@ -376,12 +376,12 @@
     margin: 0;
     font-size: var(--text-xs, 0.75rem);
     font-family: var(--font-sans, 'Nunito', sans-serif);
-    color: rgba(255, 255, 255, 0.36);
+    color: rgba(255, 255, 255, 0.52);
     line-height: var(--leading-relaxed, 1.625);
   }
 
   .gate-sub strong {
-    color: rgba(255, 255, 255, 0.6);
+    color: rgba(255, 255, 255, 0.80);
     font-weight: 600;
   }
 
@@ -431,8 +431,8 @@
   .gate-pin-input {
     width: 100%;
     padding: var(--space-4, 16px);
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid var(--chat-border-accent, rgba(20, 184, 166, 0.22));
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid var(--chat-border-accent, rgba(20, 184, 166, 0.30));
     border-radius: var(--radius-lg, 14px);
     color: rgba(255, 255, 255, 0.92);
     /* 26px > 16px iOS threshold — prevents auto-zoom, signals vault-weight */
@@ -451,9 +451,9 @@
   }
 
   .gate-pin-input::placeholder {
-    color: rgba(255, 255, 255, 0.14);
-    letter-spacing: 0.2em;
-    font-size: var(--text-sm, 0.875rem);
+    color: rgba(255, 255, 255, 0.40);
+    letter-spacing: 0.3em;
+    font-size: 20px;
     font-family: var(--font-sans, 'Nunito', sans-serif);
   }
 
@@ -489,7 +489,7 @@
     margin: 0;
     font-size: var(--text-xs, 0.75rem);
     font-family: var(--font-sans, 'Nunito', sans-serif);
-    color: rgba(255, 255, 255, 0.18);
+    color: rgba(255, 255, 255, 0.38);
   }
 
   /* ── Open button ─────────────────────────────────────────────── */
@@ -498,9 +498,9 @@
     max-width: 280px;
     padding: var(--space-4, 16px);
     border-radius: var(--radius-lg, 14px);
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    background: rgba(255, 255, 255, 0.05);
-    color: rgba(255, 255, 255, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.52);
     font-size: var(--text-base, 1rem);
     font-weight: 700;
     font-family: var(--font-sans, 'Nunito', sans-serif);
@@ -514,7 +514,7 @@
     touch-action: manipulation;
   }
 
-  .gate-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .gate-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
   .gate-btn:focus-visible {
     outline: 2px solid var(--chat-accent, #14b8a6);
@@ -560,6 +560,64 @@
     font-family: var(--font-mono, 'JetBrains Mono', monospace);
     color: rgba(255, 255, 255, 0.14);
     letter-spacing: 0.03em;
+  }
+
+  /* ── Responsive — compact phones (≤ 380px) ──────────────────── */
+  @media (max-width: 380px) {
+    .gate-content {
+      gap: var(--space-4, 16px);
+      padding: var(--space-4, 16px) var(--space-3, 12px) var(--space-6, 24px);
+    }
+
+    .gate-icon-wrap {
+      width: 80px;
+      height: 80px;
+    }
+
+    .gate-icon {
+      width: 46px;
+      height: 46px;
+    }
+
+    .gate-icon-ring--inner {
+      inset: 10px;
+    }
+
+    .gate-title {
+      font-size: var(--text-lg, 1rem);
+    }
+
+    .gate-pin-input {
+      min-height: 56px;
+      font-size: 22px;
+    }
+
+    .gate-btn {
+      min-height: 48px;
+      padding: var(--space-3, 12px);
+    }
+  }
+
+  /* ── Responsive — landscape short screens ────────────────────── */
+  @media (max-height: 600px) and (orientation: landscape) {
+    .gate-content {
+      gap: var(--space-3, 12px);
+      padding: var(--space-2, 8px) var(--space-4, 16px) var(--space-4, 16px);
+    }
+
+    .gate-icon-wrap {
+      width: 64px;
+      height: 64px;
+    }
+
+    .gate-icon {
+      width: 40px;
+      height: 40px;
+    }
+
+    .gate-icon-ring--inner {
+      inset: 8px;
+    }
   }
 
   /* ── Accessibility ───────────────────────────────────────────── */

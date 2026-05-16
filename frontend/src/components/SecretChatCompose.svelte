@@ -347,7 +347,7 @@
   .scc-icon-btn:hover { color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.06); }
   .scc-icon-btn:focus-visible { outline: 2px solid var(--chat-accent, #14b8a6); outline-offset: 2px; }
   .scc-icon-btn:disabled { opacity: 0.22; cursor: not-allowed; }
-  .scc-icon-btn--panic { color: rgba(255,255,255,0.16); }
+  .scc-icon-btn--panic { color: rgba(255,255,255,0.30); }
   .scc-icon-btn--panic:hover { color: var(--danger-400, #f87171); background: rgba(248,113,113,0.07); }
   .scc-icon-btn--loading { cursor: wait; }
   .scc-icon-btn--active { color: var(--chat-accent, #14b8a6); background: var(--chat-accent-subtle, rgba(20,184,166,0.08)); }
@@ -389,7 +389,7 @@
     border-color: var(--chat-border-accent, rgba(20,184,166,0.22));
     box-shadow: 0 0 0 3px var(--chat-accent-subtle, rgba(20,184,166,0.08));
   }
-  .scc-compose-text::placeholder { color: rgba(255,255,255,0.22); }
+  .scc-compose-text::placeholder { color: rgba(255,255,255,0.32); }
 
   /* ── Send button ──────────────────────────────────────────────── */
   .scc-send-btn {
@@ -472,7 +472,7 @@
     margin: 0;
     font-size: var(--text-2xs, 0.6875rem);
     font-family: var(--font-sans, 'Nunito', sans-serif);
-    color: rgba(255, 255, 255, 0.13);
+    color: rgba(255, 255, 255, 0.24);
   }
 
   .scc-char-count {

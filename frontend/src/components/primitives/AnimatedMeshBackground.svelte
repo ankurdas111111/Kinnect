@@ -1,12 +1,21 @@
 <script>
   /**
    * AnimatedMeshBackground — aurora orbs + spatial grid + floating particles.
-   * Replaces 18 manual decorative divs/spans duplicated in Login and Register.
+   * Replaces manual decorative divs duplicated in Login and Register.
    *
    * Props:
-   *   grid      — render spatial depth grid overlay (default true)
+   *   variant  — 'brand' (teal, default) | 'neutral' (monochrome)
+   *   grid     — render spatial depth grid overlay (default true)
    *   particles — render floating ambient particle dots (default true)
+   *
+   * Bug fixes applied:
+   *   - Added missing `variant` prop (Login/Register were passing variant="brand"
+   *     to an undeclared prop, causing a Svelte console warning)
+   *   - Fixed orb-3: removed base transform:translateX(-50%) which conflicted
+   *     with keyframe starting at translate(0,0), causing a snap on animation
+   *     start. Now uses left:calc(50% - 150px) for centering instead.
    */
+  export let variant = 'brand';
   export let grid = true;
   export let particles = true;
 </script>
@@ -114,11 +123,14 @@
     animation: amb-drift-2 26s ease-in-out infinite reverse;
   }
 
+  /* Bug fix: was using transform:translateX(-50%) as base style which conflicted
+     with keyframes starting at translate(0,0) — caused a visible snap at t=0.
+     Fixed: center using left:calc(50% - 150px) (half of 300px width) instead. */
   .amb-orb-3 {
     width: 300px; height: 300px;
     background: radial-gradient(circle, rgba(6, 182, 212, 0.12) 0%, transparent 65%);
-    top: 40%; left: 50%;
-    transform: translateX(-50%);
+    top: 40%;
+    left: calc(50% - 150px);
     animation: amb-drift-1 32s ease-in-out infinite;
   }
 
@@ -222,6 +234,7 @@
   /* ── Reduced motion ─────────────────────────────────────────────────── */
   @media (prefers-reduced-motion: reduce) {
     .amb-blob,
+    .amb-blob::after,
     .amb-orb-1,
     .amb-orb-2,
     .amb-orb-3,

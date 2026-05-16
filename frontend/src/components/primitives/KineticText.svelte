@@ -6,12 +6,18 @@
    * Gracefully degrades under prefers-reduced-motion.
    *
    * Props:
-   *   text     — the heading string to animate
-   *   tag      — HTML element to render (default 'h1')
-   *   delay    — base delay in ms before animation starts (default 0)
-   *   stagger  — ms between each character (default 40)
-   *   className — additional CSS class
-   *   once     — if true, only animates on first mount (not on text change)
+   *   text      — the heading string to animate
+   *   tag       — HTML element to render (default 'h1')
+   *   delay     — base delay in ms before animation starts (default 0)
+   *   stagger   — ms between each character (default 40)
+   *   className — additional CSS class applied to the root element
+   *   once      — if true, only animates on first mount (not on text change)
+   *
+   * Bug fix: removed filter:blur() from the kt-rise keyframe.
+   * filter is NOT GPU-composited — it forces the browser to create a new
+   * stacking context and triggers repaint on every frame, causing jank on
+   * iOS Safari especially when 20+ characters animate simultaneously.
+   * The entrance now uses transform+opacity only (GPU compositor path).
    */
   export let text = '';
   export let tag = 'h1';
@@ -50,6 +56,9 @@
 
   .kt-char {
     display: inline-block;
+    /* GPU-only: transform + opacity only. No filter — filter is not composited
+       and causes repaint on every frame when many characters animate in parallel,
+       particularly on iOS Safari. */
     animation: kt-rise 500ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
     will-change: transform, opacity;
   }
@@ -62,13 +71,11 @@
   @keyframes kt-rise {
     from {
       opacity: 0;
-      transform: translateY(0.6em) rotateX(40deg);
-      filter: blur(3px);
+      transform: translateY(0.5em) scale(0.9);
     }
     to {
       opacity: 1;
-      transform: translateY(0) rotateX(0deg);
-      filter: blur(0);
+      transform: translateY(0) scale(1);
     }
   }
 
@@ -77,7 +84,7 @@
       animation: none;
       opacity: 1;
       transform: none;
-      filter: none;
+      will-change: auto;
     }
   }
 </style>

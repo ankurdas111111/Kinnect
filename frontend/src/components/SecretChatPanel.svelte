@@ -1055,9 +1055,9 @@
     transition: opacity 0.2s;
   }
   .scp-header-name--hidden {
-    opacity: 0.3;
+    opacity: 0.50;
     letter-spacing: 0.15em;
-    color: rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.50);
   }
 
   .scp-unread-badge {
@@ -1086,7 +1086,7 @@
   .scp-subtext {
     font-size: var(--text-xs, 0.75rem);
     font-family: var(--font-sans, 'Nunito', sans-serif);
-    color: rgba(255, 255, 255, 0.35);
+    color: rgba(255, 255, 255, 0.52);
   }
 
   /* ── Typing indicator (CSS-only dots) ─────────────────────── */
@@ -1116,7 +1116,7 @@
   .scp-presence-dot {
     width: 6px; height: 6px;
     border-radius: var(--radius-full, 9999px);
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.35);
     flex-shrink: 0;
   }
   .scp-presence-dot--active {

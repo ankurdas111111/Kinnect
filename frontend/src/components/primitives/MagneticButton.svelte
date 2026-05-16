@@ -12,6 +12,12 @@
    *   strength  — max displacement in px (default 6)
    *   disabled  — opt out of magnetic effect (default false)
    *   className — extra class on wrapper
+   *
+   * Bug fix: inner element was using `display: contents` which creates no layout
+   * box, so `will-change: transform` and `transform` style had zero effect.
+   * The magnetic movement was completely invisible. Fixed: inner now uses
+   * `display: inline-flex` with `width: 100%` so it forms a real box that
+   * can receive the transform while still filling the wrapper.
    */
   import { onDestroy } from 'svelte';
 
@@ -24,7 +30,6 @@
   let tx = 0, ty = 0;
   let cx = 0, cy = 0;
   let raf = null;
-  let inside = false;
 
   function lerp(a, b, t) { return a + (b - a) * t; }
 
@@ -59,13 +64,8 @@
   }
 
   function onMouseLeave() {
-    inside = false;
     tx = 0; ty = 0;
     startTick();
-  }
-
-  function onMouseEnter() {
-    inside = true;
   }
 
   function onTouchMove(e) {
@@ -95,10 +95,12 @@
   bind:this={el}
   on:mousemove={onMouseMove}
   on:mouseleave={onMouseLeave}
-  on:mouseenter={onMouseEnter}
   on:touchmove|passive={onTouchMove}
   on:touchend={onTouchEnd}
 >
+  <!-- Bug fix: was display:contents — a `contents` element creates no box,
+       so transform and will-change had zero effect. Now inline-flex fills
+       the wrapper and properly receives the magnetic transform. -->
   <div class="mag-inner" bind:this={inner}>
     <slot />
   </div>
@@ -111,8 +113,18 @@
   }
 
   .mag-inner {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
     will-change: transform;
-    display: contents;
-    /* transform applied by JS */
+    /* transform applied by JS rAF loop */
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mag-inner {
+      will-change: auto;
+      transform: none !important;
+    }
   }
 </style>

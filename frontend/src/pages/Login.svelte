@@ -71,7 +71,7 @@
     mobileTouched = true;
 
     if (mode === 'email') {
-      if (!emailValid) { error = 'Enter a valid email'; return; }
+      if (!emailValid) { error = 'Enter a valid email address'; return; }
     } else {
       if (!validateMobile()) { error = mobileHint || 'Enter a valid mobile number'; return; }
     }
@@ -113,18 +113,18 @@
           push('/');
         }
       } else {
-        error = res.error || 'Login failed';
+        error = res.error || 'Sign in failed — please check your credentials and try again';
       }
     } catch (e) {
-      error = 'Network error';
+      error = 'Network error — check your connection and try again';
     }
     loading = false;
   }
 </script>
 
 <div class="auth-page page-enter">
-  <!-- 2026 Animated Mesh Background — conic mesh + aurora orbs + particles -->
-  <AnimatedMeshBackground variant="brand" grid={true} particles={true} />
+  <!-- 2026 Animated Mesh Background — aurora orbs + spatial grid + particles -->
+  <AnimatedMeshBackground grid={true} particles={true} />
 
   <div class="auth-brand">
     <div class="auth-brand-inner">
@@ -294,7 +294,7 @@
             </button>
           </div>
           {#if passwordError}
-            <span class="auth-hint error">At least 6 characters</span>
+            <span class="auth-hint error">At least 6 characters required</span>
           {/if}
         </div>
 
@@ -368,7 +368,7 @@
     color: var(--text-tertiary);
     display: flex;
     align-items: center;
-    padding: var(--space-3, 12px);
+    padding: var(--space-3);
     min-width: 44px;
     min-height: 44px;
     border-radius: 4px;
@@ -391,43 +391,6 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* ── Mobile brand header — only visible on small screens ───────────── */
-  .mobile-brand-header {
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 20px;
-    animation: fadeIn 400ms var(--ease-out, ease) both;
-  }
-
-  .mobile-brand-logo {
-    width: 44px;
-    height: 44px;
-    border-radius: 14px;
-    background: linear-gradient(135deg, var(--primary-400, #2dd4bf) 0%, var(--primary-700, #0f766e) 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 6px 20px rgba(20, 184, 166, 0.40);
-    margin-bottom: 4px;
-  }
-
-  .mobile-brand-name {
-    font-family: var(--font-display, 'Sora', sans-serif);
-    font-size: 1.25rem;
-    font-weight: 800;
-    color: var(--text-primary, #ffffff);
-    letter-spacing: -0.02em;
-    line-height: 1;
-  }
-
-  .mobile-brand-tagline {
-    font-size: 0.8125rem;
-    color: rgba(255, 255, 255, 0.62);
-    letter-spacing: 0.01em;
-  }
-
   /* Submit button transitions to success green after redirect */
   :global(.auth-submit.redirecting) {
     background: linear-gradient(135deg, var(--success-500, #10b981) 0%, var(--success-700, #047857) 100%) !important;
@@ -436,11 +399,5 @@
       0 3px 8px rgba(16, 185, 129, 0.25),
       inset 0 1px 0 rgba(255, 255, 255, 0.22) !important;
     transition: background 300ms var(--ease-out), box-shadow 300ms var(--ease-out) !important;
-  }
-
-  @media (max-width: 767px) {
-    .mobile-brand-header {
-      display: flex;
-    }
   }
 </style>

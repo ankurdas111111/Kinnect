@@ -271,8 +271,8 @@
     display: block;
     width: 5px;
     height: 9px;
-    border-right: 2px solid #10b981;
-    border-bottom: 2px solid #10b981;
+    border-right: 2px solid var(--success-500, #10b981);
+    border-bottom: 2px solid var(--success-500, #10b981);
     transform: rotate(45deg) translate(-1px, -1px);
     border-radius: 1px;
   }
@@ -336,7 +336,7 @@
     inset 0 -1px 0 rgba(0, 0, 0, 0.15);
   backdrop-filter: blur(28px) saturate(2.0);
   -webkit-backdrop-filter: blur(28px) saturate(2.0);
-  animation: card-3d-flip-in 600ms var(--ease-3d-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
+  animation: card-enter 600ms var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
   position: relative;
   overflow: hidden;
   transition:
@@ -736,11 +736,14 @@
   animation: aurora-drift-2 26s ease-in-out infinite reverse;
 }
 
+/* Bug fix: orb-3 had base transform: translateX(-50%) AND keyframes starting at translate(0,0),
+   which snapped the element on animation start. Fixed by removing base transform and
+   using left: calc(50% - 150px) to achieve the centering without conflicting with keyframes. */
 .auth-aurora-orb-3 {
   width: 300px; height: 300px;
   background: radial-gradient(circle, rgba(6, 182, 212, 0.12) 0%, transparent 65%);
-  top: 40%; left: 50%;
-  transform: translateX(-50%);
+  top: 40%;
+  left: calc(50% - 150px);
   animation: aurora-drift-1 32s ease-in-out infinite;
 }
 
@@ -799,9 +802,12 @@
   box-shadow: 0 0 10px rgba(45, 212, 191, 0.5), 0 0 20px rgba(20, 184, 166, 0.25);
 }
 
-/* Mobile-only brand header — enhance with glow */
+/* ── Mobile brand header — single authoritative definition ──────────────
+   NOTE: Login.svelte and Register.svelte previously had duplicate scoped
+   definitions that conflicted with these. Those duplicates have been removed.
+   The mobile-brand-header is hidden by default on desktop; shown on mobile. */
 .mobile-brand-header {
-  display: flex;
+  display: none;
   flex-direction: column;
   align-items: center;
   gap: var(--space-1);
@@ -809,8 +815,15 @@
   padding-top: calc(var(--safe-top, 0px) + var(--space-4));
 }
 
+@media (max-width: 767px) {
+  .mobile-brand-header {
+    display: flex;
+  }
+}
+
 .mobile-brand-logo {
-  width: 44px; height: 44px;
+  width: 44px;
+  height: 44px;
   background: linear-gradient(135deg, var(--primary-400) 0%, var(--primary-600) 100%);
   border-radius: var(--radius-md);
   display: flex;
@@ -821,7 +834,6 @@
     0 3px 8px rgba(20, 184, 166, 0.25),
     inset 0 1px 0 rgba(255, 255, 255, 0.20);
   margin-bottom: var(--space-1);
-  /* 3D depth breathe */
   animation: depth-breathe 4s ease-in-out infinite;
 }
 
@@ -840,26 +852,94 @@
   letter-spacing: 0.02em;
 }
 
-@media (min-width: 768px) {
-  .mobile-brand-header { display: none; }
-}
-
 /* ── Enhanced page entrance ─────────────────────────────────────────────── */
 .page-enter {
-  animation: page-mount-3d 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: page-mount 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-@keyframes page-mount-3d {
+/* ═══════════════════════════════════════════════════════════════════════════
+   KEYFRAMES — All animation definitions in one place.
+   Bug fix: previously missing keyframes (aurora-drift-*, depth-breathe,
+   particle-float, card-enter) caused silent animation failures.
+   page-mount-3d used filter:blur which is not GPU-composited — replaced with
+   transform-only page-mount.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Card entrance — spring scale+translate, GPU only (no filter) */
+@keyframes card-enter {
   from {
     opacity: 0;
-    transform: perspective(1200px) translateY(16px) rotateX(2deg);
-    filter: blur(4px);
+    transform: translateY(24px) scale(0.96);
   }
   to {
     opacity: 1;
-    transform: perspective(1200px) translateY(0) rotateX(0);
-    filter: blur(0);
+    transform: translateY(0) scale(1);
   }
+}
+
+/* Page mount — GPU only transform, no filter blur */
+@keyframes page-mount {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Aurora orb drifts */
+@keyframes aurora-drift-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  20%       { transform: translate(60px, -40px) scale(1.06); }
+  40%       { transform: translate(30px, 80px) scale(0.97); }
+  60%       { transform: translate(-50px, 30px) scale(1.04); }
+  80%       { transform: translate(20px, -20px) scale(1.02); }
+}
+
+@keyframes aurora-drift-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25%       { transform: translate(-70px, 50px) scale(1.08); }
+  50%       { transform: translate(-20px, 100px) scale(0.94); }
+  75%       { transform: translate(60px, -30px) scale(1.05); }
+}
+
+@keyframes aurora-drift-3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(40px, -60px) scale(1.10); }
+  66%       { transform: translate(-30px, 40px) scale(0.96); }
+}
+
+/* Mobile logo depth-breathe — subtle scale pulse for brand presence */
+@keyframes depth-breathe {
+  0%, 100% { transform: scale(1) translateY(0); box-shadow: 0 8px 24px rgba(20, 184, 166, 0.45), 0 3px 8px rgba(20, 184, 166, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.20); }
+  50%       { transform: scale(1.04) translateY(-2px); box-shadow: 0 12px 32px rgba(20, 184, 166, 0.55), 0 5px 12px rgba(20, 184, 166, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.25); }
+}
+
+/* Particle float — GPU only (transform + opacity) */
+@keyframes particle-float {
+  0%, 100% {
+    transform: translateY(0) translateX(0) scale(1);
+    opacity: 0.25;
+  }
+  33% {
+    transform: translateY(-12px) translateX(6px) scale(1.2);
+    opacity: 0.4;
+  }
+  66% {
+    transform: translateY(8px) translateX(-4px) scale(0.9);
+    opacity: 0.15;
+  }
+}
+
+/* Shake — for error banners */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-6px); }
+  40%       { transform: translateX(6px); }
+  60%       { transform: translateX(-4px); }
+  80%       { transform: translateX(4px); }
 }
 
 /* ── Reduced motion ─────────────────────────────────────────────────────── */
@@ -869,18 +949,37 @@
   .auth-aurora-orb-2,
   .auth-aurora-orb-3 {
     animation: none;
+    will-change: auto;
   }
   .auth-particle {
     animation: none;
     opacity: 0.2;
+    will-change: auto;
   }
   .mobile-brand-logo {
     animation: none;
+  }
+  .auth-card {
+    animation: none;
+  }
+  .auth-bg-blob,
+  .auth-bg-blob::after,
+  .auth-brand-inner::before,
+  .auth-brand-inner::after {
+    animation: none;
+    will-change: auto;
+  }
+  .auth-brand-features li {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .auth-submit::after {
+    display: none;
   }
   .page-enter {
     animation: none;
     opacity: 1;
     transform: none;
-    filter: none;
   }
 }

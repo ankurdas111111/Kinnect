@@ -52,7 +52,7 @@
 
   function validateEmail() {
     if (!emailValue.trim()) { emailHint = ''; return false; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue.trim())) { emailHint = 'Enter a valid email'; return false; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue.trim())) { emailHint = 'Enter a valid email address'; return false; }
     emailHint = '';
     return true;
   }
@@ -102,9 +102,9 @@
     emailTouched = true;
     mobileTouched = true;
 
-    if (!firstName.trim()) { error = 'First name is required'; return; }
+    if (!firstName.trim()) { error = 'First name is required to create your account'; return; }
     if (password.length < 6) { error = 'Password must be at least 6 characters'; return; }
-    if (password !== confirm) { error = 'Passwords do not match'; return; }
+    if (password !== confirm) { error = 'Passwords do not match — please re-enter'; return; }
 
     const body = {
       first_name: firstName.trim(),
@@ -115,7 +115,7 @@
     };
 
     if (contactType === 'email') {
-      if (!validateEmail()) { error = emailHint || 'Enter a valid email'; return; }
+      if (!validateEmail()) { error = emailHint || 'Enter a valid email address'; return; }
       body.contact_value = emailValue.trim().toLowerCase();
     } else {
       if (!validateMobile()) { error = mobileHint || 'Enter a valid mobile number'; return; }
@@ -143,18 +143,18 @@
           push('/');
         }
       } else {
-        error = res.error || 'Registration failed';
+        error = res.error || 'Registration failed — please try again';
       }
     } catch (e) {
-      error = 'Network error';
+      error = 'Network error — check your connection and try again';
     }
     loading = false;
   }
 </script>
 
 <div class="auth-page page-enter">
-  <!-- 2026 Animated Mesh Background — conic mesh + aurora orbs + particles -->
-  <AnimatedMeshBackground variant="brand" grid={true} particles={true} />
+  <!-- 2026 Animated Mesh Background — aurora orbs + spatial grid + particles -->
+  <AnimatedMeshBackground grid={true} particles={true} />
 
   <div class="auth-brand">
     <div class="auth-brand-inner">
@@ -262,23 +262,23 @@
         <div class="auth-field">
           <label for="reg_password">Password</label>
           <div class="input-wrapper">
-          <input
-            id="reg_password"
-            type={showPassword ? 'text' : 'password'}
-            class="input"
-            class:is-invalid={passwordTouched && password.length > 0 && password.length < 6}
-            bind:value={password}
-            autocomplete="new-password"
-            enterkeyhint="next"
-            on:blur={() => passwordTouched = true}
-          />
-          <button type="button" class="input-icon input-icon--toggle" on:click={() => showPassword = !showPassword} aria-label={showPassword ? 'Hide password' : 'Show password'}>
-            {#if showPassword}
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-            {:else}
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            {/if}
-          </button>
+            <input
+              id="reg_password"
+              type={showPassword ? 'text' : 'password'}
+              class="input"
+              class:is-invalid={passwordTouched && password.length > 0 && password.length < 6}
+              bind:value={password}
+              autocomplete="new-password"
+              enterkeyhint="next"
+              on:blur={() => passwordTouched = true}
+            />
+            <button type="button" class="input-icon input-icon--toggle" on:click={() => showPassword = !showPassword} aria-label={showPassword ? 'Hide password' : 'Show password'}>
+              {#if showPassword}
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              {:else}
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              {/if}
+            </button>
           </div>
           {#if password}
             <div class="password-strength">
@@ -291,6 +291,7 @@
             <span class="auth-hint">Minimum 6 characters</span>
           {/if}
         </div>
+
         <div class="auth-field">
           <label for="reg_confirm">Confirm password</label>
           <div class="input-wrapper">
@@ -322,7 +323,7 @@
           {/if}
         </div>
 
-        <div class="auth-field" style="margin-bottom: var(--space-2);"><label class="label">Contact method</label></div>
+        <div class="auth-field contact-type-label"><label class="label">Contact method</label></div>
         <div class="auth-toggle" role="tablist" aria-label="Contact method">
           <button type="button" class="auth-toggle-btn" class:active={contactType === 'email'} on:click={() => contactType = 'email'} on:keydown={(e) => onContactToggleKeydown(e, 'email')} role="tab" aria-selected={contactType === 'email'} tabindex={contactType === 'email' ? 0 : -1}>Email</button>
           <button type="button" class="auth-toggle-btn" class:active={contactType === 'mobile'} on:click={() => contactType = 'mobile'} on:keydown={(e) => onContactToggleKeydown(e, 'mobile')} role="tab" aria-selected={contactType === 'mobile'} tabindex={contactType === 'mobile' ? 0 : -1}>Mobile</button>
@@ -394,7 +395,7 @@
 <style>
   @import '../styles/auth.css';
 
-  /* KineticText headline — matches auth.css h1 sizing but uses span chars */
+  /* KineticText headline */
   :global(.auth-brand-h1) {
     font-size: clamp(2rem, 3.5vw, 2.75rem);
     font-weight: 800;
@@ -446,7 +447,7 @@
     color: var(--text-tertiary);
     display: flex;
     align-items: center;
-    padding: var(--space-3, 12px);
+    padding: var(--space-3);
     min-width: 44px;
     min-height: 44px;
     border-radius: 4px;
@@ -463,6 +464,12 @@
     gap: var(--space-2);
     margin-top: var(--space-1);
   }
+
+  /* Contact method label row — minimal spacing */
+  .contact-type-label {
+    margin-bottom: var(--space-2);
+  }
+
   .label {
     font-size: var(--text-xs);
     font-weight: 600;
@@ -502,47 +509,4 @@
     vertical-align: middle;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* ── Mobile brand header ─────────────────────────────────────────────── */
-  .mobile-brand-header {
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 20px;
-    animation: fadeIn 400ms var(--ease-out, ease) both;
-  }
-
-  .mobile-brand-logo {
-    width: 44px;
-    height: 44px;
-    border-radius: 14px;
-    background: linear-gradient(135deg, var(--primary-400, #2dd4bf) 0%, var(--primary-700, #0f766e) 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 6px 20px rgba(20, 184, 166, 0.40);
-    margin-bottom: 4px;
-  }
-
-  .mobile-brand-name {
-    font-family: var(--font-display, 'Sora', sans-serif);
-    font-size: 1.25rem;
-    font-weight: 800;
-    color: var(--text-primary, #ffffff);
-    letter-spacing: -0.02em;
-    line-height: 1;
-  }
-
-  .mobile-brand-tagline {
-    font-size: 0.8125rem;
-    color: rgba(255, 255, 255, 0.45);
-    letter-spacing: 0.01em;
-  }
-
-  @media (max-width: 767px) {
-    .mobile-brand-header {
-      display: flex;
-    }
-  }
 </style>

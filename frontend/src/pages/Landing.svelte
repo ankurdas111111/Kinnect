@@ -751,7 +751,7 @@
   }
 
   @keyframes particle-float {
-    0%  { transform: translateY(0)   opacity:1; }
+    0%  { transform: translateY(0); opacity: 1; }
     50% { transform: translateY(-20px); opacity:0.4; }
     100%{ transform: translateY(0);  opacity:1; }
   }
@@ -1273,7 +1273,7 @@
   .step-connector {
     position: absolute;
     top: 24px;
-    right: -calc(var(--space-6) / 2);
+    right: calc(-1 * var(--space-6) / 2);
     width: calc(100% + var(--space-6));
     height: 1px;
     background: linear-gradient(90deg, var(--primary-700) 0%, var(--border-default) 100%);
