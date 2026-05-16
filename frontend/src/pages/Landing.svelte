@@ -914,26 +914,36 @@
   }
 
   .mockup-ping {
+    /* Larger hit area so the ring animation has room to expand without
+       being clipped by the parent card's overflow:hidden */
     position: relative;
-    width: 10px; height: 10px;
+    width: 20px; height: 20px;
+    flex-shrink: 0;
   }
   .ping-dot {
     position: absolute;
-    inset: 2px;
+    /* Center 6px dot in the 20px container */
+    top: 50%; left: 50%;
+    width: 6px; height: 6px;
+    transform: translate(-50%, -50%);
     border-radius: 50%;
     background: var(--success-500);
   }
   .ping-ring {
     position: absolute;
-    inset: 0;
+    /* Start centered and same size as dot */
+    top: 50%; left: 50%;
+    width: 6px; height: 6px;
+    margin: -3px 0 0 -3px;
     border-radius: 50%;
     border: 1.5px solid var(--success-500);
+    /* Scale up to fill the 20px container (max ×2.4 = 14.4px — fits within 20px) */
     animation: ping-expand 1.8s ease-out infinite;
   }
 
   @keyframes ping-expand {
-    0%   { transform: scale(1); opacity: 0.8; }
-    100% { transform: scale(2.4); opacity: 0; }
+    0%   { transform: scale(1);   opacity: 0.8; }
+    100% { transform: scale(2.2); opacity: 0; }
   }
 
   /* Mini map */
@@ -985,7 +995,8 @@
     width: 10px; height: 10px;
     border-radius: 50%;
     z-index: 2;
-    box-shadow: 0 0 10px currentColor;
+    position: relative; /* stacking above the ring */
+    box-shadow: 0 0 8px currentColor;
   }
   .pin-ring {
     position: absolute;
@@ -993,11 +1004,13 @@
     width: 10px; height: 10px;
     border-radius: 50%;
     border: 1.5px solid;
+    /* Expand from center of the 10×10 element, not from top-left corner */
+    transform-origin: 5px 5px;
     animation: pin-expand 2s ease-out infinite;
   }
   @keyframes pin-expand {
-    0%   { transform: scale(1); opacity:0.8; }
-    100% { transform: scale(2.2); opacity:0; }
+    0%   { transform: scale(1);   opacity: 0.8; }
+    100% { transform: scale(2.4); opacity: 0; }
   }
   .pin-label {
     font-size: 9px;
@@ -1055,7 +1068,8 @@
     background: rgba(16,185,129,0.18);
     border: 1px solid rgba(16,185,129,0.40);
     color: var(--success-400);
-    top: -14px; right: -20px;
+    /* Float above the card's top-right corner — inset enough to stay within hero overflow:hidden */
+    top: -18px; right: -10px;
     animation: chip-bob 3.5s ease-in-out infinite;
   }
 
@@ -1063,8 +1077,15 @@
     background: rgba(20,184,166,0.15);
     border: 1px solid rgba(20,184,166,0.38);
     color: var(--primary-400);
-    bottom: 24px; left: -28px;
+    /* Float below the card's bottom-left corner — don't overlap list rows */
+    bottom: -20px; left: -10px;
     animation: chip-bob 4s ease-in-out 1s infinite;
+  }
+
+  /* Tighten chip offsets on small screens to prevent viewport overflow */
+  @media (max-width: 480px) {
+    .chip-safe  { right: -4px; top: -16px; }
+    .chip-alert { left: -4px;  bottom: -18px; }
   }
 
   .chip-icon { font-size: 12px; }
