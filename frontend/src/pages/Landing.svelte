@@ -384,9 +384,6 @@
             </span>
             <span class="stat-label">{s.label}</span>
           </div>
-          {#if i < stats.length - 1}
-            <div class="stat-divider" aria-hidden="true"></div>
-          {/if}
         {/each}
       </div>
     </div>
@@ -397,37 +394,33 @@
   <section class="features" aria-labelledby="features-heading">
     <div class="landing-container">
 
-      <div class="section-header" use:reveal={'features-header'}>
-        {#if revealed.has('features-header')}
-          <div in:fly={{ y: 20, duration: 500, easing: cubicOut }}>
-            <p class="section-eyebrow">Everything you need</p>
-            <h2 id="features-heading" class="section-title">
-              Built for families.<br>Designed for calm.
-            </h2>
-          </div>
-        {/if}
+      <div
+        class="section-header reveal-block"
+        class:is-revealed={revealed.has('features-header')}
+        use:reveal={'features-header'}
+      >
+        <p class="section-eyebrow">Everything you need</p>
+        <h2 id="features-heading" class="section-title">
+          Built for families.<br>Designed for calm.
+        </h2>
       </div>
 
       <div class="features-grid" role="list">
         {#each features as f, i}
           <div
-            class="feature-cell"
+            class="feature-cell reveal-block"
+            class:is-revealed={revealed.has(`feature-${i}`)}
+            style="transition-delay: {(i % 3) * 70}ms"
             role="listitem"
             use:reveal={`feature-${i}`}
           >
-            {#if revealed.has(`feature-${i}`)}
-              <div
-                in:fly={{ y: 28, duration: 480, delay: (i % 3) * 70, easing: cubicOut }}
-              >
-                <Card variant="glass" glow={f.glow} hover padding="lg">
-                  <div class="feature-icon-wrap" aria-hidden="true">
-                    {@html f.icon}
-                  </div>
-                  <h3 class="feature-title">{f.title}</h3>
-                  <p class="feature-desc">{f.desc}</p>
-                </Card>
+            <Card variant="glass" glow={f.glow} hover padding="lg">
+              <div class="feature-icon-wrap" aria-hidden="true">
+                {@html f.icon}
               </div>
-            {/if}
+              <h3 class="feature-title">{f.title}</h3>
+              <p class="feature-desc">{f.desc}</p>
+            </Card>
           </div>
         {/each}
       </div>
@@ -440,37 +433,34 @@
   <section class="how-it-works" aria-labelledby="how-heading">
     <div class="landing-container">
 
-      <div class="section-header" use:reveal={'how-header'}>
-        {#if revealed.has('how-header')}
-          <div in:fade={{ duration: 440 }}>
-            <p class="section-eyebrow">Simple by design</p>
-            <h2 id="how-heading" class="section-title">Up and running in minutes</h2>
-          </div>
-        {/if}
+      <div
+        class="section-header reveal-block"
+        class:is-revealed={revealed.has('how-header')}
+        use:reveal={'how-header'}
+      >
+        <p class="section-eyebrow">Simple by design</p>
+        <h2 id="how-heading" class="section-title">Up and running in minutes</h2>
       </div>
 
       <div class="steps-track" role="list">
         {#each steps as s, i}
           <div
-            class="step"
+            class="step reveal-block"
+            class:is-revealed={revealed.has(`step-${i}`)}
+            style="transition-delay: {i * 110}ms"
             role="listitem"
             use:reveal={`step-${i}`}
           >
-            {#if revealed.has(`step-${i}`)}
-              <div
-                class="step-inner"
-                in:fly={{ y: 24, duration: 500, delay: i * 110, easing: cubicOut }}
-              >
-                <div class="step-num" aria-hidden="true">{s.num}</div>
-                {#if i < steps.length - 1}
-                  <div class="step-connector" aria-hidden="true"></div>
-                {/if}
-                <div class="step-body">
-                  <h3 class="step-title">{s.title}</h3>
-                  <p class="step-desc">{s.desc}</p>
-                </div>
+            <div class="step-inner">
+              <div class="step-num" aria-hidden="true">{s.num}</div>
+              {#if i < steps.length - 1}
+                <div class="step-connector" aria-hidden="true"></div>
+              {/if}
+              <div class="step-body">
+                <h3 class="step-title">{s.title}</h3>
+                <p class="step-desc">{s.desc}</p>
               </div>
-            {/if}
+            </div>
           </div>
         {/each}
       </div>
@@ -483,18 +473,22 @@
   <section class="demo-section" aria-labelledby="demo-heading">
     <div class="landing-container">
 
-      <div class="section-header" use:reveal={'demo-header'}>
-        {#if revealed.has('demo-header')}
-          <div in:fade={{ duration: 440 }}>
-            <p class="section-eyebrow">See it live</p>
-            <h2 id="demo-heading" class="section-title">The app, right here</h2>
-          </div>
-        {/if}
+      <div
+        class="section-header reveal-block"
+        class:is-revealed={revealed.has('demo-header')}
+        use:reveal={'demo-header'}
+      >
+        <p class="section-eyebrow">See it live</p>
+        <h2 id="demo-heading" class="section-title">The app, right here</h2>
       </div>
 
-      <div class="demo-frame" use:reveal={'demo-frame'} aria-label="Interactive app preview">
-        {#if revealed.has('demo-frame')}
-          <div in:scale={{ duration: 520, start: 0.94, easing: cubicOut }}>
+      <div
+        class="demo-frame reveal-block"
+        class:is-revealed={revealed.has('demo-frame')}
+        use:reveal={'demo-frame'}
+        aria-label="Interactive app preview"
+      >
+        <div>
 
             <!-- Tab row -->
             <div class="demo-tabs" role="tablist" aria-label="Demo views">
@@ -592,8 +586,7 @@
               {/if}
             </div>
 
-          </div>
-        {/if}
+        </div>
       </div>
 
     </div>
@@ -601,14 +594,17 @@
 
 
   <!-- ═══════ CTA ════════════════════════════════════════════════════════ -->
-  <section class="cta-section" use:reveal={'cta'} aria-labelledby="cta-heading">
-    {#if revealed.has('cta')}
-      <div class="cta-bg" aria-hidden="true">
-        <div class="cta-orb cta-orb-1"></div>
-        <div class="cta-orb cta-orb-2"></div>
-      </div>
+  <section class="cta-section" aria-labelledby="cta-heading">
+    <div class="cta-bg" aria-hidden="true">
+      <div class="cta-orb cta-orb-1"></div>
+      <div class="cta-orb cta-orb-2"></div>
+    </div>
 
-      <div class="landing-container cta-inner" in:fly={{ y: 32, duration: 550, easing: cubicOut }}>
+    <div
+      class="landing-container cta-inner reveal-block"
+      class:is-revealed={revealed.has('cta')}
+      use:reveal={'cta'}
+    >
         <h2 id="cta-heading" class="cta-title">Start protecting your family today.</h2>
         <p class="cta-sub">Free forever for families under 6 members. No credit card required.</p>
 
@@ -654,7 +650,6 @@
           {/each}
         </div>
       </div>
-    {/if}
   </section>
 
 </div>
@@ -1128,11 +1123,13 @@
   }
 
   .stats-grid {
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
     gap: 0;
-    flex-wrap: wrap;
+  }
+
+  @media (max-width: 640px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
   }
 
   .stat-item {
@@ -1140,21 +1137,17 @@
     flex-direction: column;
     align-items: center;
     gap: var(--space-1);
-    padding: var(--space-4) var(--space-8);
-    flex: 1;
-    min-width: 140px;
+    padding: var(--space-5) var(--space-4);
+    border-right: 1px solid var(--border-default);
   }
-
-  .stat-divider {
-    width: 1px;
-    height: 40px;
-    background: var(--border-default);
-    flex-shrink: 0;
-  }
+  .stat-item:last-child { border-right: none; }
 
   @media (max-width: 640px) {
-    .stat-divider { display: none; }
-    .stat-item { min-width: 120px; padding: var(--space-3) var(--space-4); }
+    .stat-item { padding: var(--space-4) var(--space-3); }
+    /* 2-col grid: right column has no border-right, bottom row has no border-bottom */
+    .stat-item:nth-child(2n) { border-right: none; }
+    .stat-item:nth-child(1),
+    .stat-item:nth-child(2) { border-bottom: 1px solid var(--border-default); }
   }
 
   .stat-value {
@@ -1604,6 +1597,19 @@
     font-weight: 500;
   }
 
+  /* ── Scroll reveal ────────────────────────────────────────────────────── */
+  .reveal-block {
+    opacity: 0;
+    transform: translateY(24px);
+    transition:
+      opacity 0.55s cubic-bezier(0.4, 0, 0.2, 1),
+      transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .reveal-block.is-revealed {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
   /* ── Reduced motion ───────────────────────────────────────────────────── */
   @media (prefers-reduced-motion: reduce) {
     .hero-orb, .cta-orb,
@@ -1616,5 +1622,6 @@
 
     .hero-card-wrap { transform: none !important; }
     .demo-route { display: none; }
+    .reveal-block { opacity: 1; transform: none; transition: none; }
   }
 </style>
