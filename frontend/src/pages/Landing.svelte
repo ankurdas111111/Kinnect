@@ -521,8 +521,10 @@
                       style="left:{p.x}%; top:{p.y}%; --pin-c:{p.c}"
                       aria-label="{p.label}'s location"
                     >
-                      <div class="demo-pin-dot"></div>
-                      <div class="demo-pin-ripple"></div>
+                      <div class="demo-pin-inner">
+                        <div class="demo-pin-dot"></div>
+                        <div class="demo-pin-ripple"></div>
+                      </div>
                       <div class="demo-pin-label">{p.label}</div>
                     </div>
                   {/each}
@@ -1387,32 +1389,45 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 2px;
+    gap: 0;
+  }
+  /* Shared 12×12 stacking context — dot and ripple overlap exactly */
+  .demo-pin-inner {
+    position: relative;
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
   }
   .demo-pin-dot {
-    width: 12px; height: 12px;
+    position: absolute;
+    inset: 0;
     border-radius: 50%;
     background: var(--pin-c);
-    box-shadow: 0 0 12px var(--pin-c);
+    box-shadow: 0 0 10px var(--pin-c);
     z-index: 2;
   }
   .demo-pin-ripple {
     position: absolute;
-    top:0; left:0;
-    width: 12px; height: 12px;
+    inset: 0;
     border-radius: 50%;
     border: 1.5px solid var(--pin-c);
-    animation: pin-expand 2.2s ease-out infinite;
+    /* scale from center — transform-origin defaults to 50% 50% */
+    animation: demo-pin-expand 2.2s ease-out infinite;
+    z-index: 1;
+  }
+  @keyframes demo-pin-expand {
+    0%   { transform: scale(1);   opacity: 0.75; }
+    100% { transform: scale(3.2); opacity: 0; }
   }
   .demo-pin-label {
     font-size: 10px;
     font-weight: 700;
-    color: rgba(255,255,255,0.8);
-    background: rgba(0,0,0,0.60);
+    color: rgba(255,255,255,0.9);
+    background: rgba(0,0,0,0.65);
     padding: 2px 6px;
     border-radius: 4px;
     white-space: nowrap;
-    margin-top: 14px;
+    margin-top: 5px;
   }
 
   .demo-route {
@@ -1618,7 +1633,7 @@
     .chip-safe, .chip-alert,
     .ping-ring, .pin-ring, .pin-1, .pin-2, .pin-3,
     .demo-pin-ripple,
-    .scroll-cue-line { animation: none; }
+    .scroll-cue-line { animation: none; opacity: 1; transform: scale(1); }
 
     .hero-card-wrap { transform: none !important; }
     .demo-route { display: none; }
