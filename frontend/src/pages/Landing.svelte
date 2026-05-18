@@ -416,11 +416,11 @@
           <div
             class="feature-cell reveal-block"
             class:is-revealed={revealed.has(`feature-${i}`)}
-            style="transition-delay: {(i % 3) * 70}ms"
+            style="transition-delay: {i * 65}ms"
             role="listitem"
             use:reveal={`feature-${i}`}
           >
-            <Card variant="glass" glow={f.glow} hover padding="lg">
+            <Card variant="glass" hover padding="lg">
               <div class="feature-icon-wrap" aria-hidden="true">
                 {@html f.icon}
               </div>
