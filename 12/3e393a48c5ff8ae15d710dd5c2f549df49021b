@@ -1,0 +1,4 @@
+frontend/src/pages/Landing.svelte
+  71991640-f7e7-4f0c-9907-e5c43680362c:2026-05-18T07:42:20.700Z 524-527,1392-1399,1402-1403,1406,1411,1414-1420,1425-1426,1430,1636
+---
+{"schema_version": "authorship/3.0.0", "base_commit_sha": "HEAD~1", "prompts": {"71991640-f7e7-4f0c-9907-e5c43680362c:2026-05-18T07:42:20.700Z": {"agent_id": {"tool": "claude_code", "model": ""}, "human_author": "ankur.das@razorpay.com", "accepted_lines": 27, "overriden_lines": 0}}}
