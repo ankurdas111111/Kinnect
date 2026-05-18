@@ -316,18 +316,24 @@
                 <div class="mockup-map-grid"></div>
                 <!-- Animated user pins -->
                 <div class="map-pin pin-1">
-                  <div class="pin-dot" style="background:#14b8a6"></div>
-                  <div class="pin-ring" style="border-color:#14b8a6"></div>
+                  <div class="pin-inner">
+                    <div class="pin-dot" style="background:#14b8a6"></div>
+                    <div class="pin-ring" style="border-color:#14b8a6"></div>
+                  </div>
                   <div class="pin-label">Mom</div>
                 </div>
                 <div class="map-pin pin-2">
-                  <div class="pin-dot" style="background:#a855f7"></div>
-                  <div class="pin-ring" style="border-color:#a855f7"></div>
+                  <div class="pin-inner">
+                    <div class="pin-dot" style="background:#a855f7"></div>
+                    <div class="pin-ring" style="border-color:#a855f7"></div>
+                  </div>
                   <div class="pin-label">Dad</div>
                 </div>
                 <div class="map-pin pin-3">
-                  <div class="pin-dot" style="background:#f59e0b"></div>
-                  <div class="pin-ring" style="border-color:#f59e0b"></div>
+                  <div class="pin-inner">
+                    <div class="pin-dot" style="background:#f59e0b"></div>
+                    <div class="pin-ring" style="border-color:#f59e0b"></div>
+                  </div>
                   <div class="pin-label">Zara</div>
                 </div>
                 <!-- Geofence circle -->
@@ -968,46 +974,53 @@
     border-radius: 50%;
     border: 1.5px dashed rgba(20,184,166,0.35);
     background: rgba(20,184,166,0.05);
-    top: 30%; left: 25%;
+    /* centered on Mom's pin position */
+    top: 35%; left: 32%;
     transform: translate(-50%,-50%);
   }
 
   .map-pin {
     position: absolute;
+    transform: translate(-50%, -50%);
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 2px;
+    gap: 0;
   }
   .pin-1 { top: 35%; left: 32%; animation: pin-float 3.2s ease-in-out infinite; }
   .pin-2 { top: 20%; left: 62%; animation: pin-float 3.8s ease-in-out 0.5s infinite; }
   .pin-3 { top: 58%; left: 55%; animation: pin-float 2.9s ease-in-out 1.1s infinite; }
 
   @keyframes pin-float {
-    0%,100% { transform: translateY(0); }
-    50%     { transform: translateY(-4px); }
+    0%,100% { transform: translate(-50%,-50%) translateY(0); }
+    50%     { transform: translate(-50%,-50%) translateY(-4px); }
   }
 
+  /* Shared 10×10 stacking context — dot and ripple overlap exactly */
+  .pin-inner {
+    position: relative;
+    width: 10px;
+    height: 10px;
+    flex-shrink: 0;
+  }
   .pin-dot {
-    width: 10px; height: 10px;
+    position: absolute;
+    inset: 0;
     border-radius: 50%;
     z-index: 2;
-    position: relative; /* stacking above the ring */
     box-shadow: 0 0 8px currentColor;
   }
   .pin-ring {
     position: absolute;
-    top: 0; left: 0;
-    width: 10px; height: 10px;
+    inset: 0;
     border-radius: 50%;
     border: 1.5px solid;
-    /* Expand from center of the 10×10 element, not from top-left corner */
-    transform-origin: 5px 5px;
     animation: pin-expand 2s ease-out infinite;
+    z-index: 1;
   }
   @keyframes pin-expand {
     0%   { transform: scale(1);   opacity: 0.8; }
-    100% { transform: scale(2.4); opacity: 0; }
+    100% { transform: scale(2.8); opacity: 0; }
   }
   .pin-label {
     font-size: 9px;
@@ -1017,7 +1030,7 @@
     padding: 1px 5px;
     border-radius: 3px;
     white-space: nowrap;
-    margin-top: 2px;
+    margin-top: 4px;
   }
 
   /* Member rows */
@@ -1179,8 +1192,12 @@
 
   /* ── Section shared ───────────────────────────────────────────────────── */
   .section-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     text-align: center;
     margin-bottom: var(--space-12, 48px);
+    width: 100%;
   }
 
   .section-eyebrow {
@@ -1284,15 +1301,19 @@
     -webkit-text-fill-color: transparent;
     background-clip: text;
     line-height: 1;
+    /* Number sits above the connector; add bottom padding to create space */
+    padding-bottom: var(--space-2);
   }
 
   .step-connector {
     position: absolute;
-    top: 24px;
-    right: calc(-1 * var(--space-6) / 2);
-    width: calc(100% + var(--space-6));
+    /* Sits at the vertical center of the number (roughly 20px from top of the 48px number) */
+    top: 22px;
+    /* Start just after the number ends (about 48px wide) and extend to the start of the next step */
+    left: 52px;
+    right: calc(-1 * var(--space-6));
     height: 1px;
-    background: linear-gradient(90deg, var(--primary-700) 0%, var(--border-default) 100%);
+    background: linear-gradient(90deg, rgba(168,85,247,0.5) 0%, rgba(168,85,247,0.12) 100%);
     pointer-events: none;
   }
 
