@@ -43,6 +43,45 @@
   function conditionsFailed() {
     window.location.hash = '#/login';
   }
+
+  // TECHNIQUE 15: View Transitions API — wrap hash-based SPA navigation so route
+  // changes feel native. Progressive enhancement: falls back to instant replace on
+  // unsupported browsers (Firefox, older Safari). Only fires for hash changes that
+  // are actual navigations, not anchor scrolls.
+  // We intercept clicks on <a href="#/..."> links at the document level so we catch
+  // both Router-managed links and any manual window.location.hash assignments that
+  // go through anchor clicks.
+  function wrapWithViewTransition(fn) {
+    if (!document.startViewTransition) {
+      fn();
+      return;
+    }
+    document.startViewTransition(fn);
+  }
+
+  onMount(() => {
+    if (!document.startViewTransition) return; // No-op on unsupported browsers
+
+    // Intercept anchor clicks that target hash routes
+    function onLinkClick(e) {
+      const anchor = e.composedPath().find(
+        el => el instanceof HTMLAnchorElement || el instanceof HTMLAreaElement
+      );
+      if (!anchor) return;
+      const href = anchor.getAttribute('href') || '';
+      if (!href.startsWith('#/')) return;
+      // Same hash — no transition needed
+      if (href === window.location.hash) return;
+
+      e.preventDefault();
+      wrapWithViewTransition(() => {
+        window.location.hash = href.slice(1); // '#/foo' → '/foo' via hash
+      });
+    }
+
+    document.addEventListener('click', onLinkClick);
+    return () => document.removeEventListener('click', onLinkClick);
+  });
 </script>
 
 <!-- Skip navigation link — renders off-screen, visible on focus -->

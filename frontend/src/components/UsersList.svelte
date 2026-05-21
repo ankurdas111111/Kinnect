@@ -443,6 +443,10 @@
                 style={user.online !== false && !user.sos?.active ? getPresenceRingStyle(user) : ''}
                 aria-hidden="true"
               ></span>
+              <!-- TECHNIQUE 9: second pulse ring for SOS — staggered multi-ring radar effect -->
+              {#if user.sos?.active}
+                <span class="presence-ring-sos-outer" aria-hidden="true"></span>
+              {/if}
             </div>
             <div class="user-meta">
               <div class="user-name-row">
@@ -516,7 +520,7 @@
                 {/if}
               </div>
               {#if (user.formattedTime || user.lastUpdate) && user.online !== false}
-                <div class="user-updated">
+                <div class="user-updated font-tabular">
                   {user.formattedTime || formatTimestamp(user.lastUpdate)}
                 </div>
               {/if}
@@ -524,7 +528,7 @@
             <div class="user-actions">
               {#if user.batteryPct != null}
                 <span
-                  class="bat-chip"
+                  class="bat-chip font-tabular"
                   class:bat-low={user.batteryPct <= 20}
                   class:bat-ok={user.batteryPct > 20 && user.batteryPct <= 50}
                   class:bat-good={user.batteryPct > 50}
@@ -933,6 +937,19 @@
     animation: ring-scale-breathe 2.8s ease-in-out infinite;
   }
 
+  /* TECHNIQUE 9: Second (outer) SOS pulse ring — staggered 0.4s for radar sweep */
+  .presence-ring-sos-outer {
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    pointer-events: none;
+    box-shadow:
+      0 0 0 2.5px var(--danger-500),
+      0 0 16px rgba(239, 68, 68, 0.35);
+    animation: sos-urgent-pulse 1s ease-in-out 0.4s infinite;
+    opacity: 0.6;
+  }
+
   @keyframes ring-scale-breathe {
     0%, 100% { transform: scale(1);    opacity: 0.85; }
     50%       { transform: scale(1.07); opacity: 1;    }
@@ -1122,6 +1139,9 @@
     font-size: var(--text-xs);
     color: var(--text-tertiary);
     letter-spacing: 0.01em;
+    /* TECHNIQUE 8: tabular-nums for timestamps */
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
   }
 
   .offline-label {
@@ -1219,6 +1239,9 @@
     background: var(--surface-inset);
     color: var(--text-tertiary);
     letter-spacing: 0.01em;
+    /* TECHNIQUE 8: tabular-nums for battery % — never shifts layout */
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
   }
   .bat-low  {
     color: var(--danger-400);
@@ -1321,12 +1344,17 @@
     bottom: 0;
     /* Was z:5401 hardcoded. Using --z-modal + 1 to sit above its backdrop. */
     z-index: calc(var(--z-modal, 5000) + 1);
-    background: var(--surface-2, rgba(20, 20, 40, 0.98));
-    backdrop-filter: blur(32px) saturate(1.8);
-    -webkit-backdrop-filter: blur(32px) saturate(1.8);
-    border-top: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
+    /* TECHNIQUE 6: Liquid Glass 2.0 — stronger blur + saturation + brightness */
+    background: var(--surface-2, rgba(12, 12, 28, 0.88));
+    backdrop-filter: blur(32px) saturate(180%) brightness(1.06);
+    -webkit-backdrop-filter: blur(32px) saturate(180%) brightness(1.06);
+    border-top: 1px solid rgba(255, 255, 255, 0.14);
     border-radius: 20px 20px 0 0;
-    box-shadow: 0 -8px 48px rgba(0,0,0,0.40), 0 -1px 0 rgba(255,255,255,0.06);
+    box-shadow:
+      0 -8px 48px rgba(0, 0, 0, 0.40),
+      0 -1px 0 rgba(255, 255, 255, 0.10),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.10);
     padding: 8px 16px calc(24px + env(safe-area-inset-bottom, 0px));
     will-change: transform;
   }
@@ -1513,6 +1541,9 @@
     .user-depth-card {
       animation: none;
       animation-delay: 0ms;
+    }
+    .presence-ring-sos-outer {
+      animation: none;
     }
   }
 </style>

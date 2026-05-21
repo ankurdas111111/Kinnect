@@ -2,26 +2,22 @@
   /**
    * Landing — Premium scroll-based storytelling page for Kinnect
    *
-   * Sections:
-   *   1. Hero    — animated entry, headline, CTA
-   *   2. Social proof bar
-   *   3. Features — staggered card reveal
-   *   4. How it works — numbered steps with connector
-   *   5. Demo panel  — interactive mockup
-   *   6. CTA footer
+   * 2026 Ultra-Polish upgrades:
+   *   - Scroll progress bar via animation-timeline: scroll(root)
+   *   - CSS scroll-driven reveal (animation-timeline: view()) replaces IntersectionObserver
+   *   - @property aurora hero background cycling
+   *   - Depth grid perspective on hero
+   *   - Multi-ring status pulse (ping-dot + ping-ring + ping-ring-2)
+   *   - Noise texture on mockup card
+   *   - Card hover depth system
+   *   - Premium typography: tabular-nums, optimizeLegibility
    *
-   * Techniques used:
-   *   - IntersectionObserver for scroll-reveal
-   *   - spring / tweened for physics motion
-   *   - Svelte fade / fly / scale / crossfade transitions
-   *   - rAF tilt on hero graphic
-   *   - Animated stat counters
-   *   - Particle field (CSS-only, no canvas)
+   * Scroll reveal fallback: IntersectionObserver kept for stats counter only.
+   * All section/card reveal now uses CSS scroll-driven classes.
    */
-  import { onMount, onDestroy, tick } from 'svelte';
-  import { spring, tweened } from 'svelte/motion';
-  import { fade, fly, scale, crossfade } from 'svelte/transition';
-  import { cubicOut, elasticOut, backOut } from 'svelte/easing';
+  import { onMount, onDestroy } from 'svelte';
+  import { fade, fly, scale } from 'svelte/transition';
+  import { cubicOut, elasticOut } from 'svelte/easing';
   import Button from '../components/primitives/Button.svelte';
   import Card   from '../components/primitives/Card.svelte';
   import Input  from '../components/primitives/Input.svelte';
@@ -91,23 +87,8 @@
     requestAnimationFrame(frame);
   }
 
-  // ── Scroll reveal ─────────────────────────────────────────────────────────
-  let revealed = new Set();
-  let observers = [];
-
-  function observeReveal(el, key) {
-    if (!el) return;
-    const obs = new IntersectionObserver(entries => {
-      for (const e of entries) {
-        if (e.isIntersecting) {
-          revealed = new Set([...revealed, key]);
-          obs.disconnect();
-        }
-      }
-    }, { threshold: 0.15 });
-    obs.observe(el);
-    observers.push(obs);
-  }
+  // ── Stats IntersectionObserver (still needed for counter trigger) ─────────
+  let statsObservers = [];
 
   function observeStats(el) {
     if (!el) return;
@@ -123,7 +104,12 @@
       }
     }, { threshold: 0.3 });
     obs.observe(el);
-    observers.push(obs);
+    statsObservers.push(obs);
+  }
+
+  function statsObserve(node) {
+    observeStats(node);
+    return { destroy() {} };
   }
 
   // ── Features list ─────────────────────────────────────────────────────────
@@ -187,21 +173,10 @@
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   onDestroy(() => {
-    observers.forEach(o => o.disconnect());
+    statsObservers.forEach(o => o.disconnect());
     if (heroRaf) cancelAnimationFrame(heroRaf);
     if (pingInterval) clearInterval(pingInterval);
   });
-
-  // ── Reveal action (Svelte use:) ────────────────────────────────────────────
-  function reveal(node, key) {
-    observeReveal(node, key);
-    return { destroy() {} };
-  }
-
-  function statsObserve(node) {
-    observeStats(node);
-    return { destroy() {} };
-  }
 
   // ── CTA email ─────────────────────────────────────────────────────────────
   let ctaEmail = '';
@@ -213,16 +188,23 @@
   }
 </script>
 
+<!-- ── TECHNIQUE 3: Scroll Progress Bar ──────────────────────────────────── -->
+<!-- Pure CSS via animation-timeline: scroll(root) — defined in global.css    -->
+<div class="scroll-progress-bar" aria-hidden="true"></div>
+
 <div class="landing" aria-label="Kinnect landing page">
 
   <!-- ═══════ HERO ════════════════════════════════════════════════════════ -->
   <section class="hero" on:mousemove={onHeroMouseMove} on:mouseleave={onHeroMouseLeave}>
     <!-- Background atmosphere -->
     <div class="hero-bg" aria-hidden="true">
+      <!-- TECHNIQUE 1: @property Aurora background layer -->
+      <div class="hero-aurora aurora-hero-bg" aria-hidden="true"></div>
       <div class="hero-orb hero-orb-1"></div>
       <div class="hero-orb hero-orb-2"></div>
       <div class="hero-orb hero-orb-3"></div>
-      <div class="hero-grid"></div>
+      <!-- TECHNIQUE 13: Depth grid with perspective -->
+      <div class="hero-grid depth-grid-perspective" aria-hidden="true"></div>
       <!-- Floating particles -->
       {#each Array(14) as _, i}
         <div class="hero-particle" style="
@@ -300,12 +282,14 @@
           in:fly={{ x: 40, duration: 700, delay: 350, easing: cubicOut }}
         >
           <div class="hero-card-wrap" bind:this={heroCardEl}>
-            <!-- App mockup card -->
-            <div class="mockup-card">
+            <!-- App mockup card — TECHNIQUE 4: noise-surface class -->
+            <div class="mockup-card noise-surface">
               <!-- Status bar -->
               <div class="mockup-topbar">
                 <div class="mockup-title">Family</div>
+                <!-- TECHNIQUE 9: Multi-ring pulse — ping-dot + ping-ring + ping-ring-2 -->
                 <div class="mockup-ping" aria-label="Live updates active">
+                  <span class="ping-ring-2" aria-hidden="true"></span>
                   <span class="ping-ring" aria-hidden="true"></span>
                   <span class="ping-dot"  aria-hidden="true"></span>
                 </div>
@@ -340,8 +324,8 @@
                 <div class="map-geofence" aria-hidden="true"></div>
               </div>
 
-              <!-- Member rows -->
-              <div class="mockup-list">
+              <!-- Member rows — TECHNIQUE 7: stagger-messages class for CSS stagger -->
+              <div class="mockup-list stagger-messages">
                 {#each [
                   { name: 'Mom',   loc: 'Home',        col: '#14b8a6', ago: 'just now' },
                   { name: 'Dad',   loc: 'Office',      col: '#a855f7', ago: '3 min ago' },
@@ -353,7 +337,8 @@
                       <span class="mockup-name">{m.name}</span>
                       <span class="mockup-loc">{m.loc}</span>
                     </span>
-                    <span class="mockup-ago">{m.ago}</span>
+                    <!-- TECHNIQUE 8: font-variant-numeric on time display -->
+                    <span class="mockup-ago font-tabular">{m.ago}</span>
                   </div>
                 {/each}
               </div>
@@ -385,7 +370,8 @@
       <div class="stats-grid">
         {#each stats as s, i}
           <div class="stat-item">
-            <span class="stat-value" aria-live="polite">
+            <!-- TECHNIQUE 8: tabular-nums on stat values -->
+            <span class="stat-value font-tabular" aria-live="polite">
               {statDisplays[i].toFixed(s.decimals || 0)}{s.suffix}
             </span>
             <span class="stat-label">{s.label}</span>
@@ -400,25 +386,20 @@
   <section class="features" aria-labelledby="features-heading">
     <div class="landing-container">
 
-      <div
-        class="section-header reveal-block"
-        class:is-revealed={revealed.has('features-header')}
-        use:reveal={'features-header'}
-      >
+      <!-- TECHNIQUE 2: scroll-driven reveal replaces IntersectionObserver -->
+      <div class="section-header reveal-scroll">
         <p class="section-eyebrow">Everything you need</p>
         <h2 id="features-heading" class="section-title">
           Built for families.<br>Designed for calm.
         </h2>
       </div>
 
-      <div class="features-grid" role="list">
+      <!-- TECHNIQUE 2: reveal-scroll-grid for staggered card reveal -->
+      <div class="features-grid reveal-scroll-grid" role="list">
         {#each features as f, i}
           <div
-            class="feature-cell reveal-block"
-            class:is-revealed={revealed.has(`feature-${i}`)}
-            style="transition-delay: {i * 65}ms"
+            class="feature-cell card-hover-depth"
             role="listitem"
-            use:reveal={`feature-${i}`}
           >
             <Card variant="glass" hover padding="lg">
               <div class="feature-icon-wrap" aria-hidden="true">
@@ -439,11 +420,7 @@
   <section class="how-it-works" aria-labelledby="how-heading">
     <div class="landing-container">
 
-      <div
-        class="section-header reveal-block"
-        class:is-revealed={revealed.has('how-header')}
-        use:reveal={'how-header'}
-      >
+      <div class="section-header reveal-scroll">
         <p class="section-eyebrow">Simple by design</p>
         <h2 id="how-heading" class="section-title">Up and running in minutes</h2>
       </div>
@@ -451,11 +428,9 @@
       <div class="steps-track" role="list">
         {#each steps as s, i}
           <div
-            class="step reveal-block"
-            class:is-revealed={revealed.has(`step-${i}`)}
-            style="transition-delay: {i * 110}ms"
+            class="step reveal-scroll"
+            style="animation-delay: {i * 110}ms"
             role="listitem"
-            use:reveal={`step-${i}`}
           >
             <div class="step-inner">
               <div class="step-num" aria-hidden="true">{s.num}</div>
@@ -479,19 +454,13 @@
   <section class="demo-section" aria-labelledby="demo-heading">
     <div class="landing-container">
 
-      <div
-        class="section-header reveal-block"
-        class:is-revealed={revealed.has('demo-header')}
-        use:reveal={'demo-header'}
-      >
+      <div class="section-header reveal-scroll">
         <p class="section-eyebrow">See it live</p>
         <h2 id="demo-heading" class="section-title">The app, right here</h2>
       </div>
 
       <div
-        class="demo-frame reveal-block"
-        class:is-revealed={revealed.has('demo-frame')}
-        use:reveal={'demo-frame'}
+        class="demo-frame reveal-scroll card-hover-depth"
         aria-label="Interactive app preview"
       >
         <div>
@@ -515,7 +484,7 @@
             <div class="demo-content" role="tabpanel">
               {#if demoTab === 'map'}
                 <div class="demo-map" in:fade={{ duration: 280 }} aria-label="Map view showing family locations">
-                  <div class="demo-map-bg" aria-hidden="true"></div>
+                  <div class="demo-map-bg depth-grid-fine" aria-hidden="true"></div>
                   <!-- Animated pins -->
                   {#each [
                     { label:'Mom',  x:28, y:42, c:'#14b8a6' },
@@ -562,7 +531,7 @@
                     >
                       <span class="alert-icon" aria-hidden="true">{alert.icon}</span>
                       <span class="alert-text">{alert.text}</span>
-                      <span class="alert-time">{alert.time}</span>
+                      <span class="alert-time font-tabular">{alert.time}</span>
                     </div>
                   {/each}
                 </div>
@@ -608,11 +577,7 @@
       <div class="cta-orb cta-orb-2"></div>
     </div>
 
-    <div
-      class="landing-container cta-inner reveal-block"
-      class:is-revealed={revealed.has('cta')}
-      use:reveal={'cta'}
-    >
+    <div class="landing-container cta-inner reveal-scroll">
         <h2 id="cta-heading" class="cta-title">Start protecting your family today.</h2>
         <p class="cta-sub">Free forever for families under 6 members. No credit card required.</p>
 
@@ -663,7 +628,7 @@
 </div>
 
 <style>
-  /* ── Layout ─────────────────────────────────────────────────────────── */
+  /* ── Layout ─────────────────────────────────────────────────────────────── */
   .landing {
     min-height: 100vh;
     background: var(--surface-0, #0d0b14);
@@ -682,7 +647,7 @@
     .landing-container { padding: 0 var(--space-4); }
   }
 
-  /* ── Hero ────────────────────────────────────────────────────────────── */
+  /* ── Hero ────────────────────────────────────────────────────────────────── */
   .hero {
     position: relative;
     min-height: 100vh;
@@ -695,6 +660,13 @@
 
   /* Background atmosphere */
   .hero-bg { position: absolute; inset: 0; pointer-events: none; }
+
+  /* TECHNIQUE 1: Aurora layer — sits behind orbs */
+  .hero-aurora {
+    position: absolute;
+    inset: 0;
+    /* aurora-color-cycle keyframe + CSS from global.css .aurora-hero-bg */
+  }
 
   .hero-orb {
     position: absolute;
@@ -732,15 +704,14 @@
     70%     { transform: translate(20px,-30px) scale(0.97); }
   }
 
+  /* TECHNIQUE 13: hero-grid now uses depth-grid-perspective from global.css */
   .hero-grid {
     position: absolute;
     inset: 0;
-    background-image:
-      linear-gradient(0deg, rgba(168,85,247,0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(168,85,247,0.03) 1px, transparent 1px);
-    background-size: 48px 48px;
-    mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, black 30%, transparent 100%);
-    -webkit-mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, black 30%, transparent 100%);
+    /* depth-grid-perspective class from global.css handles the grid + perspective transform */
+    /* Override the mask-image from global.css for hero-specific fade */
+    mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
+    -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
   }
 
   .hero-particle {
@@ -806,12 +777,14 @@
     50%     { opacity:0.5; transform:scale(0.8); }
   }
 
+  /* TECHNIQUE 8: letter-spacing -0.03em on large heading */
   .hero-headline {
     font-family: var(--font-display);
     font-size: clamp(2.25rem, 5vw, 3.5rem);
     font-weight: 800;
     line-height: 1.10;
     letter-spacing: -0.03em;
+    text-rendering: optimizeLegibility;
     color: var(--text-primary);
     margin-bottom: var(--space-5);
   }
@@ -882,9 +855,10 @@
     transform-style: preserve-3d;
   }
 
+  /* TECHNIQUE 6: Liquid Glass 2.0 on mockup card */
   .mockup-card {
     width: 300px;
-    background: rgba(13, 11, 20, 0.88);
+    background: rgba(13, 11, 20, 0.85);
     border: 1px solid rgba(168,85,247,0.22);
     border-top-color: rgba(200,120,255,0.40);
     border-radius: 20px;
@@ -893,8 +867,10 @@
       0 32px 80px rgba(0,0,0,0.60),
       0 8px 24px rgba(0,0,0,0.40),
       0 0 0 1px rgba(168,85,247,0.10),
-      inset 0 1px 0 rgba(255,255,255,0.08);
-    backdrop-filter: blur(20px);
+      inset 0 1px 0 rgba(255,255,255,0.08),
+      inset 0 -1px 0 rgba(0,0,0,0.14);
+    backdrop-filter: blur(32px) saturate(180%) brightness(1.06);
+    -webkit-backdrop-filter: blur(32px) saturate(180%) brightness(1.06);
   }
 
   @media (max-width: 480px) {
@@ -916,38 +892,13 @@
     color: var(--text-primary);
   }
 
+  /* TECHNIQUE 9: Multi-ring ping — container holds 3 layers */
   .mockup-ping {
-    /* Larger hit area so the ring animation has room to expand without
-       being clipped by the parent card's overflow:hidden */
     position: relative;
     width: 20px; height: 20px;
     flex-shrink: 0;
   }
-  .ping-dot {
-    position: absolute;
-    /* Center 6px dot in the 20px container */
-    top: 50%; left: 50%;
-    width: 6px; height: 6px;
-    transform: translate(-50%, -50%);
-    border-radius: 50%;
-    background: var(--success-500);
-  }
-  .ping-ring {
-    position: absolute;
-    /* Start centered and same size as dot */
-    top: 50%; left: 50%;
-    width: 6px; height: 6px;
-    margin: -3px 0 0 -3px;
-    border-radius: 50%;
-    border: 1.5px solid var(--success-500);
-    /* Scale up to fill the 20px container (max ×2.4 = 14.4px — fits within 20px) */
-    animation: ping-expand 1.8s ease-out infinite;
-  }
-
-  @keyframes ping-expand {
-    0%   { transform: scale(1);   opacity: 0.8; }
-    100% { transform: scale(2.2); opacity: 0; }
-  }
+  /* ping-dot, ping-ring, ping-ring-2 defined in global.css TECHNIQUE 9 block */
 
   /* Mini map */
   .mockup-map {
@@ -974,7 +925,6 @@
     border-radius: 50%;
     border: 1.5px dashed rgba(20,184,166,0.35);
     background: rgba(20,184,166,0.05);
-    /* centered on Mom's pin position */
     top: 35%; left: 32%;
     transform: translate(-50%,-50%);
   }
@@ -996,7 +946,6 @@
     50%     { transform: translate(-50%,-50%) translateY(-4px); }
   }
 
-  /* Shared 10×10 stacking context — dot and ripple overlap exactly */
   .pin-inner {
     position: relative;
     width: 10px;
@@ -1078,7 +1027,6 @@
     background: rgba(16,185,129,0.18);
     border: 1px solid rgba(16,185,129,0.40);
     color: var(--success-400);
-    /* Float above the card's top-right corner — inset enough to stay within hero overflow:hidden */
     top: -18px; right: -10px;
     animation: chip-bob 3.5s ease-in-out infinite;
   }
@@ -1087,12 +1035,10 @@
     background: rgba(20,184,166,0.15);
     border: 1px solid rgba(20,184,166,0.38);
     color: var(--primary-400);
-    /* Float below the card's bottom-left corner — don't overlap list rows */
     bottom: -20px; left: -10px;
     animation: chip-bob 4s ease-in-out 1s infinite;
   }
 
-  /* Tighten chip offsets on small screens to prevent viewport overflow */
   @media (max-width: 480px) {
     .chip-safe  { right: -4px; top: -16px; }
     .chip-alert { left: -4px;  bottom: -18px; }
@@ -1129,7 +1075,7 @@
   }
 
 
-  /* ── Stats bar ────────────────────────────────────────────────────────── */
+  /* ── Stats bar ────────────────────────────────────────────────────────────── */
   .stats-bar {
     padding: var(--space-10) 0;
     border-top: 1px solid var(--border-subtle);
@@ -1159,24 +1105,24 @@
 
   @media (max-width: 640px) {
     .stat-item { padding: var(--space-4) var(--space-3); }
-    /* 2-col grid: right column has no border-right, bottom row has no border-bottom */
     .stat-item:nth-child(2n) { border-right: none; }
     .stat-item:nth-child(1),
     .stat-item:nth-child(2) { border-bottom: 1px solid var(--border-default); }
   }
 
+  /* TECHNIQUE 8: tabular-nums + letter-spacing */
   .stat-value {
     font-family: var(--font-display);
     font-size: var(--text-3xl);
     font-weight: 800;
     letter-spacing: -0.03em;
+    text-rendering: optimizeLegibility;
     background: linear-gradient(135deg, var(--primary-300) 0%, var(--primary-500) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
     min-width: 5ch;
     text-align: center;
-    tabular-nums: auto;
     font-variant-numeric: tabular-nums;
   }
 
@@ -1190,7 +1136,7 @@
   }
 
 
-  /* ── Section shared ───────────────────────────────────────────────────── */
+  /* ── Section shared ─────────────────────────────────────────────────────── */
   .section-header {
     display: flex;
     flex-direction: column;
@@ -1210,17 +1156,19 @@
     margin-bottom: var(--space-3);
   }
 
+  /* TECHNIQUE 8: -0.025em letter-spacing on section titles */
   .section-title {
     font-family: var(--font-display);
     font-size: clamp(1.75rem, 3.5vw, 2.5rem);
     font-weight: 800;
     line-height: 1.15;
     letter-spacing: -0.025em;
+    text-rendering: optimizeLegibility;
     color: var(--text-primary);
   }
 
 
-  /* ── Features ─────────────────────────────────────────────────────────── */
+  /* ── Features ─────────────────────────────────────────────────────────────── */
   .features {
     padding: var(--space-16) 0 var(--space-12);
   }
@@ -1258,7 +1206,8 @@
     font-size: var(--text-lg);
     font-weight: 700;
     color: var(--text-primary);
-    letter-spacing: -0.01em;
+    letter-spacing: -0.015em;
+    text-rendering: optimizeLegibility;
     margin-bottom: var(--space-2);
   }
 
@@ -1269,7 +1218,7 @@
   }
 
 
-  /* ── How it works ─────────────────────────────────────────────────────── */
+  /* ── How it works ─────────────────────────────────────────────────────────── */
   .how-it-works { padding: var(--space-12) 0; }
 
   .steps-track {
@@ -1291,25 +1240,24 @@
     gap: var(--space-4);
   }
 
+  /* TECHNIQUE 8: -0.05em letter-spacing on large step numbers */
   .step-num {
     font-family: var(--font-display);
     font-size: var(--text-4xl);
     font-weight: 900;
     letter-spacing: -0.05em;
+    text-rendering: optimizeLegibility;
     background: linear-gradient(135deg, var(--primary-400) 0%, var(--primary-700) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
     line-height: 1;
-    /* Number sits above the connector; add bottom padding to create space */
     padding-bottom: var(--space-2);
   }
 
   .step-connector {
     position: absolute;
-    /* Sits at the vertical center of the number (roughly 20px from top of the 48px number) */
     top: 22px;
-    /* Start just after the number ends (about 48px wide) and extend to the start of the next step */
     left: 52px;
     right: calc(-1 * var(--space-6));
     height: 1px;
@@ -1327,6 +1275,7 @@
     font-weight: 700;
     color: var(--text-primary);
     letter-spacing: -0.01em;
+    text-rendering: optimizeLegibility;
   }
 
   .step-desc {
@@ -1336,21 +1285,25 @@
   }
 
 
-  /* ── Demo section ─────────────────────────────────────────────────────── */
+  /* ── Demo section ─────────────────────────────────────────────────────────── */
   .demo-section { padding: var(--space-12) 0 var(--space-16); }
 
+  /* TECHNIQUE 6: Liquid Glass 2.0 on demo frame */
   .demo-frame {
     max-width: 640px;
     margin: 0 auto;
     background: var(--surface-1, rgba(13,11,20,0.70));
     border: 1px solid var(--border-default);
-    border-top-color: rgba(255,255,255,0.10);
+    border-top-color: rgba(255,255,255,0.14);
     border-radius: 20px;
     overflow: hidden;
+    backdrop-filter: blur(32px) saturate(180%) brightness(1.06);
+    -webkit-backdrop-filter: blur(32px) saturate(180%) brightness(1.06);
     box-shadow:
       0 24px 64px rgba(0,0,0,0.40),
       0 4px 16px rgba(0,0,0,0.24),
-      inset 0 1px 0 rgba(255,255,255,0.07);
+      inset 0 1px 0 rgba(255,255,255,0.10),
+      inset 0 -1px 0 rgba(0,0,0,0.10);
   }
 
   /* Demo tabs */
@@ -1395,13 +1348,11 @@
     overflow: hidden;
     background: rgba(8,8,20,0.70);
   }
+  /* depth-grid-fine applied via class on .demo-map-bg */
   .demo-map-bg {
     position: absolute;
     inset: 0;
-    background-image:
-      linear-gradient(0deg, rgba(255,255,255,0.025) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
-    background-size: 32px 32px;
+    /* depth-grid-fine from global.css */
   }
 
   .demo-pin {
@@ -1412,7 +1363,6 @@
     align-items: center;
     gap: 0;
   }
-  /* Shared 12×12 stacking context — dot and ripple overlap exactly */
   .demo-pin-inner {
     position: relative;
     width: 12px;
@@ -1432,7 +1382,6 @@
     inset: 0;
     border-radius: 50%;
     border: 1.5px solid var(--pin-c);
-    /* scale from center — transform-origin defaults to 50% 50% */
     animation: demo-pin-expand 2.2s ease-out infinite;
     z-index: 1;
   }
@@ -1473,7 +1422,8 @@
 
   .alert-icon { font-size: 16px; flex-shrink:0; }
   .alert-text { flex:1; font-size: var(--text-sm); color: var(--text-primary); min-width:0; }
-  .alert-time { font-size: var(--text-xs); color: var(--text-tertiary); flex-shrink:0; }
+  /* TECHNIQUE 8: tabular-nums on time */
+  .alert-time { font-size: var(--text-xs); color: var(--text-tertiary); flex-shrink:0; font-variant-numeric: tabular-nums; }
 
   /* Demo chat */
   .demo-chat {
@@ -1523,7 +1473,7 @@
   }
 
 
-  /* ── CTA section ──────────────────────────────────────────────────────── */
+  /* ── CTA section ────────────────────────────────────────────────────────── */
   .cta-section {
     position: relative;
     padding: var(--space-16) 0 var(--space-10);
@@ -1559,11 +1509,13 @@
     gap: var(--space-5);
   }
 
+  /* TECHNIQUE 8: heading polish */
   .cta-title {
     font-family: var(--font-display);
     font-size: clamp(1.75rem, 3.5vw, 2.5rem);
     font-weight: 800;
     letter-spacing: -0.025em;
+    text-rendering: optimizeLegibility;
     color: var(--text-primary);
     max-width: 600px;
   }
@@ -1633,31 +1585,34 @@
     font-weight: 500;
   }
 
-  /* ── Scroll reveal ────────────────────────────────────────────────────── */
-  .reveal-block {
-    opacity: 0;
-    transform: translateY(24px);
-    transition:
-      opacity 0.55s cubic-bezier(0.4, 0, 0.2, 1),
-      transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  .reveal-block.is-revealed {
-    opacity: 1;
-    transform: translateY(0);
+  /* ── TECHNIQUE 2: Scroll-driven reveal (CSS-only fallback) ────────────────── */
+  /* reveal-scroll class in global.css handles the animation-timeline: view()    */
+  /* This fallback ensures the element is visible even without scroll-driven support */
+  .reveal-scroll {
+    /* If scroll-driven not supported, elements show immediately */
+    /* The @supports block in global.css applies the animation only when supported */
   }
 
-  /* ── Reduced motion ───────────────────────────────────────────────────── */
+  /* ── Reduced motion ─────────────────────────────────────────────────────── */
   @media (prefers-reduced-motion: reduce) {
     .hero-orb, .cta-orb,
     .hero-particle,
     .hero-badge-dot,
     .chip-safe, .chip-alert,
-    .ping-ring, .pin-ring, .pin-1, .pin-2, .pin-3,
+    .pin-ring, .pin-1, .pin-2, .pin-3,
     .demo-pin-ripple,
-    .scroll-cue-line { animation: none; opacity: 1; transform: scale(1); }
+    .scroll-cue-line,
+    .hero-aurora { animation: none; opacity: 1; transform: scale(1); }
 
     .hero-card-wrap { transform: none !important; }
     .demo-route { display: none; }
-    .reveal-block { opacity: 1; transform: none; transition: none; }
+
+    /* Fallback reveal for reduced-motion — all elements instantly visible */
+    .reveal-scroll,
+    .reveal-scroll-grid > * {
+      opacity: 1 !important;
+      transform: none !important;
+      animation: none !important;
+    }
   }
 </style>

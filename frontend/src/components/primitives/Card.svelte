@@ -4,12 +4,13 @@
    *
    * Props:
    *   variant   — 'default' | 'elevated' | 'glass' | 'outlined' | 'solid'
-   *   hover     — enable hover elevation + lift
+   *   hover     — enable hover elevation + lift (TECHNIQUE 14: layered shadow + translateY)
    *   tilt      — enable 3D tilt on mouse move
    *   glow      — color name for glow: 'primary' | 'success' | 'danger' | 'warning' | null
    *   padding   — 'none' | 'sm' | 'md' | 'lg'
    *   clickable — adds cursor:pointer and active press
    *   intensity — tilt max degrees (default 8)
+   *   noise     — enable CSS feTurbulence noise texture overlay (TECHNIQUE 4, default true)
    */
   import { spring } from 'svelte/motion';
   import { createEventDispatcher } from 'svelte';
@@ -21,6 +22,9 @@
   export let padding   = 'md';
   export let clickable = false;
   export let intensity = 8;
+  // TECHNIQUE 4: noise texture — enabled by default on default/elevated/glass variants,
+  // disabled on outlined (transparent bg) variants where it's not meaningful
+  export let noise     = variant !== 'outlined';
 
   const dispatch = createEventDispatcher();
 
@@ -97,6 +101,7 @@
   class="card card-{variant} pad-{padding}"
   class:hover-lift={hover}
   class:clickable
+  class:noise-surface={noise}
   class:glow-primary={glow === 'primary'}
   class:glow-success={glow === 'success'}
   class:glow-danger={glow === 'danger'}
@@ -196,32 +201,42 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.20);
   }
 
-  /* ── Hover lift ───────────────────────────────────────────────────────── */
+  /* ── Hover lift (TECHNIQUE 14: layered shadow depth + translateY) ─────── */
   .card.hover-lift {
     cursor: default;
     transition:
       box-shadow 280ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
-      filter     280ms var(--ease-out),
+      transform   280ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+      filter      280ms var(--ease-out),
       border-color 280ms;
   }
 
   .card-default.hover-lift:hover,
   .card-elevated.hover-lift:hover,
   .card-solid.hover-lift:hover {
+    /* TECHNIQUE 14: translateY(-2px) + layered shadow system */
+    transform: translateY(-2px);
     box-shadow:
-      0 16px 48px rgba(0, 0, 0, 0.34),
-      0 6px  16px rgba(0, 0, 0, 0.22),
+      0 4px 8px  rgba(0, 0, 0, 0.10),
+      0 8px 24px rgba(0, 0, 0, 0.18),
+      0 16px 48px rgba(0, 0, 0, 0.14),
+      0 0 0 1px rgba(255, 255, 255, 0.05),
       inset 0 1px 0 rgba(255, 255, 255, 0.10);
     filter: brightness(1.04);
   }
 
   .card-glass.hover-lift:hover {
+    /* TECHNIQUE 14: glass variant — stronger depth + Liquid Glass 2.0 */
+    transform: translateY(-2px);
     box-shadow:
-      0 20px 56px rgba(0, 0, 0, 0.38),
-      0 6px  16px rgba(0, 0, 0, 0.22),
+      0 4px 8px  rgba(0, 0, 0, 0.14),
+      0 8px 24px rgba(0, 0, 0, 0.22),
+      0 20px 56px rgba(0, 0, 0, 0.28),
       0 0 0 1px rgba(255, 255, 255, 0.06);
     filter: brightness(1.06);
     border-color: var(--glass-border-strong, rgba(255, 255, 255, 0.22));
+    backdrop-filter: blur(32px) saturate(180%) brightness(1.08);
+    -webkit-backdrop-filter: blur(32px) saturate(180%) brightness(1.08);
   }
 
   /* ── Clickable ────────────────────────────────────────────────────────── */

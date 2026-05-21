@@ -2829,3 +2829,796 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
     filter: none !important;
   }
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   2026 ULTRA-POLISH SYSTEM — 15-technique implementation
+   Applied: 2026-05-21 | Direction: Quiet Premium + Urgent Calm
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── TECHNIQUE 1: @property Aurora Gradients ─────────────────────────────── */
+/* Registered typed custom properties allow browsers to interpolate colors    */
+/* smoothly in gradients — impossible without @property                        */
+
+@property --aurora-1 {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: #14b8a6;
+}
+
+@property --aurora-2 {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: #7c3aed;
+}
+
+@property --aurora-3 {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: #06b6d4;
+}
+
+@property --glow-opacity {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 0.35;
+}
+
+@property --edge-color {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: #14b8a6;
+}
+
+/* Aurora keyframes — uses @property interpolation for smooth color cycling */
+@keyframes aurora-color-cycle {
+  0%   { --aurora-1: #14b8a6; --aurora-2: #7c3aed; --aurora-3: #06b6d4; }
+  33%  { --aurora-1: #7c3aed; --aurora-2: #06b6d4; --aurora-3: #14b8a6; }
+  66%  { --aurora-1: #06b6d4; --aurora-2: #14b8a6; --aurora-3: #7c3aed; }
+  100% { --aurora-1: #14b8a6; --aurora-2: #7c3aed; --aurora-3: #06b6d4; }
+}
+
+@keyframes glow-breathe {
+  0%, 100% { --glow-opacity: 0.28; }
+  50%       { --glow-opacity: 0.55; }
+}
+
+@keyframes edge-glow-pulse {
+  0%, 100% { --edge-color: #14b8a6; }
+  50%       { --edge-color: #06b6d4; }
+}
+
+/* Animated aurora hero background class */
+/* color-mix() correctly handles <color> @property values; rgba() does not */
+.aurora-hero-bg {
+  animation: aurora-color-cycle 12s ease-in-out infinite;
+  background: radial-gradient(
+    ellipse 80% 60% at 20% 40%,
+    color-mix(in srgb, var(--aurora-1) 18%, transparent) 0%,
+    transparent 60%
+  ),
+  radial-gradient(
+    ellipse 60% 80% at 80% 20%,
+    color-mix(in srgb, var(--aurora-2) 12%, transparent) 0%,
+    transparent 55%
+  ),
+  radial-gradient(
+    ellipse 70% 50% at 50% 90%,
+    color-mix(in srgb, var(--aurora-3) 10%, transparent) 0%,
+    transparent 60%
+  );
+}
+
+/* Button glow breathe via @property */
+.btn-glow-breathe {
+  animation: glow-breathe 3s ease-in-out infinite;
+  box-shadow: 0 0 calc(var(--glow-opacity) * 60px) rgba(20, 184, 166, var(--glow-opacity)),
+              0 4px 20px rgba(20, 184, 166, calc(var(--glow-opacity) * 0.6));
+}
+
+/* Card edge glow — animated via @property */
+.card-edge-animated {
+  animation: edge-glow-pulse 4s ease-in-out infinite;
+}
+
+/* ── TECHNIQUE 2: CSS Scroll-Driven Animation Classes ──────────────────────  */
+/* Used by Landing.svelte — replaces JS IntersectionObserver                   */
+/* Supported: Chrome 115+, Safari 18+. Falls back to instant-show gracefully. */
+
+@supports (animation-timeline: view()) {
+  .reveal-scroll {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 60%;
+  }
+
+  .reveal-scroll-fade {
+    animation: reveal-fade linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 50%;
+  }
+
+  .reveal-scroll-left {
+    animation: reveal-left linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 55%;
+  }
+
+  .reveal-scroll-right {
+    animation: reveal-right linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 55%;
+  }
+
+  /* Staggered scroll reveal for grid items */
+  .reveal-scroll-grid > *:nth-child(1) { animation: reveal-up linear both; animation-timeline: view(); animation-range: entry 0% entry 60%; animation-delay: 0ms; }
+  .reveal-scroll-grid > *:nth-child(2) { animation: reveal-up linear both; animation-timeline: view(); animation-range: entry 0% entry 60%; animation-delay: 80ms; }
+  .reveal-scroll-grid > *:nth-child(3) { animation: reveal-up linear both; animation-timeline: view(); animation-range: entry 0% entry 60%; animation-delay: 160ms; }
+  .reveal-scroll-grid > *:nth-child(4) { animation: reveal-up linear both; animation-timeline: view(); animation-range: entry 0% entry 60%; animation-delay: 240ms; }
+  .reveal-scroll-grid > *:nth-child(5) { animation: reveal-up linear both; animation-timeline: view(); animation-range: entry 0% entry 60%; animation-delay: 320ms; }
+  .reveal-scroll-grid > *:nth-child(6) { animation: reveal-up linear both; animation-timeline: view(); animation-range: entry 0% entry 60%; animation-delay: 400ms; }
+}
+
+/* Scroll-driven keyframes */
+@keyframes reveal-up {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes reveal-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes reveal-left {
+  from { opacity: 0; transform: translateX(-24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes reveal-right {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Fallback for browsers without scroll-driven: instant show */
+@supports not (animation-timeline: view()) {
+  .reveal-scroll,
+  .reveal-scroll-fade,
+  .reveal-scroll-left,
+  .reveal-scroll-right {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── TECHNIQUE 3: Scroll Progress Bar ──────────────────────────────────────── */
+/* Pure CSS — no JS. animation-timeline: scroll(root) fills the bar             */
+
+@supports (animation-timeline: scroll()) {
+  .scroll-progress-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    z-index: var(--z-topmost, 9000);
+    pointer-events: none;
+    transform-origin: left center;
+    background: linear-gradient(
+      90deg,
+      var(--primary-400, #2dd4bf) 0%,
+      var(--primary-500, #14b8a6) 40%,
+      #8b5cf6 80%,
+      #06b6d4 100%
+    );
+    animation: scroll-progress linear;
+    animation-timeline: scroll(root);
+    box-shadow: 0 0 8px rgba(20, 184, 166, 0.55);
+  }
+
+  @keyframes scroll-progress {
+    from { transform: scaleX(0); }
+    to   { transform: scaleX(1); }
+  }
+}
+
+/* ── TECHNIQUE 4: Noise Texture Layer ──────────────────────────────────────── */
+/* Premium matte finish — like Linear/Notion card surfaces                       */
+/* Applied via CSS class .noise-surface or .card::after override                 */
+
+.noise-surface {
+  position: relative;
+  isolation: isolate;
+}
+
+.noise-surface::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.028;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+  border-radius: inherit;
+  z-index: 1;
+}
+
+/* Dark mode — slightly stronger noise for the matte effect */
+[data-theme="dark"] .noise-surface::after,
+@media (prefers-color-scheme: dark) {
+  .noise-surface::after { opacity: 0.038; }
+}
+
+/* Panel noise surface — applied to glass panels */
+.panel-noise {
+  position: relative;
+  isolation: isolate;
+}
+
+.panel-noise::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.022;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+  border-radius: inherit;
+  z-index: 0;
+}
+
+/* ── TECHNIQUE 5: 6-State Button Global Refinements ────────────────────────── */
+/* Augments Button.svelte with active/focus/disabled global polish               */
+
+/* Active press sink — GPU-only translateY + scale */
+.btn:active:not(:disabled):not(.loading) {
+  transform: translateY(1px) scale(0.98);
+  transition-duration: 60ms;
+}
+
+/* Focus ring — brand-colored, not just outline */
+.btn:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--surface-0, #080810),
+    0 0 0 4px var(--primary-400, #2dd4bf),
+    0 4px 16px rgba(20, 184, 166, 0.30);
+}
+
+/* Disabled — opacity 0.38 per Material Design 3 / WCAG */
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  opacity: 0.38;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Loading state — shimmer gradient on the button itself */
+.btn.loading {
+  background-size: 200% 100%;
+  animation: btn-loading-shimmer 1.5s ease-in-out infinite;
+  pointer-events: none;
+  cursor: wait;
+}
+
+@keyframes btn-loading-shimmer {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+
+/* ── TECHNIQUE 6: Liquid Glass 2.0 ─────────────────────────────────────────── */
+/* Applied to .panel-base, modals, bottom sheets, glass cards                    */
+
+.glass-liquid {
+  backdrop-filter: blur(32px) saturate(180%) brightness(1.08);
+  -webkit-backdrop-filter: blur(32px) saturate(180%) brightness(1.08);
+  background: var(--glass-bg, rgba(9, 9, 20, 0.72));
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-top-color: rgba(255, 255, 255, 0.20);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.14),
+    0 8px 32px rgba(0, 0, 0, 0.45);
+}
+
+/* Upgrade .panel-base globally to Liquid Glass 2.0 */
+.panel-base {
+  backdrop-filter: blur(32px) saturate(180%) brightness(1.06) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(180%) brightness(1.06) !important;
+  border-top-color: rgba(255, 255, 255, 0.18) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.12),
+    var(--shadow-panel, 8px 0 48px rgba(0, 0, 0, 0.50)) !important;
+}
+
+[data-theme="light"] .panel-base {
+  backdrop-filter: blur(32px) saturate(180%) brightness(1.04) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(180%) brightness(1.04) !important;
+}
+
+/* ── TECHNIQUE 7: Stagger List Animation — CSS-only nth-child delay ──────────── */
+
+/* Contact/user list stagger — fine-grained 50ms steps */
+.stagger-list > *:nth-child(1)  { animation-delay: 0ms   !important; }
+.stagger-list > *:nth-child(2)  { animation-delay: 50ms  !important; }
+.stagger-list > *:nth-child(3)  { animation-delay: 100ms !important; }
+.stagger-list > *:nth-child(4)  { animation-delay: 150ms !important; }
+.stagger-list > *:nth-child(5)  { animation-delay: 200ms !important; }
+.stagger-list > *:nth-child(6)  { animation-delay: 250ms !important; }
+.stagger-list > *:nth-child(7)  { animation-delay: 300ms !important; }
+.stagger-list > *:nth-child(8)  { animation-delay: 350ms !important; }
+.stagger-list > *:nth-child(9)  { animation-delay: 400ms !important; }
+.stagger-list > *:nth-child(10) { animation-delay: 450ms !important; }
+.stagger-list > *:nth-child(n+11){ animation-delay: 500ms !important; }
+
+/* Message list stagger — faster cascade */
+.stagger-messages > *:nth-child(1)  { animation-delay: 0ms  !important; }
+.stagger-messages > *:nth-child(2)  { animation-delay: 35ms !important; }
+.stagger-messages > *:nth-child(3)  { animation-delay: 70ms !important; }
+.stagger-messages > *:nth-child(4)  { animation-delay: 105ms !important; }
+.stagger-messages > *:nth-child(5)  { animation-delay: 140ms !important; }
+.stagger-messages > *:nth-child(n+6){ animation-delay: 175ms !important; }
+
+/* ── TECHNIQUE 8: Premium Typography Polish ──────────────────────────────────── */
+
+/* Global OpenType features — kern, ligatures, contextual alternates */
+body, input, textarea, button, select {
+  font-feature-settings: 'kern' 1, 'liga' 1, 'calt' 1;
+}
+
+/* Optimized heading rendering */
+h1, h2, h3, h4, h5, h6,
+.hero-headline, .section-title, .cta-title, .feature-title,
+.step-title, .panel-header h3, .auth-card h2 {
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'kern' 1, 'liga' 1, 'calt' 1, 'cv02' 1;
+}
+
+/* Tight tracking on large headings (>24px) */
+h1, .hero-headline, .section-title, .cta-title,
+.stat-value, .step-num {
+  letter-spacing: -0.025em;
+}
+
+/* Medium headings */
+h2, h3, .feature-title, .step-title {
+  letter-spacing: -0.015em;
+}
+
+/* Tabular numerics — all numeric/data/coordinate displays */
+.font-tabular,
+.stat-value,
+.mockup-ago,
+.user-updated,
+.distance-label,
+.bat-chip,
+.eta-chip,
+.coord-display,
+[class*="timestamp"],
+[class*="distance"],
+[class*="speed"],
+[class*="battery"],
+[class*="accuracy"] {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'kern' 1, 'tnum' 1;
+}
+
+/* ── TECHNIQUE 9: Status Pulse Redesign — Multi-ring System ──────────────────── */
+/* Replaces basic single-ring with inner dot + middle ring + outer ring           */
+
+/* Multi-ring status indicator — replaces .ping-dot */
+.status-pulse {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.status-pulse-dot {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  z-index: 3;
+}
+
+.status-pulse-ring-1 {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  z-index: 2;
+  animation: multi-ring-pulse 2s ease-out infinite;
+}
+
+.status-pulse-ring-2 {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  z-index: 1;
+  animation: multi-ring-pulse 2s ease-out 0.5s infinite;
+}
+
+/* Online/safe — teal/green */
+.status-pulse.status-online .status-pulse-dot {
+  background: var(--success-500, #10b981);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
+}
+.status-pulse.status-online .status-pulse-ring-1,
+.status-pulse.status-online .status-pulse-ring-2 {
+  border: 1.5px solid var(--success-500, #10b981);
+}
+
+/* SOS — red, faster pulse (1s) */
+.status-pulse.status-sos .status-pulse-dot {
+  background: var(--danger-500, #ef4444);
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.30);
+}
+.status-pulse.status-sos .status-pulse-ring-1,
+.status-pulse.status-sos .status-pulse-ring-2 {
+  border: 1.5px solid var(--danger-500, #ef4444);
+  animation-duration: 1s;
+}
+
+/* Warning/away — amber */
+.status-pulse.status-warning .status-pulse-dot {
+  background: var(--warning-500, #f59e0b);
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25);
+}
+.status-pulse.status-warning .status-pulse-ring-1,
+.status-pulse.status-warning .status-pulse-ring-2 {
+  border: 1.5px solid var(--warning-500, #f59e0b);
+}
+
+/* Offline — gray, no pulse */
+.status-pulse.status-offline .status-pulse-dot {
+  background: var(--gray-500, #64748b);
+}
+.status-pulse.status-offline .status-pulse-ring-1,
+.status-pulse.status-offline .status-pulse-ring-2 {
+  animation: none;
+  opacity: 0;
+}
+
+@keyframes multi-ring-pulse {
+  0%   { transform: scale(1);   opacity: 0.8; }
+  50%  { transform: scale(2.0); opacity: 0.3; }
+  100% { transform: scale(3.0); opacity: 0; }
+}
+
+/* Upgrade existing .ping-dot/.ping-ring in mockup card */
+.ping-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--success-500, #10b981);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
+  z-index: 3;
+}
+
+.ping-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  margin: -3.5px 0 0 -3.5px;
+  border-radius: 50%;
+  border: 1.5px solid var(--success-500, #10b981);
+  animation: multi-ring-pulse 2s ease-out infinite;
+  z-index: 2;
+}
+
+/* Second outer ring for premium look */
+.ping-ring-2 {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  margin: -3.5px 0 0 -3.5px;
+  border-radius: 50%;
+  border: 1px solid var(--success-500, #10b981);
+  animation: multi-ring-pulse 2s ease-out 0.5s infinite;
+  z-index: 1;
+}
+
+/* ── TECHNIQUE 11: Skeleton Loading States ───────────────────────────────────── */
+/* Premium shimmer replacing all spinners in loading states                        */
+
+/* Skeleton base — inline usage */
+.skel {
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-base, rgba(255,255,255,0.04)) 0%,
+    var(--skeleton-highlight, rgba(255,255,255,0.10)) 40%,
+    var(--skeleton-base, rgba(255,255,255,0.04)) 80%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer var(--skeleton-duration, 1.6s) ease-in-out infinite;
+  border-radius: var(--radius-md, 8px);
+}
+
+/* Skeleton text line variants */
+.skel-text-xs  { height: 10px; border-radius: 4px; }
+.skel-text-sm  { height: 12px; border-radius: 4px; }
+.skel-text-md  { height: 14px; border-radius: 4px; }
+.skel-text-lg  { height: 18px; border-radius: 5px; }
+.skel-text-xl  { height: 24px; border-radius: 6px; }
+
+/* Skeleton avatar circle */
+.skel-avatar-sm { width: 32px; height: 32px; border-radius: 50%; }
+.skel-avatar-md { width: 44px; height: 44px; border-radius: 50%; }
+.skel-avatar-lg { width: 56px; height: 56px; border-radius: 50%; }
+
+/* Skeleton card — full card placeholder */
+.skel-card {
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-base, rgba(255,255,255,0.04)) 0%,
+    var(--skeleton-highlight, rgba(255,255,255,0.10)) 40%,
+    var(--skeleton-base, rgba(255,255,255,0.04)) 80%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer var(--skeleton-duration, 1.6s) ease-in-out infinite;
+  border-radius: var(--radius-xl, 20px);
+  min-height: 80px;
+}
+
+/* Skeleton list item — avatar + lines pattern */
+.skel-list-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+
+/* Skeleton button replacement */
+.skel-button {
+  height: 40px;
+  border-radius: var(--radius-lg, 14px);
+}
+
+/* Stagger skeleton items */
+.skel-list-item:nth-child(1) { animation-delay: 0ms; }
+.skel-list-item:nth-child(2) { animation-delay: 80ms; }
+.skel-list-item:nth-child(3) { animation-delay: 160ms; }
+.skel-list-item:nth-child(4) { animation-delay: 240ms; }
+
+/* Light mode skeletons */
+[data-theme="light"] .skel,
+[data-theme="light"] .skel-card,
+[data-theme="light"] .skel-button {
+  background: linear-gradient(
+    90deg,
+    rgba(0,0,0,0.06) 0%,
+    rgba(0,0,0,0.12) 40%,
+    rgba(0,0,0,0.06) 80%
+  );
+  background-size: 200% 100%;
+}
+
+/* ── TECHNIQUE 12: Press Impact — Haptic-matched Animation ──────────────────── */
+/* Matches timing of haptics.js light/medium/heavy calls                          */
+
+.press-impact {
+  transition: transform 80ms var(--ease-spring, cubic-bezier(0.34,1.56,0.64,1));
+}
+
+.press-impact:active {
+  transform: scale(0.96);
+}
+
+/* Radial ripple from press center */
+.press-ripple {
+  position: relative;
+  overflow: hidden;
+}
+
+.press-ripple::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle at var(--press-x, 50%) var(--press-y, 50%),
+    rgba(255, 255, 255, 0.18) 0%,
+    transparent 65%
+  );
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 500ms ease-out;
+}
+
+.press-ripple:active::after {
+  opacity: 1;
+  transition: opacity 80ms;
+}
+
+/* SOS button press — more dramatic */
+.sos-press {
+  transition: transform 80ms var(--ease-spring, cubic-bezier(0.34,1.56,0.64,1)),
+              box-shadow 80ms var(--ease-spring);
+}
+
+.sos-press:active {
+  transform: scale(0.94) translateY(2px);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.40) !important;
+}
+
+/* ── TECHNIQUE 13: Dark Background Depth Grid ────────────────────────────────── */
+/* Applied to landing hero and empty states                                        */
+
+.depth-grid {
+  background-image:
+    linear-gradient(rgba(20, 184, 166, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(20, 184, 166, 0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.depth-grid-perspective {
+  background-image:
+    linear-gradient(rgba(20, 184, 166, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(20, 184, 166, 0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+  transform: perspective(500px) rotateX(8deg) scale(1.1);
+  transform-origin: center top;
+  mask-image: linear-gradient(to bottom, transparent 0%, black 20%, black 80%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 20%, black 80%, transparent 100%);
+}
+
+/* Finer grid for dense panels */
+.depth-grid-fine {
+  background-image:
+    linear-gradient(rgba(20, 184, 166, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(20, 184, 166, 0.025) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* ── TECHNIQUE 14: Card Hover Depth System ───────────────────────────────────── */
+/* Layered shadow + translateY(-2px) — more cinematic than single shadow           */
+
+.card-hover-depth {
+  transition:
+    transform 280ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
+    box-shadow 280ms var(--ease-out),
+    border-color 280ms var(--ease-out);
+  will-change: transform;
+}
+
+.card-hover-depth:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 4px 8px rgba(0, 0, 0, 0.12),
+    0 8px 24px rgba(0, 0, 0, 0.20),
+    0 16px 48px rgba(0, 0, 0, 0.16),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.card-hover-depth:active {
+  transform: translateY(0) scale(0.99);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.12),
+    0 1px 2px rgba(0, 0, 0, 0.10);
+  transition-duration: 80ms;
+}
+
+/* Dark mode — even richer shadow depth */
+[data-theme="dark"] .card-hover-depth:hover,
+@media (prefers-color-scheme: dark) {
+  .card-hover-depth:hover {
+    box-shadow:
+      0 4px 8px rgba(0, 0, 0, 0.35),
+      0 8px 24px rgba(0, 0, 0, 0.45),
+      0 16px 48px rgba(0, 0, 0, 0.40),
+      0 0 0 1px rgba(255, 255, 255, 0.08);
+  }
+}
+
+/* Existing card hover-lift — augment with translateY */
+.card.hover-lift:hover {
+  transform: translateY(-2px) !important;
+}
+
+/* ── TECHNIQUE 15 helper: View Transitions fallback class ────────────────────── */
+/* App.svelte uses the View Transitions API. This class provides a CSS fallback.  */
+
+.page-transition-enter {
+  animation: page-fade-in 250ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+
+.page-transition-exit {
+  animation: page-fade-out 200ms ease-in both;
+}
+
+@keyframes page-fade-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.99); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes page-fade-out {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.98); }
+}
+
+/* View Transitions API — ::view-transition-* pseudo-elements */
+@supports (view-transition-name: auto) {
+  ::view-transition-old(root) {
+    animation: 200ms ease-in both page-vt-old;
+  }
+
+  ::view-transition-new(root) {
+    animation: 300ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both page-vt-new;
+  }
+
+  @keyframes page-vt-old {
+    from { opacity: 1; transform: scale(1); }
+    to   { opacity: 0; transform: scale(0.98) translateY(-4px); }
+  }
+
+  @keyframes page-vt-new {
+    from { opacity: 0; transform: scale(1.01) translateY(6px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+}
+
+/* ── REDUCED MOTION — disable all new 2026 techniques ────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  /* @property aurora */
+  .aurora-hero-bg { animation: none !important; }
+  .btn-glow-breathe { animation: none !important; }
+  .card-edge-animated { animation: none !important; }
+
+  /* Scroll-driven — override with instant-show */
+  .reveal-scroll,
+  .reveal-scroll-fade,
+  .reveal-scroll-left,
+  .reveal-scroll-right,
+  .reveal-scroll-grid > * {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  /* Progress bar — hide (purely decorative) */
+  .scroll-progress-bar { display: none !important; }
+
+  /* Status pulse — stop animation, keep dot */
+  .status-pulse-ring-1,
+  .status-pulse-ring-2,
+  .ping-ring,
+  .ping-ring-2 { animation: none !important; opacity: 0 !important; }
+
+  /* Skeleton shimmer — stop, keep placeholder */
+  .skel, .skel-card, .skel-button, .skel-list-item {
+    animation: none !important;
+    background-position: 0 0 !important;
+  }
+
+  /* Press impact */
+  .press-impact:active { transform: none !important; }
+  .sos-press:active { transform: none !important; }
+
+  /* Card hover */
+  .card-hover-depth:hover { transform: none !important; }
+  .card.hover-lift:hover { transform: none !important; }
+
+  /* View transitions */
+  ::view-transition-old(root),
+  ::view-transition-new(root) { animation: none !important; }
+
+  .page-transition-enter,
+  .page-transition-exit { animation: none !important; }
+
+  /* Multi-ring pulse */
+  @keyframes multi-ring-pulse { from { opacity: 0; } to { opacity: 0; } }
+}

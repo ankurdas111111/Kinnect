@@ -502,7 +502,12 @@
     const ring = document.createElement('div');
     ring.className = 'marker-ring animate-pulse-ring';
     ring.style.setProperty('--user-color', color);
+    // TECHNIQUE 9/10: second ring layer — staggered 0.7s for multi-ring radar sweep
+    const ring2 = document.createElement('div');
+    ring2.className = 'marker-ring marker-ring-2 animate-pulse-ring';
+    ring2.style.setProperty('--user-color', color);
     wrapper.appendChild(ring);
+    wrapper.appendChild(ring2);
     wrapper.appendChild(iconEl);
     return wrapper;
   }
@@ -1308,6 +1313,14 @@
     animation: marker-pulse-ring 2s ease-out infinite;
   }
 
+  /* TECHNIQUE 9/10: second ring — staggered delay, slightly larger inset for concentric effect */
+  :global(.marker-ring-2) {
+    inset: -12px;
+    border-width: 1.5px;
+    opacity: 0.65;
+    animation-delay: 0.7s;
+  }
+
   @keyframes marker-pulse-ring {
     0%   { transform: scale(1);   opacity: 0.5; }
     100% { transform: scale(1.8); opacity: 0; }
@@ -1318,5 +1331,13 @@
   @keyframes nav-pulse {
     0% { transform: scale(1); opacity: 0.6; }
     100% { transform: scale(2.2); opacity: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :global(.marker-ring),
+    :global(.marker-ring-2) {
+      animation: none;
+      opacity: 0.4;
+    }
   }
 </style>
