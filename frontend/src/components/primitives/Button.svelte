@@ -14,13 +14,31 @@
   import { spring } from 'svelte/motion';
   import { createEventDispatcher } from 'svelte';
 
-  export let variant  = 'primary';
-  export let size     = 'md';
-  export let loading  = false;
-  export let disabled = false;
-  export let fullWidth = false;
-  export let type     = 'button';
-  export let href     = null; // renders as <a> when set
+  /**
+   * @typedef {Object} Props
+   * @property {string} [variant]
+   * @property {string} [size]
+   * @property {boolean} [loading]
+   * @property {boolean} [disabled]
+   * @property {boolean} [fullWidth]
+   * @property {string} [type]
+   * @property {any} [href] - renders as <a> when set
+   * @property {import('svelte').Snippet} [icon]
+   * @property {import('svelte').Snippet} [children]
+   */
+
+  /** @type {Props} */
+  let {
+    variant = 'primary',
+    size = 'md',
+    loading = false,
+    disabled = false,
+    fullWidth = false,
+    type = 'button',
+    href = null,
+    icon,
+    children
+  } = $props();
 
   const dispatch = createEventDispatcher();
 
@@ -28,8 +46,8 @@
   const scale = spring(1, { stiffness: 600, damping: 28 });
 
   // Ripple state
-  let ripples = [];
-  let btnEl;
+  let ripples = $state([]);
+  let btnEl = $state();
 
   function onPointerDown(e) {
     if (disabled || loading) return;
@@ -62,10 +80,10 @@
     dispatch('click', e);
   }
 
-  $: tag = href ? 'a' : 'button';
+  let tag = $derived(href ? 'a' : 'button');
 </script>
 
-<!-- svelte-ignore a11y-no-static-element-interactions -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <svelte:element
   this={tag}
   {href}
@@ -73,16 +91,16 @@
   class="btn btn-{variant} btn-{size}"
   class:full-width={fullWidth}
   class:loading
-  class:icon-only={$$slots.icon && !$$slots.default}
+  class:icon-only={icon && !children}
   disabled={disabled || loading || undefined}
   aria-disabled={disabled || loading || undefined}
   aria-busy={loading || undefined}
   bind:this={btnEl}
   style="transform: scale({$scale})"
-  on:pointerdown={onPointerDown}
-  on:pointerup={onPointerUp}
-  on:pointerleave={onPointerLeave}
-  on:click={handleClick}
+  onpointerdown={onPointerDown}
+  onpointerup={onPointerUp}
+  onpointerleave={onPointerLeave}
+  onclick={handleClick}
 >
   <!-- Shimmer sweep layer -->
   <span class="btn-shimmer" aria-hidden="true"></span>
@@ -101,11 +119,11 @@
       </svg>
     </span>
   {:else}
-    {#if $$slots.icon}
-      <span class="btn-icon-wrap"><slot name="icon" /></span>
+    {#if icon}
+      <span class="btn-icon-wrap">{@render icon?.()}</span>
     {/if}
-    {#if $$slots.default}
-      <span class="btn-label"><slot /></span>
+    {#if children}
+      <span class="btn-label">{@render children?.()}</span>
     {/if}
   {/if}
 </svelte:element>

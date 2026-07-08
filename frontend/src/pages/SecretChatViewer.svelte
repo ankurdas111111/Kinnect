@@ -1,3 +1,5 @@
+<!-- @migration-task Error while migrating Svelte code: can't migrate `let state = 'loading';` to `$state` because there's a variable named state.
+     Rename the variable and try again or migrate by hand. -->
 <svelte:head>
   <title>Kinnect — Secure Note</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />

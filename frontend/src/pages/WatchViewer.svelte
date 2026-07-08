@@ -6,21 +6,30 @@
   import { createMapIcon, formatCoordinate, escapeAttr } from '../lib/tracking.js';
   import { animateMarkerTo } from '../lib/markerInterpolator.js';
   import { MAP_STYLE } from '../lib/mapStyle.js';
+  import Card from '../components/primitives/Card.svelte';
 
-  export let params = {};
+  let { params = {} } = $props();
 
-  let mapContainer;
+  let mapContainer = $state();
   let map;
   let marker = null;
   let markerPopup = null;
   let socket = null;
-  let bannerText = 'Connecting...';
-  let bannerSos = false;
-  let sosActive = false;
-  let hasInit = false;
+  let bannerText = $state('Connecting...');
+  let bannerSos = $state(false);
+  let sosActive = $state(false);
+  let hasInit = $state(false);
   let initTimeout = null;
-  let watchedName = '';
-  let watchedPhone = '';
+  let watchedName = $state('');
+  let watchedPhone = $state('');
+
+  // Animated status badge state — calm colour by connection state.
+  let connState = $derived.by(() => {
+    if (sosActive) return 'sos';
+    if (bannerSos) return 'issue';
+    if (hasInit) return 'live';
+    return 'connecting';
+  });
 
   function clearInitTimeout() {
     if (initTimeout) {
@@ -39,7 +48,7 @@
     }, 8000);
   }
 
-  $: token = params.token || '';
+  let token = $derived(params.token || '');
 
   function setBanner(sos) {
     if (!sos?.active) { bannerText = 'Watch link connected.'; bannerSos = false; sosActive = false; return; }
@@ -51,8 +60,8 @@
     try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (_) {}
   }
 
-  let followMode = true;
-  let sosNarrative = null;
+  let followMode = $state(true);
+  let sosNarrative = $state(null);
 
   function update(u) {
     if (!u || typeof u.latitude !== 'number') return;
@@ -134,35 +143,39 @@
         </div>
       {/if}
     {:else}
-      {#if bannerSos}
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-      {/if}
-      <span class="watch-status-text">{bannerText}</span>
+      <span class="watch-status-badge" data-state={connState}>
+        <span class="sdot" aria-hidden="true"></span>
+        <span class="watch-status-text">{bannerText}</span>
+      </span>
     {/if}
   </div>
   {#if sosActive && sosNarrative}
-    <div class="narrative-panel">
-      <span class="narrative-eyebrow">Crisis Context</span>
-      {#if sosNarrative.motionSummary}
-        <div class="narrative-row">
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          {sosNarrative.motionSummary}
+    <div class="narrative-dock">
+      <Card variant="glass" glow="danger" padding="md" hover={false}>
+        <div class="narrative-body">
+          <span class="narrative-eyebrow">Crisis Context</span>
+          {#if sosNarrative.motionSummary}
+            <div class="narrative-row">
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              {sosNarrative.motionSummary}
+            </div>
+          {/if}
+          {#if sosNarrative.batteryPct != null}
+            <div class="narrative-row">
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="7" width="18" height="10" rx="1"/><line x1="22" y1="11" x2="22" y2="13"/></svg>
+              Battery {sosNarrative.batteryPct}%
+            </div>
+          {/if}
+          {#if sosNarrative.triggerRule && sosNarrative.triggerRule !== 'manual'}
+            <div class="narrative-row trigger">Auto-triggered: {sosNarrative.triggerRule}</div>
+          {/if}
         </div>
-      {/if}
-      {#if sosNarrative.batteryPct != null}
-        <div class="narrative-row">
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="7" width="18" height="10" rx="1"/><line x1="22" y1="11" x2="22" y2="13"/></svg>
-          Battery {sosNarrative.batteryPct}%
-        </div>
-      {/if}
-      {#if sosNarrative.triggerRule && sosNarrative.triggerRule !== 'manual'}
-        <div class="narrative-row trigger">Auto-triggered: {sosNarrative.triggerRule}</div>
-      {/if}
+      </Card>
     </div>
   {/if}
 
   <div class="bottom-controls">
-    <button class="btn btn-sm" class:btn-primary={followMode} class:btn-secondary={!followMode} on:click={() => followMode = !followMode} aria-label={followMode ? 'Disable auto-follow' : 'Enable auto-follow'}>
+    <button class="btn btn-sm" class:btn-primary={followMode} class:btn-secondary={!followMode} onclick={() => followMode = !followMode} aria-label={followMode ? 'Disable auto-follow' : 'Enable auto-follow'}>
       {followMode ? 'Following' : 'Follow'}
     </button>
     <a href="/#/register" class="btn btn-sm btn-secondary" aria-label="Sign up for Kinnect">Sign up for Kinnect</a>
@@ -247,8 +260,9 @@
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    padding: 7px 14px;
-    background: #16a34a;
+    min-height: 44px;
+    padding: 7px 16px;
+    background: var(--success-600, #16a34a);
     color: white;
     border-radius: var(--radius-full);
     font-size: 13px;
@@ -256,12 +270,12 @@
     text-decoration: none;
     white-space: nowrap;
     flex-shrink: 0;
-    box-shadow: 0 0 18px rgba(22, 163, 74, 0.45);
+    box-shadow: var(--glow-live-sm);
     transition: background 150ms, box-shadow 150ms;
   }
   .watch-call-btn:hover {
-    background: #15803d;
-    box-shadow: 0 0 24px rgba(22, 163, 74, 0.60);
+    background: var(--success-700, #15803d);
+    box-shadow: var(--glow-live);
   }
 
   .watch-sos-badge {
@@ -284,10 +298,79 @@
     50% { opacity: 0.65; }
   }
 
+  /* Animated status badge with state-driven glow (pre-identity states) */
+  .watch-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1-5);
+    min-width: 0;
+    padding: 8px 14px;
+    border-radius: var(--radius-full);
+    color: white;
+    transition:
+      background 320ms var(--ease-out),
+      box-shadow 320ms var(--ease-out);
+  }
+
   .watch-status-text {
     font-size: var(--text-sm);
     font-weight: 600;
-    opacity: 0.88;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sdot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+  }
+
+  .watch-status-badge[data-state="connecting"] {
+    background: var(--primary-500-12);
+    box-shadow: var(--glow-primary-sm);
+  }
+  .watch-status-badge[data-state="connecting"] .sdot {
+    background: var(--primary-300);
+    animation: badge-blink 1s ease-in-out infinite;
+  }
+
+  .watch-status-badge[data-state="live"] {
+    background: var(--success-500-20);
+    box-shadow: var(--glow-live-sm);
+  }
+  .watch-status-badge[data-state="live"] .sdot {
+    background: var(--success-400);
+    animation: badge-pulse 1.8s ease-in-out infinite;
+  }
+
+  .watch-status-badge[data-state="issue"] {
+    background: var(--danger-500-20);
+    box-shadow: var(--glow-sos-sm);
+  }
+  .watch-status-badge[data-state="issue"] .sdot {
+    background: var(--danger-400);
+    animation: badge-blink 0.85s ease-in-out infinite;
+  }
+
+  .watch-status-badge[data-state="sos"] {
+    background: var(--danger-500-20);
+    box-shadow: var(--glow-sos-sm);
+  }
+  .watch-status-badge[data-state="sos"] .sdot {
+    background: var(--danger-400);
+    animation: badge-pulse 1s ease-in-out infinite;
+  }
+
+  @keyframes badge-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.55; transform: scale(0.82); }
+  }
+  @keyframes badge-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.25; }
   }
 
   .bottom-controls {
@@ -312,18 +395,17 @@
     }
   }
 
-  .narrative-panel {
+  /* SOS crisis-context dock — danger-glow Card wrapper */
+  .narrative-dock {
     position: absolute;
     bottom: calc(var(--space-4) + 48px);
     left: var(--space-3);
     right: var(--space-3);
     z-index: 50;
-    background: rgba(8, 8, 16, 0.88);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(239, 68, 68, 0.22);
-    border-radius: var(--radius-lg);
-    padding: var(--space-3) var(--space-4);
+    animation: slide-up-in 340ms var(--ease-spring) both;
+  }
+
+  .narrative-body {
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -331,11 +413,10 @@
 
   .narrative-eyebrow {
     font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.10em;
+    font-weight: 800;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: var(--danger-500);
-    opacity: 0.8;
+    color: var(--danger-400);
   }
 
   .narrative-row {
@@ -343,16 +424,17 @@
     align-items: center;
     gap: 6px;
     font-size: 12px;
-    color: rgba(255,255,255,0.75);
+    color: var(--text-secondary);
     font-weight: 500;
   }
 
   .narrative-row.trigger {
-    color: #f59e0b;
+    color: var(--warning-500, #f59e0b);
+    font-weight: 600;
   }
 
   @media (min-width: 768px) {
-    .narrative-panel {
+    .narrative-dock {
       left: auto;
       right: var(--space-4);
       width: 260px;
@@ -364,6 +446,13 @@
     .watch-page.sos-active {
       animation: none;
       outline-color: var(--danger-500);
+    }
+    .watch-status-badge .sdot,
+    .watch-sos-badge {
+      animation: none;
+    }
+    .narrative-dock {
+      animation: none;
     }
   }
 </style>

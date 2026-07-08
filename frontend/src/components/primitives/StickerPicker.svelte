@@ -1,13 +1,21 @@
 <script>
+  import { run } from 'svelte/legacy';
+
   import { onMount, onDestroy, createEventDispatcher } from 'svelte';
 
   const dispatch = createEventDispatcher();
 
-  export let open = false;
-  export let anchor = null;
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [open]
+   * @property {any} [anchor]
+   */
 
-  let wrapEl;
-  let activeTab = 'flirty';
+  /** @type {Props} */
+  let { open = false, anchor = null } = $props();
+
+  let wrapEl = $state();
+  let activeTab = $state('flirty');
 
   const CDN = 'https://fonts.gstatic.com/s/e/notoemoji/latest';
 
@@ -166,7 +174,7 @@
   }
 
   // Track broken images per-tab so we can hide failed GIFs cleanly
-  let brokenHexes = new Set();
+  let brokenHexes = $state(new Set());
 
   function handleImgError(hex) {
     brokenHexes = new Set([...brokenHexes, hex]);
@@ -190,9 +198,11 @@
     wrapEl.style.left = left + 'px';
   }
 
-  $: if (open && wrapEl) {
-    setTimeout(reposition, 10);
-  }
+  run(() => {
+    if (open && wrapEl) {
+      setTimeout(reposition, 10);
+    }
+  });
 
   function onDocPointer(e) {
     if (!open) return;
@@ -212,7 +222,7 @@
         <button
           class="sp-tab"
           class:sp-tab--active={activeTab === tab.id}
-          on:click={() => activeTab = tab.id}
+          onclick={() => activeTab = tab.id}
           type="button"
           role="tab"
           aria-selected={activeTab === tab.id}
@@ -229,7 +239,7 @@
       {#each STICKERS[activeTab].filter(s => !brokenHexes.has(s.hex)) as s (s.hex)}
         <button
           class="sp-sticker-btn"
-          on:click={() => pick(s.hex)}
+          onclick={() => pick(s.hex)}
           type="button"
           title={s.alt}
           aria-label={s.alt}
@@ -241,7 +251,7 @@
             class="sp-img"
             width="48"
             height="48"
-            on:error={() => handleImgError(s.hex)}
+            onerror={() => handleImgError(s.hex)}
           />
         </button>
       {/each}

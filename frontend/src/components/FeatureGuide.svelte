@@ -1,10 +1,18 @@
 <script>
+  import { run } from 'svelte/legacy';
+
   import { createEventDispatcher } from 'svelte';
 
-  export let open = false;
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [open]
+   */
+
+  /** @type {Props} */
+  let { open = $bindable(false) } = $props();
 
   const dispatch = createEventDispatcher();
-  let currentPage = 0;
+  let currentPage = $state(0);
 
   const pages = [
     {
@@ -133,7 +141,9 @@
   function goTo(i) { currentPage = i; }
 
   // Reset page when opened
-  $: if (open) currentPage = 0;
+  run(() => {
+    if (open) currentPage = 0;
+  });
 
   // Icon SVG paths
   const icons = {
@@ -155,7 +165,7 @@
       <!-- Header -->
       <div class="guide-header">
         <span class="guide-badge">Guide</span>
-        <button class="guide-skip" on:click={close}>
+        <button class="guide-skip" onclick={close}>
           {currentPage === pages.length - 1 ? 'Done' : 'Skip'}
         </button>
       </div>
@@ -193,7 +203,7 @@
             <button
               class="guide-dot"
               class:active={i === currentPage}
-              on:click={() => goTo(i)}
+              onclick={() => goTo(i)}
               aria-label="Page {i + 1}"
               aria-selected={i === currentPage}
             ></button>
@@ -201,9 +211,9 @@
         </div>
         <div class="guide-nav">
           {#if currentPage > 0}
-            <button class="guide-nav-btn guide-prev" on:click={prev}>Back</button>
+            <button class="guide-nav-btn guide-prev" onclick={prev}>Back</button>
           {/if}
-          <button class="guide-nav-btn guide-next" on:click={next}>
+          <button class="guide-nav-btn guide-next" onclick={next}>
             {currentPage === pages.length - 1 ? 'Get Started' : 'Next'}
           </button>
         </div>
@@ -229,15 +239,19 @@
     padding: 16px;
   }
 
+  /*
+   * Viewport-proportional card: 25rem (400px, the previous fixed max) is the
+   * floor so mobile/tablet render identically; grows with 34vw on desktop
+   * and settles at 34rem (544px) on large screens.
+   */
   .guide-card {
     background: var(--surface-raised, #1a1a2e);
     border: 1px solid var(--border-default);
     border-radius: 24px;
-    max-width: 400px;
-    width: 100%;
+    width: min(92vw, clamp(25rem, 34vw, 34rem));
     max-height: 85vh;
     overflow-y: auto;
-    padding: 20px;
+    padding: clamp(20px, 1.8vw, 32px);
     box-shadow: 0 24px 64px rgba(0, 0, 0, 0.40);
     position: relative;
   }
@@ -291,8 +305,8 @@
   }
 
   .guide-icon {
-    width: 56px;
-    height: 56px;
+    width: clamp(56px, 4vw, 68px);
+    height: clamp(56px, 4vw, 68px);
     border-radius: 16px;
     background: linear-gradient(135deg, rgba(20, 184, 166, 0.15), rgba(99, 102, 241, 0.10));
     border: 1px solid rgba(20, 184, 166, 0.25);
@@ -316,7 +330,7 @@
 
   .guide-title {
     font-family: var(--font-display);
-    font-size: var(--text-xl, 20px);
+    font-size: clamp(var(--text-xl, 20px), 1.4vw, 26px);
     font-weight: 800;
     color: var(--text-primary);
     margin: 0 0 6px;
@@ -324,7 +338,7 @@
   }
 
   .guide-desc {
-    font-size: var(--text-sm);
+    font-size: clamp(var(--text-sm, 13px), 1vw, 15px);
     color: var(--text-secondary);
     margin: 0 0 16px;
     line-height: 1.5;
@@ -365,7 +379,7 @@
   }
 
   .guide-step-text {
-    font-size: var(--text-sm, 13px);
+    font-size: clamp(var(--text-sm, 13px), 0.95vw, 15px);
     color: var(--text-primary);
     line-height: 1.4;
   }
@@ -439,9 +453,10 @@
     color: var(--text-tertiary);
   }
 
-  /* Mobile: card fills the screen */
+  /* Mobile: card fills the screen (unchanged behavior) */
   @media (max-width: 480px) {
     .guide-card {
+      width: 100%;
       max-width: 100%;
       max-height: 90vh;
       border-radius: 20px;

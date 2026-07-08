@@ -1,4 +1,6 @@
 <script>
+  import { run } from 'svelte/legacy';
+
   import { createEventDispatcher, onMount, onDestroy } from 'svelte';
   import { fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
@@ -6,8 +8,8 @@
   import { adminOverview } from '../lib/stores/admin.js';
 
   const dispatch = createEventDispatcher();
-  let activeTab = 'rooms';
-  let loading = true;
+  let activeTab = $state('rooms');
+  let loading = $state(true);
   let loadingTimer = null;
 
   function beginLoading() {
@@ -30,23 +32,25 @@
     socket.emit('requestAdminOverview');
   }
 
-  $: stats = $adminOverview?.stats || {};
-  $: rooms = $adminOverview?.rooms || [];
-  $: users = $adminOverview?.users || [];
-  $: guardianships = $adminOverview?.guardianships || [];
-  $: if (loading && $adminOverview && (
-    Array.isArray($adminOverview.rooms) ||
-    Array.isArray($adminOverview.users) ||
-    Array.isArray($adminOverview.guardianships)
-  )) loading = false;
+  let stats = $derived($adminOverview?.stats || {});
+  let rooms = $derived($adminOverview?.rooms || []);
+  let users = $derived($adminOverview?.users || []);
+  let guardianships = $derived($adminOverview?.guardianships || []);
+  run(() => {
+    if (loading && $adminOverview && (
+      Array.isArray($adminOverview.rooms) ||
+      Array.isArray($adminOverview.users) ||
+      Array.isArray($adminOverview.guardianships)
+    )) loading = false;
+  });
 </script>
 
 <div class="panel-shell panel-right panel-base" transition:fly={{ x: 400, duration: 250, easing: cubicOut }}>
   <div class="panel-header">
     <h3>Super Admin</h3>
     <div class="header-actions">
-      <button class="btn btn-secondary btn-sm" on:click={refresh}>Refresh</button>
-      <button class="btn btn-icon btn-ghost" aria-label="Close super admin panel" on:click={() => dispatch('close')}>
+      <button class="btn btn-secondary btn-sm" onclick={refresh}>Refresh</button>
+      <button class="btn btn-icon btn-ghost" aria-label="Close super admin panel" onclick={() => dispatch('close')}>
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -76,9 +80,9 @@
 
       <!-- Tabs -->
       <div class="tabs mt-3" role="tablist" aria-label="Super Admin views">
-        <button class="tab" class:active={activeTab === 'rooms'} on:click={() => activeTab = 'rooms'} role="tab" aria-selected={activeTab === 'rooms'}>Rooms</button>
-        <button class="tab" class:active={activeTab === 'users'} on:click={() => activeTab = 'users'} role="tab" aria-selected={activeTab === 'users'}>Users</button>
-        <button class="tab" class:active={activeTab === 'guardians'} on:click={() => activeTab = 'guardians'} role="tab" aria-selected={activeTab === 'guardians'}>Guardians</button>
+        <button class="tab" class:active={activeTab === 'rooms'} onclick={() => activeTab = 'rooms'} role="tab" aria-selected={activeTab === 'rooms'}>Rooms</button>
+        <button class="tab" class:active={activeTab === 'users'} onclick={() => activeTab = 'users'} role="tab" aria-selected={activeTab === 'users'}>Users</button>
+        <button class="tab" class:active={activeTab === 'guardians'} onclick={() => activeTab = 'guardians'} role="tab" aria-selected={activeTab === 'guardians'}>Guardians</button>
       </div>
 
       <!-- Rooms Tab -->

@@ -1,8 +1,10 @@
 <script>
+  import { run } from 'svelte/legacy';
+
   import { onMount, onDestroy } from 'svelte';
   // maplibregl is loaded dynamically inside onMount so the main bundle
   // does not block on the ~283 kB maplibre chunk at parse time.
-  let maplibregl;
+  let maplibregl = $state();
   import { otherUsers, myLocation, mySocketId, mySafetyStatus, focusUser, mapFlyTo, routeGeometry, navigationState, mapTappedUser, mapChatRequest } from '../lib/stores/map.js';
   import { recentTrailResult } from '../lib/stores/trail.js';
   import { emitGetRecentTrail } from '../lib/socket.js';
@@ -15,18 +17,24 @@
   // F3: meeting point markers
   import { myRooms } from '../lib/stores/rooms.js';
 
-  export let followMode = false;
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [followMode]
+   */
 
-  let mapContainer;
-  let map;
+  /** @type {Props} */
+  let { followMode = $bindable(false) } = $props();
+
+  let mapContainer = $state();
+  let map = $state();
   let markers = new Map();       // sid → maplibregl.Marker
   let markerPopups = new Map();   // sid → maplibregl.Popup
   let markerUsers = new Map();    // sid → user object (for mobile tap → QA sheet)
   let markerState = new Map();
   let geofenceIds = new Set();
-  let myMarker = null;
-  let myPopup = null;
-  let hasSetView = false;
+  let myMarker = $state(null);
+  let myPopup = $state(null);
+  let hasSetView = $state(false);
   // F3: roomCode → maplibregl.Marker
   let meetingMarkers = new Map();
 
@@ -38,7 +46,7 @@
     el.innerHTML = `
       <div style="position:relative;width:48px;height:48px;">
         <div style="position:absolute;inset:0;border-radius:50%;background:rgba(59,130,246,0.15);animation:nav-pulse 2s ease-out infinite;"></div>
-        <div style="position:absolute;inset:8px;border-radius:50%;background:#3b82f6;border:3px solid #fff;box-shadow:0 2px 8px rgba(59,130,246,0.5);display:flex;align-items:center;justify-content:center;">
+        <div style="position:absolute;inset:8px;border-radius:50%;background:var(--blue-500);border:3px solid #fff;box-shadow:0 2px 8px rgba(59,130,246,0.5);display:flex;align-items:center;justify-content:center;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
         </div>
       </div>`;
@@ -46,9 +54,9 @@
   }
 
   // ── Navigation camera state ────────────────────────────────────────
-  let prevNavLat = null;
-  let prevNavLng = null;
-  let currentBearing = 0; // degrees, 0=north, 90=east
+  let prevNavLat = $state(null);
+  let prevNavLng = $state(null);
+  let currentBearing = $state(0); // degrees, 0=north, 90=east
 
   /** Compute bearing in degrees from point A to point B */
   function computeBearing(lat1, lng1, lat2, lng2) {
@@ -59,9 +67,9 @@
               Math.sin(lat1 * toRad) * Math.cos(lat2 * toRad) * Math.cos(dLng);
     return ((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360;
   }
-  let isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
-  let renderUsersRaf = null;
-  let pendingUsers = new Map();
+  let isMobile = $state(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+  let renderUsersRaf = $state(null);
+  let pendingUsers = $state(new Map());
   const popupCache = new Map();
   const _lastRenderedUsers = new Map();
 
@@ -128,7 +136,7 @@
     el.style.cssText = 'display:flex;flex-direction:column;align-items:center;cursor:pointer;';
     const safeLabel = (label || 'Meet here').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     el.innerHTML = `
-      <div style="background:linear-gradient(135deg,#10b981,#059669);width:34px;height:34px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 14px rgba(16,185,129,0.55);display:flex;align-items:center;justify-content:center;">
+      <div style="background:linear-gradient(135deg,var(--success-500),var(--success-600));width:34px;height:34px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 14px rgba(16,185,129,0.55);display:flex;align-items:center;justify-content:center;">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M4 15V5l5 3 3-4 3 4 5-3v10"/><line x1="4" y1="22" x2="4" y2="15" stroke="#fff" stroke-width="2"/></svg>
       </div>
       <div style="background:rgba(16,185,129,0.92);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;margin-top:3px;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 6px rgba(0,0,0,0.18);">${safeLabel}</div>
@@ -322,94 +330,7 @@
     if (typeof window !== 'undefined') window.removeEventListener('resize', debouncedCheckMobile);
   });
 
-  $: if (map && $myLocation) {
-    const { latitude, longitude, speed, formattedTime, accuracy } = $myLocation;
-    const lngLat = [longitude, latitude];
-    const selfBadges = [];
-    if ($mySafetyStatus?.geofence?.enabled) selfBadges.push('<span class="pu-feat pu-feat-geo">⬡ Geofence</span>');
-    if ($mySafetyStatus?.autoSos?.enabled) selfBadges.push('<span class="pu-feat pu-feat-autoSos">⏱ Auto-SOS</span>');
-    if ($mySafetyStatus?.checkIn?.enabled) selfBadges.push('<span class="pu-feat pu-feat-checkin">✓ Check-in</span>');
-    const accCls0 = accuracy == null ? '' : accuracy <= 15 ? 'pu-good' : accuracy <= 50 ? 'pu-warn' : 'pu-danger';
-    let selfPopupHtml = '<div class="pu-wrap">';
-    selfPopupHtml += '<div class="pu-hdr"><strong class="pu-name">You</strong>';
-    selfPopupHtml += '<span class="pu-status pu-online"><span class="pu-dot"></span>Connected</span></div>';
-    selfPopupHtml += '<div class="pu-grid">';
-    selfPopupHtml += `<span class="pu-lbl">Speed</span><span class="pu-val">${speed >= 1 ? speed : 0} km/h</span>`;
-    if (accuracy != null) selfPopupHtml += `<span class="pu-lbl">Accuracy</span><span class="pu-val ${accCls0}">~${Math.round(accuracy)}m</span>`;
-    if (formattedTime) selfPopupHtml += `<span class="pu-lbl">Updated</span><span class="pu-val">${escapeAttr(String(formattedTime))}</span>`;
-    selfPopupHtml += `<span class="pu-lbl">Position</span><span class="pu-val pu-mono">${Number(latitude).toFixed(5)}, ${Number(longitude).toFixed(5)}</span>`;
-    selfPopupHtml += '</div>';
-    if (selfBadges.length) selfPopupHtml += '<div class="pu-feats">' + selfBadges.join('') + '</div>';
-    selfPopupHtml += '</div>';
 
-    if (!myMarker) {
-      const el = navActive ? createNavArrow() : createMapIcon('var(--primary-500)', '', { markerType: 'self' });
-      myPopup = new maplibregl.Popup({ offset: [0, -44], maxWidth: '280px', closeButton: false })
-        .setHTML(selfPopupHtml);
-      myMarker = new maplibregl.Marker({ element: el, anchor: 'center', rotationAlignment: 'map' })
-        .setLngLat(lngLat)
-        .setPopup(myPopup)
-        .addTo(map);
-    } else {
-      animateMarkerTo('__self__', myMarker, lngLat);
-      myPopup.setHTML(selfPopupHtml);
-      // Swap marker style when entering/exiting nav mode
-      const el = myMarker.getElement();
-      if (navActive && !el.classList.contains('nav-arrow-marker')) {
-        const newEl = createNavArrow();
-        myMarker.remove();
-        myMarker = new maplibregl.Marker({ element: newEl, anchor: 'center', rotationAlignment: 'map' })
-          .setLngLat(lngLat).setPopup(myPopup).addTo(map);
-      } else if (!navActive && el.classList.contains('nav-arrow-marker')) {
-        const newEl = createMapIcon('var(--primary-500)', '', { markerType: 'self' });
-        myMarker.remove();
-        myMarker = new maplibregl.Marker({ element: newEl, anchor: 'bottom' })
-          .setLngLat(lngLat).setPopup(myPopup).addTo(map);
-      }
-    }
-
-    if (followMode && navActive) {
-      // ── Google Maps-style 3D navigation camera ──────────────────
-      // Compute bearing from previous position (need >5m movement to avoid jitter)
-      if (prevNavLat != null && prevNavLng != null) {
-        const dLat = latitude - prevNavLat;
-        const dLng = longitude - prevNavLng;
-        const movedM = Math.sqrt(dLat * dLat + dLng * dLng) * 111320;
-        if (movedM > 5) {
-          currentBearing = computeBearing(prevNavLat, prevNavLng, latitude, longitude);
-          prevNavLat = latitude;
-          prevNavLng = longitude;
-        }
-      } else {
-        prevNavLat = latitude;
-        prevNavLng = longitude;
-      }
-
-      // Tilt + rotate + follow from behind (user at bottom 1/3)
-      map.easeTo({
-        center: lngLat,
-        zoom: 17.5,
-        bearing: currentBearing,
-        pitch: 55,  // 3D tilt
-        duration: 600,
-        padding: { top: 200, bottom: 40, left: 0, right: 0 },
-      });
-    } else if (followMode) {
-      map.easeTo({ center: lngLat, zoom: Math.max(map.getZoom(), 15), duration: 600 });
-    } else if (!hasSetView) {
-      map.jumpTo({ center: lngLat, zoom: 15 });
-    }
-    hasSetView = true;
-  }
-
-  $: if (map && map.loaded()) {
-    const gf = $mySafetyStatus?.geofence;
-    if (gf?.enabled && gf.centerLat != null && gf.centerLng != null && gf.radiusM > 0) {
-      updateCircleSource('my-geofence', [gf.centerLng, gf.centerLat], gf.radiusM);
-    } else {
-      updateCircleSource('my-geofence', [0, 0], 0);
-    }
-  }
 
   function buildPopup(user) {
     const name = escapeAttr(user.displayName || 'User');
@@ -600,161 +521,16 @@
     }
   }
 
-  $: if (map) {
-    const current = $otherUsers;
-    pendingUsers = current;
-
-    // Remove markers for users no longer present
-    for (const [sid, m] of markers) {
-      if (!current.has(sid)) {
-        cancelAnimation(sid);
-        m.remove();
-        markers.delete(sid);
-        markerState.delete(sid);
-        popupCache.delete(sid);
-        _lastRenderedUsers.delete(sid);
-        if (markerPopups.has(sid)) { markerPopups.get(sid).remove(); markerPopups.delete(sid); }
-        markerUsers.delete(sid);
-        dirtyMarkers.delete(sid);
-      }
-    }
-
-    // Clean stale geofence sources
-    for (const sid of geofenceIds) {
-      if (!current.has(sid)) {
-        const srcId = 'gf-' + sid;
-        if (map.getLayer(srcId + '-fill')) map.removeLayer(srcId + '-fill');
-        if (map.getLayer(srcId + '-outline')) map.removeLayer(srcId + '-outline');
-        if (map.getSource(srcId)) map.removeSource(srcId);
-        geofenceIds.delete(sid);
-      }
-    }
-
-    // Mark only changed users as dirty
-    for (const [sid, user] of current) {
-      if (user.latitude == null || user.longitude == null) continue;
-      if (_lastRenderedUsers.get(sid) !== user) {
-        _lastRenderedUsers.set(sid, user);
-        markDirty(sid);
-      }
-    }
-
-    // Handle geofences (still rendered via renderUserMarkers for simplicity)
-    if (renderUsersRaf) cancelAnimationFrame(renderUsersRaf);
-    renderUsersRaf = requestAnimationFrame(() => {
-      renderUsersRaf = null;
-      // Only handle geofences in the full render pass
-      for (const [sid, user] of current) {
-        if (!map.loaded()) continue;
-        const gf = user.geofence;
-        const srcId = 'gf-' + sid;
-        if (gf?.enabled && gf.centerLat != null && gf.centerLng != null && gf.radiusM > 0) {
-          ensureCircleSource(srcId);
-          ensureCircleLayer(srcId + '-fill', srcId, '#8b5cf6', 0.08, '#8b5cf6', 2, [6, 4]);
-          updateCircleSource(srcId, [gf.centerLng, gf.centerLat], gf.radiusM);
-          geofenceIds.add(sid);
-        } else if (geofenceIds.has(sid)) {
-          if (map.getLayer(srcId + '-fill')) map.removeLayer(srcId + '-fill');
-          if (map.getLayer(srcId + '-outline')) map.removeLayer(srcId + '-outline');
-          if (map.getSource(srcId)) map.removeSource(srcId);
-          geofenceIds.delete(sid);
-        }
-      }
-    });
-  }
 
   // Snapshot of last-rendered cluster positions — skip rebuild if nothing moved
   let _clusterPosSnapshot = new Map(); // socketId → 'lat,lng,sos,online'
 
-  // Update cluster GeoJSON only when user positions actually change
-  $: if (map && map.getSource('users-cluster')) {
-    let dirty = false;
-    for (const user of $otherUsers.values()) {
-      const key = `${user.latitude},${user.longitude},${!!user.sos?.active},${user.online !== false}`;
-      if (_clusterPosSnapshot.get(user.socketId) !== key) { dirty = true; break; }
-    }
-    // Also rebuild if a user was removed
-    if (!dirty && _clusterPosSnapshot.size !== $otherUsers.size) dirty = true;
-    if (dirty) {
-      const features = [];
-      for (const user of $otherUsers.values()) {
-        if (user.latitude == null || user.longitude == null || user.online === false) continue;
-        features.push({
-          type: 'Feature',
-          geometry: { type: 'Point', coordinates: [user.longitude, user.latitude] },
-          properties: { name: user.displayName || 'User', sos: !!user.sos?.active },
-        });
-        _clusterPosSnapshot.set(user.socketId, `${user.latitude},${user.longitude},${!!user.sos?.active},${user.online !== false}`);
-      }
-      map.getSource('users-cluster').setData({ type: 'FeatureCollection', features });
-    }
-  }
 
-  // ── Place search fly-to ──────────────────────────────────────────────
-  $: if (map && $mapFlyTo) {
-    const target = $mapFlyTo;
-    mapFlyTo.set(null);
-    map.flyTo({ center: [target.lng, target.lat], zoom: target.zoom || 16, duration: 900 });
-  }
 
-  // ── Route polyline from directions ─────────────────────────────────
-  $: if (map) {
-    const geo = $routeGeometry;
-    if (geo && geo.coordinates?.length) {
-      const srcId = 'directions-route';
-      const layerId = 'directions-route-line';
-      const glowId = 'directions-route-glow';
-      const geojson = { type: 'Feature', geometry: geo, properties: {} };
-      if (map.getSource(srcId)) {
-        map.getSource(srcId).setData(geojson);
-      } else {
-        map.addSource(srcId, { type: 'geojson', data: geojson });
-        map.addLayer({ id: glowId, type: 'line', source: srcId,
-          paint: { 'line-color': '#6366f1', 'line-width': 8, 'line-opacity': 0.18, 'line-blur': 3 } });
-        map.addLayer({ id: layerId, type: 'line', source: srcId,
-          paint: { 'line-color': '#818cf8', 'line-width': 4, 'line-opacity': 0.85 },
-          layout: { 'line-cap': 'round', 'line-join': 'round' } });
-      }
-    } else {
-      // Clear route
-      if (map.getLayer('directions-route-line')) map.removeLayer('directions-route-line');
-      if (map.getLayer('directions-route-glow')) map.removeLayer('directions-route-glow');
-      if (map.getSource('directions-route')) map.removeSource('directions-route');
-    }
-  }
 
   // ── Trail playback layer — draw breadcrumb path for a user ──────────
-  let activeTrailUserId = null; // userId whose trail is shown (or null)
+  let activeTrailUserId = $state(null); // userId whose trail is shown (or null)
 
-  $: if (map && $recentTrailResult) {
-    const res = $recentTrailResult;
-    if (!res.ok || !res.points?.length) {
-      // Clear on error or empty
-      if (map.getLayer('trail-line')) map.removeLayer('trail-line');
-      if (map.getLayer('trail-glow')) map.removeLayer('trail-glow');
-      if (map.getSource('trail-route')) map.removeSource('trail-route');
-      activeTrailUserId = null;
-    } else {
-      activeTrailUserId = res.targetUserId;
-      const coords = res.points.map(p => [p.lng, p.lat]);
-      const geojson = { type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} };
-      if (map.getSource('trail-route')) {
-        map.getSource('trail-route').setData(geojson);
-      } else {
-        map.addSource('trail-route', { type: 'geojson', data: geojson });
-        map.addLayer({ id: 'trail-glow', type: 'line', source: 'trail-route',
-          paint: { 'line-color': '#f59e0b', 'line-width': 10, 'line-opacity': 0.15, 'line-blur': 4 } });
-        map.addLayer({ id: 'trail-line', type: 'line', source: 'trail-route',
-          paint: { 'line-color': '#fbbf24', 'line-width': 3, 'line-opacity': 0.82, 'line-dasharray': [2, 1.5] },
-          layout: { 'line-cap': 'round', 'line-join': 'round' } });
-      }
-      // Fit to trail bounds
-      if (coords.length > 1) {
-        const bounds = coords.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(coords[0], coords[0]));
-        map.fitBounds(bounds, { padding: 80, duration: 700, maxZoom: 17 });
-      }
-    }
-  }
 
   function clearTrail() {
     if (!map) return;
@@ -772,122 +548,378 @@
   }
 
   // ── Navigation mode — follow user + destination marker + fit bounds ──
-  let destMarker = null;
-  let navActive = false;
+  let destMarker = $state(null);
+  let navActive = $state(false);
 
   let mapReady = false;
 
-  $: if (map) {
-    const nav = $navigationState;
-    if (nav?.active && nav.routeCoords?.length) {
-      navActive = true;
-      followMode = true;
 
-      // Compute initial bearing: user → destination
-      if ($myLocation?.latitude) {
-        currentBearing = computeBearing(
-          $myLocation.latitude, $myLocation.longitude,
-          nav.destLat, nav.destLng
-        );
-        prevNavLat = $myLocation.latitude;
-        prevNavLng = $myLocation.longitude;
+
+
+  run(() => {
+    if (map) {
+      const nav = $navigationState;
+      if (nav?.active && nav.routeCoords?.length) {
+        navActive = true;
+        followMode = true;
+
+        // Compute initial bearing: user → destination
+        if ($myLocation?.latitude) {
+          currentBearing = computeBearing(
+            $myLocation.latitude, $myLocation.longitude,
+            nav.destLat, nav.destLng
+          );
+          prevNavLat = $myLocation.latitude;
+          prevNavLng = $myLocation.longitude;
+        }
+
+        // Add destination marker (red pin with flag)
+        if (destMarker) destMarker.remove();
+        const destEl = document.createElement('div');
+        destEl.innerHTML = `<div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--danger-500),var(--danger-600));border:3px solid #fff;box-shadow:0 2px 16px rgba(239,68,68,0.5);display:flex;align-items:center;justify-content:center;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 119.5 9 2.5 2.5 0 0112 11.5z"/></svg>
+        </div><div style="width:2px;height:10px;background:var(--danger-500,#ef4444);margin:0 auto;border-radius:0 0 2px 2px;opacity:0.6;" aria-hidden="true"></div>`;
+        destEl.style.cssText = 'display:flex;flex-direction:column;align-items:center;';
+        destMarker = new maplibregl.Marker({ element: destEl, anchor: 'bottom' })
+          .setLngLat([nav.destLng, nav.destLat])
+          .addTo(map);
+
+        // Step 1: Fit to route overview (2D, north-up)
+        const coords = nav.routeCoords;
+        const bounds = coords.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(coords[0], coords[0]));
+        map.fitBounds(bounds, { padding: { top: 100, bottom: 100, left: 50, right: 50 }, duration: 800, pitch: 0, bearing: 0 });
+
+        // Step 2: After overview, swoop into 3D navigation view
+        setTimeout(() => {
+          if (!$myLocation?.latitude) return;
+          map.easeTo({
+            center: [$myLocation.longitude, $myLocation.latitude],
+            zoom: 17.5,
+            bearing: currentBearing,
+            pitch: 55,
+            duration: 1000,
+            padding: { top: 200, bottom: 40, left: 0, right: 0 },
+          });
+        }, 1400);
+
+      } else if (navActive) {
+        // ── Navigation ended — reset camera to 2D north-up ──────────
+        navActive = false;
+        followMode = false;
+        prevNavLat = null;
+        prevNavLng = null;
+        if (destMarker) { destMarker.remove(); destMarker = null; }
+        // Smoothly return to flat north-up view
+        map.easeTo({ pitch: 0, bearing: 0, duration: 600 });
+      }
+    }
+  });
+  run(() => {
+    if (map && $myLocation) {
+      const { latitude, longitude, speed, formattedTime, accuracy } = $myLocation;
+      const lngLat = [longitude, latitude];
+      const selfBadges = [];
+      if ($mySafetyStatus?.geofence?.enabled) selfBadges.push('<span class="pu-feat pu-feat-geo">⬡ Geofence</span>');
+      if ($mySafetyStatus?.autoSos?.enabled) selfBadges.push('<span class="pu-feat pu-feat-autoSos">⏱ Auto-SOS</span>');
+      if ($mySafetyStatus?.checkIn?.enabled) selfBadges.push('<span class="pu-feat pu-feat-checkin">✓ Check-in</span>');
+      const accCls0 = accuracy == null ? '' : accuracy <= 15 ? 'pu-good' : accuracy <= 50 ? 'pu-warn' : 'pu-danger';
+      let selfPopupHtml = '<div class="pu-wrap">';
+      selfPopupHtml += '<div class="pu-hdr"><strong class="pu-name">You</strong>';
+      selfPopupHtml += '<span class="pu-status pu-online"><span class="pu-dot"></span>Connected</span></div>';
+      selfPopupHtml += '<div class="pu-grid">';
+      selfPopupHtml += `<span class="pu-lbl">Speed</span><span class="pu-val">${speed >= 1 ? speed : 0} km/h</span>`;
+      if (accuracy != null) selfPopupHtml += `<span class="pu-lbl">Accuracy</span><span class="pu-val ${accCls0}">~${Math.round(accuracy)}m</span>`;
+      if (formattedTime) selfPopupHtml += `<span class="pu-lbl">Updated</span><span class="pu-val">${escapeAttr(String(formattedTime))}</span>`;
+      selfPopupHtml += `<span class="pu-lbl">Position</span><span class="pu-val pu-mono">${Number(latitude).toFixed(5)}, ${Number(longitude).toFixed(5)}</span>`;
+      selfPopupHtml += '</div>';
+      if (selfBadges.length) selfPopupHtml += '<div class="pu-feats">' + selfBadges.join('') + '</div>';
+      selfPopupHtml += '</div>';
+
+      if (!myMarker) {
+        const el = navActive ? createNavArrow() : createMapIcon('var(--primary-500)', '', { markerType: 'self' });
+        myPopup = new maplibregl.Popup({ offset: [0, -44], maxWidth: '280px', closeButton: false })
+          .setHTML(selfPopupHtml);
+        myMarker = new maplibregl.Marker({ element: el, anchor: 'center', rotationAlignment: 'map' })
+          .setLngLat(lngLat)
+          .setPopup(myPopup)
+          .addTo(map);
+      } else {
+        animateMarkerTo('__self__', myMarker, lngLat);
+        myPopup.setHTML(selfPopupHtml);
+        // Swap marker style when entering/exiting nav mode
+        const el = myMarker.getElement();
+        if (navActive && !el.classList.contains('nav-arrow-marker')) {
+          const newEl = createNavArrow();
+          myMarker.remove();
+          myMarker = new maplibregl.Marker({ element: newEl, anchor: 'center', rotationAlignment: 'map' })
+            .setLngLat(lngLat).setPopup(myPopup).addTo(map);
+        } else if (!navActive && el.classList.contains('nav-arrow-marker')) {
+          const newEl = createMapIcon('var(--primary-500)', '', { markerType: 'self' });
+          myMarker.remove();
+          myMarker = new maplibregl.Marker({ element: newEl, anchor: 'bottom' })
+            .setLngLat(lngLat).setPopup(myPopup).addTo(map);
+        }
       }
 
-      // Add destination marker (red pin with flag)
-      if (destMarker) destMarker.remove();
-      const destEl = document.createElement('div');
-      destEl.innerHTML = `<div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#ef4444,#dc2626);border:3px solid #fff;box-shadow:0 2px 16px rgba(239,68,68,0.5);display:flex;align-items:center;justify-content:center;">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 119.5 9 2.5 2.5 0 0112 11.5z"/></svg>
-      </div><div style="width:2px;height:10px;background:var(--danger-500,#ef4444);margin:0 auto;border-radius:0 0 2px 2px;opacity:0.6;" aria-hidden="true"></div>`;
-      destEl.style.cssText = 'display:flex;flex-direction:column;align-items:center;';
-      destMarker = new maplibregl.Marker({ element: destEl, anchor: 'bottom' })
-        .setLngLat([nav.destLng, nav.destLat])
-        .addTo(map);
+      if (followMode && navActive) {
+        // ── Google Maps-style 3D navigation camera ──────────────────
+        // Compute bearing from previous position (need >5m movement to avoid jitter)
+        if (prevNavLat != null && prevNavLng != null) {
+          const dLat = latitude - prevNavLat;
+          const dLng = longitude - prevNavLng;
+          const movedM = Math.sqrt(dLat * dLat + dLng * dLng) * 111320;
+          if (movedM > 5) {
+            currentBearing = computeBearing(prevNavLat, prevNavLng, latitude, longitude);
+            prevNavLat = latitude;
+            prevNavLng = longitude;
+          }
+        } else {
+          prevNavLat = latitude;
+          prevNavLng = longitude;
+        }
 
-      // Step 1: Fit to route overview (2D, north-up)
-      const coords = nav.routeCoords;
-      const bounds = coords.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(coords[0], coords[0]));
-      map.fitBounds(bounds, { padding: { top: 100, bottom: 100, left: 50, right: 50 }, duration: 800, pitch: 0, bearing: 0 });
-
-      // Step 2: After overview, swoop into 3D navigation view
-      setTimeout(() => {
-        if (!$myLocation?.latitude) return;
+        // Tilt + rotate + follow from behind (user at bottom 1/3)
         map.easeTo({
-          center: [$myLocation.longitude, $myLocation.latitude],
+          center: lngLat,
           zoom: 17.5,
           bearing: currentBearing,
-          pitch: 55,
-          duration: 1000,
+          pitch: 55,  // 3D tilt
+          duration: 600,
           padding: { top: 200, bottom: 40, left: 0, right: 0 },
         });
-      }, 1400);
-
-    } else if (navActive) {
-      // ── Navigation ended — reset camera to 2D north-up ──────────
-      navActive = false;
-      followMode = false;
-      prevNavLat = null;
-      prevNavLng = null;
-      if (destMarker) { destMarker.remove(); destMarker = null; }
-      // Smoothly return to flat north-up view
-      map.easeTo({ pitch: 0, bearing: 0, duration: 600 });
+      } else if (followMode) {
+        map.easeTo({ center: lngLat, zoom: Math.max(map.getZoom(), 15), duration: 600 });
+      } else if (!hasSetView) {
+        map.jumpTo({ center: lngLat, zoom: 15 });
+      }
+      hasSetView = true;
     }
-  }
+  });
+  run(() => {
+    if (map && map.loaded()) {
+      const gf = $mySafetyStatus?.geofence;
+      if (gf?.enabled && gf.centerLat != null && gf.centerLng != null && gf.radiusM > 0) {
+        updateCircleSource('my-geofence', [gf.centerLng, gf.centerLat], gf.radiusM);
+      } else {
+        updateCircleSource('my-geofence', [0, 0], 0);
+      }
+    }
+  });
+  run(() => {
+    if (map) {
+      const current = $otherUsers;
+      pendingUsers = current;
 
-  $: if (map && $focusUser) {
-    const sid = $focusUser;
-    focusUser.set(null);
+      // Remove markers for users no longer present
+      for (const [sid, m] of markers) {
+        if (!current.has(sid)) {
+          cancelAnimation(sid);
+          m.remove();
+          markers.delete(sid);
+          markerState.delete(sid);
+          popupCache.delete(sid);
+          _lastRenderedUsers.delete(sid);
+          if (markerPopups.has(sid)) { markerPopups.get(sid).remove(); markerPopups.delete(sid); }
+          markerUsers.delete(sid);
+          dirtyMarkers.delete(sid);
+        }
+      }
 
-    if (sid === '__self__' && myMarker && $myLocation) {
-      map.flyTo({ center: [$myLocation.longitude, $myLocation.latitude], zoom: 17, duration: 800 });
-      setTimeout(() => myMarker.togglePopup(), 900);
-    } else if (markers.has(sid)) {
-      const m = markers.get(sid);
-      const ll = m.getLngLat();
-      map.flyTo({ center: [ll.lng, ll.lat], zoom: 17, duration: 800 });
-      setTimeout(() => m.togglePopup(), 900);
-    } else {
-      for (const [mSid, user] of $otherUsers) {
-        if (user.userId === sid && markers.has(mSid)) {
-          const m = markers.get(mSid);
-          map.flyTo({ center: m.getLngLat(), zoom: 17, duration: 800 });
-          setTimeout(() => m.togglePopup(), 900);
-          break;
+      // Clean stale geofence sources
+      for (const sid of geofenceIds) {
+        if (!current.has(sid)) {
+          const srcId = 'gf-' + sid;
+          if (map.getLayer(srcId + '-fill')) map.removeLayer(srcId + '-fill');
+          if (map.getLayer(srcId + '-outline')) map.removeLayer(srcId + '-outline');
+          if (map.getSource(srcId)) map.removeSource(srcId);
+          geofenceIds.delete(sid);
+        }
+      }
+
+      // Mark only changed users as dirty
+      for (const [sid, user] of current) {
+        if (user.latitude == null || user.longitude == null) continue;
+        if (_lastRenderedUsers.get(sid) !== user) {
+          _lastRenderedUsers.set(sid, user);
+          markDirty(sid);
+        }
+      }
+
+      // Handle geofences (still rendered via renderUserMarkers for simplicity)
+      if (renderUsersRaf) cancelAnimationFrame(renderUsersRaf);
+      renderUsersRaf = requestAnimationFrame(() => {
+        renderUsersRaf = null;
+        // Only handle geofences in the full render pass
+        for (const [sid, user] of current) {
+          if (!map.loaded()) continue;
+          const gf = user.geofence;
+          const srcId = 'gf-' + sid;
+          if (gf?.enabled && gf.centerLat != null && gf.centerLng != null && gf.radiusM > 0) {
+            ensureCircleSource(srcId);
+            ensureCircleLayer(srcId + '-fill', srcId, '#8b5cf6', 0.08, '#8b5cf6', 2, [6, 4]);
+            updateCircleSource(srcId, [gf.centerLng, gf.centerLat], gf.radiusM);
+            geofenceIds.add(sid);
+          } else if (geofenceIds.has(sid)) {
+            if (map.getLayer(srcId + '-fill')) map.removeLayer(srcId + '-fill');
+            if (map.getLayer(srcId + '-outline')) map.removeLayer(srcId + '-outline');
+            if (map.getSource(srcId)) map.removeSource(srcId);
+            geofenceIds.delete(sid);
+          }
+        }
+      });
+    }
+  });
+  // Update cluster GeoJSON only when user positions actually change
+  run(() => {
+    if (map && map.getSource('users-cluster')) {
+      let dirty = false;
+      for (const user of $otherUsers.values()) {
+        const key = `${user.latitude},${user.longitude},${!!user.sos?.active},${user.online !== false}`;
+        if (_clusterPosSnapshot.get(user.socketId) !== key) { dirty = true; break; }
+      }
+      // Also rebuild if a user was removed
+      if (!dirty && _clusterPosSnapshot.size !== $otherUsers.size) dirty = true;
+      if (dirty) {
+        const features = [];
+        for (const user of $otherUsers.values()) {
+          if (user.latitude == null || user.longitude == null || user.online === false) continue;
+          features.push({
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: [user.longitude, user.latitude] },
+            properties: { name: user.displayName || 'User', sos: !!user.sos?.active },
+          });
+          _clusterPosSnapshot.set(user.socketId, `${user.latitude},${user.longitude},${!!user.sos?.active},${user.online !== false}`);
+        }
+        map.getSource('users-cluster').setData({ type: 'FeatureCollection', features });
+      }
+    }
+  });
+  // ── Place search fly-to ──────────────────────────────────────────────
+  run(() => {
+    if (map && $mapFlyTo) {
+      const target = $mapFlyTo;
+      mapFlyTo.set(null);
+      map.flyTo({ center: [target.lng, target.lat], zoom: target.zoom || 16, duration: 900 });
+    }
+  });
+  // ── Route polyline from directions ─────────────────────────────────
+  run(() => {
+    if (map) {
+      const geo = $routeGeometry;
+      if (geo && geo.coordinates?.length) {
+        const srcId = 'directions-route';
+        const layerId = 'directions-route-line';
+        const glowId = 'directions-route-glow';
+        const geojson = { type: 'Feature', geometry: geo, properties: {} };
+        if (map.getSource(srcId)) {
+          map.getSource(srcId).setData(geojson);
+        } else {
+          map.addSource(srcId, { type: 'geojson', data: geojson });
+          // NOTE: brand-indigo hex literals mirror --primary-500 / --indigo-400 tokens.
+          // MapLibre paint needs literal colors (this file does not read CSS vars at runtime).
+          map.addLayer({ id: glowId, type: 'line', source: srcId,
+            paint: { 'line-color': '#6366f1', 'line-width': 9, 'line-opacity': 0.24, 'line-blur': 4 } });
+          map.addLayer({ id: layerId, type: 'line', source: srcId,
+            paint: { 'line-color': '#818cf8', 'line-width': 4.5, 'line-opacity': 0.92 },
+            layout: { 'line-cap': 'round', 'line-join': 'round' } });
+        }
+      } else {
+        // Clear route
+        if (map.getLayer('directions-route-line')) map.removeLayer('directions-route-line');
+        if (map.getLayer('directions-route-glow')) map.removeLayer('directions-route-glow');
+        if (map.getSource('directions-route')) map.removeSource('directions-route');
+      }
+    }
+  });
+  run(() => {
+    if (map && $recentTrailResult) {
+      const res = $recentTrailResult;
+      if (!res.ok || !res.points?.length) {
+        // Clear on error or empty
+        if (map.getLayer('trail-line')) map.removeLayer('trail-line');
+        if (map.getLayer('trail-glow')) map.removeLayer('trail-glow');
+        if (map.getSource('trail-route')) map.removeSource('trail-route');
+        activeTrailUserId = null;
+      } else {
+        activeTrailUserId = res.targetUserId;
+        const coords = res.points.map(p => [p.lng, p.lat]);
+        const geojson = { type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} };
+        if (map.getSource('trail-route')) {
+          map.getSource('trail-route').setData(geojson);
+        } else {
+          map.addSource('trail-route', { type: 'geojson', data: geojson });
+          // NOTE: amber hex literals mirror --warning-500 / --warning-400 tokens.
+          // Trail breadcrumb — clearer but calm: a touch wider/more opaque than before.
+          map.addLayer({ id: 'trail-glow', type: 'line', source: 'trail-route',
+            paint: { 'line-color': '#f59e0b', 'line-width': 11, 'line-opacity': 0.20, 'line-blur': 4 } });
+          map.addLayer({ id: 'trail-line', type: 'line', source: 'trail-route',
+            paint: { 'line-color': '#fbbf24', 'line-width': 3.5, 'line-opacity': 0.9, 'line-dasharray': [2.5, 1.5] },
+            layout: { 'line-cap': 'round', 'line-join': 'round' } });
+        }
+        // Fit to trail bounds
+        if (coords.length > 1) {
+          const bounds = coords.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(coords[0], coords[0]));
+          map.fitBounds(bounds, { padding: 80, duration: 700, maxZoom: 17 });
         }
       }
     }
-  }
+  });
+  run(() => {
+    if (map && $focusUser) {
+      const sid = $focusUser;
+      focusUser.set(null);
 
-  // ── F3: Meeting point markers — one green flag per room that has a meeting point ──
-  $: if (map && maplibregl) {
-    const rooms = $myRooms;
-    const currentCodes = new Set(rooms.filter(r => r.meetingPoint).map(r => r.code));
-
-    // Remove markers for rooms that no longer have a meeting point
-    for (const [code, m] of meetingMarkers) {
-      if (!currentCodes.has(code)) {
-        m.remove();
-        meetingMarkers.delete(code);
-      }
-    }
-
-    // Add or update markers for rooms with a meeting point
-    for (const room of rooms) {
-      if (!room.meetingPoint) continue;
-      const mp = room.meetingPoint;
-      const lngLat = [mp.lng, mp.lat];
-      if (meetingMarkers.has(room.code)) {
-        meetingMarkers.get(room.code).setLngLat(lngLat);
+      if (sid === '__self__' && myMarker && $myLocation) {
+        map.flyTo({ center: [$myLocation.longitude, $myLocation.latitude], zoom: 17, duration: 800 });
+        setTimeout(() => myMarker.togglePopup(), 900);
+      } else if (markers.has(sid)) {
+        const m = markers.get(sid);
+        const ll = m.getLngLat();
+        map.flyTo({ center: [ll.lng, ll.lat], zoom: 17, duration: 800 });
+        setTimeout(() => m.togglePopup(), 900);
       } else {
-        const el = createMeetingPointEl(mp.label || room.name || room.code);
-        const m = new maplibregl.Marker({ element: el, anchor: 'bottom' })
-          .setLngLat(lngLat)
-          .addTo(map);
-        meetingMarkers.set(room.code, m);
+        for (const [mSid, user] of $otherUsers) {
+          if (user.userId === sid && markers.has(mSid)) {
+            const m = markers.get(mSid);
+            map.flyTo({ center: m.getLngLat(), zoom: 17, duration: 800 });
+            setTimeout(() => m.togglePopup(), 900);
+            break;
+          }
+        }
       }
     }
-  }
+  });
+  // ── F3: Meeting point markers — one green flag per room that has a meeting point ──
+  run(() => {
+    if (map && maplibregl) {
+      const rooms = $myRooms;
+      const currentCodes = new Set(rooms.filter(r => r.meetingPoint).map(r => r.code));
 
+      // Remove markers for rooms that no longer have a meeting point
+      for (const [code, m] of meetingMarkers) {
+        if (!currentCodes.has(code)) {
+          m.remove();
+          meetingMarkers.delete(code);
+        }
+      }
+
+      // Add or update markers for rooms with a meeting point
+      for (const room of rooms) {
+        if (!room.meetingPoint) continue;
+        const mp = room.meetingPoint;
+        const lngLat = [mp.lng, mp.lat];
+        if (meetingMarkers.has(room.code)) {
+          meetingMarkers.get(room.code).setLngLat(lngLat);
+        } else {
+          const el = createMeetingPointEl(mp.label || room.name || room.code);
+          const m = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+            .setLngLat(lngLat)
+            .addTo(map);
+          meetingMarkers.set(room.code, m);
+        }
+      }
+    }
+  });
 </script>
 
 <div class="map-container" bind:this={mapContainer}
@@ -978,7 +1010,7 @@
     height: 40px;
     border-radius: 50% 50% 50% 4px;
     transform: rotate(-45deg);
-    background: linear-gradient(135deg, #818cf8, #6366f1);
+    background: linear-gradient(135deg, var(--indigo-400), var(--indigo-500));
     border: 2.5px solid #fff;
     box-shadow: 0 4px 18px rgba(99,102,241,0.55), 0 2px 6px rgba(0,0,0,0.25);
     display: flex;
@@ -1110,7 +1142,6 @@
     pointer-events: none;
     z-index: -1;
   }
-
   :global(.map-pin.pin-offline) {
     opacity: 0.5;
   }
@@ -1135,7 +1166,7 @@
       0 12px 40px rgba(0, 0, 0, 0.22),
       0 0 0 1px rgba(0, 0, 0, 0.06),
       inset 0 1px 0 rgba(255, 255, 255, 0.70);
-    padding: 14px 16px;
+    padding: 16px 18px;
     line-height: 1.5;
     font-family: var(--font-sans, 'Inter', sans-serif);
     backdrop-filter: blur(28px) saturate(1.8);
@@ -1170,57 +1201,76 @@
   /* ── Popup content classes (light + dark mode aware) ─────────────────── */
   /* Fix #1: increased base font sizes for readability on mobile */
   :global(.pu-wrap)  { min-width: 190px; font-size: 13px; line-height: 1.5; }
-  :global(.pu-hdr)   { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+  :global(.pu-hdr)   { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid rgba(0,0,0,0.07); }
   :global(.pu-name)  { font-family: var(--font-display); font-size: 15px; font-weight: 700; letter-spacing: -0.01em; color: var(--popup-text-heading, #0f172a); }
-  :global(.pu-status) { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 600; }
+  :global(.pu-status) { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; font-size: 10px; font-weight: 600; }
   :global(.pu-dot)   { width: 7px; height: 7px; border-radius: 50%; background: currentColor; display: inline-block; }
   :global(.pu-online)  { color: var(--success-500, #22c55e); }
   :global(.pu-offline) { color: var(--gray-400, #9ca3af); }
-  :global(.pu-grid)  { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 13px; }
-  :global(.pu-lbl)   { font-size: 12px; font-weight: 600; color: var(--popup-text-label, #64748b); }
-  :global(.pu-val)   { font-size: 13px; color: var(--popup-text-val, #1e293b); }
-  :global(.pu-good)  { color: var(--success-500, #22c55e); font-weight: 600; }
-  :global(.pu-warn)  { color: var(--warning-500, #eab308); font-weight: 600; }
-  :global(.pu-danger){ color: var(--danger-500, #ef4444); font-weight: 600; }
-  :global(.pu-mono)  { font-family: monospace; font-size: 10px; }
-  :global(.pu-badges){ margin-top: 6px; display: flex; flex-direction: column; gap: 3px; font-size: 10px; }
-  :global(.pu-badge) { border-radius: 6px; padding: 3px 8px; font-weight: 500; border: 1px solid transparent; }
+  :global(.pu-grid)  { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 13px; align-items: baseline; }
+  :global(.pu-lbl)   { font-size: 11px; font-weight: 500; letter-spacing: 0.02em; text-transform: uppercase; color: var(--popup-text-label, #64748b); }
+  :global(.pu-val)   { font-size: 13px; font-weight: 600; text-align: right; color: var(--popup-text-val, #1e293b); }
+  :global(.pu-good)  { color: var(--success-500, #22c55e); font-weight: 700; }
+  :global(.pu-warn)  { color: var(--warning-500, #eab308); font-weight: 700; }
+  :global(.pu-danger){ color: var(--danger-500, #ef4444); font-weight: 700; }
+  :global(.pu-mono)  { font-family: monospace; font-size: 11px; letter-spacing: -0.02em; }
+  :global(.pu-badges){ margin-top: 10px; display: flex; flex-direction: column; gap: 4px; font-size: 10px; }
+  :global(.pu-badge) { border-radius: 8px; padding: 4px 9px; font-weight: 500; border: 1px solid transparent; }
   :global(.pu-badge-sos)    { background: rgba(220, 38, 38, 0.10); color: var(--danger-600, #dc2626); border-color: rgba(220, 38, 38, 0.25); font-weight: 700; }
-  :global(.pu-badge-geo)    { background: rgba(124, 58, 237, 0.10); color: #7c3aed; border-color: rgba(124, 58, 237, 0.25); }
-  :global(.pu-badge-autoSos){ background: rgba(217, 119, 6, 0.10); color: #d97706; border-color: rgba(217, 119, 6, 0.25); }
+  :global(.pu-badge-geo)    { background: rgba(124, 58, 237, 0.10); color: var(--violet-600); border-color: rgba(124, 58, 237, 0.25); }
+  :global(.pu-badge-autoSos){ background: rgba(217, 119, 6, 0.10); color: var(--warning-600); border-color: rgba(217, 119, 6, 0.25); }
   :global(.pu-badge-checkin){ background: rgba(8, 145, 178, 0.10); color: #0891b2; border-color: rgba(8, 145, 178, 0.25); }
-  :global(.pu-feats) { margin-top: 5px; display: flex; flex-wrap: wrap; gap: 4px; font-size: 10px; }
+  :global(.pu-feats) { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 5px; font-size: 10px; }
   :global(.pu-feat)  { font-weight: 600; }
   :global(.pu-feat-geo)    { color: #8b5cf6; }
-  :global(.pu-feat-autoSos){ color: #f59e0b; }
+  :global(.pu-feat-autoSos){ color: var(--warning-500); }
   :global(.pu-feat-checkin){ color: #06b6d4; }
-  :global(.pu-rooms) { margin-top: 5px; font-size: 10px; color: var(--popup-text-label, #64748b); }
-  :global(.pu-actions) { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,0.08); }
-  :global(.pu-chat-btn) { display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 8px; background: rgba(99,102,241,0.10); border: 1px solid rgba(99,102,241,0.22); color: #6366f1; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 120ms; }
+  :global(.pu-rooms) { margin-top: 8px; font-size: 10px; color: var(--popup-text-label, #64748b); }
+  :global(.pu-actions) { display: flex; gap: 8px; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(0,0,0,0.08); }
+  :global(.pu-chat-btn) { display: inline-flex; align-items: center; gap: 5px; padding: 6px 13px; border-radius: 9px; background: rgba(99,102,241,0.10); border: 1px solid rgba(99,102,241,0.22); color: var(--indigo-500); font-size: 12px; font-weight: 600; cursor: pointer; transition: background 120ms; }
   :global(.pu-chat-btn:hover) { background: rgba(99,102,241,0.18); }
-  :global(.pu-trail-btn) { display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 8px; background: rgba(245,158,11,0.10); border: 1px solid rgba(245,158,11,0.22); color: #d97706; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 120ms; }
+  :global(.pu-trail-btn) { display: inline-flex; align-items: center; gap: 5px; padding: 6px 13px; border-radius: 9px; background: rgba(245,158,11,0.10); border: 1px solid rgba(245,158,11,0.22); color: var(--warning-600); font-size: 12px; font-weight: 600; cursor: pointer; transition: background 120ms; }
   :global(.pu-trail-btn:hover) { background: rgba(245,158,11,0.18); }
-  :global([data-theme="dark"] .pu-trail-btn) { background: rgba(252,211,77,0.10); border-color: rgba(252,211,77,0.22); color: #fcd34d; }
+  :global([data-theme="dark"] .pu-trail-btn) { background: rgba(252,211,77,0.10); border-color: rgba(252,211,77,0.22); color: var(--warning-300); }
   :global([data-theme="dark"] .pu-trail-btn:hover) { background: rgba(252,211,77,0.18); }
 
   /* Fix #1 continued: mobile-specific font size bump for popup text */
   @media (max-width: 480px) {
     :global(.pu-wrap) { font-size: 14px; }
     :global(.pu-val)  { font-size: 14px; }
-    :global(.pu-lbl)  { font-size: 13px; }
+    :global(.pu-lbl)  { font-size: 12px; }
     :global(.pu-grid) { font-size: 14px; }
   }
 
   /* Dark mode: text colours for popup */
+  :global([data-theme="dark"] .pu-hdr) { border-bottom-color: rgba(255, 255, 255, 0.09); }
   :global([data-theme="dark"] .pu-lbl) { color: rgba(255, 255, 255, 0.50); }
   :global([data-theme="dark"] .pu-val) { color: rgba(255, 255, 255, 0.90); }
   :global([data-theme="dark"] .pu-name) { color: rgba(255, 255, 255, 0.95); }
   :global([data-theme="dark"] .pu-rooms) { color: rgba(255, 255, 255, 0.55); }
+  :global([data-theme="dark"] .pu-actions) { border-top-color: rgba(255, 255, 255, 0.10); }
   /* Dark mode: badge colours stay vivid, labels adapt */
-  :global([data-theme="dark"] .pu-badge-sos)    { background: rgba(220, 38, 38, 0.20); border-color: rgba(220, 38, 38, 0.40); color: #fca5a5; }
-  :global([data-theme="dark"] .pu-badge-geo)    { background: rgba(167, 139, 250, 0.15); border-color: rgba(167, 139, 250, 0.30); color: #c4b5fd; }
-  :global([data-theme="dark"] .pu-badge-autoSos){ background: rgba(252, 211, 77, 0.12); border-color: rgba(252, 211, 77, 0.25); color: #fcd34d; }
+  :global([data-theme="dark"] .pu-badge-sos)    { background: rgba(220, 38, 38, 0.20); border-color: rgba(220, 38, 38, 0.40); color: var(--danger-300); }
+  :global([data-theme="dark"] .pu-badge-geo)    { background: rgba(167, 139, 250, 0.15); border-color: rgba(167, 139, 250, 0.30); color: var(--violet-300); }
+  :global([data-theme="dark"] .pu-badge-autoSos){ background: rgba(252, 211, 77, 0.12); border-color: rgba(252, 211, 77, 0.25); color: var(--warning-300); }
   :global([data-theme="dark"] .pu-badge-checkin){ background: rgba(103, 232, 249, 0.12); border-color: rgba(103, 232, 249, 0.25); color: #67e8f9; }
+
+  /* ── Contextual float chip — calmer glass + glanceable status halo ──────
+     Base chip lives in global.css; these overrides add breathing room and a
+     soft, token-derived status ring so the accuracy/speed dot reads at a glance. */
+  :global(.map-float-chip) {
+    padding: 5px 12px;
+    gap: 6px;
+    letter-spacing: 0.02em;
+  }
+  :global(.map-float-chip .chip-dot) {
+    width: 7px;
+    height: 7px;
+  }
+  :global(.map-float-chip.chip-precise .chip-dot) { box-shadow: 0 0 0 3px color-mix(in oklch, var(--success-400) 22%, transparent); }
+  :global(.map-float-chip.chip-ok .chip-dot)      { box-shadow: 0 0 0 3px color-mix(in oklch, var(--warning-400) 22%, transparent); }
+  :global(.map-float-chip.chip-rough .chip-dot)   { box-shadow: 0 0 0 3px color-mix(in oklch, var(--danger-400) 22%, transparent); }
+  :global(.map-float-chip.chip-speed .chip-dot)   { box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary-400) 22%, transparent); }
 
   .safety-overlay {
     position: absolute;
@@ -1249,13 +1299,13 @@
     pointer-events: auto;
     animation: chip-in 0.3s var(--ease-spring);
   }
-  .safety-chip.geofence { background: rgba(139, 92, 246, 0.18); border: 1px solid rgba(139, 92, 246, 0.35); color: #7c3aed; }
-  .safety-chip.autosos  { background: rgba(245, 158, 11, 0.18); border: 1px solid rgba(245, 158, 11, 0.35); color: #d97706; }
+  .safety-chip.geofence { background: rgba(139, 92, 246, 0.18); border: 1px solid rgba(139, 92, 246, 0.35); color: var(--violet-600); }
+  .safety-chip.autosos  { background: rgba(245, 158, 11, 0.18); border: 1px solid rgba(245, 158, 11, 0.35); color: var(--warning-600); }
   .safety-chip.checkin  { background: rgba(6, 182, 212, 0.18); border: 1px solid rgba(6, 182, 212, 0.35); color: #0891b2; }
 
-  :global([data-theme="dark"]) .safety-chip.geofence { background: rgba(139, 92, 246, 0.22); color: #a78bfa; }
-  :global([data-theme="dark"]) .safety-chip.autosos  { background: rgba(245, 158, 11, 0.22); color: #fbbf24; }
-  :global([data-theme="dark"]) .safety-chip.checkin  { background: rgba(6, 182, 212, 0.22); color: #22d3ee; }
+  :global([data-theme="dark"]) .safety-chip.geofence { background: rgba(139, 92, 246, 0.22); color: var(--violet-400); }
+  :global([data-theme="dark"]) .safety-chip.autosos  { background: rgba(245, 158, 11, 0.22); color: var(--warning-400); }
+  :global([data-theme="dark"]) .safety-chip.checkin  { background: rgba(6, 182, 212, 0.22); color: var(--cyan-400); }
   .safety-icon { font-size: 13px; }
   .safety-detail { opacity: 0.7; font-weight: 500; font-size: 10px; }
   @media (max-width: 767px) {
@@ -1308,7 +1358,7 @@
     position: absolute;
     inset: -8px;
     border-radius: 50%;
-    border: 2px solid var(--user-color, #3b82f6);
+    border: 2px solid var(--user-color, var(--blue-500));
     pointer-events: none;
     animation: marker-pulse-ring 2s ease-out infinite;
   }

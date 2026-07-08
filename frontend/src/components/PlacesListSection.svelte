@@ -1,23 +1,37 @@
 <script>
+  
+
   /**
-   * PlacesListSection — saved places list, zone story, and add-place form.
-   * Receives places and callbacks from SavedPlacesPanel (the orchestrator).
+   * @typedef {Object} Props
+   * @property {any} [places] - PlacesListSection — saved places list, zone story, and add-place form.
+Receives places and callbacks from SavedPlacesPanel (the orchestrator).
+   * @property {any} [iconOptions]
+   * @property {any} [iconEmoji]
+   * @property {any} onAdd - fn(name, radius, icon) → Promise
+   * @property {any} onRemove - fn(placeId, placeName)
+   * @property {any} onViewStory - fn(placeId)
+   * @property {any} [storyPlaceId]
+   * @property {boolean} [storyLoading]
+   * @property {any} [storyVisits]
    */
-  export let places = [];
-  export let iconOptions = [];
-  export let iconEmoji = {};
-  export let onAdd;       // fn(name, radius, icon) → Promise
-  export let onRemove;    // fn(placeId, placeName)
-  export let onViewStory; // fn(placeId)
 
-  export let storyPlaceId = null;
-  export let storyLoading = false;
-  export let storyVisits = [];
+  /** @type {Props} */
+  let {
+    places = [],
+    iconOptions = [],
+    iconEmoji = {},
+    onAdd,
+    onRemove,
+    onViewStory,
+    storyPlaceId = null,
+    storyLoading = false,
+    storyVisits = []
+  } = $props();
 
-  let newPlaceName = '';
-  let newPlaceRadius = 100;
-  let newPlaceIcon = 'pin';
-  let showAddPlace = false;
+  let newPlaceName = $state('');
+  let newPlaceRadius = $state(100);
+  let newPlaceIcon = $state('pin');
+  let showAddPlace = $state(false);
 
   function formatDuration(seconds) {
     if (!seconds) return '';
@@ -72,7 +86,7 @@
       </div>
       <p class="empty-title">No saved places yet</p>
       <p class="empty-sub">Add home or work to get arrival and departure alerts.</p>
-      <button class="btn btn-primary btn-sm" on:click={() => showAddPlace = true}>
+      <button class="btn btn-primary btn-sm" onclick={() => showAddPlace = true}>
         Add a Place
       </button>
     </div>
@@ -86,7 +100,7 @@
         </div>
         <button
           class="icon-action"
-          on:click={() => onViewStory(place.id)}
+          onclick={() => onViewStory(place.id)}
           aria-label="View visit history for {place.name}"
           aria-expanded={storyPlaceId === place.id}
         >
@@ -94,7 +108,7 @@
         </button>
         <button
           class="icon-action icon-action--danger"
-          on:click={() => onRemove(place.id, place.name)}
+          onclick={() => onRemove(place.id, place.name)}
           aria-label="Remove {place.name}"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
@@ -168,21 +182,21 @@
       <div class="form-actions">
         <button
           class="btn btn-primary btn-sm"
-          on:click={handleAdd}
+          onclick={handleAdd}
           disabled={!newPlaceName.trim()}
         >
           Save This Place
         </button>
         <button
           class="btn btn-secondary btn-sm"
-          on:click={() => { showAddPlace = false; newPlaceName = ''; }}
+          onclick={() => { showAddPlace = false; newPlaceName = ''; }}
         >
           Cancel
         </button>
       </div>
     </div>
   {:else if places.length > 0}
-    <button class="btn btn-secondary btn-sm add-btn" on:click={() => showAddPlace = true}>
+    <button class="btn btn-secondary btn-sm add-btn" onclick={() => showAddPlace = true}>
       + Add a Place
     </button>
   {/if}

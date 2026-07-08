@@ -1,8 +1,14 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
 
-  export let lastUpdateAt = null; // unix ms
-  export let movementPhase = null; // 'stationary' | 'walking' | 'driving' | 'transit'
+  /**
+   * @typedef {Object} Props
+   * @property {any} [lastUpdateAt] - unix ms
+   * @property {any} [movementPhase] - 'stationary' | 'walking' | 'driving' | 'transit'
+   */
+
+  /** @type {Props} */
+  let { lastUpdateAt = null, movementPhase = null } = $props();
 
   // Decay constants (seconds) per movement phase
   const DECAY = {
@@ -13,14 +19,14 @@
     default: 300,
   };
 
-  let now = Date.now();
+  let now = $state(Date.now());
   let intervalId;
 
-  $: elapsed = lastUpdateAt ? (now - lastUpdateAt) / 1000 : Infinity;
-  $: k = 1 / (DECAY[movementPhase] ?? DECAY.default);
-  $: confidence = lastUpdateAt ? Math.exp(-k * elapsed) : 0;
-  $: dots = Math.round(confidence * 5);
-  $: dotColor = dots >= 4 ? 'dot-green' : dots >= 2 ? 'dot-amber' : 'dot-red';
+  let elapsed = $derived(lastUpdateAt ? (now - lastUpdateAt) / 1000 : Infinity);
+  let k = $derived(1 / (DECAY[movementPhase] ?? DECAY.default));
+  let confidence = $derived(lastUpdateAt ? Math.exp(-k * elapsed) : 0);
+  let dots = $derived(Math.round(confidence * 5));
+  let dotColor = $derived(dots >= 4 ? 'dot-green' : dots >= 2 ? 'dot-amber' : 'dot-red');
 
   onMount(() => {
     intervalId = setInterval(() => { now = Date.now(); }, 10_000);

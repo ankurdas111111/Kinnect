@@ -1,27 +1,28 @@
 <script>
+  import { run } from 'svelte/legacy';
+
   import { fade, scale } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { PIN_ICONS } from '../lib/pinIcons.js';
   import { apiPost } from '../lib/api.js';
-  import { emitSyncPlace } from '../lib/socket.js';
   import { savedPlaces } from '../lib/stores/savedPlaces.js';
   import { myRooms } from '../lib/stores/rooms.js';
 
-  export let lat;
-  export let lng;
-  export let onClose;
+  let { lat, lng, onClose } = $props();
 
-  let name = '';
-  let selectedIcon = 'pin';
-  let visibility = 'personal'; // 'personal' | 'room' | 'universal'
-  let selectedRoomCode = '';
-  let saving = false;
-  let error = '';
+  let name = $state('');
+  let selectedIcon = $state('pin');
+  let visibility = $state('personal'); // 'personal' | 'room' | 'universal'
+  let selectedRoomCode = $state('');
+  let saving = $state(false);
+  let error = $state('');
 
   // Pre-select first room when user switches to 'room' visibility
-  $: if (visibility === 'room' && !selectedRoomCode && $myRooms.length > 0) {
-    selectedRoomCode = $myRooms[0].code;
-  }
+  run(() => {
+    if (visibility === 'room' && !selectedRoomCode && $myRooms.length > 0) {
+      selectedRoomCode = $myRooms[0].code;
+    }
+  });
 
   function onBackdropClick(e) {
     if (e.target === e.currentTarget) onClose();
@@ -45,7 +46,10 @@
       });
       if (place?.id) {
         savedPlaces.update(m => { m.set(place.id, place); return m; });
-        if (visibility !== 'personal') emitSyncPlace('add', place);
+        // Note: emitSyncPlace('add', place) used to be called here for shared
+        // pins, but that export (and any syncPlace event) never existed — the
+        // TypeError was caught below and shown as a false "Network error".
+        // Shared pins reach other members via the places API on their next load.
         onClose();
       } else {
         error = place?.error || 'Failed to save pin.';
@@ -58,8 +62,8 @@
   }
 </script>
 
-<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-<div class="cpd-backdrop" on:click={onBackdropClick} transition:fade={{ duration: 150 }} role="presentation">
+<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+<div class="cpd-backdrop" onclick={onBackdropClick} transition:fade={{ duration: 150 }} role="presentation">
   <div
     class="cpd-card"
     role="dialog"
@@ -69,7 +73,7 @@
   >
     <div class="cpd-header">
       <span class="cpd-title">Add Pin</span>
-      <button class="cpd-close" on:click={onClose} aria-label="Close">
+      <button class="cpd-close" onclick={onClose} aria-label="Close">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -87,7 +91,7 @@
         maxlength="100"
         placeholder="e.g. Home, School, Meeting point"
         bind:value={name}
-        on:keydown={(e) => e.key === 'Enter' && !saving && handleCreate()}
+        onkeydown={(e) => e.key === 'Enter' && !saving && handleCreate()}
         autofocus
       />
 
@@ -101,7 +105,7 @@
             aria-checked={selectedIcon === icon.id}
             aria-label={icon.label}
             title={icon.label}
-            on:click={() => selectedIcon = icon.id}
+            onclick={() => selectedIcon = icon.id}
           >
             <span class="cpd-emoji">{icon.emoji}</span>
             <span class="cpd-icon-label">{icon.label}</span>
@@ -116,7 +120,7 @@
           class:selected={visibility === 'personal'}
           role="radio"
           aria-checked={visibility === 'personal'}
-          on:click={() => visibility = 'personal'}
+          onclick={() => visibility = 'personal'}
         >
           <span class="cpd-vis-icon">🔒</span>
           <span class="cpd-vis-text">
@@ -129,7 +133,7 @@
           class:selected={visibility === 'room'}
           role="radio"
           aria-checked={visibility === 'room'}
-          on:click={() => visibility = 'room'}
+          onclick={() => visibility = 'room'}
           disabled={$myRooms.length === 0}
           title={$myRooms.length === 0 ? 'You are not in any rooms' : undefined}
         >
@@ -144,7 +148,7 @@
           class:selected={visibility === 'universal'}
           role="radio"
           aria-checked={visibility === 'universal'}
-          on:click={() => visibility = 'universal'}
+          onclick={() => visibility = 'universal'}
         >
           <span class="cpd-vis-icon">👨‍👩‍👧</span>
           <span class="cpd-vis-text">
@@ -168,8 +172,8 @@
     </div>
 
     <div class="cpd-footer">
-      <button class="btn btn-secondary" on:click={onClose}>Cancel</button>
-      <button class="btn btn-primary" on:click={handleCreate} disabled={saving}>
+      <button class="btn btn-secondary" onclick={onClose}>Cancel</button>
+      <button class="btn btn-primary" onclick={handleCreate} disabled={saving}>
         {saving ? 'Saving…' : 'Add Pin'}
       </button>
     </div>

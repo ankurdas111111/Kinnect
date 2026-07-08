@@ -1,19 +1,27 @@
 <script>
+  import { self } from 'svelte/legacy';
+
   import { createEventDispatcher, onMount } from 'svelte';
   import { authUser } from '../lib/stores/auth.js';
   import { socket } from '../lib/socket.js';
 
-  export let visible = false;
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [visible]
+   */
+
+  /** @type {Props} */
+  let { visible = false } = $props();
 
   const dispatch = createEventDispatcher();
 
-  let step = 1;
-  let contactCode = '';
-  let adding = false;
-  let addError = '';
-  let addSuccess = false;
+  let step = $state(1);
+  let contactCode = $state('');
+  let adding = $state(false);
+  let addError = $state('');
+  let addSuccess = $state(false);
 
-  $: shareCode = $authUser?.shareCode || '';
+  let shareCode = $derived($authUser?.shareCode || '');
 
   function handleAddContact() {
     if (!contactCode.trim() || adding || addSuccess) return;
@@ -50,7 +58,7 @@
 </script>
 
 {#if visible}
-  <div class="onboarding-backdrop" on:click|self={() => dispatch('dismiss')} on:keydown={(e) => { if (e.key === 'Escape') dispatch('dismiss'); }} role="dialog" aria-modal="true" aria-label="Get started" tabindex="-1">
+  <div class="onboarding-backdrop" onclick={self(() => dispatch('dismiss'))} onkeydown={(e) => { if (e.key === 'Escape') dispatch('dismiss'); }} role="dialog" aria-modal="true" aria-label="Get started" tabindex="-1">
     <div class="onboarding-card">
       <!-- Step indicators -->
       <div class="step-indicators" aria-label="Step {step} of 2">
@@ -80,10 +88,10 @@
             Your location is private. Only your family can see it.
           </div>
           <div class="onboarding-actions">
-            <button class="btn-primary-full" on:click={() => { dispatch('requestPermission'); step = 2; }}>
+            <button class="btn-primary-full" onclick={() => { dispatch('requestPermission'); step = 2; }}>
               Turn on location
             </button>
-            <button class="btn-ghost-sm" on:click={() => step = 2}>Maybe later</button>
+            <button class="btn-ghost-sm" onclick={() => step = 2}>Maybe later</button>
           </div>
         </div>
       {:else}
@@ -97,7 +105,7 @@
             <span class="code-label">Your family code</span>
             <div class="code-display">
               <span class="code-value">{shareCode || '—'}</span>
-              <button class="copy-btn" on:click={copyCode} aria-label="Copy or share code" disabled={!shareCode}>
+              <button class="copy-btn" onclick={copyCode} aria-label="Copy or share code" disabled={!shareCode}>
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
               </button>
             </div>
@@ -111,9 +119,9 @@
               bind:value={contactCode}
               maxlength="10"
               style="text-transform:uppercase"
-              on:keydown={(e) => e.key === 'Enter' && handleAddContact()}
+              onkeydown={(e) => e.key === 'Enter' && handleAddContact()}
             />
-            <button class="add-btn" on:click={handleAddContact} disabled={adding || !contactCode.trim() || addSuccess}>
+            <button class="add-btn" onclick={handleAddContact} disabled={adding || !contactCode.trim() || addSuccess}>
               {#if adding}
                 <span class="mini-spinner"></span>
               {:else if addSuccess}
@@ -130,7 +138,7 @@
             <span class="add-success">You're connected!</span>
           {/if}
 
-          <button class="btn-ghost-sm" style="margin-top: var(--space-4)" on:click={() => dispatch('dismiss')}>
+          <button class="btn-ghost-sm" style="margin-top: var(--space-4)" onclick={() => dispatch('dismiss')}>
             I'm all set
           </button>
         </div>
@@ -168,9 +176,10 @@
       inset 0 1px 0 rgba(255, 255, 255, 0.20),
       inset 0 -1px 0 rgba(0, 0, 0, 0.05);
     border-radius: 24px;
-    padding: 28px 24px;
-    max-width: 360px;
-    width: 100%;
+    /* Viewport-proportional: 22.5rem (360px, previous fixed max) is the floor
+       so mobile renders identically; grows with 32vw and caps at 32rem. */
+    width: min(92vw, clamp(22.5rem, 32vw, 32rem));
+    padding: clamp(28px, 2.2vw, 40px) clamp(24px, 1.9vw, 36px);
     /* 3D flip entrance */
     animation: card-3d-flip-in 500ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
     display: flex;
@@ -214,8 +223,8 @@
   }
 
   .brand-icon {
-    width: 76px;
-    height: 76px;
+    width: clamp(76px, 5.5vw, 88px);
+    height: clamp(76px, 5.5vw, 88px);
     background: linear-gradient(135deg, rgba(99,102,241,0.18) 0%, rgba(139,92,246,0.12) 100%);
     border-radius: 22px;
     display: flex;
@@ -235,7 +244,7 @@
 
   .onboarding-title {
     font-family: var(--font-display);
-    font-size: 22px;
+    font-size: clamp(22px, 1.6vw, 27px);
     font-weight: 800;
     color: var(--text-primary);
     margin: 0;
@@ -243,11 +252,11 @@
   }
 
   .onboarding-desc {
-    font-size: 14px;
+    font-size: clamp(14px, 1vw, 16px);
     color: var(--text-secondary);
     line-height: 1.55;
     margin: 0;
-    max-width: 280px;
+    max-width: min(100%, clamp(280px, 22vw, 400px));
   }
 
   .privacy-note {
@@ -255,7 +264,7 @@
     align-items: center;
     gap: 6px;
     font-family: var(--font-display);
-    font-size: 12px;
+    font-size: clamp(12px, 0.85vw, 13px);
     font-weight: 500;
     color: var(--text-tertiary);
     background: rgba(99, 102, 241, 0.06);
@@ -351,7 +360,7 @@
 
   .code-value {
     font-family: ui-monospace, 'Cascadia Code', 'JetBrains Mono', monospace;
-    font-size: 18px;
+    font-size: clamp(18px, 1.2vw, 21px);
     font-weight: 800;
     letter-spacing: 0.12em;
     color: var(--primary-600);

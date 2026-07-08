@@ -451,23 +451,26 @@ func (h *Hub) handleGetGeofenceLog(c *Client, _ json.RawMessage) {
 	if user == nil {
 		return
 	}
-	rows, err := db.GetGeofenceEvents(context.Background(), h.pool.DB, user.UserID, 50)
-	if err != nil {
-		c.Send("geofenceLog", map[string]interface{}{"events": []interface{}{}})
-		return
-	}
-	events := make([]map[string]interface{}, 0, len(rows))
-	for _, r := range rows {
-		events = append(events, map[string]interface{}{
-			"id":        r.ID,
-			"fenceName": r.FenceName,
-			"eventType": r.EventType,
-			"lat":       r.Lat,
-			"lng":       r.Lng,
-			"ts":        r.Ts,
-		})
-	}
-	c.Send("geofenceLog", map[string]interface{}{"events": events})
+	userID := user.UserID
+	h.offloadDB(func(ctx context.Context) {
+		rows, err := db.GetGeofenceEvents(ctx, h.pool.DB, userID, 50)
+		if err != nil {
+			c.Send("geofenceLog", map[string]interface{}{"events": []interface{}{}})
+			return
+		}
+		events := make([]map[string]interface{}, 0, len(rows))
+		for _, r := range rows {
+			events = append(events, map[string]interface{}{
+				"id":        r.ID,
+				"fenceName": r.FenceName,
+				"eventType": r.EventType,
+				"lat":       r.Lat,
+				"lng":       r.Lng,
+				"ts":        r.Ts,
+			})
+		}
+		c.Send("geofenceLog", map[string]interface{}{"events": events})
+	})
 }
 
 func toInt(v interface{}) (int, bool) {

@@ -1,4 +1,6 @@
 <script>
+  import { self } from 'svelte/legacy';
+
   import { get } from 'svelte/store';
   import { fade, fly } from 'svelte/transition';
   import { authUser } from '../lib/stores/auth.js';
@@ -6,19 +8,19 @@
   import { getShareOrigin } from '../lib/env.js';
   import { toasts } from '../lib/stores/toast.js';
 
-  export let open = false;
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [open]
+   */
 
-  let copyDone = false;
-  let copyCodeDone = false;
+  /** @type {Props} */
+  let { open = $bindable(false) } = $props();
 
-  // App URL
-  $: appUrl = getShareOrigin();
+  let copyDone = $state(false);
+  let copyCodeDone = $state(false);
 
-  // Best room to feature in the invite (first one, or none)
-  $: featuredRoom = $myRooms.length > 0 ? $myRooms[0] : null;
 
-  // Invite text — conversational Indian-family tone
-  $: waText = buildWaText($authUser, featuredRoom, appUrl);
+
 
   function buildWaText(user, room, url) {
     const name = user?.displayName?.split(' ')[0] ?? 'me';
@@ -67,11 +69,17 @@
   }
 
   function close() { open = false; }
+  // App URL
+  let appUrl = $derived(getShareOrigin());
+  // Best room to feature in the invite (first one, or none)
+  let featuredRoom = $derived($myRooms.length > 0 ? $myRooms[0] : null);
+  // Invite text — conversational Indian-family tone
+  let waText = $derived(buildWaText($authUser, featuredRoom, appUrl));
 </script>
 
 {#if open}
-  <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div class="inv-backdrop" transition:fade={{ duration: 150 }} on:click|self={close}>
+  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+  <div class="inv-backdrop" transition:fade={{ duration: 150 }} onclick={self(close)}>
     <div class="inv-sheet" transition:fly={{ y: 80, duration: 220 }}>
       <div class="inv-drag-handle" aria-hidden="true"></div>
 
@@ -89,7 +97,7 @@
           <p class="inv-title">Invite Family</p>
           <p class="inv-sub">Invite family, friends &amp; close ones via WhatsApp</p>
         </div>
-        <button class="inv-close-btn" on:click={close} aria-label="Close">
+        <button class="inv-close-btn" onclick={close} aria-label="Close">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
@@ -112,7 +120,7 @@
             <span class="inv-code-label">{featuredRoom ? 'Group code' : 'My code'}</span>
             <span class="inv-code-value">{code}</span>
           </div>
-          <button class="inv-copy-code-btn" on:click={copyCode} aria-label="Copy code">
+          <button class="inv-copy-code-btn" onclick={copyCode} aria-label="Copy code">
             {#if copyCodeDone}
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
               <span style="color:#4ade80">Copied</span>
@@ -126,11 +134,11 @@
 
       <!-- Action buttons -->
       <div class="inv-actions">
-        <button class="inv-wa-btn" on:click={shareWhatsApp}>
+        <button class="inv-wa-btn" onclick={shareWhatsApp}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.016.5 3.914 1.37 5.582L0 24l6.618-1.342A11.954 11.954 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 0 1-5.013-1.375l-.36-.213-3.727.757.788-3.613-.234-.372A9.818 9.818 0 0 1 2.182 12C2.182 6.566 6.566 2.182 12 2.182c5.433 0 9.818 4.384 9.818 9.818 0 5.433-4.385 9.818-9.818 9.818z"/></svg>
           Share on WhatsApp
         </button>
-        <button class="inv-copy-btn" on:click={copyLink}>
+        <button class="inv-copy-btn" onclick={copyLink}>
           {#if copyDone}
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
             <span style="color:#4ade80">Link copied!</span>

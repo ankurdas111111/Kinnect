@@ -6,16 +6,21 @@
   import { historyPoints, historyLoading, historyTarget, historyDate, historyVisible, historyPlayback } from '../lib/stores/history.js';
   import { myContacts } from '../lib/stores/contacts.js';
 
-  export let embedded = false;
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [embedded]
+   */
+
+  /** @type {Props} */
+  let { embedded = false } = $props();
 
   const dispatch = createEventDispatcher();
 
-  let selectedUserId = '';
-  let dateInput = $historyDate;
+  let selectedUserId = $state('');
+  let dateInput = $state($historyDate);
   let playTimer = null;
   let historyTimeout;
 
-  $: visibleUsers = buildUserList($otherUsers, $myContacts, $authUser);
 
   function buildUserList(others, contacts, auth) {
     const list = [];
@@ -114,7 +119,8 @@
     return Math.round(d * 10) / 10;
   }
 
-  $: distKm = calcDistance($historyPoints);
+  let visibleUsers = $derived(buildUserList($otherUsers, $myContacts, $authUser));
+  let distKm = $derived(calcDistance($historyPoints));
 </script>
 
 {#if embedded}
@@ -147,14 +153,14 @@
       <div class="history-actions">
         <button
           class="btn btn-primary btn-sm"
-          on:click={fetchHistory}
+          onclick={fetchHistory}
           disabled={!selectedUserId || $historyLoading}
           aria-busy={$historyLoading}
         >
           {$historyLoading ? 'Loading…' : 'Show Route'}
         </button>
         {#if $historyVisible}
-          <button class="btn btn-secondary btn-sm" on:click={clearHistory}>Clear</button>
+          <button class="btn btn-secondary btn-sm" onclick={clearHistory}>Clear</button>
         {/if}
       </div>
     </div>
@@ -208,7 +214,7 @@
           min="0"
           max={Math.max(0, $historyPoints.length - 1)}
           value={$historyPlayback.index}
-          on:input={onSlider}
+          oninput={onSlider}
           class="playback-slider"
           aria-label="Scrub through route"
           aria-valuemin="0"
@@ -220,7 +226,7 @@
           class="btn btn-sm play-btn"
           class:btn-primary={!$historyPlayback.playing}
           class:btn-secondary={$historyPlayback.playing}
-          on:click={togglePlayback}
+          onclick={togglePlayback}
           aria-label={$historyPlayback.playing ? 'Pause route playback' : 'Play route playback'}
           aria-pressed={$historyPlayback.playing}
         >
@@ -248,7 +254,7 @@
         </div>
         <p class="empty-title">No route data for this day</p>
         <p class="empty-sub">Location history is stored for 30 days. Try a different date or person.</p>
-        <button class="btn btn-secondary btn-sm empty-cta" on:click={() => { historyVisible.set(false); }}>
+        <button class="btn btn-secondary btn-sm empty-cta" onclick={() => { historyVisible.set(false); }}>
           Try another date
         </button>
       </div>
@@ -266,7 +272,7 @@
   <div class="panel-shell panel-left panel-base">
     <div class="panel-header">
       <h3>Route History</h3>
-      <button class="panel-close" on:click={() => dispatch('close')} aria-label="Close route history">&times;</button>
+      <button class="panel-close" onclick={() => dispatch('close')} aria-label="Close route history">&times;</button>
     </div>
     <div class="panel-body">
       <p>View route history from the sidebar.</p>

@@ -2,10 +2,21 @@
   import { createEventDispatcher } from 'svelte';
   import TiltCard from './TiltCard.svelte';
 
-  export let location = null;
-  export let trackingActive = false;
-  export let bufferedCount = 0;
-  export let socketConnected = false;
+  /**
+   * @typedef {Object} Props
+   * @property {any} [location]
+   * @property {boolean} [trackingActive]
+   * @property {number} [bufferedCount]
+   * @property {boolean} [socketConnected]
+   */
+
+  /** @type {Props} */
+  let {
+    location = null,
+    trackingActive = false,
+    bufferedCount = 0,
+    socketConnected = false
+  } = $props();
 
   const dispatch = createEventDispatcher();
 </script>
@@ -20,7 +31,7 @@
     <button
       class="btn btn-primary toggle"
       class:live={trackingActive}
-      on:click={() => dispatch('toggleTracking')}
+      onclick={() => dispatch('toggleTracking')}
       aria-pressed={trackingActive}
     >
       {trackingActive ? 'Stop' : 'Start'}
@@ -50,8 +61,8 @@
   {/if}
 
   <div class="footer">
-    <button class="btn btn-secondary" on:click={() => dispatch('centerOnMe')}>Center Me</button>
-    <button class="btn btn-secondary" on:click={() => dispatch('toggleFollow')}>Follow</button>
+    <button class="btn btn-secondary" onclick={() => dispatch('centerOnMe')}>Center Me</button>
+    <button class="btn btn-secondary" onclick={() => dispatch('toggleFollow')}>Follow</button>
     <span class="meta">
       {#if !socketConnected}
         reconnecting

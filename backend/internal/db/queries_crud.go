@@ -526,6 +526,35 @@ func UpsertDailyActivity(ctx context.Context, db *sql.DB, userID string, distanc
 	return err
 }
 
+// PersistPositionBundle writes everything a qualifying position update persists —
+// users.last_* snapshot, daily_activity upsert, and the position_history trail row —
+// in a single round trip via data-modifying CTEs. The previous 3 sequential
+// statements cost 3 RTTs to a remote DB per write on a 10-connection pool.
+// Guard semantics match UpdateUserLocation (only newer timestamps win).
+func PersistPositionBundle(ctx context.Context, db *sql.DB, userID string, lat, lng float64, speedStr string, speed float64, ts int64, distanceDeltaM int, addActiveMinute bool) error {
+	activeMinDelta := 0
+	if addActiveMinute {
+		activeMinDelta = 1
+	}
+	_, err := db.ExecContext(ctx, `
+		WITH loc AS (
+			UPDATE users SET last_latitude=$2, last_longitude=$3, last_speed=$4, last_update=$5
+			WHERE id=$1 AND (last_update IS NULL OR last_update < $5)
+		),
+		act AS (
+			INSERT INTO daily_activity (user_id, date, distance_m, active_minutes, updated_at)
+			VALUES ($1, CURRENT_DATE, $6, $7, $5)
+			ON CONFLICT (user_id, date) DO UPDATE
+			  SET distance_m     = daily_activity.distance_m + EXCLUDED.distance_m,
+			      active_minutes = daily_activity.active_minutes + EXCLUDED.active_minutes,
+			      updated_at     = EXCLUDED.updated_at
+		)
+		INSERT INTO position_history (user_id, lat, lng, speed, ts)
+		VALUES ($1, $2, $3, $8, $5)`,
+		userID, lat, lng, speedStr, ts, distanceDeltaM, activeMinDelta, speed)
+	return err
+}
+
 // GetDailyActivity returns the last N days of activity for a user.
 func GetDailyActivity(ctx context.Context, db *sql.DB, userID string, days int) ([]DailyActivityRow, error) {
 	rows, err := db.QueryContext(ctx,

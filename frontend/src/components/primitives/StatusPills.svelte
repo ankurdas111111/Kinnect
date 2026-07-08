@@ -1,12 +1,25 @@
 <script>
   import NetworkStateChip from './NetworkStateChip.svelte';
 
-  export let trackingActive = false;
-  export let lastAccuracy = null;
-  export let latencyMs = null;
-  export let isOnline = true;
-  export let socketConnected = false;
-  export let bufferedCount = 0;
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [trackingActive]
+   * @property {any} [lastAccuracy]
+   * @property {any} [latencyMs]
+   * @property {boolean} [isOnline]
+   * @property {boolean} [socketConnected]
+   * @property {number} [bufferedCount]
+   */
+
+  /** @type {Props} */
+  let {
+    trackingActive = false,
+    lastAccuracy = null,
+    latencyMs = null,
+    isOnline = true,
+    socketConnected = false,
+    bufferedCount = 0
+  } = $props();
 </script>
 
 <div class="status-pills" role="status" aria-live="polite">

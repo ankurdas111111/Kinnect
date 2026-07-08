@@ -3,14 +3,15 @@
   import { push } from 'svelte-spa-router';
   import { authUser, loadSession } from '../lib/stores/auth.js';
   import { socket, setupSocketHandlers } from '../lib/socket.js';
+  import Skeleton from '../components/primitives/Skeleton.svelte';
 
-  export let params = {};
+  let { params = {} } = $props();
 
-  let status = 'loading'; // loading | adding | success | error | login-required
-  let message = '';
+  let status = $state('loading'); // loading | adding | success | error | login-required
+  let message = $state('');
   let contactName = '';
 
-  $: code = (params.code || '').trim().toUpperCase();
+  let code = $derived((params.code || '').trim().toUpperCase());
 
   onMount(async () => {
     // Ensure session is loaded
@@ -113,9 +114,12 @@
     </div>
 
     {#if status === 'loading' || status === 'adding'}
-      <div class="add-contact-spinner"></div>
-      <h2>Adding contact...</h2>
-      <p class="add-contact-sub">Code: <code>{code}</code></p>
+      <h2>Adding contact…</h2>
+      <div class="add-contact-skeleton" aria-hidden="true">
+        <Skeleton variant="title" width="55%" />
+        <Skeleton variant="text" count={2} />
+      </div>
+      <p class="add-contact-sub">Code <span class="code-chip">{code}</span></p>
 
     {:else if status === 'success'}
       <div class="add-contact-icon success">
@@ -129,9 +133,9 @@
         <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
       </div>
       <h2>Sign in to add contact</h2>
-      <p class="add-contact-sub">You need to be logged in to add <code>{code}</code> as a contact.</p>
+      <p class="add-contact-sub">You need to be logged in to add <span class="code-chip">{code}</span> as a contact.</p>
       <p class="add-contact-sub">Redirecting to login...</p>
-      <a href="#/login" class="add-contact-btn">Sign in now</a>
+      <a href="#/login" class="add-contact-btn tactile">Sign in now</a>
 
     {:else if status === 'error'}
       <div class="add-contact-icon error">
@@ -139,7 +143,7 @@
       </div>
       <h2>Oops</h2>
       <p class="add-contact-sub">{message}</p>
-      <a href="#/" class="add-contact-btn">Open Kinnect</a>
+      <a href="#/" class="add-contact-btn tactile">Open Kinnect</a>
     {/if}
   </div>
 </div>
@@ -169,6 +173,8 @@
     align-items: center;
     gap: var(--space-3);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+    /* Card entrance — spring scale + fade, transform/opacity only. */
+    animation: card-in 360ms var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
   }
 
   .add-contact-logo {
@@ -198,23 +204,31 @@
     line-height: 1.5;
   }
 
-  .add-contact-sub code {
-    background: var(--surface-inset);
-    padding: 2px 8px;
-    border-radius: var(--radius-sm);
+  /* Token-styled share-code chip — monospace, subtle tint + border. */
+  .code-chip {
+    display: inline-flex;
+    align-items: center;
+    background: var(--primary-500-12, var(--surface-inset));
+    border: 1px solid var(--primary-500-30, var(--border-default));
+    padding: 2px 10px;
+    border-radius: var(--radius-full, 9999px);
+    font-family: var(--font-mono, monospace);
     font-size: var(--text-sm);
     font-weight: 600;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.08em;
     color: var(--text-primary);
+    vertical-align: baseline;
   }
 
-  .add-contact-spinner {
-    width: 36px;
-    height: 36px;
-    border: 3px solid var(--border-default);
-    border-top-color: var(--primary-500);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
+  /* Skeleton block for the loading / adding state. */
+  .add-contact-skeleton {
+    width: 100%;
+    max-width: 240px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) 0;
   }
 
   .add-contact-icon {
@@ -229,22 +243,28 @@
   .add-contact-icon.success {
     background: var(--success-500, #10b981);
     color: white;
+    /* Success glow */
+    box-shadow: 0 0 20px var(--success-500-20), 0 0 40px var(--success-500-20);
   }
 
   .add-contact-icon.error {
     background: var(--danger-500, #ef4444);
     color: white;
+    /* Danger glow */
+    box-shadow: var(--glow-sos-sm, 0 0 20px var(--danger-500-20));
   }
 
   .add-contact-icon.info {
     background: var(--primary-500);
     color: white;
+    box-shadow: var(--glow-primary-sm, 0 0 20px var(--primary-500-20));
   }
 
   .add-contact-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    min-height: 44px;
     padding: var(--space-2) var(--space-5);
     background: var(--primary-500);
     color: white;
@@ -261,5 +281,12 @@
     background: var(--primary-600);
   }
 
-  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes card-in {
+    from { opacity: 0; transform: scale(0.94); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .add-contact-card { animation: none; }
+  }
 </style>

@@ -17,8 +17,10 @@
    *   typing     (active: bool)   — typing indicator changed
    *
    * iOS notes:
-   *   - field-sizing:content is NOT supported on iOS Safari — we use a JS
-   *     auto-resize approach on the textarea instead.
+   *   - field-sizing:content is used natively where supported (Chrome/Edge 123+,
+   *     Safari 26+); on iOS Safari versions without it we fall back to the JS
+   *     auto-resize approach on the textarea (autoResize skips itself when the
+   *     browser supports field-sizing).
    *   - The compose footer uses padding-bottom: max(space-4, safe-area-inset-bottom)
    *     so it always clears the home indicator on iPhone.
    *   - When rendered inside SecretChatViewer, --keyboard-offset CSS var is set
@@ -37,30 +39,44 @@
   import EmojiPicker from './primitives/EmojiPicker.svelte';
   import StickerPicker from './primitives/StickerPicker.svelte';
 
-  export let peerFirst = 'them';
-  export let sending = false;
-  export let photoSending = false;
-  export let hasPin = false;
+  /**
+   * @typedef {Object} Props
+   * @property {string} [peerFirst]
+   * @property {boolean} [sending]
+   * @property {boolean} [photoSending]
+   * @property {boolean} [hasPin]
+   */
+
+  /** @type {Props} */
+  let {
+    peerFirst = 'them',
+    sending = false,
+    photoSending = false,
+    hasPin = false
+  } = $props();
 
   const dispatch = createEventDispatcher();
 
-  let composeText = '';
-  let composeTextEl;
-  let emojiOpen = false;
-  let emojiAnchor;
-  let stickerOpen = false;
-  let stickerAnchor;
-  let attachMenuOpen = false;
-  let photoInputEl;
-  let cameraInputEl;
+  let composeText = $state('');
+  let composeTextEl = $state();
+  let emojiOpen = $state(false);
+  let emojiAnchor = $state();
+  let stickerOpen = $state(false);
+  let stickerAnchor = $state();
+  let attachMenuOpen = $state(false);
+  let photoInputEl = $state();
+  let cameraInputEl = $state();
   let isTyping = false;
   let _typingTimer = null;
 
   onDestroy(() => { clearTimeout(_typingTimer); });
 
-  // Auto-resize textarea — iOS Safari does not support field-sizing:content
+  // JS auto-resize fallback for browsers without CSS field-sizing:content
+  // (notably older iOS Safari). When field-sizing is supported the CSS
+  // @supports block below handles growth natively and this is a no-op.
   function autoResize(el) {
     if (!el) return;
+    if ('fieldSizing' in el.style) return; // native field-sizing:content active
     el.style.height = 'auto';
     const maxH = 120;
     const scrollH = el.scrollHeight;
@@ -138,7 +154,7 @@
 </script>
 
 <!-- ── Compose footer ───────────────────────────────────────── -->
-<footer class="scc-compose scv-compose">
+<footer class="scc-compose scv-compose fx-glass">
   <div class="scc-compose-inner">
 
     <!-- Panic/blank-screen button.
@@ -148,7 +164,7 @@
          strict-mode locator conflict (2 elements match). -->
     <button
       class="scc-icon-btn scc-icon-btn--panic"
-      on:click={() => dispatch('panic')}
+      onclick={() => dispatch('panic')}
       aria-label="Blank screen"
       title="Blank screen for privacy"
       type="button"
@@ -164,7 +180,7 @@
     <button
       class="scc-icon-btn"
       bind:this={emojiAnchor}
-      on:click={() => { emojiOpen = !emojiOpen; stickerOpen = false; haptics.tap?.(); }}
+      onclick={() => { emojiOpen = !emojiOpen; stickerOpen = false; haptics.tap?.(); }}
       aria-label="Open emoji picker"
       aria-expanded={emojiOpen}
       aria-haspopup="true"
@@ -182,7 +198,7 @@
     <button
       class="scc-icon-btn"
       bind:this={stickerAnchor}
-      on:click={() => { stickerOpen = !stickerOpen; emojiOpen = false; haptics.tap?.(); }}
+      onclick={() => { stickerOpen = !stickerOpen; emojiOpen = false; haptics.tap?.(); }}
       aria-label="Open sticker picker"
       aria-expanded={stickerOpen}
       aria-haspopup="true"
@@ -195,9 +211,9 @@
 
     <!-- Hidden file inputs -->
     <input bind:this={photoInputEl} type="file" accept="image/*" style="display:none"
-           on:change={handlePhotoSelect} aria-hidden="true" tabindex="-1" />
+           onchange={handlePhotoSelect} aria-hidden="true" tabindex="-1" />
     <input bind:this={cameraInputEl} type="file" accept="image/*" capture="environment"
-           style="display:none" on:change={handlePhotoSelect} aria-hidden="true" tabindex="-1" />
+           style="display:none" onchange={handlePhotoSelect} aria-hidden="true" tabindex="-1" />
 
     <!-- Attach / camera menu -->
     <div class="scc-attach-wrap">
@@ -205,7 +221,7 @@
         class="scc-icon-btn"
         class:scc-icon-btn--loading={photoSending}
         class:scc-icon-btn--active={attachMenuOpen}
-        on:click={toggleAttachMenu}
+        onclick={toggleAttachMenu}
         aria-label="Send encrypted photo"
         aria-expanded={attachMenuOpen}
         aria-haspopup="menu"
@@ -224,7 +240,7 @@
       {#if attachMenuOpen}
         <div class="scc-attach-menu" role="menu" aria-label="Photo source">
           <button class="scc-attach-item" type="button" role="menuitem"
-                  on:click={() => { attachMenuOpen = false; cameraInputEl?.click(); }}>
+                  onclick={() => { attachMenuOpen = false; cameraInputEl?.click(); }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
               <circle cx="12" cy="13" r="4"/>
@@ -232,7 +248,7 @@
             Take Photo
           </button>
           <button class="scc-attach-item" type="button" role="menuitem"
-                  on:click={() => { attachMenuOpen = false; photoInputEl?.click(); }}>
+                  onclick={() => { attachMenuOpen = false; photoInputEl?.click(); }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
               <circle cx="8.5" cy="8.5" r="1.5"/>
@@ -253,16 +269,16 @@
       placeholder="Message {peerFirst}…"
       bind:value={composeText}
       bind:this={composeTextEl}
-      on:keydown={handleKeydown}
-      on:input={handleInput}
+      onkeydown={handleKeydown}
+      oninput={handleInput}
       disabled={sending}
     ></textarea>
 
     <button
-      class="scc-send-btn scv-send-btn"
+      class="scc-send-btn scv-send-btn tactile"
       class:scc-send-btn--active={composeText.trim().length > 0}
       class:scv-send-btn--active={composeText.trim().length > 0}
-      on:click={send}
+      onclick={send}
       disabled={sending || !composeText.trim()}
       aria-label="Send encrypted message"
       type="button"
@@ -306,8 +322,13 @@
 />
 
 <style>
-  /* ── Compose footer ───────────────────────────────────────────── */
+  /* ── Compose footer — Liquid-glass surface (.fx-glass) ─────────── */
   footer.scc-compose {
+    /* Scope the shared glass border tokens to the chat's teal theme so the
+       frosted panel provided by .fx-glass stays on-brand instead of adopting
+       the app-wide violet edge. Background / blur / shadow come from .fx-glass. */
+    --glass-border:        var(--chat-border, rgba(255, 255, 255, 0.07));
+    --glass-border-strong: var(--chat-border-accent, rgba(20, 184, 166, 0.22));
     /* Consume keyboard-offset CSS var set by parent's VisualViewport listener.
        This moves the compose bar up by the keyboard height on iOS Chrome/Safari
        without changing the stacking context (no translateY on parent). */
@@ -320,10 +341,6 @@
     flex-direction: column;
     gap: var(--space-1-5, 6px);
     flex-shrink: 0;
-    background: rgba(6, 6, 16, 0.92);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   }
 
   .scc-compose-inner {
@@ -377,13 +394,23 @@
     font-family: var(--font-sans, 'Nunito', sans-serif);
     transition: border-color 0.12s, box-shadow 0.12s;
     -webkit-appearance: none;
-    /* field-sizing:content is not supported on iOS Safari — JS autoResize() handles this */
+    /* Browsers without field-sizing (older iOS Safari): JS autoResize() handles growth */
     max-height: 120px;
     overflow-y: hidden;
     min-height: 44px;
     height: 44px;
     box-sizing: border-box;
     display: block;
+  }
+
+  /* Native content-sized textarea where supported (Baseline 2026) —
+     grows with input up to max-height, no JS measurement needed. */
+  @supports (field-sizing: content) {
+    .scc-compose-text {
+      field-sizing: content;
+      height: auto;
+      overflow-y: auto;
+    }
   }
   .scc-compose-text:focus {
     border-color: var(--chat-border-accent, rgba(20,184,166,0.22));
@@ -466,14 +493,16 @@
     display: flex; align-items: center; justify-content: space-between;
   }
 
+  /* Encryption trust cue — accent-tinted lock keeps E2E status clearly visible */
   .scc-compose-hint {
     display: flex; align-items: center;
     gap: var(--space-1-5, 6px);
     margin: 0;
     font-size: var(--text-2xs, 0.6875rem);
     font-family: var(--font-sans, 'Nunito', sans-serif);
-    color: rgba(255, 255, 255, 0.24);
+    color: rgba(255, 255, 255, 0.4);
   }
+  .scc-compose-hint svg { color: var(--chat-accent, #14b8a6); }
 
   .scc-char-count {
     font-size: var(--text-2xs, 0.6875rem);

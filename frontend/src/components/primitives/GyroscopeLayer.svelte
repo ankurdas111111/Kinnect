@@ -16,11 +16,23 @@
    */
   import { onMount, onDestroy } from 'svelte';
 
-  export let maxShift = 8;
-  export let depth = 1.0;
-  export let disabled = false;
+  /**
+   * @typedef {Object} Props
+   * @property {number} [maxShift]
+   * @property {number} [depth]
+   * @property {boolean} [disabled]
+   * @property {import('svelte').Snippet} [children]
+   */
 
-  let el;
+  /** @type {Props} */
+  let {
+    maxShift = 8,
+    depth = 1.0,
+    disabled = false,
+    children
+  } = $props();
+
+  let el = $state();
   let supported = false;
   let tx = 0, ty = 0;
   let cx = 0, cy = 0;
@@ -93,7 +105,7 @@
   bind:this={el}
   aria-hidden="true"
 >
-  <slot />
+  {@render children?.()}
 </div>
 
 <style>

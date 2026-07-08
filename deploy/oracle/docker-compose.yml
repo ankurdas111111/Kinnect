@@ -1,0 +1,27 @@
+# Kinnect app stack — plugs into the shared EDGE (Caddy + Postgres).
+# It publishes NO ports and runs NO proxy/db of its own.
+#   - `web` network: lets edge-caddy reach this backend by container_name.
+#   - `db`  network: lets this backend reach edge-postgres.
+# Start:  docker compose -f deploy/oracle/docker-compose.yml up -d --build
+services:
+  backend:
+    build:
+      context: ../..                 # repo root
+      dockerfile: Dockerfile.backend
+    image: kinnect-backend
+    container_name: kinnect-backend   # must match reverse_proxy target in edge/Caddyfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://kinnect:${KINNECT_DB_PASSWORD}@edge-postgres:5432/kinnect?sslmode=disable
+      SESSION_SECRET: ${SESSION_SECRET}
+      PORT: "3000"
+      NODE_ENV: production
+      CORS_ALLOWED_ORIGINS: https://${DOMAIN}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+    networks: [web, db]
+
+networks:
+  web:
+    external: true
+  db:
+    external: true

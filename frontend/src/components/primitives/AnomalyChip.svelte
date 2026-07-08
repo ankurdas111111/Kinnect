@@ -1,9 +1,15 @@
 <script>
   import { createEventDispatcher } from 'svelte';
 
-  // Props
-  export let state = null; // 'normal' | 'unusual' | 'unknown' | null
-  export let detail = '';
+  
+  /**
+   * @typedef {Object} Props
+   * @property {any} [state] - Props - 'normal' | 'unusual' | 'unknown' | null
+   * @property {string} [detail]
+   */
+
+  /** @type {Props} */
+  let { state = null, detail = '' } = $props();
 
   const dispatch = createEventDispatcher();
 
@@ -15,13 +21,13 @@
 </script>
 
 {#if state === 'unusual'}
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <span class="anomaly-chip chip-unusual" on:click={handleClick} role="button" tabindex="0" aria-label="Unusual activity — tap for detail">
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <span class="anomaly-chip chip-unusual" onclick={handleClick} role="button" tabindex="0" aria-label="Unusual activity — tap for detail">
     ⚠ Unusual
   </span>
 {:else if state === 'unknown'}
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <span class="anomaly-chip chip-unknown" on:click={handleClick} role="button" tabindex="0" aria-label="New — tap for detail">
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <span class="anomaly-chip chip-unknown" onclick={handleClick} role="button" tabindex="0" aria-label="New — tap for detail">
     New
   </span>
 {/if}

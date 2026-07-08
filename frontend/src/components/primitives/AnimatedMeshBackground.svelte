@@ -1,23 +1,25 @@
 <script>
+  
   /**
-   * AnimatedMeshBackground — aurora orbs + spatial grid + floating particles.
-   * Replaces manual decorative divs duplicated in Login and Register.
-   *
-   * Props:
-   *   variant  — 'brand' (teal, default) | 'neutral' (monochrome)
-   *   grid     — render spatial depth grid overlay (default true)
-   *   particles — render floating ambient particle dots (default true)
-   *
-   * Bug fixes applied:
-   *   - Added missing `variant` prop (Login/Register were passing variant="brand"
-   *     to an undeclared prop, causing a Svelte console warning)
-   *   - Fixed orb-3: removed base transform:translateX(-50%) which conflicted
-   *     with keyframe starting at translate(0,0), causing a snap on animation
-   *     start. Now uses left:calc(50% - 150px) for centering instead.
+   * @typedef {Object} Props
+   * @property {string} [variant] - AnimatedMeshBackground — aurora orbs + spatial grid + floating particles.
+Replaces manual decorative divs duplicated in Login and Register.
+Props:
+variant  — 'brand' (teal, default) | 'neutral' (monochrome)
+grid     — render spatial depth grid overlay (default true)
+particles — render floating ambient particle dots (default true)
+Bug fixes applied:
+- Added missing `variant` prop (Login/Register were passing variant="brand"
+to an undeclared prop, causing a Svelte console warning)
+- Fixed orb-3: removed base transform:translateX(-50%) which conflicted
+with keyframe starting at translate(0,0), causing a snap on animation
+start. Now uses left:calc(50% - 150px) for centering instead.
+   * @property {boolean} [grid]
+   * @property {boolean} [particles]
    */
-  export let variant = 'brand';
-  export let grid = true;
-  export let particles = true;
+
+  /** @type {Props} */
+  let { variant = 'brand', grid = true, particles = true } = $props();
 </script>
 
 <!-- Animated gradient blob -->

@@ -65,14 +65,14 @@
       class="toast toast-{toast.type}"
       out:fade={{ duration: 150 }}
       role="status"
-      on:pointerdown={(e) => onSwipeDown(e, toast.id)}
-      on:pointermove={onSwipeMove}
-      on:pointerup={(e) => onSwipeUp(e, toast.id)}
-      on:pointercancel={onSwipeCancel}
+      onpointerdown={(e) => onSwipeDown(e, toast.id)}
+      onpointermove={onSwipeMove}
+      onpointerup={(e) => onSwipeUp(e, toast.id)}
+      onpointercancel={onSwipeCancel}
     >
       <span class="toast-icon" aria-hidden="true">{@html typeIcon(toast.type)}</span>
       <span class="toast-message">{toast.message}</span>
-      <button class="toast-close" on:click={() => toasts.remove(toast.id)} aria-label="Dismiss">
+      <button class="toast-close" onclick={() => toasts.remove(toast.id)} aria-label="Dismiss">
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
       {#if toast.duration > 0}

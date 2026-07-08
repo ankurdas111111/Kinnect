@@ -1,13 +1,24 @@
 <script>
+  import { run } from 'svelte/legacy';
+
   import { onDestroy } from 'svelte';
   import { socket } from '../lib/socket.js';
   import { rideShare } from '../lib/stores/rideShare.js';
+  import { startLiveShareActivity, endLiveShareActivity } from '../lib/liveActivities.js';
   import { parseRideText, ocrImage, readClipboardText } from '../lib/rideImport.js';
   import { toasts } from '../lib/stores/toast.js';
   import { haptics } from '../lib/haptics.js';
   import { getShareOrigin } from '../lib/env.js';
+  import TiltCard from './primitives/TiltCard.svelte';
+  import MagneticButton from './primitives/MagneticButton.svelte';
 
-  export let open = false;
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [open]
+   */
+
+  /** @type {Props} */
+  let { open = $bindable(false) } = $props();
 
   // ── Vehicle type options ──────────────────────────────────────────
   const VEHICLE_TYPES = [
@@ -29,16 +40,16 @@
   ];
 
   // ── Local form state ──────────────────────────────────────────────
-  let vehicleType = '';
-  let plateInput  = '';
-  let destInput   = '';
-  let etaMins     = 0;    // 0 = not set
-  let starting    = false;
-  let copied      = false;
-  let safelyDone  = false;
+  let vehicleType = $state('');
+  let plateInput  = $state('');
+  let destInput   = $state('');
+  let etaMins     = $state(0);    // 0 = not set
+  let starting    = $state(false);
+  let copied      = $state(false);
+  let safelyDone  = $state(false);
 
   // ── Elapsed timer ─────────────────────────────────────────────────
-  let elapsedSec     = 0;
+  let elapsedSec     = $state(0);
   let _timerInterval = null;
 
   function startTimer() {
@@ -54,11 +65,11 @@
 
   onDestroy(() => stopTimer());
 
-  let _prevActive = false;
-  $: {
+  let _prevActive = $state(false);
+  run(() => {
     if ($rideShare.active && !_prevActive) { startTimer(); _prevActive = true; }
     else if (!$rideShare.active && _prevActive) { stopTimer(); _prevActive = false; }
-  }
+  });
 
   function formatElapsed(sec) {
     const h = Math.floor(sec / 3600);
@@ -70,19 +81,41 @@
   }
 
   // ── Derived form state ────────────────────────────────────────────
-  $: showPlate = ['car', 'scooter', 'auto', 'cab'].includes(vehicleType);
+  let showPlate = $derived(['car', 'scooter', 'auto', 'cab'].includes(vehicleType));
 
-  $: etaLabel = etaMins > 0
+  let etaLabel = $derived(etaMins > 0
     ? new Date(Date.now() + etaMins * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    : '';
+    : '');
 
   // ETA countdown on the active screen.
   // Reference elapsedSec so Svelte re-evaluates this every second via the timer.
-  $: etaMinsLeft = ($rideShare.eta && $rideShare.active && elapsedSec >= 0)
+  let etaMinsLeft = $derived(($rideShare.eta && $rideShare.active && elapsedSec >= 0)
     ? Math.max(0, Math.round(($rideShare.eta - Date.now()) / 60000))
-    : -1;
+    : -1);
 
-  $: activeVehicleLabel = VEHICLE_TYPES.find(v => v.id === $rideShare.vehicleType)?.label || '';
+  let activeVehicleLabel = $derived(VEHICLE_TYPES.find(v => v.id === $rideShare.vehicleType)?.label || '');
+
+  // ── Step progress (derived from existing lifecycle state — no new flow) ────
+  // 0 = Setup, 1 = En route (active), 2 = Arrived (reached safely)
+  let rideStep = $derived(safelyDone ? 2 : ($rideShare.active ? 1 : 0));
+  const RIDE_STEPS = ['Setup', 'En route', 'Arrived'];
+
+  // iOS Live Activity mirrors the ride lifecycle (no-op on other platforms).
+  // Driven by the store (set by the server ack), not the emit, so it also
+  // covers rides restored after a reconnect.
+  let _laRideActive = $state(false);
+  run(() => {
+    if ($rideShare.active && !_laRideActive) {
+      _laRideActive = true;
+      startLiveShareActivity('ride', {
+        status: 'En route',
+        detail: $rideShare.dest ? `To ${$rideShare.dest}` : ($rideShare.vehicle || '')
+      });
+    } else if (!$rideShare.active && _laRideActive) {
+      _laRideActive = false;
+      endLiveShareActivity();
+    }
+  });
 
   // ── Actions ───────────────────────────────────────────────────────
   function startRide() {
@@ -159,16 +192,20 @@
   }
 
   // Reset form when sheet closes without an active ride
-  $: if (!open && !$rideShare.active) {
-    vehicleType = ''; plateInput = ''; destInput = ''; etaMins = 0; starting = false;
-  }
-  $: if ($rideShare.active) { starting = false; }
+  run(() => {
+    if (!open && !$rideShare.active) {
+      vehicleType = ''; plateInput = ''; destInput = ''; etaMins = 0; starting = false;
+    }
+  });
+  run(() => {
+    if ($rideShare.active) { starting = false; }
+  });
 
   // ── Smart Ride Import ───────────────────────────────────────────
-  let importing = false;
-  let importSource = '';   // 'ocr' | 'clipboard'
-  let autoFilled = false;
-  let fileInputEl;
+  let importing = $state(false);
+  let importSource = $state('');   // 'ocr' | 'clipboard'
+  let autoFilled = $state(false);
+  let fileInputEl = $state();
 
   function applyParsed(result) {
     let filled = false;
@@ -238,10 +275,20 @@
 </script>
 
 {#if open}
-  <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div class="ride-backdrop" on:click={() => { if (!$rideShare.active) open = false; }} aria-hidden="true"></div>
+  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+  <div class="ride-backdrop" onclick={() => { if (!$rideShare.active) open = false; }} aria-hidden="true"></div>
   <div class="ride-sheet" role="dialog" aria-modal="true" aria-label="Share My Ride">
     <div class="ride-handle" aria-hidden="true"></div>
+
+    <!-- Step progress — reflects existing ride lifecycle state -->
+    <div class="step-progress" aria-hidden="true">
+      {#each RIDE_STEPS as label, i}
+        <div class="step-item" class:step-active={rideStep === i} class:step-complete={rideStep > i}>
+          <span class="step-bead"></span>
+          <span class="step-label">{label}</span>
+        </div>
+      {/each}
+    </div>
 
     {#if !$rideShare.active}
       <!-- ── Setup screen ─────────────────────────────────────────── -->
@@ -261,7 +308,7 @@
 
       <!-- Smart Import -->
       <div class="import-row">
-        <button class="import-btn" on:click={handleScreenshot} disabled={importing}>
+        <button class="import-btn tactile" onclick={handleScreenshot} disabled={importing}>
           {#if importing && importSource === 'ocr'}
             <span class="import-spinner" aria-hidden="true"></span> Scanning...
           {:else}
@@ -269,7 +316,7 @@
             Scan Screenshot
           {/if}
         </button>
-        <button class="import-btn" on:click={handlePaste} disabled={importing}>
+        <button class="import-btn tactile" onclick={handlePaste} disabled={importing}>
           {#if importing && importSource === 'clipboard'}
             <span class="import-spinner" aria-hidden="true"></span> Reading...
           {:else}
@@ -278,76 +325,85 @@
           {/if}
         </button>
       </div>
-      <input type="file" accept="image/*" class="sr-only" bind:this={fileInputEl} on:change={onFileSelected} />
+      <input type="file" accept="image/*" class="sr-only" bind:this={fileInputEl} onchange={onFileSelected} />
 
-      <!-- Vehicle type chips -->
-      <p class="field-label">How are you travelling?</p>
-      <div class="vehicle-chips" class:autofilled={autoFilled} role="group" aria-label="Vehicle type">
-        {#each VEHICLE_TYPES as vt}
-          <button
-            class="vchip"
-            class:vchip-active={vehicleType === vt.id}
-            on:click={() => vehicleType = vehicleType === vt.id ? '' : vt.id}
-            aria-pressed={vehicleType === vt.id}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d={vt.svgD}/>
-            </svg>
-            {vt.label}
-          </button>
-        {/each}
-      </div>
+      <!-- Setup card: vehicle picker + trip details grouped with elevation -->
+      <div class="setup-card">
+        <!-- Vehicle type picker -->
+        <p class="field-label">How are you travelling?</p>
+        <div class="vehicle-chips" class:autofilled={autoFilled} role="group" aria-label="Vehicle type">
+          {#each VEHICLE_TYPES as vt}
+            <TiltCard intensity={9} shine={true}>
+              <button
+                class="vchip"
+                class:vchip-active={vehicleType === vt.id}
+                onclick={() => vehicleType = vehicleType === vt.id ? '' : vt.id}
+                aria-pressed={vehicleType === vt.id}
+              >
+                <span class="vchip-icon" aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d={vt.svgD}/>
+                  </svg>
+                </span>
+                <span class="vchip-label">{vt.label}</span>
+              </button>
+            </TiltCard>
+          {/each}
+        </div>
 
-      <div class="ride-form">
-        {#if showPlate}
-          <label class="form-label" for="ride-plate">Number plate / identifier (optional)</label>
+        <div class="ride-form">
+          {#if showPlate}
+            <label class="form-label" for="ride-plate">Number plate / identifier (optional)</label>
+            <input
+              id="ride-plate"
+              class="ride-input"
+              type="text"
+              maxlength="20"
+              placeholder="MH01AB1234, Ola #4532…"
+              bind:value={plateInput}
+            />
+          {/if}
+
+          <label class="form-label" for="ride-dest">Where are you headed? (optional)</label>
           <input
-            id="ride-plate"
+            id="ride-dest"
             class="ride-input"
             type="text"
-            maxlength="20"
-            placeholder="MH01AB1234, Ola #4532…"
-            bind:value={plateInput}
+            maxlength="30"
+            placeholder="Home, Office, Station…"
+            bind:value={destInput}
           />
-        {/if}
 
-        <label class="form-label" for="ride-dest">Where are you headed? (optional)</label>
-        <input
-          id="ride-dest"
-          class="ride-input"
-          type="text"
-          maxlength="30"
-          placeholder="Home, Office, Station…"
-          bind:value={destInput}
-        />
-
-        <!-- ETA picker -->
-        <p class="field-label" style="margin-bottom: 6px;">Expected arrival (optional)</p>
-        <div class="eta-pills" role="group" aria-label="Expected arrival time">
-          {#each ETA_OPTS as opt}
-            <button
-              class="pill-btn"
-              class:pill-active={etaMins === opt.mins}
-              on:click={() => etaMins = etaMins === opt.mins ? 0 : opt.mins}
-              aria-pressed={etaMins === opt.mins}
-            >{opt.label}</button>
-          {/each}
-          {#if etaMins > 0}
-            <span class="eta-arrival">by {etaLabel}</span>
-          {/if}
+          <!-- ETA picker -->
+          <p class="field-label" style="margin-bottom: 6px;">Expected arrival (optional)</p>
+          <div class="eta-pills" role="group" aria-label="Expected arrival time">
+            {#each ETA_OPTS as opt}
+              <button
+                class="pill-btn"
+                class:pill-active={etaMins === opt.mins}
+                onclick={() => etaMins = etaMins === opt.mins ? 0 : opt.mins}
+                aria-pressed={etaMins === opt.mins}
+              >{opt.label}</button>
+            {/each}
+            {#if etaMins > 0}
+              <span class="eta-arrival">by {etaLabel}</span>
+            {/if}
+          </div>
         </div>
       </div>
 
       <div class="ride-actions">
-        <button class="btn btn-primary ride-start-btn" on:click={startRide} disabled={starting}>
-          {#if starting}
-            Creating ride link…
-          {:else}
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14m-7-7 7 7-7 7"/></svg>
-            Share My Ride
-          {/if}
-        </button>
-        <button class="btn btn-ghost ride-cancel-btn" on:click={() => { open = false; }}>Cancel</button>
+        <MagneticButton strength={5} className="mag-full">
+          <button class="btn btn-primary ride-start-btn tactile" onclick={startRide} disabled={starting}>
+            {#if starting}
+              Creating ride link…
+            {:else}
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14m-7-7 7 7-7 7"/></svg>
+              Share My Ride
+            {/if}
+          </button>
+        </MagneticButton>
+        <button class="btn btn-ghost ride-cancel-btn" onclick={() => { open = false; }}>Cancel</button>
       </div>
 
     {:else if safelyDone}
@@ -395,7 +451,7 @@
 
       <!-- Share actions -->
       <div class="ride-active-actions">
-        <button class="btn-wa ride-wa-btn" on:click={shareOnWhatsApp}>
+        <button class="btn-wa ride-wa-btn tactile" onclick={shareOnWhatsApp}>
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347zm-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884zm8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/>
           </svg>
@@ -403,7 +459,7 @@
         </button>
 
         <div class="ride-secondary-actions">
-          <button class="btn-secondary-action" on:click={copyLink} aria-label="Copy link">
+          <button class="btn-secondary-action tactile" onclick={copyLink} aria-label="Copy link">
             {#if copied}
               <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
               Copied
@@ -413,17 +469,19 @@
             {/if}
           </button>
 
-          <button class="btn-secondary-action" on:click={shareNative} aria-label="Share via other apps">
+          <button class="btn-secondary-action tactile" onclick={shareNative} aria-label="Share via other apps">
             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
             Share
           </button>
         </div>
       </div>
 
-      <button class="btn-safe" on:click={endRide} disabled={safelyDone}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
-        Reached Safely
-      </button>
+      <MagneticButton strength={5} className="mag-full">
+        <button class="btn-safe tactile" onclick={endRide} disabled={safelyDone}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+          Reached Safely
+        </button>
+      </MagneticButton>
     {/if}
   </div>
 {/if}
@@ -462,6 +520,55 @@
     margin: 4px auto 20px;
   }
 
+  /* Full-width magnetic CTA wrapper — overrides inline-flex so the button fills */
+  :global(.mag-full) {
+    display: flex;
+    width: 100%;
+  }
+
+  /* ── Step progress ───────────────────────────────────────────── */
+  .step-progress {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-4, 16px);
+    margin-bottom: var(--space-5, 20px);
+  }
+
+  .step-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2, 8px);
+  }
+
+  .step-bead {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border-default, rgba(255,255,255,0.16));
+    transition: transform 220ms var(--ease-spring, cubic-bezier(0.34,1.56,0.64,1)),
+                background-color 220ms var(--ease-out, ease);
+  }
+
+  .step-label {
+    font-family: var(--font-display);
+    font-size: var(--text-xs, 11px);
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: var(--text-tertiary);
+    transition: color 220ms var(--ease-out, ease);
+  }
+
+  .step-item.step-active .step-bead {
+    background: var(--primary-500, #6366f1);
+    transform: scale(1.5);
+    box-shadow: 0 0 0 4px var(--primary-500-20, rgba(99,102,241,0.2));
+  }
+  .step-item.step-active .step-label { color: var(--primary-300, #a5b4fc); }
+
+  .step-item.step-complete .step-bead { background: var(--success-500, #10b981); }
+  .step-item.step-complete .step-label { color: var(--text-secondary); }
+
   /* ── Header ──────────────────────────────────────────────────── */
   .ride-header {
     display: flex;
@@ -499,7 +606,17 @@
     line-height: 1.4;
   }
 
-  /* ── Vehicle type chips ──────────────────────────────────────── */
+  /* ── Setup card (elevated container) ─────────────────────────── */
+  .setup-card {
+    background: var(--surface-1, rgba(255,255,255,0.03));
+    border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
+    border-radius: var(--radius-xl, 16px);
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: var(--elevation-2, 0 4px 16px rgba(0,0,0,0.10));
+  }
+
+  /* ── Vehicle type picker ─────────────────────────────────────── */
   .field-label {
     font-size: var(--text-xs, 11px);
     font-weight: 700;
@@ -517,42 +634,65 @@
     margin-bottom: 16px;
   }
 
+  /* TiltCard wrapper is the grid cell — make it a proper card cell */
+  .vehicle-chips :global(.tilt-root) {
+    border-radius: 14px;
+  }
+
   .vchip {
+    width: 100%;
+    min-height: 72px;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 10px 8px;
+    padding: 12px 8px;
     background: var(--surface-inset, rgba(255,255,255,0.05));
     border: 1px solid var(--border-subtle, rgba(255,255,255,0.10));
-    border-radius: 12px;
+    border-radius: 14px;
     font-family: var(--font-display);
-    font-size: var(--text-sm, 13px);
     font-weight: 600;
     color: var(--text-secondary);
     cursor: pointer;
-    transition: background 150ms, border-color 150ms, color 150ms, transform 120ms;
+    transition: background-color 150ms, border-color 150ms, color 150ms, box-shadow 200ms, transform 120ms;
+  }
+
+  .vchip-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .vchip-label {
+    font-size: var(--text-sm, 13px);
+    line-height: 1;
   }
 
   .vchip:hover {
     background: var(--surface-hover);
     color: var(--text-primary);
+    border-color: var(--primary-500-30, rgba(99,102,241,0.3));
+    box-shadow: 0 0 0 1px var(--primary-500-20, rgba(99,102,241,0.2)),
+                0 6px 20px var(--primary-500-12, rgba(99,102,241,0.12));
   }
 
   .vchip.vchip-active {
-    background: rgba(99,102,241,0.18);
+    background: var(--primary-500-20, rgba(99,102,241,0.18));
     border-color: var(--primary-500, #6366f1);
     color: var(--primary-300, #a5b4fc);
-    box-shadow: 0 0 0 1px rgba(99,102,241,0.25);
-    transform: scale(1.03);
+    box-shadow: 0 0 0 1px var(--primary-500-30, rgba(99,102,241,0.3)),
+                0 8px 24px var(--primary-500-20, rgba(99,102,241,0.2));
+    transform: scale(1.02);
   }
+
+  .vchip.vchip-active .vchip-icon { color: var(--primary-300, #a5b4fc); }
 
   /* ── Form inputs ─────────────────────────────────────────────── */
   .ride-form {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    margin-bottom: 18px;
   }
 
   .form-label {
@@ -596,6 +736,7 @@
 
   .pill-btn {
     padding: 6px 14px;
+    min-height: 36px;
     font-family: var(--font-display);
     font-size: var(--text-xs);
     font-weight: 700;
@@ -646,6 +787,7 @@
   .ride-cancel-btn {
     width: 100%;
     padding: 12px;
+    min-height: 44px;
     font-size: var(--text-base, 15px);
   }
 
@@ -761,6 +903,7 @@
     justify-content: center;
     gap: 7px;
     padding: 11px;
+    min-height: 44px;
     font-family: var(--font-display);
     font-size: var(--text-sm, 13px);
     font-weight: 700;
@@ -862,6 +1005,7 @@
     justify-content: center;
     gap: 6px;
     padding: 10px 8px;
+    min-height: 44px;
     font-family: var(--font-display);
     font-size: var(--text-xs, 11px);
     font-weight: 700;
@@ -908,5 +1052,13 @@
     clip: rect(0,0,0,0);
     white-space: nowrap;
     border: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .step-bead,
+    .step-label,
+    .vchip { transition: none; }
+    .step-item.step-active .step-bead,
+    .vchip.vchip-active { transform: none; }
   }
 </style>

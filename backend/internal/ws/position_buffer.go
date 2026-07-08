@@ -25,7 +25,14 @@ const (
 //   - Purges daily_activity older than 30 days                            [F9]
 //   - Runs VACUUM ANALYZE on the heavy time-series tables (non-blocking, updates planner stats)
 func (h *Hub) StartPositionPurger(ctx context.Context) {
-	// Run once immediately at startup so the first deployment cleans up right away.
+	// Delay the first purge so its DELETEs + 7 VACUUM ANALYZEs don't compete
+	// with LoadAll and user reconnections for the 10-connection pool during
+	// cold start (which happens on every Render free-tier spin-up).
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(5 * time.Minute):
+	}
 	h.runPurge(ctx)
 
 	ticker := time.NewTicker(purgeInterval)

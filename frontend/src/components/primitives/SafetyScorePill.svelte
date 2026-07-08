@@ -1,17 +1,23 @@
 <script>
-  // Props
-  export let score = null;   // number 0-100 or null
-  export let breakdown = null; // object with component scores or null
+  
+  /**
+   * @typedef {Object} Props
+   * @property {any} [score] - Props - number 0-100 or null
+   * @property {any} [breakdown] - object with component scores or null
+   */
 
-  let tooltipVisible = false;
+  /** @type {Props} */
+  let { score = null, breakdown = null } = $props();
 
-  $: pillClass = score == null
+  let tooltipVisible = $state(false);
+
+  let pillClass = $derived(score == null
     ? 'pill-gray'
     : score >= 85 ? 'pill-green'
     : score >= 60 ? 'pill-amber'
-    : 'pill-red';
+    : 'pill-red');
 
-  $: isPulse = score != null && score < 60;
+  let isPulse = $derived(score != null && score < 60);
 
   function formatScore(s) {
     return s == null ? '—' : Math.round(s);
@@ -35,13 +41,13 @@
   };
 </script>
 
-<!-- svelte-ignore a11y-click-events-have-key-events -->
+<!-- svelte-ignore a11y_click_events_have_key_events -->
 <span
   class="safety-pill {pillClass}"
   class:pill-pulse={isPulse}
   class:pill-clickable={breakdown != null}
-  on:click={toggleTooltip}
-  on:keydown={handleKeydown}
+  onclick={toggleTooltip}
+  onkeydown={handleKeydown}
   role={breakdown ? 'button' : 'status'}
   tabindex={breakdown ? 0 : -1}
   aria-label="Safety score {formatScore(score)} out of 100{breakdown ? '. Click for breakdown.' : ''}"

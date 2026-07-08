@@ -16,10 +16,21 @@
   import { createEventDispatcher } from 'svelte';
   import { fade } from 'svelte/transition';
 
-  export let msgId = '';
-  export let pin = '';
-  export let error = '';
-  export let unlocking = false;
+  /**
+   * @typedef {Object} Props
+   * @property {string} [msgId]
+   * @property {string} [pin]
+   * @property {string} [error]
+   * @property {boolean} [unlocking]
+   */
+
+  /** @type {Props} */
+  let {
+    msgId = '',
+    pin = '',
+    error = '',
+    unlocking = false
+  } = $props();
 
   const dispatch = createEventDispatcher();
 
@@ -43,15 +54,15 @@
     maxlength="8"
     placeholder="Sender's PIN"
     value={pin}
-    on:input={handleInput}
-    on:keydown={handleKeydown}
+    oninput={handleInput}
+    onkeydown={handleKeydown}
     disabled={unlocking}
     autocomplete="off"
     aria-describedby={error ? `inline-err-${msgId}` : undefined}
   />
   <button
     class="sid-btn"
-    on:click={() => dispatch('submit')}
+    onclick={() => dispatch('submit')}
     disabled={unlocking || pin.length < 4}
     type="button"
     aria-label="Decrypt this message"

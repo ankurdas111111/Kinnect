@@ -1,6 +1,8 @@
 <script>
 	import { onMount, onDestroy } from 'svelte';
 	import { writable } from 'svelte/store';
+	import Card from '../components/primitives/Card.svelte';
+	import Skeleton from '../components/primitives/Skeleton.svelte';
 
 	let healthData = writable(null);
 	let diagnosticsData = writable(null);
@@ -92,22 +94,23 @@
 		clearInterval(metricsInterval);
 	});
 
+	// Token-based status classes (map to .status-* styles below) — no Tailwind
 	const getStatusColor = (status) => {
-		if (status === 'ok') return 'text-green-600';
-		if (status === 'error') return 'text-red-600';
-		return 'text-yellow-600';
+		if (status === 'ok') return 'status-ok';
+		if (status === 'error') return 'status-error';
+		return 'status-warning';
 	};
 
 	const getMemoryWarning = (mb) => {
-		if (mb > 800) return 'text-red-600 font-bold';
-		if (mb > 500) return 'text-yellow-600';
-		return 'text-green-600';
+		if (mb > 800) return 'status-error';
+		if (mb > 500) return 'status-warning';
+		return 'status-ok';
 	};
 
 	const getGoroutineWarning = (count) => {
-		if (count > 10000) return 'text-red-600 font-bold';
-		if (count > 5000) return 'text-yellow-600';
-		return 'text-green-600';
+		if (count > 10000) return 'status-error';
+		if (count > 5000) return 'status-warning';
+		return 'status-ok';
 	};
 
 	const formatBytes = (bytes) => {
@@ -119,353 +122,400 @@
 	};
 </script>
 
+<div class="dashboard">
+	<header class="header">
+		<div class="header-lead">
+			<div class="title-row">
+				<span class="title-icon" aria-hidden="true">
+					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l3-4 3 2 4-6"/></svg>
+				</span>
+				<h1 class="title">Backend Monitoring</h1>
+			</div>
+			<div class="last-update">
+				<span class="refresh-indicator" aria-hidden="true"></span>
+				Last update: {$lastUpdate || 'loading…'}
+			</div>
+		</div>
+		<div class="endpoint">Endpoint: {monitoringUrl}</div>
+	</header>
+
+	{#if $error}
+		<div class="error-message" role="alert">
+			<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+			<span>{$error}</span>
+		</div>
+	{/if}
+
+	{#if $loading}
+		<div class="bento-grid" style="--bento-cols:3;">
+			{#each Array(5) as _, i (i)}
+				<Card variant="glass" hover={false}>
+					<div class="metric-head">
+						<Skeleton variant="avatar" width="36px" height="36px" radius="10px" />
+						<Skeleton variant="title" width="60%" />
+					</div>
+					<Skeleton variant="text" count={3} />
+				</Card>
+			{/each}
+		</div>
+	{:else if $healthData}
+		<div class="bento-grid" style="--bento-cols:3;">
+			<!-- System Health -->
+			<Card variant="glass" hover={false}>
+				<div class="metric-head">
+					<span class="metric-icon" aria-hidden="true">
+						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+					</span>
+					<h2 class="metric-title">System Health</h2>
+				</div>
+				<div class="metric-hero">
+					<span class="metric-hero-value {getStatusColor($healthData.status)}">{$healthData.status.toUpperCase()}</span>
+					<span class="metric-hero-label">Overall status</span>
+				</div>
+				<div class="stat">
+					<span class="stat-label">Database</span>
+					<span class="stat-value {getStatusColor($healthData.db)}">{$healthData.db}</span>
+				</div>
+				<div class="stat">
+					<span class="stat-label">DB Connections</span>
+					<span class="stat-value">{$healthData.connections}</span>
+				</div>
+				<div class="stat">
+					<span class="stat-label">GC Runs</span>
+					<span class="stat-value">{$healthData.memory.num_gc}</span>
+				</div>
+			</Card>
+
+			{#if $diagnosticsData}
+				<!-- Memory -->
+				<Card variant="glass" hover={false}>
+					<div class="metric-head">
+						<span class="metric-icon" aria-hidden="true">
+							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/></svg>
+						</span>
+						<h2 class="metric-title">Memory Usage</h2>
+					</div>
+					<div class="metric-hero">
+						<span class="metric-hero-value {getMemoryWarning($diagnosticsData.runtime.memory_mb.alloc)}">{$diagnosticsData.runtime.memory_mb.alloc}<span class="unit">MB</span></span>
+						<span class="metric-hero-label">Allocated</span>
+					</div>
+					<div class="stat">
+						<span class="stat-label">System</span>
+						<span class="stat-value">{$diagnosticsData.runtime.memory_mb.sys} MB</span>
+					</div>
+					<div class="stat">
+						<span class="stat-label">Heap Alloc</span>
+						<span class="stat-value">{$diagnosticsData.runtime.memory_mb.heap_alloc} MB</span>
+					</div>
+					<div class="progress-bar" role="presentation">
+						<div class="progress-fill" style="transform: scaleX({Math.min($diagnosticsData.runtime.memory_mb.alloc / 1000, 1)});"></div>
+					</div>
+				</Card>
+
+				<!-- Goroutines -->
+				<Card variant="glass" hover={false}>
+					<div class="metric-head">
+						<span class="metric-icon" aria-hidden="true">
+							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><polyline points="21 3 21 9 15 9"/></svg>
+						</span>
+						<h2 class="metric-title">Goroutines</h2>
+					</div>
+					<div class="metric-hero">
+						<span class="metric-hero-value {getGoroutineWarning($diagnosticsData.runtime.goroutines)}">{$diagnosticsData.runtime.goroutines}</span>
+						<span class="metric-hero-label">Active</span>
+					</div>
+					<div class="stat">
+						<span class="stat-label">GC Pause</span>
+						<span class="stat-value">{($diagnosticsData.runtime.gc.pause_ns / 1_000_000).toFixed(2)} ms</span>
+					</div>
+					<div class="progress-bar" role="presentation">
+						<div class="progress-fill" style="transform: scaleX({Math.min($diagnosticsData.runtime.goroutines / 10000, 1)});"></div>
+					</div>
+				</Card>
+
+				<!-- Database Pool -->
+				<Card variant="glass" hover={false}>
+					<div class="metric-head">
+						<span class="metric-icon" aria-hidden="true">
+							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>
+						</span>
+						<h2 class="metric-title">Database Pool</h2>
+					</div>
+					<div class="metric-hero">
+						<span class="metric-hero-value">{$diagnosticsData.database.open_connections}</span>
+						<span class="metric-hero-label">Open connections</span>
+					</div>
+					<div class="stat">
+						<span class="stat-label">In Use</span>
+						<span class="stat-value">{$diagnosticsData.database.in_use}</span>
+					</div>
+					<div class="stat">
+						<span class="stat-label">Idle</span>
+						<span class="stat-value">{$diagnosticsData.database.idle}</span>
+					</div>
+					<div class="stat">
+						<span class="stat-label">Wait Count</span>
+						<span class="stat-value">{$diagnosticsData.database.wait_count}</span>
+					</div>
+				</Card>
+
+				<!-- Cache -->
+				<Card variant="glass" hover={false}>
+					<div class="metric-head">
+						<span class="metric-icon" aria-hidden="true">
+							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+						</span>
+						<h2 class="metric-title">Cache</h2>
+					</div>
+					<div class="metric-hero">
+						<span class="metric-hero-value">{formatBytes($diagnosticsData.cache.size_bytes)}</span>
+						<span class="metric-hero-label">In-memory size</span>
+					</div>
+					<div class="progress-bar" role="presentation">
+						<div class="progress-fill" style="transform: scaleX({Math.min($diagnosticsData.cache.size_bytes / (50 * 1024 * 1024), 1)});"></div>
+					</div>
+				</Card>
+			{/if}
+		</div>
+
+		<!-- Key Metrics Table -->
+		{#if $metricsData}
+			<Card variant="glass" hover={false}>
+				<div class="metric-head">
+					<span class="metric-icon" aria-hidden="true">
+						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+					</span>
+					<h2 class="metric-title">Key Prometheus Metrics</h2>
+				</div>
+				<table class="metric-table">
+					<thead>
+						<tr>
+							<th>Metric</th>
+							<th>Value</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each Object.entries($metricsData).sort((a, b) => a[0].localeCompare(b[0])) as [key, value]}
+							{#if key.includes('active') || key.includes('total') || key.includes('queue')}
+								<tr>
+									<td>{key}</td>
+									<td class="metric-num">{typeof value === 'number' ? value.toFixed(0) : value}</td>
+								</tr>
+							{/if}
+						{/each}
+					</tbody>
+				</table>
+			</Card>
+		{/if}
+	{/if}
+</div>
+
 <style>
 	.dashboard {
-		background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-		color: #eee;
+		background: var(--bg-base, #0a0a14);
+		color: var(--text-primary);
+		font-family: var(--font-sans);
 		min-height: 100vh;
-		padding: 20px;
+		padding: calc(env(safe-area-inset-top, 0px) + var(--space-5)) var(--space-5)
+			calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
 	}
 
 	.header {
 		display: flex;
 		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 30px;
-		padding-bottom: 20px;
-		border-bottom: 2px solid #0f3460;
+		align-items: flex-end;
+		gap: var(--space-4);
+		flex-wrap: wrap;
+		margin-bottom: var(--space-6);
+		padding-bottom: var(--space-4);
+		border-bottom: 1px solid var(--border-default);
 	}
 
+	.title-row { display: flex; align-items: center; gap: var(--space-2); }
+	.title-icon {
+		display: grid; place-items: center;
+		width: 36px; height: 36px;
+		border-radius: var(--radius-md, 10px);
+		background: var(--primary-500-12);
+		color: var(--primary-400);
+	}
+	.title-icon :global(svg) { width: 20px; height: 20px; }
+
 	.title {
-		font-size: 28px;
-		font-weight: bold;
-		color: #00d4ff;
+		margin: 0;
+		font-family: var(--font-display);
+		font-size: var(--text-xl, 22px);
+		font-weight: 700;
+		letter-spacing: -0.02em;
+		color: var(--text-primary);
 	}
 
 	.last-update {
-		font-size: 12px;
-		color: #888;
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		margin-top: var(--space-2);
+		font-size: var(--text-xs, 12px);
+		color: var(--text-tertiary);
 	}
 
-	.grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-		gap: 20px;
-		margin-bottom: 30px;
+	.endpoint {
+		font-size: var(--text-xs, 12px);
+		color: var(--text-tertiary);
+		font-family: var(--font-mono, monospace);
 	}
 
-	.card {
-		background: rgba(15, 52, 96, 0.5);
-		border: 1px solid #0f3460;
-		border-radius: 8px;
-		padding: 20px;
-		transition: all 0.3s ease;
+	/* ── Card internals ─────────────────────────────────────────────── */
+	.metric-head {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		margin-bottom: var(--space-4);
 	}
-
-	.card:hover {
-		background: rgba(15, 52, 96, 0.8);
-		border-color: #00d4ff;
-		box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+	.metric-icon {
+		display: grid; place-items: center;
+		width: 36px; height: 36px;
+		flex-shrink: 0;
+		border-radius: var(--radius-md, 10px);
+		background: var(--primary-500-12);
+		color: var(--primary-400);
 	}
+	.metric-icon :global(svg) { width: 19px; height: 19px; }
 
-	.card-title {
-		font-size: 14px;
-		font-weight: bold;
-		color: #00d4ff;
-		margin-bottom: 15px;
+	.metric-title {
+		margin: 0;
+		font-family: var(--font-display);
+		font-size: var(--text-sm, 13px);
+		font-weight: 700;
 		text-transform: uppercase;
-		letter-spacing: 1px;
+		letter-spacing: 0.05em;
+		color: var(--text-secondary);
+	}
+
+	.metric-hero {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		margin-bottom: var(--space-3);
+	}
+	.metric-hero-value {
+		font-family: var(--font-display);
+		font-size: var(--text-2xl, 28px);
+		font-weight: 800;
+		line-height: 1.05;
+		letter-spacing: -0.02em;
+		color: var(--text-primary);
+		font-variant-numeric: tabular-nums;
+	}
+	.metric-hero-value .unit {
+		font-size: var(--text-sm, 14px);
+		font-weight: 600;
+		color: var(--text-tertiary);
+		margin-left: 4px;
+	}
+	.metric-hero-label {
+		font-size: var(--text-xs, 12px);
+		color: var(--text-tertiary);
 	}
 
 	.stat {
 		display: flex;
 		justify-content: space-between;
-		padding: 8px 0;
-		border-bottom: 1px solid rgba(0, 212, 255, 0.1);
+		align-items: center;
+		gap: var(--space-3);
+		padding: var(--space-2) 0;
+		border-bottom: 1px solid var(--border-default);
 	}
-
-	.stat:last-child {
-		border-bottom: none;
-	}
+	.stat:last-child { border-bottom: none; }
 
 	.stat-label {
-		color: #aaa;
-		font-size: 13px;
+		color: var(--text-tertiary);
+		font-size: var(--text-sm, 13px);
 	}
-
 	.stat-value {
-		font-weight: bold;
-		font-size: 14px;
-		color: #fff;
+		font-weight: 700;
+		font-size: var(--text-sm, 14px);
+		color: var(--text-primary);
+		font-variant-numeric: tabular-nums;
 	}
 
-	.status-ok {
-		color: #4ade80;
-	}
+	/* Status colors — token driven (replaces Tailwind text-*-600) */
+	.status-ok      { color: var(--success-500); }
+	.status-error   { color: var(--danger-500); }
+	.status-warning { color: var(--warning-500); }
 
-	.status-error {
-		color: #f87171;
-	}
-
-	.status-warning {
-		color: #facc15;
-	}
-
+	/* ── Metrics table ──────────────────────────────────────────────── */
 	.metric-table {
 		width: 100%;
-		font-size: 12px;
+		font-size: var(--text-xs, 12px);
 		border-collapse: collapse;
 	}
-
 	.metric-table th,
 	.metric-table td {
-		padding: 10px;
+		padding: var(--space-2) var(--space-3);
 		text-align: left;
-		border-bottom: 1px solid rgba(0, 212, 255, 0.1);
+		border-bottom: 1px solid var(--border-default);
 	}
-
 	.metric-table th {
-		background: rgba(0, 212, 255, 0.1);
-		color: #00d4ff;
-		font-weight: bold;
+		color: var(--text-secondary);
+		font-weight: 700;
 		text-transform: uppercase;
 		font-size: 11px;
-		letter-spacing: 1px;
+		letter-spacing: 0.05em;
 	}
+	.metric-table td { color: var(--text-secondary); font-family: var(--font-mono, monospace); }
+	.metric-num { color: var(--text-primary); font-weight: 700; font-variant-numeric: tabular-nums; }
+	.metric-table tbody tr:hover { background: var(--surface-hover, rgba(255,255,255,0.04)); }
 
-	.metric-table tr:hover {
-		background: rgba(0, 212, 255, 0.05);
-	}
-
+	/* ── Error banner ───────────────────────────────────────────────── */
 	.error-message {
-		background: rgba(248, 113, 113, 0.1);
-		border: 1px solid #f87171;
-		border-radius: 4px;
-		padding: 15px;
-		margin-bottom: 20px;
-		color: #fca5a5;
-		font-size: 13px;
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		background: var(--danger-500-12);
+		border: 1px solid var(--danger-500-20);
+		border-radius: var(--radius-md, 10px);
+		padding: var(--space-3) var(--space-4);
+		margin-bottom: var(--space-5);
+		color: var(--danger-500);
+		font-size: var(--text-sm, 13px);
 	}
+	.error-message :global(svg) { flex-shrink: 0; }
 
-	.loading {
-		text-align: center;
-		padding: 40px;
-		color: #00d4ff;
-		font-size: 16px;
-	}
-
+	/* ── Progress bar (transform-only fill) ─────────────────────────── */
 	.progress-bar {
 		width: 100%;
 		height: 6px;
-		background: rgba(0, 212, 255, 0.1);
-		border-radius: 3px;
+		background: var(--surface-inset, rgba(255,255,255,0.06));
+		border-radius: var(--radius-full, 999px);
 		overflow: hidden;
-		margin-top: 8px;
+		margin-top: var(--space-2);
 	}
-
 	.progress-fill {
 		height: 100%;
-		background: linear-gradient(90deg, #4ade80, #00d4ff);
-		border-radius: 3px;
-		transition: width 0.3s ease;
+		width: 100%;
+		transform-origin: left center;
+		background: linear-gradient(90deg, var(--success-500), var(--primary-500));
+		border-radius: var(--radius-full, 999px);
+		transition: transform 300ms var(--ease-out, cubic-bezier(0.16,1,0.3,1));
 	}
 
 	.refresh-indicator {
 		display: inline-block;
-		width: 8px;
-		height: 8px;
-		background: #4ade80;
+		width: 8px; height: 8px;
+		background: var(--success-500);
 		border-radius: 50%;
-		margin-right: 6px;
+		box-shadow: var(--glow-success-sm, 0 0 8px var(--success-500-20));
 		animation: pulse 2s infinite;
 	}
 
 	@keyframes pulse {
-		0%, 100% {
-			opacity: 1;
-		}
-		50% {
-			opacity: 0.5;
-		}
+		0%, 100% { opacity: 1; }
+		50%      { opacity: 0.5; }
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.refresh-indicator { animation: none; }
+		.progress-fill { transition: none; }
 	}
 </style>
-
-<div class="dashboard">
-	<div class="header">
-		<div>
-			<div class="title">📊 Backend Monitoring Dashboard</div>
-			<div class="last-update">
-				<span class="refresh-indicator"></span>
-				Last update: {$lastUpdate || 'loading...'}
-			</div>
-		</div>
-		<div style="font-size: 12px; color: #888;">
-			Endpoint: {monitoringUrl}
-		</div>
-	</div>
-
-	{#if $error}
-		<div class="error-message">
-			⚠️ {$error}
-		</div>
-	{/if}
-
-	{#if $loading}
-		<div class="loading">Loading monitoring data...</div>
-	{:else}
-		<!-- Health Status Card -->
-		{#if $healthData}
-			<div class="grid">
-				<div class="card">
-					<div class="card-title">🏥 System Health</div>
-					<div class="stat">
-						<span class="stat-label">Status</span>
-						<span class="stat-value {getStatusColor($healthData.status)}">
-							{$healthData.status.toUpperCase()}
-						</span>
-					</div>
-					<div class="stat">
-						<span class="stat-label">Database</span>
-						<span class="stat-value {getStatusColor($healthData.db)}">
-							{$healthData.db}
-						</span>
-					</div>
-					<div class="stat">
-						<span class="stat-label">DB Connections</span>
-						<span class="stat-value">{$healthData.connections}</span>
-					</div>
-					<div class="stat">
-						<span class="stat-label">GC Runs</span>
-						<span class="stat-value">{$healthData.memory.num_gc}</span>
-					</div>
-				</div>
-
-				<!-- Memory Card -->
-				{#if $diagnosticsData}
-					<div class="card">
-						<div class="card-title">💾 Memory Usage</div>
-						<div class="stat">
-							<span class="stat-label">Allocated</span>
-							<span class="stat-value {getMemoryWarning($diagnosticsData.runtime.memory_mb.alloc)}">
-								{$diagnosticsData.runtime.memory_mb.alloc} MB
-							</span>
-						</div>
-						<div class="stat">
-							<span class="stat-label">System</span>
-							<span class="stat-value">
-								{$diagnosticsData.runtime.memory_mb.sys} MB
-							</span>
-						</div>
-						<div class="stat">
-							<span class="stat-label">Heap Alloc</span>
-							<span class="stat-value">
-								{$diagnosticsData.runtime.memory_mb.heap_alloc} MB
-							</span>
-						</div>
-						<div class="progress-bar">
-							<div
-								class="progress-fill"
-								style="width: {Math.min(
-									($diagnosticsData.runtime.memory_mb.alloc / 1000) * 100,
-									100
-								)}%"
-							></div>
-						</div>
-					</div>
-
-					<!-- Goroutines Card -->
-					<div class="card">
-						<div class="card-title">🔄 Goroutines</div>
-						<div class="stat">
-							<span class="stat-label">Active</span>
-							<span class="stat-value {getGoroutineWarning($diagnosticsData.runtime.goroutines)}">
-								{$diagnosticsData.runtime.goroutines}
-							</span>
-						</div>
-						<div class="stat">
-							<span class="stat-label">GC Pause</span>
-							<span class="stat-value">
-								{($diagnosticsData.runtime.gc.pause_ns / 1_000_000).toFixed(2)} ms
-							</span>
-						</div>
-						<div class="progress-bar">
-							<div
-								class="progress-fill"
-								style="width: {Math.min(
-									($diagnosticsData.runtime.goroutines / 10000) * 100,
-									100
-								)}%"
-							></div>
-						</div>
-					</div>
-
-					<!-- Database Connection Pool -->
-					<div class="card">
-						<div class="card-title">🗄️ Database Pool</div>
-						<div class="stat">
-							<span class="stat-label">Open</span>
-							<span class="stat-value">{$diagnosticsData.database.open_connections}</span>
-						</div>
-						<div class="stat">
-							<span class="stat-label">In Use</span>
-							<span class="stat-value">{$diagnosticsData.database.in_use}</span>
-						</div>
-						<div class="stat">
-							<span class="stat-label">Idle</span>
-							<span class="stat-value">{$diagnosticsData.database.idle}</span>
-						</div>
-						<div class="stat">
-							<span class="stat-label">Wait Count</span>
-							<span class="stat-value">{$diagnosticsData.database.wait_count}</span>
-						</div>
-					</div>
-
-					<!-- Cache Info -->
-					<div class="card">
-						<div class="card-title">⚡ Cache</div>
-						<div class="stat">
-							<span class="stat-label">Size</span>
-							<span class="stat-value">
-								{formatBytes($diagnosticsData.cache.size_bytes)}
-							</span>
-						</div>
-						<div class="progress-bar">
-							<div
-								class="progress-fill"
-								style="width: {Math.min(
-									($diagnosticsData.cache.size_bytes / (50 * 1024 * 1024)) * 100,
-									100
-								)}%"
-							/>
-						</div>
-					</div>
-				{/if}
-			</div>
-
-			<!-- Key Metrics Table -->
-			{#if $metricsData}
-				<div class="card">
-					<div class="card-title">📈 Key Prometheus Metrics</div>
-					<table class="metric-table">
-						<thead>
-							<tr>
-								<th>Metric</th>
-								<th>Value</th>
-							</tr>
-						</thead>
-						<tbody>
-							{#each Object.entries($metricsData).sort((a, b) => a[0].localeCompare(b[0])) as [key, value]}
-								{#if key.includes('active') || key.includes('total') || key.includes('queue')}
-									<tr>
-										<td>{key}</td>
-										<td>{typeof value === 'number' ? value.toFixed(0) : value}</td>
-									</tr>
-								{/if}
-							{/each}
-						</tbody>
-					</table>
-				</div>
-			{/if}
-		{/if}
-	{/if}
-</div>

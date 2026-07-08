@@ -1,24 +1,36 @@
 <script>
-  /**
-   * TiltCard — GPU-composited 3D perspective tilt.
-   * Uses rAF lerp (no JS frameworks) → stays off main thread as much as possible.
-   * Exports:
-   *   intensity  — max tilt degrees (default 12)
-   *   shine      — show specular highlight following cursor (default true)
-   *   disabled   — opt-out on low-power devices or when not needed
-   */
-  export let intensity = 12;
-  export let shine = true;
-  export let disabled = false;
+  import { passive } from 'svelte/legacy';
 
-  let el;
+  
+  /**
+   * @typedef {Object} Props
+   * @property {number} [intensity] - TiltCard — GPU-composited 3D perspective tilt.
+Uses rAF lerp (no JS frameworks) → stays off main thread as much as possible.
+Exports:
+intensity  — max tilt degrees (default 12)
+shine      — show specular highlight following cursor (default true)
+disabled   — opt-out on low-power devices or when not needed
+   * @property {boolean} [shine]
+   * @property {boolean} [disabled]
+   * @property {import('svelte').Snippet} [children]
+   */
+
+  /** @type {Props} */
+  let {
+    intensity = 12,
+    shine = true,
+    disabled = false,
+    children
+  } = $props();
+
+  let el = $state();
   // Current rendered tilt (lerped toward target)
   let cx = 0, cy = 0;
   // Target tilt (set immediately on pointer move)
   let tx = 0, ty = 0;
   // Shine position (%)
-  let sx = 50, sy = 50;
-  let hovering = false;
+  let sx = $state(50), sy = $state(50);
+  let hovering = $state(false);
   let raf = null;
 
   function lerp(a, b, t) { return a + (b - a) * t; }
@@ -80,15 +92,15 @@
   }
 </script>
 
-<!-- svelte-ignore a11y-no-static-element-interactions -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="tilt-root"
   class:disabled
   bind:this={el}
-  on:mousemove={handleMouseMove}
-  on:mouseleave={handleMouseLeave}
-  on:touchmove|passive={handleTouchMove}
-  on:touchend={handleTouchEnd}
+  onmousemove={handleMouseMove}
+  onmouseleave={handleMouseLeave}
+  use:passive={['touchmove', () => handleTouchMove]}
+  ontouchend={handleTouchEnd}
 >
   {#if shine && hovering && !disabled}
     <div
@@ -97,7 +109,7 @@
       style="background: radial-gradient(circle at {sx}% {sy}%, rgba(255,255,255,0.13) 0%, transparent 58%);"
     ></div>
   {/if}
-  <slot />
+  {@render children?.()}
 </div>
 
 <style>

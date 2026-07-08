@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"nhooyr.io/websocket"
+	"github.com/coder/websocket"
 )
 
 const (
@@ -149,6 +149,9 @@ func (c *Client) WritePump(ctx context.Context) {
 				slog.Debug("WebSocket write error", "client", c.id, "error", err)
 				return
 			}
+			if c.hub.metrics != nil {
+				c.hub.metrics.WSMessagesSent.Inc()
+			}
 
 		case <-ticker.C:
 			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -169,6 +172,12 @@ func (c *Client) Send(event string, data interface{}) {
 		slog.Debug("Failed to encode message", "client", c.id, "event", event, "error", err)
 		return
 	}
+	c.SendRaw(event, raw)
+}
+
+// SendRaw puts an already-encoded frame on the send channel. Non-blocking; drops if full.
+// The event name is used only for drop logging.
+func (c *Client) SendRaw(event string, raw []byte) {
 	select {
 	case c.send <- raw:
 	default:

@@ -1,10 +1,13 @@
 <script>
+  import { createBubbler, preventDefault } from 'svelte/legacy';
+
+  const bubble = createBubbler();
   import { socket } from '../../lib/socket.js';
   import { haptics } from '../../lib/haptics.js';
 
   let holdTimer = null;
-  let holding = false;
-  let feedback = null; // 'ok' | 'callme' | null
+  let holding = $state(false);
+  let feedback = $state(null); // 'ok' | 'callme' | null
 
   function clearFeedback() {
     setTimeout(() => { feedback = null; }, 1500);
@@ -49,10 +52,10 @@
   class:feedback-ok={feedback === 'ok'}
   class:feedback-callme={feedback === 'callme'}
   aria-label={holding ? 'Hold for Call Me pulse' : "Tap for I'm OK pulse"}
-  on:pointerdown={onPointerDown}
-  on:pointerup={onPointerUp}
-  on:pointercancel={onPointerCancel}
-  on:contextmenu|preventDefault
+  onpointerdown={onPointerDown}
+  onpointerup={onPointerUp}
+  onpointercancel={onPointerCancel}
+  oncontextmenu={preventDefault(bubble('contextmenu'))}
 >
   {#if feedback === 'ok'}
     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">

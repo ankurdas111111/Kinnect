@@ -1,40 +1,53 @@
 <script>
+  import { run } from 'svelte/legacy';
+
   import { createEventDispatcher, onMount, onDestroy, tick } from 'svelte';
 
-  export let open = false;
-  export let title = '';
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [open]
+   * @property {string} [title]
+   * @property {import('svelte').Snippet} [children]
+   */
+
+  /** @type {Props} */
+  let { open = false, title = '', children } = $props();
 
   const dispatch = createEventDispatcher();
 
-  let sheetEl;
+  let sheetEl = $state();
   let dragging = false;
   let startY = 0;
   let startTime = 0;
-  let currentOffset = 0;
-  let snapState = 'peek';
-  let lastFocusedEl = null;
-  let wasOpen = false;
+  let currentOffset = $state(0);
+  let snapState = $state('peek');
+  let lastFocusedEl = $state(null);
+  let wasOpen = $state(false);
 
   const SNAP_PEEK = 0.65;   // 35% of screen visible from bottom
   const SNAP_HALF = 0.45;
   const SNAP_FULL = 0.08;
 
-  $: viewH = typeof window !== 'undefined' ? window.innerHeight : 800;
-  $: peekY = viewH * SNAP_PEEK;
-  $: halfY = viewH * SNAP_HALF;
-  $: fullY = viewH * SNAP_FULL;
+  let viewH = $derived(typeof window !== 'undefined' ? window.innerHeight : 800);
+  let peekY = $derived(viewH * SNAP_PEEK);
+  let halfY = $derived(viewH * SNAP_HALF);
+  let fullY = $derived(viewH * SNAP_FULL);
 
-  $: if (open && snapState === 'closed') {
-    snapState = 'peek';
-    currentOffset = peekY;
-  }
+  run(() => {
+    if (open && snapState === 'closed') {
+      snapState = 'peek';
+      currentOffset = peekY;
+    }
+  });
 
-  $: if (!open) {
-    snapState = 'closed';
-    currentOffset = viewH;
-  }
+  run(() => {
+    if (!open) {
+      snapState = 'closed';
+      currentOffset = viewH;
+    }
+  });
 
-  $: translateY = snapState === 'closed' ? viewH : currentOffset;
+  let translateY = $derived(snapState === 'closed' ? viewH : currentOffset);
 
   function onPointerDown(e) {
     if (e.target.closest('.sheet-body')) return;
@@ -156,26 +169,30 @@
     if (typeof window !== 'undefined') window.removeEventListener('keydown', onKeydown);
   });
 
-  $: if (open && !wasOpen) {
-    wasOpen = true;
-    lastFocusedEl = document.activeElement;
-    tick().then(() => {
-      var focusable = getFocusable();
-      if (focusable.length) focusable[0].focus();
-      else sheetEl?.focus();
-    });
-  }
-
-  $: if (!open && wasOpen) {
-    wasOpen = false;
-    if (lastFocusedEl && typeof lastFocusedEl.focus === 'function') {
-      lastFocusedEl.focus();
+  run(() => {
+    if (open && !wasOpen) {
+      wasOpen = true;
+      lastFocusedEl = document.activeElement;
+      tick().then(() => {
+        var focusable = getFocusable();
+        if (focusable.length) focusable[0].focus();
+        else sheetEl?.focus();
+      });
     }
-  }
+  });
+
+  run(() => {
+    if (!open && wasOpen) {
+      wasOpen = false;
+      if (lastFocusedEl && typeof lastFocusedEl.focus === 'function') {
+        lastFocusedEl.focus();
+      }
+    }
+  });
 </script>
 
 {#if open}
-  <div class="sheet-backdrop" class:visible={snapState !== 'closed'} on:click={onBackdropClick} aria-hidden="true"></div>
+  <div class="sheet-backdrop" class:visible={snapState !== 'closed'} onclick={onBackdropClick} aria-hidden="true"></div>
   <!-- Fix #2: expose snap state as CSS classes so child components and CSS
        can conditionally control overflow behaviour at each snap position. -->
   <div
@@ -186,9 +203,9 @@
     bind:this={sheetEl}
     tabindex="-1"
     style="transform: translateY({translateY}px)"
-    on:pointerdown={onPointerDown}
-    on:pointermove={onPointerMove}
-    on:pointerup={onPointerUp}
+    onpointerdown={onPointerDown}
+    onpointermove={onPointerMove}
+    onpointerup={onPointerUp}
     role="dialog"
     aria-modal="true"
     aria-label={title || 'Bottom sheet'}
@@ -199,13 +216,13 @@
     {#if title}
       <div class="sheet-header">
         <h3>{title}</h3>
-        <button class="btn btn-icon btn-ghost" on:click={dismiss} aria-label="Close">
+        <button class="btn btn-icon btn-ghost" onclick={dismiss} aria-label="Close">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
     {/if}
     <div class="sheet-body">
-      <slot />
+      {@render children?.()}
     </div>
   </div>
 {/if}

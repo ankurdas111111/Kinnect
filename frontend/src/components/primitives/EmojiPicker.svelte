@@ -1,14 +1,22 @@
 <script>
+  import { run } from 'svelte/legacy';
+
   import { onMount, onDestroy, createEventDispatcher } from 'svelte';
 
   const dispatch = createEventDispatcher();
 
-  export let open = false;
-  export let anchor = null; // element to position near
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [open]
+   * @property {any} [anchor] - element to position near
+   */
 
-  let pickerEl;
-  let wrapEl;
-  let pickerReady = false;
+  /** @type {Props} */
+  let { open = false, anchor = null } = $props();
+
+  let pickerEl = $state();
+  let wrapEl = $state();
+  let pickerReady = $state(false);
 
   // Position the picker above/near the anchor button.
   // On iOS Chrome the virtual keyboard shifts the visual viewport — we must
@@ -63,9 +71,11 @@
     document.removeEventListener('pointerdown', onDocClick, true);
   });
 
-  $: if (open && pickerReady && wrapEl) {
-    setTimeout(reposition, 10);
-  }
+  run(() => {
+    if (open && pickerReady && wrapEl) {
+      setTimeout(reposition, 10);
+    }
+  });
 
   function handlePick(e) {
     const emoji = e.detail?.emoji?.unicode;
@@ -78,7 +88,7 @@
     <emoji-picker
       bind:this={pickerEl}
       class="ep-picker"
-      on:emoji-click={handlePick}
+      onemoji-click={handlePick}
     ></emoji-picker>
   </div>
 {/if}

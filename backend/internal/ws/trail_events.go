@@ -53,41 +53,43 @@ func (h *Hub) handleGetRecentTrail(c *Client, data json.RawMessage) {
 	}
 
 	cutoff := time.Now().Add(-time.Duration(window) * time.Minute).UnixMilli()
-	rows, err := h.pool.DB.QueryContext(context.Background(),
-		`SELECT lat, lng, speed, ts
-		 FROM position_history
-		 WHERE user_id = $1 AND ts >= $2
-		 ORDER BY ts ASC
-		 LIMIT 1000`,
-		targetUserId, cutoff)
-	if err != nil {
-		c.Send("trailError", map[string]interface{}{"error": "database error"})
-		return
-	}
-	defer rows.Close()
-
-	type point struct {
-		Lat   float64 `json:"lat"`
-		Lng   float64 `json:"lng"`
-		Speed float64 `json:"speed"`
-		Ts    int64   `json:"ts"`
-	}
-	points := make([]point, 0, 64)
-	for rows.Next() {
-		var p point
-		var speed *float64
-		if err := rows.Scan(&p.Lat, &p.Lng, &speed, &p.Ts); err != nil {
-			continue
+	h.offloadDB(func(ctx context.Context) {
+		rows, err := h.pool.DB.QueryContext(ctx,
+			`SELECT lat, lng, speed, ts
+			 FROM position_history
+			 WHERE user_id = $1 AND ts >= $2
+			 ORDER BY ts ASC
+			 LIMIT 1000`,
+			targetUserId, cutoff)
+		if err != nil {
+			c.Send("trailError", map[string]interface{}{"error": "database error"})
+			return
 		}
-		if speed != nil {
-			p.Speed = *speed
-		}
-		points = append(points, p)
-	}
+		defer rows.Close()
 
-	c.Send("recentTrailData", map[string]interface{}{
-		"points":        points,
-		"windowMinutes": window,
-		"targetUserId":  targetUserId,
+		type point struct {
+			Lat   float64 `json:"lat"`
+			Lng   float64 `json:"lng"`
+			Speed float64 `json:"speed"`
+			Ts    int64   `json:"ts"`
+		}
+		points := make([]point, 0, 64)
+		for rows.Next() {
+			var p point
+			var speed *float64
+			if err := rows.Scan(&p.Lat, &p.Lng, &speed, &p.Ts); err != nil {
+				continue
+			}
+			if speed != nil {
+				p.Speed = *speed
+			}
+			points = append(points, p)
+		}
+
+		c.Send("recentTrailData", map[string]interface{}{
+			"points":        points,
+			"windowMinutes": window,
+			"targetUserId":  targetUserId,
+		})
 	})
 }

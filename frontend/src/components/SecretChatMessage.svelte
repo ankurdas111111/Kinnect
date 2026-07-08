@@ -22,24 +22,40 @@
 
   const dispatch = createEventDispatcher();
 
-  export let msg;
-  export let plain = null;
-  export let isOwn = false;
-  export let showInline = false;
-  export let inlinePin = '';
-  export let inlineError = '';
-  export let inlineUnlocking = false;
-  export let lockedSet;
-  export let lockCountdown = null;
-  export let deletingMsgId = null;
-  export let myId = '';
-  export let peerFirst = '';
-  export let seenPulse = false;
+  /**
+   * @typedef {Object} Props
+   * @property {any} msg
+   * @property {any} [plain]
+   * @property {boolean} [isOwn]
+   * @property {boolean} [showInline]
+   * @property {string} [inlinePin]
+   * @property {string} [inlineError]
+   * @property {boolean} [inlineUnlocking]
+   * @property {any} lockedSet
+   * @property {any} [lockCountdown]
+   * @property {any} [deletingMsgId]
+   * @property {string} [myId]
+   * @property {string} [peerFirst]
+   * @property {boolean} [seenPulse]
+   */
 
-  $: decrypted = !isOwn && plain !== null && !lockedSet?.has(msg.id);
-  $: isLocked = !isOwn && !decrypted;
-  $: unread = !!myId && myId !== '_owner_' && msg.senderId !== myId && !msg.seenAt;
-  $: likelyPhoto = isLocked && isLikelyPhotoMsg(msg.ciphertext);
+  /** @type {Props} */
+  let {
+    msg,
+    plain = null,
+    isOwn = false,
+    showInline = false,
+    inlinePin = '',
+    inlineError = '',
+    inlineUnlocking = false,
+    lockedSet,
+    lockCountdown = null,
+    deletingMsgId = null,
+    myId = '',
+    peerFirst = '',
+    seenPulse = false
+  } = $props();
+
 
   const GIF_RE   = /^\[gif:(https?:\/\/[^\]]+)\]$/;
   const PHOTO_RE = /^\[photo:(data:image\/[^;]+;base64,[^\]]+)\]$/;
@@ -68,6 +84,10 @@
     if (d < 86400000) return `${Math.floor(d / 3600000)}h ago`;
     return new Date(ts).toLocaleDateString([], { month: 'short', day: 'numeric' });
   }
+  let decrypted = $derived(!isOwn && plain !== null && !lockedSet?.has(msg.id));
+  let isLocked = $derived(!isOwn && !decrypted);
+  let unread = $derived(!!myId && myId !== '_owner_' && msg.senderId !== myId && !msg.seenAt);
+  let likelyPhoto = $derived(isLocked && isLikelyPhotoMsg(msg.ciphertext));
 </script>
 
 <div
@@ -124,7 +144,7 @@
       <div class="retry-row">
         <button
           class="retry-btn"
-          on:click={() => dispatch('retry', msg.id)}
+          onclick={() => dispatch('retry', msg.id)}
           aria-label="Retry sending message"
           type="button"
         >
@@ -170,7 +190,7 @@
         <button
           class="delete-btn"
           class:delete-btn--confirm={deletingMsgId === msg.id}
-          on:click={() => dispatch('delete', msg.id)}
+          onclick={() => dispatch('delete', msg.id)}
           aria-label={deletingMsgId === msg.id ? 'Tap again to confirm delete' : 'Delete message'}
           type="button"
         >
@@ -209,8 +229,8 @@
           loading="lazy"
           role="button"
           tabindex="0"
-          on:click={() => dispatch('photoExpand', parsePhoto(plain))}
-          on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && dispatch('photoExpand', parsePhoto(plain))}
+          onclick={() => dispatch('photoExpand', parsePhoto(plain))}
+          onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && dispatch('photoExpand', parsePhoto(plain))}
         />
       {:else if parseGif(plain)}
         <img src={parseGif(plain)} class="msg-sticker" alt="Sticker from {peerFirst}" loading="lazy" />
@@ -221,7 +241,7 @@
       <!-- Relock: full 44×44 touch target -->
       <button
         class="relock-btn"
-        on:click={() => dispatch('relock', msg.id)}
+        onclick={() => dispatch('relock', msg.id)}
         title="Lock message"
         aria-label="Lock this message"
         type="button"
@@ -260,7 +280,7 @@
       class:bubble--grp-last={msg.groupLast}
       class:bubble--grp-mid={!msg.groupFirst && !msg.groupLast}
       class:bubble--locked-photo={likelyPhoto}
-      on:click={() => dispatch('toggleInline', msg.id)}
+      onclick={() => dispatch('toggleInline', msg.id)}
       aria-expanded={showInline}
       aria-label={likelyPhoto
         ? 'Encrypted photo — tap to enter PIN and decrypt'
@@ -289,7 +309,7 @@
           Photo · tap to unlock
         </span>
       {:else}
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <svg class="locked-lock" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
           <rect x="3" y="11" width="18" height="11" rx="2"/>
           <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
         </svg>
@@ -366,17 +386,17 @@
   .bubble--their.bubble--grp-mid,
   .bubble--locked.bubble--grp-mid   { border-top-left-radius: var(--radius-sm, 6px); border-bottom-left-radius: var(--radius-sm, 6px); }
 
-  /* ── Own bubble ──────────────────────────────────────────────── */
+  /* ── Own bubble — token-styled teal glass (sent + encrypted) ──── */
   .bubble--own {
     display: flex;
     align-items: center;
     gap: var(--space-2, 8px);
     background: linear-gradient(
       135deg,
-      rgba(20, 184, 166, 0.15) 0%,
-      rgba(20, 184, 166, 0.08) 100%
+      var(--primary-500-12) 0%,
+      var(--primary-500-08) 100%
     );
-    border: 1px solid rgba(20, 184, 166, 0.25);
+    border: 1px solid var(--chat-border-accent, rgba(20, 184, 166, 0.22));
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 2px 8px rgba(0, 0, 0, 0.25);
     max-width: 100%;
     overflow: hidden;
@@ -395,8 +415,10 @@
     user-select: none;
   }
 
+  /* Lock glyph — prominent trust cue on every sent (encrypted) bubble */
   .lock-icon {
-    color: rgba(20, 184, 166, 0.45);
+    color: var(--chat-accent, #14b8a6);
+    opacity: 0.9;
     flex-shrink: 0;
     display: flex;
     align-items: center;
@@ -505,6 +527,14 @@
     border-color: var(--chat-border-accent, rgba(20, 184, 166, 0.22));
     background: var(--chat-accent-subtle, rgba(20, 184, 166, 0.08));
     border-style: solid;
+  }
+
+  /* Encrypted lock glyph stays a clear, accent-tinted trust cue while locked */
+  .locked-lock,
+  .locked-photo-label svg {
+    color: var(--chat-accent, #14b8a6);
+    opacity: 0.8;
+    flex-shrink: 0;
   }
 
   /* Photo locked variant */

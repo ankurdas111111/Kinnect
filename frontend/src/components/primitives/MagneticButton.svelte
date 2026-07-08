@@ -1,4 +1,6 @@
 <script>
+  import { passive } from 'svelte/legacy';
+
   /**
    * MagneticButton — 2026 magnetic attraction effect.
    *
@@ -21,12 +23,24 @@
    */
   import { onDestroy } from 'svelte';
 
-  export let strength = 6;
-  export let disabled = false;
-  export let className = '';
+  /**
+   * @typedef {Object} Props
+   * @property {number} [strength]
+   * @property {boolean} [disabled]
+   * @property {string} [className]
+   * @property {import('svelte').Snippet} [children]
+   */
 
-  let el;
-  let inner;
+  /** @type {Props} */
+  let {
+    strength = 6,
+    disabled = false,
+    className = '',
+    children
+  } = $props();
+
+  let el = $state();
+  let inner = $state();
   let tx = 0, ty = 0;
   let cx = 0, cy = 0;
   let raf = null;
@@ -89,20 +103,20 @@
   });
 </script>
 
-<!-- svelte-ignore a11y-no-static-element-interactions -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="mag-root {className}"
   bind:this={el}
-  on:mousemove={onMouseMove}
-  on:mouseleave={onMouseLeave}
-  on:touchmove|passive={onTouchMove}
-  on:touchend={onTouchEnd}
+  onmousemove={onMouseMove}
+  onmouseleave={onMouseLeave}
+  use:passive={['touchmove', () => onTouchMove]}
+  ontouchend={onTouchEnd}
 >
   <!-- Bug fix: was display:contents — a `contents` element creates no box,
        so transform and will-change had zero effect. Now inline-flex fills
        the wrapper and properly receives the magnetic transform. -->
   <div class="mag-inner" bind:this={inner}>
-    <slot />
+    {@render children?.()}
   </div>
 </div>
 

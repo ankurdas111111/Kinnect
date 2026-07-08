@@ -1,0 +1,17 @@
+# One block per project. Caddy auto-provisions Let's Encrypt TLS for each host
+# and transparently proxies WebSocket upgrades. The proxy target is the app's
+# container_name + internal port (both must be on the `web` docker network).
+
+kinnect.duckdns.org {
+	encode gzip zstd
+	reverse_proxy kinnect-backend:3000
+}
+
+# --- add more projects below, same pattern ---
+# projectb.duckdns.org {
+# 	reverse_proxy projectb-backend:8080
+# }
+#
+# projectc.duckdns.org {
+# 	reverse_proxy projectc-web:80
+# }

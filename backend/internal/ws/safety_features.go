@@ -410,52 +410,61 @@ func (h *Hub) handleStartWalkWithMe(c *Client, data json.RawMessage) {
 	expiresAtPtr := &expiresAt
 	token := generateLiveToken()
 	createdAt := time.Now().UnixMilli()
+	userID := user.UserID
+	displayName := user.DisplayName
 
-	if err := db.CreateLiveToken(context.Background(), h.pool.DB, token, user.UserID, expiresAtPtr, createdAt); err != nil {
-		slog.Error("startWalkWithMe: failed to create live token", "error", err)
-		c.Send("walkError", map[string]interface{}{"message": "Failed to start walk session"})
-		return
-	}
-	h.Cache.AddLiveToken(token, user.UserID, expiresAtPtr, createdAt)
-
-	now := time.Now().UnixMilli()
-	user.WalkActive = true
-	user.WalkDestLat = destLat
-	user.WalkDestLng = destLng
-	user.WalkDestName = destName
-	user.WalkToken = token
-	user.WalkWatcherID = watcherID
-	user.WalkStartedAt = now
-	user.WalkStoppedAt = 0
-	user.WalkOfflineAt = 0
-	user.WalkDeviationNotifiedAt = 0
-
-	slog.Info("Walk With Me started", "user", user.DisplayName, "dest", destName)
-
-	// Tell the initiating client
-	c.Send("walkStarted", map[string]interface{}{
-		"token":    token,
-		"destName": destName,
-		"destLat":  destLat,
-		"destLng":  destLng,
-	})
-
-	// Notify the selected watcher
-	if watcherID != "" {
-		if watcher := h.GetClientByUserID(watcherID); watcher != nil {
-			watcher.Send("walkWithMeRequest", map[string]interface{}{
-				"fromUserId":   user.UserID,
-				"fromName":     user.DisplayName,
-				"destName":     destName,
-				"token":        token,
-			})
+	h.offloadDB(func(ctx context.Context) {
+		if err := db.CreateLiveToken(ctx, h.pool.DB, token, userID, expiresAtPtr, createdAt); err != nil {
+			slog.Error("startWalkWithMe: failed to create live token", "error", err)
+			c.Send("walkError", map[string]interface{}{"message": "Failed to start walk session"})
+			return
 		}
-	}
+		h.RunOnLoop(func() {
+			h.Cache.AddLiveToken(token, userID, expiresAtPtr, createdAt)
+			u := h.Cache.GetActiveUser(c.ID())
+			if u == nil {
+				return
+			}
+			now := time.Now().UnixMilli()
+			u.WalkActive = true
+			u.WalkDestLat = destLat
+			u.WalkDestLng = destLng
+			u.WalkDestName = destName
+			u.WalkToken = token
+			u.WalkWatcherID = watcherID
+			u.WalkStartedAt = now
+			u.WalkStoppedAt = 0
+			u.WalkOfflineAt = 0
+			u.WalkDeviationNotifiedAt = 0
 
-	// Broadcast updated state
-	sanitized := h.Cache.SanitizeUser(user)
-	sanitized["online"] = true
-	h.emitToVisibleAndSelf(user, "userUpdate", sanitized)
+			slog.Info("Walk With Me started", "user", displayName, "dest", destName)
+
+			// Tell the initiating client
+			c.Send("walkStarted", map[string]interface{}{
+				"token":    token,
+				"destName": destName,
+				"destLat":  destLat,
+				"destLng":  destLng,
+			})
+
+			// Notify the selected watcher
+			if watcherID != "" {
+				if watcher := h.GetClientByUserID(watcherID); watcher != nil {
+					watcher.Send("walkWithMeRequest", map[string]interface{}{
+						"fromUserId": userID,
+						"fromName":   displayName,
+						"destName":   destName,
+						"token":      token,
+					})
+				}
+			}
+
+			// Broadcast updated state
+			sanitized := h.Cache.SanitizeUser(u)
+			sanitized["online"] = true
+			h.emitToVisibleAndSelf(u, "userUpdate", sanitized)
+		})
+	})
 }
 
 // handleEndWalkWithMe manually ends a walk session.

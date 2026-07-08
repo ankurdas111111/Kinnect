@@ -9,13 +9,19 @@
   import { activeSosUsers } from '../lib/stores/sos.js';
   import { hubBadgeCount, hubBadgeSos } from '../lib/stores/hubBadge.js';
 
-  $: ghostMode = $privacyPause && $privacyPause > Date.now();
-  $: hubBadge  = $hubBadgeCount > 0 ? ($hubBadgeCount > 9 ? '9+' : String($hubBadgeCount)) : ($activeSosUsers.size > 0 ? '!' : null);
-  $: hubBadgeIsUrgent = $hubBadgeSos || $activeSosUsers.size > 0;
+  let ghostMode = $derived($privacyPause && $privacyPause > Date.now());
+  let hubBadge  = $derived($hubBadgeCount > 0 ? ($hubBadgeCount > 9 ? '9+' : String($hubBadgeCount)) : ($activeSosUsers.size > 0 ? '!' : null));
+  let hubBadgeIsUrgent = $derived($hubBadgeSos || $activeSosUsers.size > 0);
 
-  export let isAdmin = false;
-  export let activePanel = null;
-  export let isTracking = false;
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [isAdmin]
+   * @property {any} [activePanel]
+   * @property {boolean} [isTracking]
+   */
+
+  /** @type {Props} */
+  let { isAdmin = false, activePanel = null, isTracking = false } = $props();
 
   const dispatch = createEventDispatcher();
 
@@ -28,7 +34,7 @@
     window.location.reload();
   }
 
-  $: initials = $authUser ? ($authUser.displayName || '').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '';
+  let initials = $derived($authUser ? ($authUser.displayName || '').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '');
 </script>
 
 <nav class="navbar navbar-inner" aria-label="Main navigation" data-ghost-mode={ghostMode ? 'true' : 'false'}>
@@ -37,7 +43,7 @@
     <button
       class="nav-dashboard-btn"
       class:has-badge={hubBadge}
-      on:click={() => push('/dashboard')}
+      onclick={() => push('/dashboard')}
       title="Family Dashboard"
       aria-label="Open family dashboard{hubBadge ? ` (${hubBadge} new)` : ''}"
     >
@@ -64,13 +70,13 @@
   <div class="navbar-right">
     <!-- Group 1: Social/Info -->
     <div class="nav-group">
-      <button class="nav-btn" class:active={activePanel === 'sharing'} on:click={() => toggle('sharing')} title="Sharing" aria-label="Toggle sharing panel" aria-pressed={activePanel === 'sharing'}>
+      <button class="nav-btn tactile" class:active={activePanel === 'sharing'} onclick={() => toggle('sharing')} title="Sharing" aria-label="Toggle sharing panel" aria-pressed={activePanel === 'sharing'}>
         <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
       </button>
-      <button class="nav-btn" class:active={activePanel === 'users'} on:click={() => toggle('users')} title="People" aria-label="Toggle users panel" aria-pressed={activePanel === 'users'}>
+      <button class="nav-btn tactile" class:active={activePanel === 'users'} onclick={() => toggle('users')} title="People" aria-label="Toggle users panel" aria-pressed={activePanel === 'users'}>
         <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       </button>
-      <button class="nav-btn" class:active={activePanel === 'info'} on:click={() => toggle('info')} title="Signal" aria-label="Toggle info panel" aria-pressed={activePanel === 'info'}>
+      <button class="nav-btn tactile" class:active={activePanel === 'info'} onclick={() => toggle('info')} title="Signal" aria-label="Toggle info panel" aria-pressed={activePanel === 'info'}>
         <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
       </button>
     </div>
@@ -78,7 +84,7 @@
     <div class="nav-divider" aria-hidden="true"></div>
 
     <!-- Group 2: Safety -->
-    <button class="nav-btn nav-btn-safety" class:active={activePanel === 'admin'} on:click={() => toggle('admin')} title="Safety" aria-label="Toggle safety panel" aria-pressed={activePanel === 'admin'}>
+    <button class="nav-btn nav-btn-safety tactile" class:active={activePanel === 'admin'} onclick={() => toggle('admin')} title="Safety" aria-label="Toggle safety panel" aria-pressed={activePanel === 'admin'}>
       <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
     </button>
 
@@ -86,18 +92,18 @@
 
     <!-- Group 3: Settings -->
     <div class="nav-group">
-      <button class="nav-btn" class:active={activePanel === 'settings'} on:click={() => toggle('settings')} title="Settings" aria-label="Toggle settings panel" aria-pressed={activePanel === 'settings'}>
+      <button class="nav-btn tactile" class:active={activePanel === 'settings'} onclick={() => toggle('settings')} title="Settings" aria-label="Toggle settings panel" aria-pressed={activePanel === 'settings'}>
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
       {#if isAdmin}
-        <button class="nav-btn" class:active={activePanel === 'superAdmin'} on:click={() => toggle('superAdmin')} title="Super Admin" aria-label="Toggle super admin panel" aria-pressed={activePanel === 'superAdmin'}>
+        <button class="nav-btn tactile" class:active={activePanel === 'superAdmin'} onclick={() => toggle('superAdmin')} title="Super Admin" aria-label="Toggle super admin panel" aria-pressed={activePanel === 'superAdmin'}>
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
         </button>
       {/if}
     </div>
 
     <!-- Premium track pill -->
-    <button class="track-pill" class:live={isTracking} on:click={toggleTracking} aria-label={isTracking ? 'Stop tracking' : 'Start tracking'}>
+    <button class="track-pill" class:live={isTracking} onclick={toggleTracking} aria-label={isTracking ? 'Stop tracking' : 'Start tracking'}>
       {#if isTracking}
         <span class="rec-dot animate-rec-blink" aria-hidden="true"></span>
         Live · Stop
@@ -109,9 +115,13 @@
 
     <div class="navbar-avatar" class:avatar-live={isTracking} title={$authUser?.displayName || ''} aria-label="User avatar">{initials}</div>
 
-    <button class="nav-btn" on:click={logout} title="Logout" aria-label="Logout">
-      <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-    </button>
+    <!-- Footer: sign-out, visually separated + danger-tinted -->
+    <div class="nav-divider" aria-hidden="true"></div>
+    <div class="navbar-footer">
+      <button class="nav-btn nav-btn-logout tactile" onclick={logout} title="Logout" aria-label="Logout">
+        <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
   </div>
 </nav>
 
@@ -322,8 +332,17 @@
     flex-shrink: 0;
   }
 
+  /* Footer cluster — trailing sign-out, pushed to the far end */
+  .navbar-footer {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+
   /* Individual nav buttons — 3D interactive */
   .nav-btn {
+    position: relative;
     width: 34px;
     height: 34px;
     border-radius: var(--radius-md);
@@ -341,6 +360,34 @@
       background 150ms var(--ease-out),
       box-shadow var(--duration-3d) var(--ease-3d-out),
       transform var(--duration-3d) var(--ease-3d-spring);
+  }
+
+  /* Left-edge active accent line — glanceable state beyond color alone */
+  .nav-btn::before {
+    content: '';
+    position: absolute;
+    left: 2px;
+    top: 50%;
+    width: 3px;
+    height: 18px;
+    border-radius: var(--radius-full);
+    background: var(--primary-400);
+    transform: translateY(-50%) scaleY(0);
+    opacity: 0;
+    transform-origin: center;
+    transition:
+      transform 200ms var(--ease-spring),
+      opacity 160ms var(--ease-out);
+    pointer-events: none;
+  }
+
+  .nav-btn.active::before {
+    transform: translateY(-50%) scaleY(1);
+    opacity: 1;
+  }
+
+  .nav-btn-safety.active::before {
+    background: var(--accent-guardian);
   }
 
   .nav-btn:hover {
@@ -371,6 +418,13 @@
     color: var(--accent-guardian);
     background: rgba(139, 92, 246, 0.10);
     box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  /* Sign-out — warning/danger tint on intent */
+  .nav-btn-logout:hover {
+    color: var(--danger-500);
+    background: var(--danger-500-12);
+    box-shadow: 0 0 0 1px var(--danger-500-20);
   }
 
   /* ── Premium track pill — 3D hero action ────────────────────────────── */
@@ -495,6 +549,10 @@
   [data-ghost-mode="false"] {
     filter: none;
     transition: filter 600ms var(--ease-out);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .nav-btn::before { transition: none; }
   }
 
   /* Mobile: hide desktop navbar */

@@ -85,22 +85,17 @@ func NewRouter(cfg *config.Config, pool *db.Pool, c *cache.Cache, store *auth.Se
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" || r.URL.Path == "" {
 			w.Header().Set("Cache-Control", "no-cache")
-			http.ServeFile(w, r, filepath.Join(absFrontend, "index.html"))
+			serveStaticCompressed(w, r, filepath.Join(absFrontend, "index.html"), "index.html")
 			return
 		}
 		fpath := filepath.Join(absFrontend, r.URL.Path)
 		if _, err := os.Stat(fpath); err == nil {
 			setStaticCacheHeaders(w, r.URL.Path)
-			if ext := filepath.Ext(r.URL.Path); ext != "" {
-				if ct := mime.TypeByExtension(ext); ct != "" {
-					w.Header().Set("Content-Type", ct)
-				}
-			}
-			http.ServeFile(w, r, fpath)
+			serveStaticCompressed(w, r, fpath, r.URL.Path)
 			return
 		}
 		w.Header().Set("Cache-Control", "no-cache")
-		http.ServeFile(w, r, filepath.Join(absFrontend, "index.html"))
+		serveStaticCompressed(w, r, filepath.Join(absFrontend, "index.html"), "index.html")
 	})
 
 	// Apply middleware: SecurityHeaders -> Gzip -> CORS -> Session
@@ -127,6 +122,41 @@ func RequireAdmin(next http.Handler) http.Handler {
 
 // hashedAssetRe matches Vite's hashed output filenames like index-C_s0HzSR.js
 var hashedAssetRe = regexp.MustCompile(`-[A-Za-z0-9_-]{6,}\.(js|css|woff2?|wasm)$`)
+
+// precompressibleExt lists extensions for which the Vite build emits sibling
+// .br/.gz files. Render does no edge compression, and the gzip middleware
+// deliberately skips ServeFile responses, so precompressed siblings are the
+// only way these ship compressed.
+var precompressibleExt = map[string]bool{
+	".js": true, ".css": true, ".html": true, ".svg": true,
+	".json": true, ".map": true, ".wasm": true, ".txt": true, ".xml": true,
+}
+
+// serveStaticCompressed serves fpath, preferring a precompressed .br or .gz
+// sibling when the client accepts that encoding. Content-Type always reflects
+// the original file.
+func serveStaticCompressed(w http.ResponseWriter, r *http.Request, fpath, urlPath string) {
+	ext := filepath.Ext(urlPath)
+	if ct := mime.TypeByExtension(ext); ct != "" {
+		w.Header().Set("Content-Type", ct)
+	}
+	if precompressibleExt[ext] {
+		accept := r.Header.Get("Accept-Encoding")
+		for _, enc := range [...]struct{ name, suffix string }{{"br", ".br"}, {"gzip", ".gz"}} {
+			if !strings.Contains(accept, enc.name) {
+				continue
+			}
+			cpath := fpath + enc.suffix
+			if _, err := os.Stat(cpath); err == nil {
+				w.Header().Set("Content-Encoding", enc.name)
+				w.Header().Add("Vary", "Accept-Encoding")
+				http.ServeFile(w, r, cpath)
+				return
+			}
+		}
+	}
+	http.ServeFile(w, r, fpath)
+}
 
 // setStaticCacheHeaders applies aggressive caching for hashed assets
 // and short caching for everything else.

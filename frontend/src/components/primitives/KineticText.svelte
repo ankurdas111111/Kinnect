@@ -1,37 +1,49 @@
 <script>
+  import { run } from 'svelte/legacy';
+
+  
   /**
-   * KineticText — 2026 per-character animated heading.
-   *
-   * Each character slides + fades in with a staggered spring delay.
-   * Gracefully degrades under prefers-reduced-motion.
-   *
-   * Props:
-   *   text      — the heading string to animate
-   *   tag       — HTML element to render (default 'h1')
-   *   delay     — base delay in ms before animation starts (default 0)
-   *   stagger   — ms between each character (default 40)
-   *   className — additional CSS class applied to the root element
-   *   once      — if true, only animates on first mount (not on text change)
-   *
-   * Bug fix: removed filter:blur() from the kt-rise keyframe.
-   * filter is NOT GPU-composited — it forces the browser to create a new
-   * stacking context and triggers repaint on every frame, causing jank on
-   * iOS Safari especially when 20+ characters animate simultaneously.
-   * The entrance now uses transform+opacity only (GPU compositor path).
+   * @typedef {Object} Props
+   * @property {string} [text] - KineticText — 2026 per-character animated heading.
+Each character slides + fades in with a staggered spring delay.
+Gracefully degrades under prefers-reduced-motion.
+Props:
+text      — the heading string to animate
+tag       — HTML element to render (default 'h1')
+delay     — base delay in ms before animation starts (default 0)
+stagger   — ms between each character (default 40)
+className — additional CSS class applied to the root element
+once      — if true, only animates on first mount (not on text change)
+Bug fix: removed filter:blur() from the kt-rise keyframe.
+filter is NOT GPU-composited — it forces the browser to create a new
+stacking context and triggers repaint on every frame, causing jank on
+iOS Safari especially when 20+ characters animate simultaneously.
+The entrance now uses transform+opacity only (GPU compositor path).
+   * @property {string} [tag]
+   * @property {number} [delay]
+   * @property {number} [stagger]
+   * @property {string} [className]
+   * @property {boolean} [once]
    */
-  export let text = '';
-  export let tag = 'h1';
-  export let delay = 0;
-  export let stagger = 40;
-  export let className = '';
-  export let once = false;
+
+  /** @type {Props} */
+  let {
+    text = '',
+    tag = 'h1',
+    delay = 0,
+    stagger = 40,
+    className = '',
+    once = false
+  } = $props();
 
   // Split into characters, preserving spaces as non-breaking
-  $: chars = Array.from(text);
+  let chars = $derived(Array.from(text));
 
   // Key to re-trigger animation on text change (unless once=true)
-  let animKey = 0;
-  $: if (!once) { text; animKey++; }
+  let animKey = $state(0);
+  run(() => {
+    if (!once) { text; animKey++; }
+  });
 </script>
 
 <!-- svelte:element used to render dynamic tag -->

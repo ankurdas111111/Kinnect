@@ -1,9 +1,12 @@
 <script>
+  import { run, self } from 'svelte/legacy';
+
   import { onMount, onDestroy, tick } from 'svelte';
   import { push } from 'svelte-spa-router';
   import { authUser, authLoading } from '../lib/stores/auth.js';
   import { socket, setupSocketHandlers, cancelReconnectBanner, setBanner as socketSetBanner } from '../lib/socket.js';
   import { banner, mySosActive } from '../lib/stores/sos.js';
+  import { startLiveShareActivity, endLiveShareActivity } from '../lib/liveActivities.js';
   import { pendingIncomingRequests } from '../lib/stores/guardians.js';
   import { otherUsers, mySocketId, myLocation, tracking, focusUser, mapFlyTo, routeGeometry, walkDestination, mapChatRequest } from '../lib/stores/map.js';
 
@@ -51,12 +54,25 @@
   import * as trackingNotif from '../lib/trackingNotification.js';
   import { startGyroscope, stopGyroscope } from '../lib/gyroscope.js';
 
-  let activePanel = null;
-  let sidebarTab = 'info';
-  let sidebarCollapsed = false;
-  let sosConfirmOpen = false;
-  let sosParticleBurstActive = false;
-  let batteryPromptOpen = false;
+  let activePanel = $state(null);
+  let sidebarTab = $state('info');
+  let sidebarCollapsed = $state(false);
+  let sosConfirmOpen = $state(false);
+  let sosParticleBurstActive = $state(false);
+  let batteryPromptOpen = $state(false);
+
+  // iOS Live Activity mirrors SOS state (no-op elsewhere). Store-driven so it
+  // covers every trigger path: FAB, notification action, and auto-SOS.
+  let _laSosActive = $state(false);
+  run(() => {
+    if ($mySosActive && !_laSosActive) {
+      _laSosActive = true;
+      startLiveShareActivity('sos', { status: 'Alert active', detail: 'Your family has been notified' });
+    } else if (!$mySosActive && _laSosActive) {
+      _laSosActive = false;
+      endLiveShareActivity();
+    }
+  });
 
   // Feature 7: Panic Mode — read from localStorage (set in SettingsPanel)
   // Double-tap the SOS FAB to fire SOS instantly without the confirm modal.
@@ -75,18 +91,18 @@
       sosConfirmOpen = true;
     }
   }
-  let secretChatPeer = null; // { id: string, name: string }
+  let secretChatPeer = $state(null); // { id: string, name: string }
 
   // Dialog element refs for programmatic focus management
-  let sosConfirmEl = null;
-  let batteryPromptEl = null;
+  let sosConfirmEl = $state(null);
+  let batteryPromptEl = $state(null);
 
   // aria-live announcement text — polled by the live region in the overlay
-  let liveAnnouncement = '';
+  let liveAnnouncement = $state('');
 
   // Track what was focused before a dialog opened so we can return focus on close
-  let _sosLastFocus = null;
-  let _batteryLastFocus = null;
+  let _sosLastFocus = $state(null);
+  let _batteryLastFocus = $state(null);
 
   // Move focus into a dialog element after Svelte updates the DOM
   async function focusDialog(el) {
@@ -100,42 +116,54 @@
   }
 
   // Map popup "Chat" button → open chat panel directly without going via action sheet
-  $: if ($mapChatRequest) { secretChatPeer = $mapChatRequest; mapChatRequest.set(null); }
+  run(() => {
+    if ($mapChatRequest) { secretChatPeer = $mapChatRequest; mapChatRequest.set(null); }
+  });
 
   // Focus management: move focus into dialogs when they open + return focus on close
-  $: if (sosConfirmOpen && sosConfirmEl) {
-    _sosLastFocus = document.activeElement;
-    focusDialog(sosConfirmEl);
-  }
-  $: if (!sosConfirmOpen && _sosLastFocus) {
-    const el = _sosLastFocus;
-    _sosLastFocus = null;
-    tick().then(() => { if (el && typeof el.focus === 'function') el.focus(); });
-  }
-  $: if (batteryPromptOpen && batteryPromptEl) {
-    _batteryLastFocus = document.activeElement;
-    focusDialog(batteryPromptEl);
-  }
-  $: if (!batteryPromptOpen && _batteryLastFocus) {
-    const el = _batteryLastFocus;
-    _batteryLastFocus = null;
-    tick().then(() => { if (el && typeof el.focus === 'function') el.focus(); });
-  }
+  run(() => {
+    if (sosConfirmOpen && sosConfirmEl) {
+      _sosLastFocus = document.activeElement;
+      focusDialog(sosConfirmEl);
+    }
+  });
+  run(() => {
+    if (!sosConfirmOpen && _sosLastFocus) {
+      const el = _sosLastFocus;
+      _sosLastFocus = null;
+      tick().then(() => { if (el && typeof el.focus === 'function') el.focus(); });
+    }
+  });
+  run(() => {
+    if (batteryPromptOpen && batteryPromptEl) {
+      _batteryLastFocus = document.activeElement;
+      focusDialog(batteryPromptEl);
+    }
+  });
+  run(() => {
+    if (!batteryPromptOpen && _batteryLastFocus) {
+      const el = _batteryLastFocus;
+      _batteryLastFocus = null;
+      tick().then(() => { if (el && typeof el.focus === 'function') el.focus(); });
+    }
+  });
 
   // aria-live: announce tracking start/stop to screen readers
-  $: if ($tracking !== undefined) {
-    liveAnnouncement = $tracking ? 'Location sharing started.' : 'Location sharing stopped.';
-  }
+  run(() => {
+    if ($tracking !== undefined) {
+      liveAnnouncement = $tracking ? 'Location sharing started.' : 'Location sharing stopped.';
+    }
+  });
 
   // aria-live: announce connection state changes (debounced — only on disconnect/reconnect)
-  let _prevSocketConnected = null;
-  $: {
+  let _prevSocketConnected = $state(null);
+  run(() => {
     const connected = $connectivityStore.socketConnected;
     if (_prevSocketConnected !== null && connected !== _prevSocketConnected) {
       liveAnnouncement = connected ? 'Reconnected to Kinnect.' : 'Connection lost. Reconnecting…';
     }
     _prevSocketConnected = connected;
-  }
+  });
 
   /**
    * Detect Android device manufacturer from the WebView UA string.
@@ -192,13 +220,13 @@
       steps: null,
     },
   };
-  let isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
-  let mobileTab = 'track';
-  let sheetOpen = false;
-  let followMode = false;
-  let meSubTab = 'info';
-  let showOnboarding = false;
-  let showFeatureGuide = false;
+  let isMobile = $state(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+  let mobileTab = $state('track');
+  let sheetOpen = $state(false);
+  let followMode = $state(false);
+  let meSubTab = $state('info');
+  let showOnboarding = $state(false);
+  let showFeatureGuide = $state(false);
   let lastAcceptedFix = null;
   let lastEmittedFix = null;
   let lastEmitAt = 0;
@@ -249,37 +277,45 @@
     } catch { return null; }
   }
 
-  $: if (!$authLoading && !$authUser) push('/login');
-  $: isAdmin = $authUser && $authUser.role === 'admin';
+  run(() => {
+    if (!$authLoading && !$authUser) push('/login');
+  });
+  let isAdmin = $derived($authUser && $authUser.role === 'admin');
 
   // Force-update persistent notification when ride status changes
-  $: if ($tracking && $rideShare && trackingNotif.isActive()) {
-    const rs = $rideShare;
-    trackingNotif.showOrUpdate({
-      visibleCount: $otherUsers.size,
-      accuracy: $myLocation?.accuracy,
-      rideActive: rs.active,
-      rideDest: rs.dest,
-      rideVehicle: rs.vehicle,
-      rideEtaMins: rs.eta ? Math.max(0, Math.round((rs.eta - Date.now()) / 60000)) : null,
-      force: true,
-    });
-  }
-  $: rightPanelOpen = activePanel === 'users' || activePanel === 'superAdmin';
-  $: sidebarOpen = !sidebarCollapsed;
-  $: hasNotification = $pendingIncomingRequests.length > 0;
-  $: mobileTab = $uiShellStore.mobileTab;
-  $: sheetOpen = $uiShellStore.sheetOpen;
+  run(() => {
+    if ($tracking && $rideShare && trackingNotif.isActive()) {
+      const rs = $rideShare;
+      trackingNotif.showOrUpdate({
+        visibleCount: $otherUsers.size,
+        accuracy: $myLocation?.accuracy,
+        rideActive: rs.active,
+        rideDest: rs.dest,
+        rideVehicle: rs.vehicle,
+        rideEtaMins: rs.eta ? Math.max(0, Math.round((rs.eta - Date.now()) / 60000)) : null,
+        force: true,
+      });
+    }
+  });
+  let rightPanelOpen = $derived(activePanel === 'users' || activePanel === 'superAdmin');
+  let sidebarOpen = $derived(!sidebarCollapsed);
+  let hasNotification = $derived($pendingIncomingRequests.length > 0);
+  run(() => {
+    mobileTab = $uiShellStore.mobileTab;
+  });
+  run(() => {
+    sheetOpen = $uiShellStore.sheetOpen;
+  });
 
   // Fix #2: Reactive FAB bottom offset — lift SOS FAB above the BottomSheet
   // when the sheet is open on mobile so the button is never obscured.
   // The peek state reveals ~35vh of the sheet from the bottom; add that as clearance.
-  $: fabBottomOffset = (isMobile && sheetOpen)
+  let fabBottomOffset = $derived((isMobile && sheetOpen)
     ? `calc(var(--bottom-tab-height, 56px) + var(--safe-bottom, 0px) + var(--space-4) + min(35vh, 280px))`
-    : `calc(var(--bottom-tab-height, 56px) + var(--safe-bottom, 0px) + var(--space-4))`;
+    : `calc(var(--bottom-tab-height, 56px) + var(--safe-bottom, 0px) + var(--space-4))`);
 
   // Wire SOS state to global CSS app-state for full-app red tint
-  $: {
+  run(() => {
     if (typeof document !== 'undefined') {
       if ($mySosActive) {
         document.documentElement.dataset.appState = 'sos';
@@ -287,18 +323,20 @@
         delete document.documentElement.dataset.appState;
       }
     }
-  }
+  });
 
   // When flying to a user on the map, auto-close panels/sheets so the map is visible
-  $: if ($focusUser) {
-    if (isMobile) {
-      setSheetOpen(false);
-      setMobileTab('track');
+  run(() => {
+    if ($focusUser) {
+      if (isMobile) {
+        setSheetOpen(false);
+        setMobileTab('track');
+      }
+      if (activePanel === 'users') {
+        activePanel = null;
+      }
     }
-    if (activePanel === 'users') {
-      activePanel = null;
-    }
-  }
+  });
 
   function setPanel(panel) {
     activePanel = activePanel === panel ? null : panel;
@@ -342,6 +380,15 @@
     else if (tab === 'safety') sidebarTab = 'admin';
     else if (tab === 'me') sidebarTab = 'info';
     setSheetOpen(true);
+  }
+
+  // Invite / add-people CTA (from UsersList empty state) → open the sharing
+  // ("Connect") view. Reuses onMobileTabChange so the mobile sheet flow is
+  // unchanged; also expands the desktop sidebar so the SharingPanel is visible
+  // there too (onMobileTabChange sets sidebarTab='sharing' + closes the right panel).
+  function openSharingFromInvite() {
+    sidebarCollapsed = false;
+    onMobileTabChange({ detail: 'share' });
   }
 
   async function pushProfile() {
@@ -737,301 +784,341 @@
 </script>
 
 <AppLayout {sidebarOpen} {rightPanelOpen}>
-  <svelte:fragment slot="topBar">
-    <MobileTopBar
-      activeTab={mobileTab}
-      trackingActive={$tracking}
-      {hasNotification}
-      lastAccuracy={$trackingMetrics.lastAccuracy}
-      latencyMs={$latencyMetrics.avgE2eMs}
-      isOnline={$connectivityStore.isOnline}
-      socketConnected={$connectivityStore.socketConnected}
-      bufferedCount={$connectivityStore.bufferedCount}
-      on:openMe={() => onMobileTabChange({ detail: 'me' })}
-    />
-  </svelte:fragment>
+  {#snippet topBar()}
 
-  <svelte:fragment slot="navbar">
-    <Navbar
-      {isAdmin}
-      activePanel={activePanel || sidebarTab}
-      on:togglePanel={onNavbarToggle}
-      on:toggleTracking={toggleTrackingAction}
-      isTracking={$tracking}
-    />
-  </svelte:fragment>
-
-  <svelte:fragment slot="sidebar">
-    <Sidebar
-      activeTab={sidebarTab}
-      {isAdmin}
-      collapsed={sidebarCollapsed}
-      on:tabChange={onSidebarTabChange}
-      on:toggle={onSidebarToggle}
-    >
-      {#if sidebarTab === 'info'}
-        <InfoPanel embedded={true} />
-      {:else if sidebarTab === 'sharing'}
-        <SharingPanel embedded={true} />
-      {:else if sidebarTab === 'admin'}
-        <AdminPanel embedded={true} />
-      {:else if sidebarTab === 'places'}
-        <SavedPlacesPanel embedded={true} />
-      {:else if sidebarTab === 'settings'}
-        <SettingsPanel embedded={true} on:openGuide={() => showFeatureGuide = true} />
-      {/if}
-    </Sidebar>
-  </svelte:fragment>
-
-  <svelte:fragment slot="map">
-    <MapView {followMode} />
-    <div class="place-search-overlay">
-      <PlaceSearch
-        on:select={e => mapFlyTo.set({ lat: e.detail.lat, lng: e.detail.lng, zoom: 15 })}
-        on:route={e => routeGeometry.set(e.detail.geometry)}
-        on:clearRoute={() => routeGeometry.set(null)}
-        on:setDestination={e => walkDestination.set(e.detail)}
+      <MobileTopBar
+        activeTab={mobileTab}
+        trackingActive={$tracking}
+        {hasNotification}
+        lastAccuracy={$trackingMetrics.lastAccuracy}
+        latencyMs={$latencyMetrics.avgE2eMs}
+        isOnline={$connectivityStore.isOnline}
+        socketConnected={$connectivityStore.socketConnected}
+        bufferedCount={$connectivityStore.bufferedCount}
+        on:openMe={() => onMobileTabChange({ detail: 'me' })}
       />
-    </div>
-  </svelte:fragment>
 
-  <svelte:fragment slot="banner">
-    <Banner />
-  </svelte:fragment>
+  {/snippet}
 
-  <svelte:fragment slot="rightPanel">
-    {#if activePanel === 'users'}
-      <UsersList on:close={() => activePanel = null} on:secretChat={(e) => { activePanel = null; secretChatPeer = e.detail; }} />
-    {:else if activePanel === 'superAdmin' && isAdmin}
-      <SuperAdminPanel on:close={() => activePanel = null} />
-    {/if}
-  </svelte:fragment>
+  {#snippet navbar()}
 
-  <svelte:fragment slot="bottomSheet">
-    <BottomSheet
-      open={sheetOpen}
-      title={mobileTab === 'track' ? 'Map' : mobileTab === 'people' ? 'People' : mobileTab === 'share' ? 'Connect' : mobileTab === 'safety' ? 'Safety' : 'Me'}
-      on:close={() => {
-        setSheetOpen(false);
-      }}
-    >
-      {#if mobileTab === 'track'}
-        <TrackingNowCard
-          location={$myLocation}
-          trackingActive={$tracking}
-          bufferedCount={$connectivityStore.bufferedCount}
-          socketConnected={$connectivityStore.socketConnected}
-          on:toggleTracking={toggleTrackingAction}
-          on:centerOnMe={() => focusUser.set('__self__')}
-          on:toggleFollow={() => (followMode = !followMode)}
-        />
-      {:else if mobileTab === 'me'}
-        <div class="page-nav-row">
-          <button class="page-nav-btn" on:click={() => push('/dashboard')}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-            Dashboard
-          </button>
-          <button class="page-nav-btn" on:click={() => push('/activity')}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-            Activity
-          </button>
-          <button class="page-nav-btn" on:click={() => push('/emergency')}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            Emergency
-          </button>
-          <button class="page-nav-btn" on:click={() => push('/checkins')}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            Check-ins
-          </button>
-          <button class="page-nav-btn" on:click={() => push('/replay')}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
-            Route History
-          </button>
-        </div>
-        <div class="spatial-subtabs">
-          <button class="spatial-subtab" class:active={meSubTab === 'info'} on:click={() => meSubTab = 'info'}>Status</button>
-          <button class="spatial-subtab" class:active={meSubTab === 'places'} on:click={() => meSubTab = 'places'}>Places</button>
-          <button class="spatial-subtab" class:active={meSubTab === 'settings'} on:click={() => meSubTab = 'settings'}>Settings</button>
-        </div>
-        {#if meSubTab === 'info'}
+      <Navbar
+        {isAdmin}
+        activePanel={activePanel || sidebarTab}
+        on:togglePanel={onNavbarToggle}
+        on:toggleTracking={toggleTrackingAction}
+        isTracking={$tracking}
+      />
+
+  {/snippet}
+
+  {#snippet sidebar()}
+
+      <Sidebar
+        activeTab={sidebarTab}
+        {isAdmin}
+        collapsed={sidebarCollapsed}
+        on:tabChange={onSidebarTabChange}
+        on:toggle={onSidebarToggle}
+      >
+        {#if sidebarTab === 'info'}
           <InfoPanel embedded={true} />
-        {:else if meSubTab === 'places'}
+        {:else if sidebarTab === 'sharing'}
+          <SharingPanel embedded={true} />
+        {:else if sidebarTab === 'admin'}
+          <AdminPanel embedded={true} />
+        {:else if sidebarTab === 'places'}
           <SavedPlacesPanel embedded={true} />
-        {:else if meSubTab === 'settings'}
+        {:else if sidebarTab === 'settings'}
           <SettingsPanel embedded={true} on:openGuide={() => showFeatureGuide = true} />
         {/if}
-      {:else if mobileTab === 'share'}
-        <SharingPanel embedded={true} />
-      {:else if mobileTab === 'safety'}
-        <div class="safety-quick-actions">
-          <button
-            class="btn"
-            class:btn-danger={!$mySosActive}
-            class:btn-secondary={$mySosActive}
-            on:click={() => { if ($mySosActive) { haptics.sosCancelled(); socket.emit('cancelSOS'); } else { haptics.warning(); sosConfirmOpen = true; } }}
-          >
-            {$mySosActive ? 'Cancel SOS' : 'Trigger SOS'}
-          </button>
-          <button class="btn btn-secondary" on:click={() => socket.emit('checkInAck')}>I'm OK</button>
-        </div>
-        <div class="page-nav-row">
-          <button class="page-nav-btn" on:click={() => push('/emergency')}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            Emergency Profile
-          </button>
-          <button class="page-nav-btn" on:click={() => push('/checkins')}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            Check-in Schedule
-          </button>
-        </div>
-        <AdminPanel embedded={true} />
-      {:else if mobileTab === 'people'}
-        <UsersList embedded={true} on:secretChat={(e) => { setSheetOpen(false); secretChatPeer = e.detail; }} />
-      {/if}
-    </BottomSheet>
-  </svelte:fragment>
+      </Sidebar>
 
-  <svelte:fragment slot="bottomTabs">
-    <BottomTabBar
-      activeTab={mobileTab}
-      {isAdmin}
-      isTracking={$tracking}
-      {hasNotification}
-      on:tabChange={onMobileTabChange}
-    />
-  </svelte:fragment>
+  {/snippet}
 
-  <svelte:fragment slot="overlay">
-    <!-- Polite live region — announces real-time status changes to screen readers -->
-    <!-- assertive region is owned by AlertOverlay for SOS announcements -->
-    <div
-      aria-live="polite"
-      aria-atomic="true"
-      class="sr-only"
-      aria-relevant="additions text"
-    >{liveAnnouncement}</div>
+  {#snippet map()}
 
-    <AlertOverlay />
-    <IncomingCallOverlay />
-
-    <!-- Secret encrypted chat overlay -->
-    {#if secretChatPeer}
-      <SecretChatPanel
-        peerId={secretChatPeer.id}
-        peerName={secretChatPeer.name}
-        onClose={() => secretChatPeer = null}
-      />
-    {/if}
-
-    <!-- Persistent emergency float card — appears above SOS FAB when a network member has active SOS + medical data -->
-    <SosFloat />
-
-    <!-- Particle burst confirmation — fires once when user sends their own SOS -->
-    <SosParticleBurst active={sosParticleBurstActive} on:done={() => sosParticleBurstActive = false} />
-
-    <!-- First-run Hub discovery coach mark (desktop only, shows once) -->
-    <HubSpotlight />
-
-    <!-- SOS FAB — always visible bottom-left.
-         Fix #2: inline style overrides the CSS @media bottom value on mobile so the FAB
-         animates out of the way when the BottomSheet is at peek state. -->
-    <button
-      class="sos-fab"
-      class:active={$mySosActive}
-      style={isMobile ? `bottom: ${fabBottomOffset}` : undefined}
-      on:click={onSosFabClick}
-      aria-label={$mySosActive ? 'Cancel SOS' : 'Send SOS'}
-    >
-      {#if $mySosActive}
-        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      {:else}
-        <span class="sos-text">SOS</span>
-      {/if}
-    </button>
-
-    <!-- Pulse Check-In FAB -->
-    <PulseButton />
-
-    <!-- FAB cluster — bottom-right: track + center + follow -->
-    <div class="fab-wrapper" class:fab-wrapper--mobile={isMobile}>
-      <MapFab
-        isTracking={$tracking}
-        {followMode}
-        on:toggleTracking={toggleTrackingAction}
-        on:centerOnMe={() => focusUser.set('__self__')}
-        on:toggleFollow={() => followMode = !followMode}
-      />
-    </div>
-
-    <!-- SOS Confirmation Modal -->
-    {#if sosConfirmOpen}
-      <div class="sos-confirm-backdrop" bind:this={sosConfirmEl} on:click|self={() => sosConfirmOpen = false} on:keydown={(e) => { if (e.key === 'Escape') sosConfirmOpen = false; }} role="dialog" aria-modal="true" aria-labelledby="sos-confirm-title" tabindex="-1">
-        <div class="sos-confirm-card-spatial">
-          <div class="sos-icon-ring">
-            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--danger-500, #ef4444)" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          </div>
-          <h3 id="sos-confirm-title" class="sos-confirm-title">Send an SOS to your family?</h3>
-          <p class="sos-confirm-desc">Everyone connected to you will be notified right away. They'll see your live location until you're safe.</p>
-          <div class="sos-confirm-actions">
-            <button class="btn btn-ghost sos-cancel-btn" on:click={() => sosConfirmOpen = false}>Cancel</button>
-            <button class="btn btn-danger sos-send-btn" on:click={() => { haptics.sos(); socket.emit('triggerSOS', { reason: 'SOS', medicalCard: getMedicalSnapshot() }); sosConfirmOpen = false; sosParticleBurstActive = true; }}>Yes, send SOS</button>
-          </div>
-        </div>
+      <MapView {followMode} />
+      <div class="place-search-overlay">
+        <PlaceSearch
+          on:select={e => mapFlyTo.set({ lat: e.detail.lat, lng: e.detail.lng, zoom: 15 })}
+          on:route={e => routeGeometry.set(e.detail.geometry)}
+          on:clearRoute={() => routeGeometry.set(null)}
+          on:setDestination={e => walkDestination.set(e.detail)}
+        />
       </div>
-    {/if}
 
-    <!-- Battery Optimization Prompt -->
-    {#if batteryPromptOpen}
-      <div class="battery-prompt-backdrop" bind:this={batteryPromptEl} on:click|self={() => batteryPromptOpen = false} on:keydown={(e) => { if (e.key === 'Escape') batteryPromptOpen = false; }} role="dialog" aria-modal="true" aria-labelledby="battery-prompt-title" tabindex="-1">
-        <div class="battery-prompt-card">
-          <div class="battery-prompt-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--warning-400, #f59e0b)" stroke-width="2"><rect x="2" y="7" width="16" height="10" rx="2"/><path d="M22 11v2"/><path d="M6 11v2"/><path d="M10 11v2"/></svg>
+  {/snippet}
+
+  {#snippet banner()}
+
+      <div class="banner-host">
+        <Banner />
+      </div>
+
+  {/snippet}
+
+  {#snippet rightPanel()}
+
+      {#if activePanel === 'users'}
+        <UsersList on:close={() => activePanel = null} on:addPeople={openSharingFromInvite} on:secretChat={(e) => { activePanel = null; secretChatPeer = e.detail; }} />
+      {:else if activePanel === 'superAdmin' && isAdmin}
+        <SuperAdminPanel on:close={() => activePanel = null} />
+      {/if}
+
+  {/snippet}
+
+  {#snippet bottomSheet()}
+
+      <BottomSheet
+        open={sheetOpen}
+        title={mobileTab === 'track' ? 'Map' : mobileTab === 'people' ? 'People' : mobileTab === 'share' ? 'Connect' : mobileTab === 'safety' ? 'Safety' : 'Me'}
+        on:close={() => {
+          setSheetOpen(false);
+        }}
+      >
+        {#if mobileTab === 'track'}
+          <TrackingNowCard
+            location={$myLocation}
+            trackingActive={$tracking}
+            bufferedCount={$connectivityStore.bufferedCount}
+            socketConnected={$connectivityStore.socketConnected}
+            on:toggleTracking={toggleTrackingAction}
+            on:centerOnMe={() => focusUser.set('__self__')}
+            on:toggleFollow={() => (followMode = !followMode)}
+          />
+        {:else if mobileTab === 'me'}
+          <div class="page-nav-row">
+            <button class="page-nav-btn tactile" title="Dashboard" aria-label="Open Dashboard" onclick={() => push('/dashboard')}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+              Dashboard
+            </button>
+            <button class="page-nav-btn tactile" title="Activity" aria-label="Open Activity" onclick={() => push('/activity')}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+              Activity
+            </button>
+            <button class="page-nav-btn tactile" title="Emergency" aria-label="Open Emergency" onclick={() => push('/emergency')}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              Emergency
+            </button>
+            <button class="page-nav-btn tactile" title="Check-ins" aria-label="Open Check-ins" onclick={() => push('/checkins')}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              Check-ins
+            </button>
+            <button class="page-nav-btn tactile" title="Route History" aria-label="Open Route History" onclick={() => push('/replay')}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
+              Route History
+            </button>
           </div>
-          <h3 id="battery-prompt-title" class="battery-prompt-title">Allow Background Access</h3>
-          {#if BATTERY_INSTRUCTIONS[batteryManufacturer].steps}
-            {@const info = BATTERY_INSTRUCTIONS[batteryManufacturer]}
-            <p class="battery-prompt-brand">{info.brand} detected</p>
-            <ol class="battery-steps-list">
-              {#each info.steps as step}
-                <li>{step}</li>
-              {/each}
-            </ol>
-          {:else}
-            <p class="battery-prompt-desc">For Kinnect to share your location when the screen is off or the app is minimized, allow it to run unrestricted in the background.</p>
+          <div class="spatial-subtabs">
+            <button class="spatial-subtab" class:active={meSubTab === 'info'} onclick={() => meSubTab = 'info'}>Status</button>
+            <button class="spatial-subtab" class:active={meSubTab === 'places'} onclick={() => meSubTab = 'places'}>Places</button>
+            <button class="spatial-subtab" class:active={meSubTab === 'settings'} onclick={() => meSubTab = 'settings'}>Settings</button>
+          </div>
+          {#if meSubTab === 'info'}
+            <InfoPanel embedded={true} />
+          {:else if meSubTab === 'places'}
+            <SavedPlacesPanel embedded={true} />
+          {:else if meSubTab === 'settings'}
+            <SettingsPanel embedded={true} on:openGuide={() => showFeatureGuide = true} />
           {/if}
-          <div class="battery-prompt-actions">
-            <button class="btn battery-skip-btn" on:click={() => batteryPromptOpen = false}>Not now</button>
-            <button class="btn battery-allow-btn" on:click={async (e) => {
+        {:else if mobileTab === 'share'}
+          <SharingPanel embedded={true} />
+        {:else if mobileTab === 'safety'}
+          <div class="safety-quick-actions">
+            <button
+              class="btn"
+              class:btn-danger={!$mySosActive}
+              class:btn-secondary={$mySosActive}
+              onclick={() => { if ($mySosActive) { haptics.sosCancelled(); socket.emit('cancelSOS'); } else { haptics.warning(); sosConfirmOpen = true; } }}
+            >
+              {$mySosActive ? 'Cancel SOS' : 'Trigger SOS'}
+            </button>
+            <button class="btn btn-secondary" onclick={() => socket.emit('checkInAck')}>I'm OK</button>
+          </div>
+          <div class="page-nav-row">
+            <button class="page-nav-btn tactile" title="Emergency Profile" aria-label="Open Emergency Profile" onclick={() => push('/emergency')}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              Emergency Profile
+            </button>
+            <button class="page-nav-btn tactile" title="Check-in Schedule" aria-label="Open Check-in Schedule" onclick={() => push('/checkins')}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              Check-in Schedule
+            </button>
+          </div>
+          <AdminPanel embedded={true} />
+        {:else if mobileTab === 'people'}
+          <UsersList embedded={true} on:addPeople={openSharingFromInvite} on:secretChat={(e) => { setSheetOpen(false); secretChatPeer = e.detail; }} />
+        {/if}
+      </BottomSheet>
+
+  {/snippet}
+
+  {#snippet bottomTabs()}
+
+      <BottomTabBar
+        activeTab={mobileTab}
+        {isAdmin}
+        isTracking={$tracking}
+        {hasNotification}
+        on:tabChange={onMobileTabChange}
+      />
+
+  {/snippet}
+
+  {#snippet overlay()}
+
+      <!-- Polite live region — announces real-time status changes to screen readers -->
+      <!-- assertive region is owned by AlertOverlay for SOS announcements -->
+      <div
+        aria-live="polite"
+        aria-atomic="true"
+        class="sr-only"
+        aria-relevant="additions text"
+      >{liveAnnouncement}</div>
+
+      <AlertOverlay />
+      <IncomingCallOverlay />
+
+      <!-- Secret encrypted chat overlay -->
+      {#if secretChatPeer}
+        <SecretChatPanel
+          peerId={secretChatPeer.id}
+          peerName={secretChatPeer.name}
+          onClose={() => secretChatPeer = null}
+        />
+      {/if}
+
+      <!-- Persistent emergency float card — appears above SOS FAB when a network member has active SOS + medical data -->
+      <SosFloat />
+
+      <!-- Particle burst confirmation — fires once when user sends their own SOS -->
+      <SosParticleBurst active={sosParticleBurstActive} on:done={() => sosParticleBurstActive = false} />
+
+      <!-- First-run Hub discovery coach mark (desktop only, shows once) -->
+      <HubSpotlight />
+
+      <!-- SOS FAB — always visible bottom-left.
+           Fix #2: inline style overrides the CSS @media bottom value on mobile so the FAB
+           animates out of the way when the BottomSheet is at peek state. -->
+      <button
+        class="sos-fab"
+        class:active={$mySosActive}
+        style={isMobile ? `bottom: ${fabBottomOffset}` : undefined}
+        onclick={onSosFabClick}
+        aria-label={$mySosActive ? 'Cancel SOS' : 'Send SOS'}
+      >
+        {#if $mySosActive}
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        {:else}
+          <span class="sos-text">SOS</span>
+        {/if}
+      </button>
+
+      <!-- Pulse Check-In FAB -->
+      <PulseButton />
+
+      <!-- FAB cluster — bottom-right: track + center + follow -->
+      <div class="fab-wrapper" class:fab-wrapper--mobile={isMobile}>
+        <MapFab
+          isTracking={$tracking}
+          {followMode}
+          on:toggleTracking={toggleTrackingAction}
+          on:centerOnMe={() => focusUser.set('__self__')}
+          on:toggleFollow={() => followMode = !followMode}
+        />
+      </div>
+
+      <!-- SOS Confirmation Modal -->
+      {#if sosConfirmOpen}
+        <div class="sos-confirm-backdrop" bind:this={sosConfirmEl} onclick={self(() => sosConfirmOpen = false)} onkeydown={(e) => { if (e.key === 'Escape') sosConfirmOpen = false; }} role="dialog" aria-modal="true" aria-labelledby="sos-confirm-title" tabindex="-1">
+          <div class="sos-confirm-card-spatial">
+            <div class="sos-icon-ring">
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--danger-500, #ef4444)" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <h3 id="sos-confirm-title" class="sos-confirm-title">Send an SOS to your family?</h3>
+            <p class="sos-confirm-desc">Everyone connected to you will be notified right away. They'll see your live location until you're safe.</p>
+            <div class="sos-confirm-actions">
+              <button class="btn btn-ghost sos-cancel-btn" onclick={() => sosConfirmOpen = false}>Cancel</button>
+              <button class="btn btn-danger sos-send-btn" onclick={() => { haptics.sos(); socket.emit('triggerSOS', { reason: 'SOS', medicalCard: getMedicalSnapshot() }); sosConfirmOpen = false; sosParticleBurstActive = true; }}>Yes, send SOS</button>
+            </div>
+          </div>
+        </div>
+      {/if}
+
+      <!-- Battery Optimization Prompt -->
+      {#if batteryPromptOpen}
+        <div class="battery-prompt-backdrop" bind:this={batteryPromptEl} onclick={self(() => batteryPromptOpen = false)} onkeydown={(e) => { if (e.key === 'Escape') batteryPromptOpen = false; }} role="dialog" aria-modal="true" aria-labelledby="battery-prompt-title" tabindex="-1">
+          <div class="battery-prompt-card">
+            <div class="battery-prompt-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--warning-400, #f59e0b)" stroke-width="2"><rect x="2" y="7" width="16" height="10" rx="2"/><path d="M22 11v2"/><path d="M6 11v2"/><path d="M10 11v2"/></svg>
+            </div>
+            <h3 id="battery-prompt-title" class="battery-prompt-title">Allow Background Access</h3>
+            {#if BATTERY_INSTRUCTIONS[batteryManufacturer].steps}
+              {@const info = BATTERY_INSTRUCTIONS[batteryManufacturer]}
+              <p class="battery-prompt-brand">{info.brand} detected</p>
+              <ol class="battery-steps-list">
+                {#each info.steps as step}
+                  <li>{step}</li>
+                {/each}
+              </ol>
+            {:else}
+              <p class="battery-prompt-desc">For Kinnect to share your location when the screen is off or the app is minimized, allow it to run unrestricted in the background.</p>
+            {/if}
+            <div class="battery-prompt-actions">
+              <button class="btn battery-skip-btn" onclick={() => batteryPromptOpen = false}>Not now</button>
+              <button class="btn battery-allow-btn" onclick={async (e) => {
               e.target.disabled = true;
               try { await requestIgnoreBatteryOptimizations(); } finally { batteryPromptOpen = false; }
             }}>Open Battery Settings</button>
+            </div>
           </div>
         </div>
-      </div>
-    {/if}
+      {/if}
 
-    <!-- First-run onboarding -->
-    <OnboardingOverlay
-      visible={showOnboarding}
-      on:requestPermission={startTracking}
-      on:dismiss={() => {
-        showOnboarding = false;
-        const key = 'kinnect_onboarded_' + ($authUser?.userId || '');
-        localStorage.setItem(key, '1');
-        // Show feature guide for first-time users after onboarding
-        if (!localStorage.getItem('kinnect_guide_seen')) {
-          setTimeout(() => { showFeatureGuide = true; }, 600);
-        }
-      }}
-    />
+      <!-- First-run onboarding -->
+      <OnboardingOverlay
+        visible={showOnboarding}
+        on:requestPermission={startTracking}
+        on:dismiss={() => {
+          showOnboarding = false;
+          const key = 'kinnect_onboarded_' + ($authUser?.userId || '');
+          localStorage.setItem(key, '1');
+          // Show feature guide for first-time users after onboarding
+          if (!localStorage.getItem('kinnect_guide_seen')) {
+            setTimeout(() => { showFeatureGuide = true; }, 600);
+          }
+        }}
+      />
 
-    <!-- Feature Guide overlay (first run + accessible from Settings) -->
-    <FeatureGuide bind:open={showFeatureGuide} />
-  </svelte:fragment>
+      <!-- Feature Guide overlay (first run + accessible from Settings) -->
+      <FeatureGuide bind:open={showFeatureGuide} />
+
+  {/snippet}
 </AppLayout>
 
 <style>
   /* spatial-subtabs styles are in global.css */
+
+  /* ── Glassmorphic banner host ────────────────────────────────────────────
+     Banner.svelte renders a position:fixed .banner that self-styles its
+     semantic status colors (info = blue, sos = red). We wrap it so the shell
+     can lift it onto a Liquid-glass surface (edge-light border + glass shadow)
+     WITHOUT overriding the variant background — SOS must stay urgent red.
+     A gentle transform/opacity slide-in replaces the plain drop for non-urgent
+     banners; the SOS variant keeps its own urgent-pulse animation untouched. */
+  .banner-host :global(.banner) {
+    border: 1px solid var(--glass-border);
+    border-top-color: var(--glass-border-strong);
+    box-shadow: var(--glass-shadow);
+  }
+  .banner-host :global(.banner:not(.banner-sos)) {
+    animation: banner-glass-in var(--duration-normal, 0.32s) var(--ease-out, cubic-bezier(0.4, 0, 0.2, 1));
+  }
+  @keyframes banner-glass-in {
+    from { transform: translateY(-8px); opacity: 0; }
+    to   { transform: translateY(0);     opacity: 1; }
+  }
 
   /* ── Page navigation row ─────────────────────────────────────────────────── */
   .page-nav-row {
@@ -1048,8 +1135,8 @@
   .page-nav-row::-webkit-scrollbar { display: none; }
 
   /* Fix #1: raised touch target to 44px for iOS HIG compliance.
-     Before: display:inline-flex; padding:8px 12px; (no min-height → ~28-32px tall)
-     After:  display:flex; justify-content:center; min-height:44px; padding:8px 12px */
+     Restyled into cleaner pill buttons (full radius) with .tactile press +
+     title/aria-label tooltips; press micro-interaction preserved below. */
   .page-nav-btn {
     display: flex;
     align-items: center;
@@ -1057,7 +1144,7 @@
     gap: 6px;
     padding: 8px 12px;
     min-height: 44px;
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-full, 999px);
     background: var(--surface-1, rgba(255, 255, 255, 0.06));
     border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.10));
     color: var(--text-secondary);
@@ -1067,7 +1154,7 @@
     white-space: nowrap;
     cursor: pointer;
     flex-shrink: 0;
-    transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), transform 120ms var(--ease-spring);
+    transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out), transform 120ms var(--ease-spring);
     -webkit-tap-highlight-color: transparent;
   }
   .page-nav-btn:hover {
@@ -1297,6 +1384,15 @@
       transition:
         bottom 300ms ease,
         background 0.2s ease;
+    }
+    .banner-host :global(.banner:not(.banner-sos)) {
+      animation: none;
+    }
+    .page-nav-btn {
+      transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
+    }
+    .page-nav-btn:active {
+      transform: none;
     }
   }
 

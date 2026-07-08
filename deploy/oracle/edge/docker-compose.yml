@@ -1,0 +1,45 @@
+# Shared EDGE stack — one per VM, hosts ALL projects.
+#   - caddy: the single entry point on :80/:443, routes by hostname to each app.
+#   - postgres: one server, one database per project.
+# Prereq (run once):  docker network create web && docker network create db
+# Start:  docker compose -f deploy/oracle/edge/docker-compose.yml up -d
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: edge-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [web]
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: edge-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPER_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [db]
+
+volumes:
+  caddy_data:
+  caddy_config:
+  postgres_data:
+
+networks:
+  web:
+    external: true
+  db:
+    external: true

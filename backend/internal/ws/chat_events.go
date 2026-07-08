@@ -43,42 +43,42 @@ func (h *Hub) handleSendSecretMsg(c *Client, data json.RawMessage) {
 		return
 	}
 
-	// Persist to DB with a hard timeout so a slow Aiven connection can't hang the hub goroutine.
-	var msgID int64
-	dbCtx, dbCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer dbCancel()
-	err := h.pool.DB.QueryRowContext(dbCtx,
-		`INSERT INTO secret_messages (sender_id, receiver_id, ciphertext, iv, salt)
-		 VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-		user.UserID, p.ReceiverID, p.Ciphertext, p.IV, p.Salt,
-	).Scan(&msgID)
-	if err != nil {
-		return
-	}
+	senderID := user.UserID
+	h.offloadDB(func(ctx context.Context) {
+		var msgID int64
+		err := h.pool.DB.QueryRowContext(ctx,
+			`INSERT INTO secret_messages (sender_id, receiver_id, ciphertext, iv, salt)
+			 VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+			senderID, p.ReceiverID, p.Ciphertext, p.IV, p.Salt,
+		).Scan(&msgID)
+		if err != nil {
+			return
+		}
 
-	now := time.Now().UTC()
+		now := time.Now().UTC()
 
-	// Ack to sender.
-	c.Send("secretMsgSent", map[string]interface{}{
-		"id":         msgID,
-		"receiverId": p.ReceiverID,
-		"ciphertext": p.Ciphertext,
-		"iv":         p.IV,
-		"salt":       p.Salt,
-		"createdAt":  now,
-	})
-
-	// Deliver to receiver if online.
-	if receiverSocketID := h.Cache.GetUserIdToSocketId(p.ReceiverID); receiverSocketID != "" {
-		h.SendToClient(receiverSocketID, "secretMsgReceived", map[string]interface{}{
+		// Ack to sender.
+		c.Send("secretMsgSent", map[string]interface{}{
 			"id":         msgID,
-			"senderId":   user.UserID,
+			"receiverId": p.ReceiverID,
 			"ciphertext": p.Ciphertext,
 			"iv":         p.IV,
 			"salt":       p.Salt,
 			"createdAt":  now,
 		})
-	}
+
+		// Deliver to receiver if online.
+		if receiverSocketID := h.Cache.GetUserIdToSocketId(p.ReceiverID); receiverSocketID != "" {
+			h.SendToClient(receiverSocketID, "secretMsgReceived", map[string]interface{}{
+				"id":         msgID,
+				"senderId":   senderID,
+				"ciphertext": p.Ciphertext,
+				"iv":         p.IV,
+				"salt":       p.Salt,
+				"createdAt":  now,
+			})
+		}
+	})
 }
 
 type getSecretMsgsPayload struct {
@@ -111,44 +111,47 @@ func (h *Hub) handleGetSecretMsgs(c *Client, data json.RawMessage) {
 		return
 	}
 
-	rows, err := h.pool.DB.QueryContext(context.Background(),
-		`SELECT id, sender_id, receiver_id, ciphertext, iv, salt, seen_at, created_at
-		 FROM secret_messages
-		 WHERE (sender_id = $1 AND receiver_id = $2)
-		    OR (sender_id = $2 AND receiver_id = $1)
-		 ORDER BY created_at DESC LIMIT $3`,
-		user.UserID, p.PeerID, p.Limit,
-	)
-	if err != nil {
-		return
-	}
-	defer rows.Close()
-
-	type msgRow struct {
-		ID         int64      `json:"id"`
-		SenderID   string     `json:"senderId"`
-		ReceiverID string     `json:"receiverId"`
-		Ciphertext string     `json:"ciphertext"`
-		IV         string     `json:"iv"`
-		Salt       string     `json:"salt"`
-		SeenAt     *time.Time `json:"seenAt"`
-		CreatedAt  time.Time  `json:"createdAt"`
-	}
-	var msgs []msgRow
-	for rows.Next() {
-		var m msgRow
-		if err := rows.Scan(&m.ID, &m.SenderID, &m.ReceiverID, &m.Ciphertext, &m.IV, &m.Salt, &m.SeenAt, &m.CreatedAt); err != nil {
-			continue
+	callerID := user.UserID
+	h.offloadDB(func(ctx context.Context) {
+		rows, err := h.pool.DB.QueryContext(ctx,
+			`SELECT id, sender_id, receiver_id, ciphertext, iv, salt, seen_at, created_at
+			 FROM secret_messages
+			 WHERE (sender_id = $1 AND receiver_id = $2)
+			    OR (sender_id = $2 AND receiver_id = $1)
+			 ORDER BY created_at DESC LIMIT $3`,
+			callerID, p.PeerID, p.Limit,
+		)
+		if err != nil {
+			return
 		}
-		msgs = append(msgs, m)
-	}
-	if msgs == nil {
-		msgs = []msgRow{} // send empty array not null
-	}
+		defer rows.Close()
 
-	c.Send("secretMsgsHistory", map[string]interface{}{
-		"peerId":   p.PeerID,
-		"messages": msgs,
+		type msgRow struct {
+			ID         int64      `json:"id"`
+			SenderID   string     `json:"senderId"`
+			ReceiverID string     `json:"receiverId"`
+			Ciphertext string     `json:"ciphertext"`
+			IV         string     `json:"iv"`
+			Salt       string     `json:"salt"`
+			SeenAt     *time.Time `json:"seenAt"`
+			CreatedAt  time.Time  `json:"createdAt"`
+		}
+		var msgs []msgRow
+		for rows.Next() {
+			var m msgRow
+			if err := rows.Scan(&m.ID, &m.SenderID, &m.ReceiverID, &m.Ciphertext, &m.IV, &m.Salt, &m.SeenAt, &m.CreatedAt); err != nil {
+				continue
+			}
+			msgs = append(msgs, m)
+		}
+		if msgs == nil {
+			msgs = []msgRow{} // send empty array not null
+		}
+
+		c.Send("secretMsgsHistory", map[string]interface{}{
+			"peerId":   p.PeerID,
+			"messages": msgs,
+		})
 	})
 }
 
@@ -169,34 +172,38 @@ func (h *Hub) handleDeleteSecretMsg(c *Client, data json.RawMessage) {
 		return
 	}
 
-	// Fetch receiver_id before deleting so we can notify them after.
-	var receiverID string
-	_ = h.pool.DB.QueryRowContext(context.Background(),
-		`SELECT receiver_id FROM secret_messages WHERE id = $1 AND sender_id = $2`,
-		p.ID, user.UserID,
-	).Scan(&receiverID)
+	senderID := user.UserID
+	msgID := p.ID
+	h.offloadDB(func(ctx context.Context) {
+		// Fetch receiver_id before deleting so we can notify them after.
+		var receiverID string
+		_ = h.pool.DB.QueryRowContext(ctx,
+			`SELECT receiver_id FROM secret_messages WHERE id = $1 AND sender_id = $2`,
+			msgID, senderID,
+		).Scan(&receiverID)
 
-	// Only allow deleting own messages (WHERE sender_id = user).
-	result, err := h.pool.DB.ExecContext(context.Background(),
-		`DELETE FROM secret_messages WHERE id = $1 AND sender_id = $2`,
-		p.ID, user.UserID,
-	)
-	if err != nil {
-		return
-	}
-	rows, _ := result.RowsAffected()
-	if rows == 0 {
-		return // not owner or already gone
-	}
-
-	c.Send("secretMsgDeleted", map[string]interface{}{"id": p.ID})
-
-	// Notify the receiver so their view updates immediately.
-	if receiverID != "" {
-		if receiverSocketID := h.Cache.GetUserIdToSocketId(receiverID); receiverSocketID != "" {
-			h.SendToClient(receiverSocketID, "secretMsgDeleted", map[string]interface{}{"id": p.ID})
+		// Only allow deleting own messages (WHERE sender_id = user).
+		result, err := h.pool.DB.ExecContext(ctx,
+			`DELETE FROM secret_messages WHERE id = $1 AND sender_id = $2`,
+			msgID, senderID,
+		)
+		if err != nil {
+			return
 		}
-	}
+		rowsAffected, _ := result.RowsAffected()
+		if rowsAffected == 0 {
+			return // not owner or already gone
+		}
+
+		c.Send("secretMsgDeleted", map[string]interface{}{"id": msgID})
+
+		// Notify the receiver so their view updates immediately.
+		if receiverID != "" {
+			if receiverSocketID := h.Cache.GetUserIdToSocketId(receiverID); receiverSocketID != "" {
+				h.SendToClient(receiverSocketID, "secretMsgDeleted", map[string]interface{}{"id": msgID})
+			}
+		}
+	})
 }
 
 // handleMarkSecretMsgSeen marks a message as seen when the receiver successfully decrypts it.
@@ -218,27 +225,31 @@ func (h *Hub) handleMarkSecretMsgSeen(c *Client, data json.RawMessage) {
 		return
 	}
 
-	// Only the receiver can mark as seen; seen_at IS NULL prevents double-marking.
-	var senderID string
-	var seenAt time.Time
-	err := h.pool.DB.QueryRowContext(context.Background(),
-		`UPDATE secret_messages
-		 SET seen_at = NOW()
-		 WHERE id = $1 AND receiver_id = $2 AND seen_at IS NULL
-		 RETURNING sender_id, seen_at`,
-		p.MsgID, user.UserID,
-	).Scan(&senderID, &seenAt)
-	if err != nil {
-		return // not found, caller is not receiver, or already seen
-	}
+	receiverID := user.UserID
+	msgID := p.MsgID
+	h.offloadDB(func(ctx context.Context) {
+		// Only the receiver can mark as seen; seen_at IS NULL prevents double-marking.
+		var senderID string
+		var seenAt time.Time
+		err := h.pool.DB.QueryRowContext(ctx,
+			`UPDATE secret_messages
+			 SET seen_at = NOW()
+			 WHERE id = $1 AND receiver_id = $2 AND seen_at IS NULL
+			 RETURNING sender_id, seen_at`,
+			msgID, receiverID,
+		).Scan(&senderID, &seenAt)
+		if err != nil {
+			return // not found, caller is not receiver, or already seen
+		}
 
-	// Notify the sender if they are online.
-	if senderSocketID := h.Cache.GetUserIdToSocketId(senderID); senderSocketID != "" {
-		h.SendToClient(senderSocketID, "secretMsgSeen", map[string]interface{}{
-			"id":     p.MsgID,
-			"seenAt": seenAt.UTC().Format(time.RFC3339),
-		})
-	}
+		// Notify the sender if they are online.
+		if senderSocketID := h.Cache.GetUserIdToSocketId(senderID); senderSocketID != "" {
+			h.SendToClient(senderSocketID, "secretMsgSeen", map[string]interface{}{
+				"id":     msgID,
+				"seenAt": seenAt.UTC().Format(time.RFC3339),
+			})
+		}
+	})
 }
 
 // handleSecretChatPresence forwards an open/close presence signal to the peer.
@@ -296,37 +307,42 @@ func (h *Hub) handleCreateSecretChatInvite(c *Client, data json.RawMessage) {
 		return
 	}
 
-	// Reuse an existing token for this (owner, peer) pair so the share link is stable.
-	var token string
-	_ = h.pool.DB.QueryRowContext(context.Background(),
-		`SELECT token FROM secret_chat_invites WHERE owner_id = $1 AND peer_id = $2 LIMIT 1`,
-		user.UserID, p.PeerID,
-	).Scan(&token)
-
-	if token == "" {
-		// No existing link — create one.
-		token = generateLiveToken()
-		_, _ = h.pool.DB.ExecContext(context.Background(),
-			`INSERT INTO secret_chat_invites (token, owner_id, peer_id)
-			 VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
-			token, user.UserID, p.PeerID,
-		)
-		// Re-read in case a concurrent insert won the race (pair constraint).
-		var existing string
-		if err := h.pool.DB.QueryRowContext(context.Background(),
+	ownerID := user.UserID
+	peerID := p.PeerID
+	nonce := p.Nonce
+	h.offloadDB(func(ctx context.Context) {
+		// Reuse an existing token for this (owner, peer) pair so the share link is stable.
+		var token string
+		_ = h.pool.DB.QueryRowContext(ctx,
 			`SELECT token FROM secret_chat_invites WHERE owner_id = $1 AND peer_id = $2 LIMIT 1`,
-			user.UserID, p.PeerID,
-		).Scan(&existing); err == nil && existing != "" {
-			token = existing
+			ownerID, peerID,
+		).Scan(&token)
+
+		if token == "" {
+			// No existing link — create one.
+			token = generateLiveToken()
+			_, _ = h.pool.DB.ExecContext(ctx,
+				`INSERT INTO secret_chat_invites (token, owner_id, peer_id)
+				 VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+				token, ownerID, peerID,
+			)
+			// Re-read in case a concurrent insert won the race (pair constraint).
+			var existing string
+			if err := h.pool.DB.QueryRowContext(ctx,
+				`SELECT token FROM secret_chat_invites WHERE owner_id = $1 AND peer_id = $2 LIMIT 1`,
+				ownerID, peerID,
+			).Scan(&existing); err == nil && existing != "" {
+				token = existing
+			}
 		}
-	}
 
-	// ExpiresAt=0 signals "permanent" — the cleanup goroutine and pages.go both honour this.
-	h.Cache.AddSecretChatInvite(token, user.UserID, p.PeerID, 0)
+		// ExpiresAt=0 signals "permanent" — the cleanup goroutine and pages.go both honour this.
+		h.Cache.AddSecretChatInvite(token, ownerID, peerID, 0)
 
-	c.Send("secretChatInviteCreated", map[string]interface{}{
-		"token": token,
-		"nonce": p.Nonce,
+		c.Send("secretChatInviteCreated", map[string]interface{}{
+			"token": token,
+			"nonce": nonce,
+		})
 	})
 }
 

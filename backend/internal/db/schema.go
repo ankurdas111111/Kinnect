@@ -2,7 +2,9 @@ package db
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"os"
@@ -279,6 +281,31 @@ func InitDB(ctx context.Context, db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_position_history_user_ts ON position_history(user_id, ts DESC)`,
 	}
 
+	// Schema-version guard: the DDL above is idempotent but still costs ~40
+	// sequential round trips to a remote DB on every boot — and the free tier
+	// cold-starts constantly. Hash the statement text; if the stored hash
+	// matches, the schema is already at this exact version and we skip it all.
+	// Any edit to the statements changes the hash and re-runs the full DDL.
+	hasher := sha256.New()
+	for _, stmt := range statements {
+		hasher.Write([]byte(stmt))
+	}
+	schemaHash := hex.EncodeToString(hasher.Sum(nil))
+
+	if _, err := db.ExecContext(ctx,
+		`CREATE TABLE IF NOT EXISTS schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`); err != nil {
+		return fmt.Errorf("schema init: create schema_meta: %w", err)
+	}
+	var storedHash string
+	err := db.QueryRowContext(ctx, `SELECT value FROM schema_meta WHERE key = 'ddl_hash'`).Scan(&storedHash)
+	if err == nil && storedHash == schemaHash {
+		fmt.Fprintln(os.Stderr, "InitDB: schema up to date (hash match), skipping DDL")
+		return nil
+	}
+	if err != nil && err != sql.ErrNoRows {
+		slog.Warn("schema init: hash lookup failed, running full DDL", "error", err)
+	}
+
 	for i, stmt := range statements {
 		// Log BEFORE executing — if we hang, the last printed index tells us which
 		// statement blocked. Use os.Stderr (unbuffered) so it flushes before exit.
@@ -292,6 +319,12 @@ func InitDB(ctx context.Context, db *sql.DB) error {
 			slog.Error("schema init: statement failed", "stmt_index", i, "stmt_preview", preview, "error", err)
 			return fmt.Errorf("schema init stmt %d (%s): %w", i, preview, err)
 		}
+	}
+
+	if _, err := db.ExecContext(ctx, `
+		INSERT INTO schema_meta (key, value) VALUES ('ddl_hash', $1)
+		ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, schemaHash); err != nil {
+		slog.Warn("schema init: failed to store ddl hash (DDL will re-run next boot)", "error", err)
 	}
 	return nil
 }

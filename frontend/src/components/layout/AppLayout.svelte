@@ -2,11 +2,38 @@
   import { onMount, onDestroy } from 'svelte';
   import { debounce } from '../../lib/debounce.js';
 
-  export let sidebarOpen = true;
-  export let rightPanelOpen = false;
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [sidebarOpen]
+   * @property {boolean} [rightPanelOpen]
+   * @property {import('svelte').Snippet} [topBar]
+   * @property {import('svelte').Snippet} [navbar]
+   * @property {import('svelte').Snippet} [sidebar]
+   * @property {import('svelte').Snippet} [map]
+   * @property {import('svelte').Snippet} [banner]
+   * @property {import('svelte').Snippet} [rightPanel]
+   * @property {import('svelte').Snippet} [bottomSheet]
+   * @property {import('svelte').Snippet} [bottomTabs]
+   * @property {import('svelte').Snippet} [overlay]
+   */
 
-  let isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
-  let isTablet = typeof window !== 'undefined' ? (window.innerWidth >= 768 && window.innerWidth < 1024) : false;
+  /** @type {Props} */
+  let {
+    sidebarOpen = true,
+    rightPanelOpen = false,
+    topBar,
+    navbar,
+    sidebar,
+    map,
+    banner,
+    rightPanel,
+    bottomSheet,
+    bottomTabs,
+    overlay
+  } = $props();
+
+  let isMobile = $state(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+  let isTablet = $state(typeof window !== 'undefined' ? (window.innerWidth >= 768 && window.innerWidth < 1024) : false);
 
   function checkBreakpoint() {
     const w = window.innerWidth;
@@ -35,42 +62,42 @@
   class:tablet={isTablet}
 >
   {#if isMobile}
-    <slot name="topBar" />
+    {@render topBar?.()}
   {/if}
 
   {#if !isMobile}
     <div class="layout-navbar">
-      <slot name="navbar" />
+      {@render navbar?.()}
     </div>
   {/if}
 
   <div class="layout-body">
     {#if !isMobile}
       <div class="layout-sidebar">
-        <slot name="sidebar" />
+        {@render sidebar?.()}
       </div>
     {/if}
 
     <div class="layout-map" id="main-content">
-      <slot name="map" />
-      <slot name="banner" />
+      {@render map?.()}
+      {@render banner?.()}
     </div>
 
     {#if rightPanelOpen && !isMobile}
       <div class="layout-right">
-        <slot name="rightPanel" />
+        {@render rightPanel?.()}
       </div>
     {/if}
   </div>
 
   {#if isMobile}
-    <slot name="bottomSheet" />
+    {@render bottomSheet?.()}
     <div class="layout-tabs">
-      <slot name="bottomTabs" />
+      {@render bottomTabs?.()}
     </div>
   {/if}
 
-  <slot name="overlay" />
+  {@render overlay?.()}
 </div>
 
 <style>
@@ -84,6 +111,19 @@
     position: relative;
   }
 
+  /*
+   * Desktop: sidebar width scales with the viewport instead of the fixed
+   * 400px global token. Overriding the custom property here (rather than
+   * hardcoding a width in Sidebar.svelte) means every consumer of
+   * var(--sidebar-width) — Sidebar, SosFloat, PulseButton, MainApp map
+   * controls — stays perfectly aligned with the sidebar edge.
+   */
+  @media (min-width: 1024px) {
+    .app-layout {
+      --sidebar-width: clamp(300px, 23vw, 420px);
+    }
+  }
+
   .layout-navbar {
     flex-shrink: 0;
     z-index: var(--z-navbar);
@@ -93,8 +133,10 @@
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-columns: auto 1fr auto;
-    grid-template-rows: 1fr;
+    /* minmax(0, 1fr) lets the map column absorb ALL remaining width without
+       being pushed by intrinsic content size at any viewport */
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-rows: minmax(0, 1fr);
     overflow: hidden;
     position: relative;
   }
@@ -114,6 +156,7 @@
     position: relative;
     overflow: hidden;
     min-width: 0;
+    min-height: 0;
   }
 
   .layout-right {

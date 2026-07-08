@@ -6,40 +6,58 @@
   import { createMapIcon, escapeAttr, escHtml } from '../lib/tracking.js';
   import { animateMarkerTo } from '../lib/markerInterpolator.js';
   import { MAP_STYLE } from '../lib/mapStyle.js';
+  import Card from '../components/primitives/Card.svelte';
 
-  export let params = {};
+  let { params = {} } = $props();
 
-  let mapContainer;
+  let mapContainer = $state();
   let map;
   let marker = null;
   let hasZoomed = false;
   let socket = null;
-  let viewerName = '';
-  let showNameOverlay = true;
-  let statusText = 'Connecting...';
-  let online = false;
-  let sharedBy = 'User';
-  let sosActive = false;
-  let sosInfo = '';
-  let sosAcks = '';
-  let sosAcked = false;
-  let expired = false;
-  let checkinText = '';
-  let checkinOverdue = false;
+  let viewerName = $state('');
+  let showNameOverlay = $state(true);
+  let statusText = $state('Connecting...');
+  let online = $state(false);
+  let sharedBy = $state('User');
+  let sosActive = $state(false);
+  let sosInfo = $state('');
+  let sosAcks = $state('');
+  let sosAcked = $state(false);
+  let expired = $state(false);
+  let checkinText = $state('');
+  let checkinOverdue = $state(false);
   let sosAudioInterval = null;
   let audioCtx = null;
   let isMobile = false;
   let hasInit = false;
   let initTimeout = null;
-  let connectionIssue = '';
+  let connectionIssue = $state('');
   let lastOriginTs = null;
-  let freshnessText = '';
+  let freshnessText = $state('');
   let freshnessInterval = null;
   let linkJoinedAt = null;
-  let linkExpiresAt = null;
-  let expiryPercent = 100;
+  let linkExpiresAt = $state(null);
+  let expiryPercent = $state(100);
 
-  $: token = params.token || '';
+  let token = $derived(params.token || '');
+
+  // Derive a calm connection state from existing signals — drives the glow badge.
+  let connState = $derived.by(() => {
+    if (connectionIssue) return 'issue';
+    if (online) return 'live';
+    const s = (statusText || '').toLowerCase();
+    if (s.includes('connect') || s.includes('reconnect') || s.includes('error') || s.includes('retry')) return 'connecting';
+    return 'offline';
+  });
+
+  // Freshness → simple 0–3 signal strength (reuses freshnessText, no new state).
+  let signalLevel = $derived(
+    !online ? 0
+      : freshnessText === 'live' ? 3
+      : freshnessText.endsWith('s ago') ? 2
+      : freshnessText ? 1 : 3
+  );
 
   function formatTimeAgo(ts) {
     if (!ts) return 'N/A';
@@ -257,8 +275,8 @@
         </div>
         <p class="text-sm text-muted" style="margin-bottom:var(--space-4);">You were invited to watch. Treat this with care.</p>
         <p class="text-sm text-muted" style="margin-bottom:var(--space-4);">Enter your name to start viewing</p>
-        <input class="input input-lg" placeholder="Your name" bind:value={viewerName} on:keydown={e => e.key === 'Enter' && startViewing()} />
-        <button class="btn btn-primary btn-lg" style="width:100%;margin-top:var(--space-3);" on:click={startViewing}>Start Viewing</button>
+        <input class="input input-lg" placeholder="Your name" bind:value={viewerName} onkeydown={e => e.key === 'Enter' && startViewing()} />
+        <button class="btn btn-primary btn-lg" style="width:100%;margin-top:var(--space-3);" onclick={startViewing}>Start Viewing</button>
         <p class="text-sm text-muted" style="margin-top:var(--space-3);">Want your own account? <a href="/#/register">Sign up</a> or <a href="/#/login">Log in</a></p>
       </div>
     </div>
@@ -267,7 +285,7 @@
   {#if !showNameOverlay && !expired && connectionIssue}
     <div class="live-error">
       <span>{connectionIssue}</span>
-      <button class="btn btn-sm btn-secondary" on:click={() => window.location.reload()}>Retry</button>
+      <button class="btn btn-sm btn-secondary" onclick={() => window.location.reload()}>Retry</button>
     </div>
   {/if}
 
@@ -276,14 +294,17 @@
     <div class="live-glass-card" class:sos-state={sosActive}>
       <div class="glass-inner">
         <div class="glass-row">
-          {#if online}
-            <span class="rec-dot-mini animate-rec-blink" aria-hidden="true"></span>
-          {:else}
-            <span class="glass-offline-dot" aria-hidden="true"></span>
-          {/if}
-          <span class="glass-status">{statusText}</span>
-          {#if freshnessText}
-            <span class="glass-fresh" class:stale={freshnessText !== 'live'}>{freshnessText}</span>
+          <span class="status-badge" data-state={connState} role="status" aria-live="polite">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span class="status-label">{statusText}</span>
+          </span>
+          {#if online && freshnessText}
+            <span class="signal-chip" class:stale={freshnessText !== 'live'} title="Location freshness">
+              <span class="signal-bars" data-level={signalLevel} aria-hidden="true">
+                <i></i><i></i><i></i>
+              </span>
+              <span class="signal-text">{freshnessText}</span>
+            </span>
           {/if}
         </div>
         {#if checkinText}
@@ -301,17 +322,22 @@
   {/if}
 
   {#if sosActive}
-    <div class="sos-banner" role="alert" aria-live="assertive">
-      <div class="sos-icon" aria-hidden="true">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-      </div>
-      <div class="sos-content">
-        <div class="sos-text">{sosInfo}</div>
-        <div class="sos-acks">{sosAcks}</div>
-      </div>
-      <button class="btn btn-sm" class:btn-secondary={sosAcked} class:btn-primary={!sosAcked} on:click={ackSos} disabled={sosAcked}>
-        {sosAcked ? 'Acknowledged' : 'Acknowledge'}
-      </button>
+    <div class="sos-dock">
+      <Card variant="glass" glow="danger" padding="none" hover={false}>
+        <div class="sos-banner" role="alert" aria-live="assertive">
+          <div class="sos-icon" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+          <div class="sos-content">
+            <div class="sos-eyebrow">Emergency SOS</div>
+            <div class="sos-text">{sosInfo}</div>
+            <div class="sos-acks">{sosAcks}</div>
+          </div>
+          <button class="btn btn-sm sos-ack-btn" class:btn-secondary={sosAcked} class:btn-primary={!sosAcked} onclick={ackSos} disabled={sosAcked}>
+            {sosAcked ? 'Acknowledged' : 'Acknowledge'}
+          </button>
+        </div>
+      </Card>
     </div>
   {/if}
 </div>
@@ -404,9 +430,9 @@
   }
 
   .live-glass-card.sos-state {
-    bottom: calc(var(--space-3) + 80px + env(safe-area-inset-bottom, 0px));
-    border-color: rgba(239, 68, 68, 0.28);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 24px rgba(239,68,68,0.18);
+    bottom: calc(var(--space-3) + 96px + env(safe-area-inset-bottom, 0px));
+    border-color: var(--danger-500-20);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4), var(--glow-sos-sm);
   }
 
   .glass-inner {
@@ -417,47 +443,118 @@
   .glass-row {
     display: flex;
     align-items: center;
+    gap: var(--space-2);
+  }
+
+  /* Animated status badge with state-driven glow */
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
     gap: var(--space-1-5);
-  }
-
-  .rec-dot-mini {
-    display: inline-block;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--color-rec, #ef4444);
-    flex-shrink: 0;
-    animation: recording-blink 1.2s ease-in-out infinite;
-  }
-
-  .glass-offline-dot {
-    display: inline-block;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.30);
-    flex-shrink: 0;
-  }
-
-  .glass-status {
+    min-width: 0;
+    padding: 5px 11px;
+    border-radius: var(--radius-full);
     font-size: var(--text-sm);
     font-weight: 600;
+    color: inherit;
+    transition:
+      background 320ms var(--ease-out, cubic-bezier(0.4, 0, 0.2, 1)),
+      box-shadow 320ms var(--ease-out, cubic-bezier(0.4, 0, 0.2, 1)),
+      color 320ms var(--ease-out, cubic-bezier(0.4, 0, 0.2, 1));
+  }
+
+  .status-label {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
-  .glass-fresh {
-    margin-left: auto;
-    font-size: var(--text-xs);
-    color: var(--success-400, #34d399);
-    font-weight: 700;
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
     flex-shrink: 0;
   }
-  .glass-fresh.stale {
-    color: rgba(255, 255, 255, 0.40);
+
+  .status-badge[data-state="live"] {
+    background: var(--success-500-20);
+    color: var(--success-400);
+    box-shadow: var(--glow-live-sm);
+  }
+  .status-badge[data-state="live"] .status-dot {
+    animation: badge-pulse 1.8s ease-in-out infinite;
+  }
+
+  .status-badge[data-state="connecting"] {
+    background: var(--primary-500-12);
+    color: var(--primary-300);
+    box-shadow: var(--glow-primary-sm);
+  }
+  .status-badge[data-state="connecting"] .status-dot {
+    animation: badge-blink 1s ease-in-out infinite;
+  }
+
+  .status-badge[data-state="issue"] {
+    background: var(--danger-500-20);
+    color: var(--danger-400);
+    box-shadow: var(--glow-sos-sm);
+  }
+  .status-badge[data-state="issue"] .status-dot {
+    animation: badge-blink 0.85s ease-in-out infinite;
+  }
+
+  .status-badge[data-state="offline"] {
+    background: transparent;
+    color: inherit;
+    opacity: 0.6;
+  }
+
+  @keyframes badge-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.55; transform: scale(0.82); }
+  }
+  @keyframes badge-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.25; }
+  }
+
+  /* Signal-strength quality indicator (derived from freshness) */
+  .signal-chip {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    font-size: var(--text-xs);
+    font-weight: 700;
+    color: var(--success-400);
+  }
+  .signal-chip.stale {
+    color: inherit;
+    opacity: 0.5;
     font-weight: 500;
   }
+
+  .signal-bars {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 12px;
+  }
+  .signal-bars i {
+    width: 3px;
+    border-radius: 1px;
+    background: currentColor;
+    opacity: 0.28;
+    transition: opacity 300ms var(--ease-out, cubic-bezier(0.4, 0, 0.2, 1));
+  }
+  .signal-bars i:nth-child(1) { height: 5px; }
+  .signal-bars i:nth-child(2) { height: 8px; }
+  .signal-bars i:nth-child(3) { height: 12px; }
+  .signal-bars[data-level="1"] i:nth-child(1),
+  .signal-bars[data-level="2"] i:nth-child(-n+2),
+  .signal-bars[data-level="3"] i { opacity: 1; }
 
   .glass-checkin {
     margin-top: 3px;
@@ -465,7 +562,7 @@
     opacity: 0.55;
   }
   .glass-checkin.overdue {
-    color: #fca5a5;
+    color: var(--danger-400);
     opacity: 1;
     font-weight: 600;
   }
@@ -504,13 +601,19 @@
     background: var(--primary-500);
   }
 
-  .sos-banner {
+  /* SOS emergency dock — danger-glow Card with strong hierarchy */
+  .sos-dock {
     position: absolute;
     bottom: 0;
     left: 0;
     right: 0;
-    z-index: 50;
-    background: var(--danger-500);
+    z-index: 55;
+    padding: var(--space-3);
+    padding-bottom: max(var(--space-3), env(safe-area-inset-bottom, 0px));
+    animation: slide-up-in 340ms var(--ease-spring) both;
+  }
+
+  .sos-banner {
     color: white;
     padding: var(--space-3) var(--space-4);
     display: flex;
@@ -536,10 +639,40 @@
     max-width: min(90vw, 640px);
   }
 
-  .sos-icon { flex-shrink: 0; }
+  .sos-icon {
+    flex-shrink: 0;
+    color: var(--danger-400);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-full);
+    background: var(--danger-500-20);
+  }
   .sos-content { flex: 1; min-width: 0; }
-  .sos-text { font-weight: 700; }
-  .sos-acks { font-size: var(--text-xs); opacity: 0.8; }
+  .sos-eyebrow {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--danger-400);
+    margin-bottom: 2px;
+  }
+  .sos-text {
+    font-weight: 700;
+    font-size: var(--text-base);
+    line-height: 1.2;
+  }
+  .sos-acks {
+    font-size: var(--text-xs);
+    opacity: 0.7;
+    margin-top: 2px;
+  }
+  .sos-ack-btn {
+    flex-shrink: 0;
+    min-height: 44px;
+  }
 
   .live-brand {
     position: absolute;
@@ -587,15 +720,22 @@
       width: min(96vw, 400px);
       padding: var(--space-2-5) var(--space-3);
     }
-    .sos-banner {
-      padding: var(--space-3);
-    }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .live-page.sos-active {
       animation: none;
       outline-color: var(--danger-500);
+    }
+    .status-badge .status-dot,
+    .rec-dot {
+      animation: none;
+    }
+    .sos-dock {
+      animation: none;
+    }
+    .signal-bars i {
+      transition: none;
     }
   }
 </style>

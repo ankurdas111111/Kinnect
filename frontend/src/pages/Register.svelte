@@ -1,4 +1,6 @@
 <script>
+  import { preventDefault } from 'svelte/legacy';
+
   import { push } from 'svelte-spa-router';
   import { authUser, loadSession } from '../lib/stores/auth.js';
   import { apiPost, fetchCsrf, clearCsrf } from '../lib/api.js';
@@ -8,27 +10,27 @@
   import AnimatedMeshBackground from '../components/primitives/AnimatedMeshBackground.svelte';
   import KineticText from '../components/primitives/KineticText.svelte';
 
-  let showPassword = false;
-  let showConfirm = false;
-  let firstName = '';
-  let lastName = '';
-  let password = '';
-  let confirm = '';
-  let contactType = 'email';
-  let emailValue = '';
-  let countryIso = 'IN';
-  let mobileDigits = '';
-  let error = '';
-  let loading = false;
-  let redirecting = false;
-  let mobileHint = '';
-  let emailHint = '';
+  let showPassword = $state(false);
+  let showConfirm = $state(false);
+  let firstName = $state('');
+  let lastName = $state('');
+  let password = $state('');
+  let confirm = $state('');
+  let contactType = $state('email');
+  let emailValue = $state('');
+  let countryIso = $state('IN');
+  let mobileDigits = $state('');
+  let error = $state('');
+  let loading = $state(false);
+  let redirecting = $state(false);
+  let mobileHint = $state('');
+  let emailHint = $state('');
 
-  let firstNameTouched = false;
-  let passwordTouched = false;
-  let confirmTouched = false;
-  let emailTouched = false;
-  let mobileTouched = false;
+  let firstNameTouched = $state(false);
+  let passwordTouched = $state(false);
+  let confirmTouched = $state(false);
+  let emailTouched = $state(false);
+  let mobileTouched = $state(false);
 
   onMount(() => {
     if ($authUser) push('/');
@@ -57,11 +59,6 @@
     return true;
   }
 
-  $: passwordStrength = getPasswordStrength(password);
-  $: emailValid = emailValue.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue.trim());
-  $: mobileValid = mobileDigits ? validateMobileLength(countryIso, mobileDigits).valid : false;
-  $: confirmMatch = confirm && password === confirm;
-  $: confirmError = confirmTouched && confirm && !confirmMatch;
 
   function onContactToggleKeydown(e, current) {
     var order = ['email', 'mobile'];
@@ -92,6 +89,16 @@
     if (score <= 2) return { level: 2, label: 'Fair', color: 'var(--warning-500)' };
     if (score <= 3) return { level: 3, label: 'Good', color: 'var(--primary-500)' };
     return { level: 4, label: 'Strong', color: 'var(--success-500)' };
+  }
+
+  // Contextual, specific hint for strengthening a weak/fair password.
+  function getPasswordHint(pw) {
+    if (!pw) return '';
+    if (pw.length < 6) return 'Use at least 6 characters';
+    if (!/[0-9]/.test(pw) && !/[^A-Za-z0-9]/.test(pw)) return 'Add a number or symbol';
+    if (!/[A-Z]/.test(pw)) return 'Add an uppercase letter';
+    if (pw.length < 8) return 'A little longer makes it stronger';
+    return '';
   }
 
   async function handleSubmit() {
@@ -150,16 +157,25 @@
     }
     loading = false;
   }
+  let passwordStrength = $derived(getPasswordStrength(password));
+  let passwordHint = $derived(getPasswordHint(password));
+  let emailValid = $derived(emailValue.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue.trim()));
+  let mobileValid = $derived(mobileDigits ? validateMobileLength(countryIso, mobileDigits).valid : false);
+  let confirmMatch = $derived(confirm && password === confirm);
+  let confirmError = $derived(confirmTouched && confirm && !confirmMatch);
 </script>
 
 <div class="auth-page page-enter">
-  <!-- 2026 Animated Mesh Background — aurora orbs + spatial grid + particles -->
-  <AnimatedMeshBackground grid={true} particles={true} />
+  <!-- 2026 Animated Mesh Background — aurora orbs + spatial grid + particles.
+       Wrapped in .fx-ambient so calm/minimal FX modes fade the decorative layer. -->
+  <div class="fx-ambient">
+    <AnimatedMeshBackground grid={true} particles={true} />
+  </div>
 
   <div class="auth-brand">
     <div class="auth-brand-inner">
       <!-- Decorative floating location pins -->
-      <div class="auth-brand-deco" aria-hidden="true">
+      <div class="auth-brand-deco fx-ambient" aria-hidden="true">
         <svg class="deco-map" viewBox="0 0 340 280" fill="none" xmlns="http://www.w3.org/2000/svg">
           <line x1="90" y1="80" x2="180" y2="130" stroke="rgba(99,102,241,0.22)" stroke-width="1.5" stroke-dasharray="5 4"/>
           <line x1="180" y1="130" x2="260" y2="90" stroke="rgba(16,185,129,0.20)" stroke-width="1.5" stroke-dasharray="5 4"/>
@@ -235,7 +251,7 @@
         </div>
       {/if}
 
-      <form on:submit|preventDefault={handleSubmit} novalidate>
+      <form class="reg-form" onsubmit={preventDefault(handleSubmit)} novalidate>
         <div class="auth-name-row">
           <div class="auth-field">
             <label for="first_name">First name</label>
@@ -247,7 +263,7 @@
               placeholder="John"
               autocomplete="given-name"
               enterkeyhint="next"
-              on:blur={() => firstNameTouched = true}
+              onblur={() => firstNameTouched = true}
             />
             {#if firstNameTouched && !firstName.trim()}
               <span class="auth-hint error">Required</span>
@@ -270,9 +286,9 @@
               bind:value={password}
               autocomplete="new-password"
               enterkeyhint="next"
-              on:blur={() => passwordTouched = true}
+              onblur={() => passwordTouched = true}
             />
-            <button type="button" class="input-icon input-icon--toggle" on:click={() => showPassword = !showPassword} aria-label={showPassword ? 'Hide password' : 'Show password'}>
+            <button type="button" class="input-icon input-icon--toggle" onclick={() => showPassword = !showPassword} aria-label={showPassword ? 'Hide password' : 'Show password'}>
               {#if showPassword}
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
               {:else}
@@ -283,10 +299,13 @@
           {#if password}
             <div class="password-strength">
               <div class="strength-bar">
-                <div class="strength-fill" style="width:{passwordStrength.level * 25}%;background:{passwordStrength.color}"></div>
+                <div class="strength-fill" style="width:{passwordStrength.level * 25}%;--strength-color:{passwordStrength.color}"></div>
               </div>
               <span class="strength-label" style="color:{passwordStrength.color}">{passwordStrength.label}</span>
             </div>
+            {#if passwordHint}
+              <span class="auth-hint password-hint">{passwordHint}</span>
+            {/if}
           {:else}
             <span class="auth-hint">Minimum 6 characters</span>
           {/if}
@@ -304,12 +323,12 @@
               bind:value={confirm}
               autocomplete="new-password"
               enterkeyhint="next"
-              on:blur={() => confirmTouched = true}
+              onblur={() => confirmTouched = true}
             />
             {#if confirmTouched && confirmMatch}
-              <span class="input-icon valid" aria-hidden="true">&#10003;</span>
+              <span class="input-icon valid check-pop" aria-hidden="true">&#10003;</span>
             {:else}
-              <button type="button" class="input-icon input-icon--toggle" on:click={() => showConfirm = !showConfirm} aria-label={showConfirm ? 'Hide password' : 'Show password'}>
+              <button type="button" class="input-icon input-icon--toggle" onclick={() => showConfirm = !showConfirm} aria-label={showConfirm ? 'Hide password' : 'Show password'}>
                 {#if showConfirm}
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                 {:else}
@@ -325,8 +344,8 @@
 
         <div class="auth-field contact-type-label"><label class="label">Contact method</label></div>
         <div class="auth-toggle" role="tablist" aria-label="Contact method">
-          <button type="button" class="auth-toggle-btn" class:active={contactType === 'email'} on:click={() => contactType = 'email'} on:keydown={(e) => onContactToggleKeydown(e, 'email')} role="tab" aria-selected={contactType === 'email'} tabindex={contactType === 'email' ? 0 : -1}>Email</button>
-          <button type="button" class="auth-toggle-btn" class:active={contactType === 'mobile'} on:click={() => contactType = 'mobile'} on:keydown={(e) => onContactToggleKeydown(e, 'mobile')} role="tab" aria-selected={contactType === 'mobile'} tabindex={contactType === 'mobile' ? 0 : -1}>Mobile</button>
+          <button type="button" class="auth-toggle-btn" class:active={contactType === 'email'} onclick={() => contactType = 'email'} onkeydown={(e) => onContactToggleKeydown(e, 'email')} role="tab" aria-selected={contactType === 'email'} tabindex={contactType === 'email' ? 0 : -1}>Email</button>
+          <button type="button" class="auth-toggle-btn" class:active={contactType === 'mobile'} onclick={() => contactType = 'mobile'} onkeydown={(e) => onContactToggleKeydown(e, 'mobile')} role="tab" aria-selected={contactType === 'mobile'} tabindex={contactType === 'mobile' ? 0 : -1}>Mobile</button>
         </div>
 
         {#if contactType === 'email'}
@@ -341,12 +360,12 @@
                 class:is-invalid={emailTouched && emailValue.trim() && !emailValid}
                 bind:value={emailValue}
                 placeholder="you@example.com"
-                on:blur={() => { emailTouched = true; validateEmail(); }}
+                onblur={() => { emailTouched = true; validateEmail(); }}
                 autocomplete="email"
                 enterkeyhint="go"
               />
               {#if emailTouched && emailValid}
-                <span class="input-icon valid" aria-hidden="true">&#10003;</span>
+                <span class="input-icon valid check-pop" aria-hidden="true">&#10003;</span>
               {/if}
             </div>
             {#if emailTouched && emailHint}<span class="auth-hint error">{emailHint}</span>{/if}
@@ -355,7 +374,7 @@
           <div class="auth-field">
             <label for="reg_mobile">Mobile number</label>
             <div class="auth-phone-row">
-              <select class="auth-cc-select" bind:value={countryIso} on:change={validateMobile} aria-label="Country code">
+              <select class="auth-cc-select" bind:value={countryIso} onchange={validateMobile} aria-label="Country code">
                 {#each COUNTRY_CODES as c}
                   <option value={c[1]}>{c[3]} {c[0]}</option>
                 {/each}
@@ -370,14 +389,14 @@
                 placeholder={mobilePlaceholder()}
                 inputmode="numeric"
                 enterkeyhint="go"
-                on:blur={() => { mobileTouched = true; validateMobile(); }}
+                onblur={() => { mobileTouched = true; validateMobile(); }}
               />
             </div>
             {#if mobileTouched && mobileHint}<span class="auth-hint error">{mobileHint}</span>{/if}
           </div>
         {/if}
 
-        <button class="auth-submit" type="submit" disabled={loading}>
+        <button class="auth-submit tactile" type="submit" disabled={loading}>
           {#if loading}
             <span class="submit-spinner" aria-hidden="true"></span>
             {redirecting ? 'Opening dashboard...' : 'Creating account...'}
@@ -458,10 +477,26 @@
     border-color: var(--success-400) !important;
   }
 
+  /* Confirm-password / email checkmark — spring pop-in when a field matches. */
+  .check-pop {
+    animation: check-pop var(--duration-normal) var(--ease-spring) both;
+  }
+  @keyframes check-pop {
+    from { transform: translateY(-50%) scale(0.4); opacity: 0; }
+    60%  { transform: translateY(-50%) scale(1.12); opacity: 1; }
+    to   { transform: translateY(-50%) scale(1); opacity: 1; }
+  }
+
   .password-strength {
     display: flex;
     align-items: center;
     gap: var(--space-2);
+    margin-top: var(--space-1);
+  }
+
+  /* Specific, calm hint shown below a weak/fair password. */
+  .password-hint {
+    display: block;
     margin-top: var(--space-1);
   }
 
@@ -486,15 +521,49 @@
     border-radius: 2px;
     overflow: hidden;
   }
+  /* Spring-eased fill with a soft glow tinted to the current strength color. */
   .strength-fill {
     height: 100%;
     border-radius: 2px;
-    transition: width var(--duration-normal) var(--ease-out), background-color var(--duration-normal);
+    background: var(--strength-color);
+    box-shadow: 0 0 8px color-mix(in oklch, var(--strength-color, transparent) 55%, transparent);
+    transition:
+      width var(--duration-normal) var(--ease-spring),
+      background-color var(--duration-normal) var(--ease-out),
+      box-shadow var(--duration-normal) var(--ease-out);
   }
   .strength-label {
     font-size: var(--text-xs);
     font-weight: 600;
     white-space: nowrap;
+  }
+
+  /* Staggered entrance for the form fields — transform/opacity only. */
+  .reg-form > * {
+    animation: field-rise var(--duration-normal) var(--ease-spring) both;
+  }
+  .reg-form > *:nth-child(1) { animation-delay: calc(var(--stagger-step, 40ms) * 1); }
+  .reg-form > *:nth-child(2) { animation-delay: calc(var(--stagger-step, 40ms) * 2); }
+  .reg-form > *:nth-child(3) { animation-delay: calc(var(--stagger-step, 40ms) * 3); }
+  .reg-form > *:nth-child(4) { animation-delay: calc(var(--stagger-step, 40ms) * 4); }
+  .reg-form > *:nth-child(5) { animation-delay: calc(var(--stagger-step, 40ms) * 5); }
+  .reg-form > *:nth-child(6) { animation-delay: calc(var(--stagger-step, 40ms) * 6); }
+  .reg-form > *:nth-child(7) { animation-delay: calc(var(--stagger-step, 40ms) * 7); }
+  @keyframes field-rise {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  /* Calmer error banner: soft color-flash instead of a shake (token-driven). */
+  .auth-error {
+    background: var(--danger-500-12);
+    border-color: var(--danger-500-20);
+    animation: error-flash var(--duration-slow) var(--ease-out);
+  }
+  @keyframes error-flash {
+    0%   { background: var(--danger-500-20); border-color: var(--danger-500); }
+    60%  { background: var(--danger-500-20); border-color: var(--danger-500); }
+    100% { background: var(--danger-500-12); border-color: var(--danger-500-20); }
   }
 
   .submit-spinner {
@@ -509,4 +578,11 @@
     vertical-align: middle;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .strength-fill { transition: none; }
+    .check-pop { animation: none; }
+    .reg-form > * { animation: none; opacity: 1; transform: none; }
+    .auth-error { animation: none; }
+  }
 </style>

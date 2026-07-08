@@ -17,17 +17,18 @@
   --text-tertiary:  #9080c0;
   --text-inverse:   #0d0b14;
 
-  /* Primary — holographic purple */
-  --primary-50:  #faf5ff;
-  --primary-100: #f3e8ff;
-  --primary-200: #e9d5ff;
-  --primary-300: #d8b4fe;
-  --primary-400: #c084fc;
-  --primary-500: #a855f7;
-  --primary-600: #9333ea;
-  --primary-700: #7e22ce;
-  --primary-800: #6b21a8;
-  --primary-900: #581c87;
+  /* Primary — holographic purple. Scale is OKLCH (exact conversions) so future
+     adjustments are perceptually uniform. */
+  --primary-50:  oklch(0.9768 0.0142 308.3);   /* #faf5ff */
+  --primary-100: oklch(0.9464 0.0327 307.17);  /* #f3e8ff */
+  --primary-200: oklch(0.9024 0.0604 306.7);   /* #e9d5ff */
+  --primary-300: oklch(0.8268 0.1082 306.38);  /* #d8b4fe */
+  --primary-400: oklch(0.7217 0.1767 305.5);   /* #c084fc */
+  --primary-500: oklch(0.6268 0.2325 303.9);   /* #a855f7 */
+  --primary-600: oklch(0.5575 0.2525 302.32);  /* #9333ea */
+  --primary-700: oklch(0.4955 0.2369 301.92);  /* #7e22ce */
+  --primary-800: oklch(0.4383 0.1984 303.72);  /* #6b21a8 */
+  --primary-900: oklch(0.3807 0.1661 304.99);  /* #581c87 */
 
   /* Borders */
   --border-default: rgba(168, 85, 247, 0.14);
@@ -119,7 +120,7 @@
 }
 
 /* ── Active tab color ────────────────────────────────────────────────────── */
-[data-theme="vapor"] .tab-item.active { color: #c084fc; }
+[data-theme="vapor"] .tab-item.active { color: var(--primary-400); }
 
 /* ── Tracking dot border matches canvas ─────────────────────────────────── */
 [data-theme="vapor"] .tracking-dot { border-color: rgba(13, 11, 20, 0.92); }

@@ -7,7 +7,10 @@ import (
 	"strings"
 	"time"
 
-	_ "github.com/lib/pq"
+	// pgx v5 via database/sql: maintained driver, binary protocol, and
+	// automatic prepared-statement caching — drop-in for the whole db layer
+	// (lib/pq has been in maintenance mode for years).
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 const (
@@ -58,7 +61,7 @@ func NewPool(connStr string) (*Pool, error) {
 		}
 	}
 
-	db, err := sql.Open("postgres", cleanURL)
+	db, err := sql.Open("pgx", cleanURL)
 	if err != nil {
 		return nil, err
 	}

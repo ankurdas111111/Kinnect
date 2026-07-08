@@ -1,14 +1,15 @@
 // ── Cache configuration ────────────────────────────────────────────────────
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const STATIC_CACHE = `kinnect-static-${CACHE_VERSION}`;
 const TILE_CACHE = `kinnect-tiles-${CACHE_VERSION}`;
 const TILE_CACHE_MAX = 500;
 
-// Install: open caches and take control immediately.
-// Static assets (maplibre chunk, CSS, etc.) are cached on first fetch below.
+// Install: precache the app shell so a fully offline launch still renders,
+// then take control immediately. Hashed assets are cached on first fetch.
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(STATIC_CACHE)
+      .then((cache) => cache.addAll(['/', '/favicon.svg', '/map-style.json']).catch(() => {}))
       .then(() => self.skipWaiting())
   );
 });
@@ -75,6 +76,26 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
       fetch(request).catch(function() { return caches.match(request); })
+    );
+    return;
+  }
+
+  // ── 4. Network-first app shell for navigations ───────────────────────────
+  // Keeps the served HTML fresh (it references hashed asset URLs) while
+  // guaranteeing the app still opens with the last-known shell when offline.
+  if (request.mode === 'navigate' && url.origin === self.location.origin) {
+    event.respondWith(
+      caches.open(STATIC_CACHE).then(async function(cache) {
+        try {
+          var response = await fetch(request);
+          if (response.ok) cache.put('/', response.clone());
+          return response;
+        } catch (_) {
+          var cached = await cache.match('/');
+          if (cached) return cached;
+          throw _;
+        }
+      })
     );
     return;
   }

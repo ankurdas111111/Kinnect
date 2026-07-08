@@ -1,17 +1,25 @@
 <script>
+  import { run } from 'svelte/legacy';
+
   import { onDestroy } from 'svelte';
 
-  export let isOnline = true;
-  export let socketConnected = false;
-  export let bufferedCount = 0;
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [isOnline]
+   * @property {boolean} [socketConnected]
+   * @property {number} [bufferedCount]
+   */
+
+  /** @type {Props} */
+  let { isOnline = true, socketConnected = false, bufferedCount = 0 } = $props();
 
   // Don't flash "Reconnecting" for brief drops (< 2.5s).
   // The socket reconnects within 200–500ms during normal background/foreground
   // cycles, so this prevents constant visual noise during those transitions.
-  let showReconnecting = false;
-  let _timer = null;
+  let showReconnecting = $state(false);
+  let _timer = $state(null);
 
-  $: {
+  run(() => {
     if (!socketConnected) {
       if (!_timer) {
         _timer = setTimeout(() => {
@@ -23,7 +31,7 @@
       if (_timer) { clearTimeout(_timer); _timer = null; }
       showReconnecting = false;
     }
-  }
+  });
 
   onDestroy(() => { if (_timer) { clearTimeout(_timer); _timer = null; } });
 </script>

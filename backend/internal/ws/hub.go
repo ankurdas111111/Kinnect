@@ -15,7 +15,7 @@ import (
 	"kinnect-v3/internal/config"
 	"kinnect-v3/internal/db"
 	"kinnect-v3/internal/monitoring"
-	"nhooyr.io/websocket"
+	"github.com/coder/websocket"
 )
 
 const (
@@ -23,6 +23,7 @@ const (
 	chanUnregisterBuf = 256
 	chanDispatchBuf   = 1024
 	chanBroadcastBuf  = 2048 // H-4: raised from 512 to reduce drop rate
+	chanTasksBuf      = 512
 	offlineGrace24h   = 24 * 60 * 60 * 1000
 	offlineGrace48h   = 48 * 60 * 60 * 1000
 	offlineGrace5d    = 5 * 24 * 60 * 60 * 1000
@@ -35,10 +36,12 @@ type dispatchMsg struct {
 	msg    *Message
 }
 
+// broadcastMsg carries a pre-encoded frame so the payload is marshaled once
+// per broadcast instead of once per recipient.
 type broadcastMsg struct {
 	targetIDs []string
-	event     string
-	data      interface{}
+	event     string // retained for logging/metrics only
+	raw       []byte
 }
 
 // positionBroadcast holds a queued position update for batched broadcast.
@@ -60,6 +63,7 @@ type Hub struct {
 	unregister chan *Client
 	dispatch   chan *dispatchMsg
 	broadcast  chan *broadcastMsg
+	tasks      chan func()
 
 	groups map[string]map[string]bool // groupName -> set of clientIDs
 
@@ -95,6 +99,7 @@ func NewHub(c *cache.Cache, p *db.Pool, cfg *config.Config) *Hub {
 		unregister:       make(chan *Client, chanUnregisterBuf),
 		dispatch:         make(chan *dispatchMsg, chanDispatchBuf),
 		broadcast:        make(chan *broadcastMsg, chanBroadcastBuf),
+		tasks:            make(chan func(), chanTasksBuf),
 		groups:           make(map[string]map[string]bool),
 		pendingPositions: make(map[string]positionBroadcast),
 		rollingBufs:      make(map[string]*rollingBuffer),
@@ -212,8 +217,39 @@ func (h *Hub) Run(ctx context.Context) {
 
 		case bm := <-h.broadcast:
 			h.handleBroadcast(bm)
+
+		case f := <-h.tasks:
+			f()
 		}
 	}
+}
+
+// RunOnLoop schedules f to run on the hub's single dispatch goroutine.
+// This is the required way to touch mutable ActiveUser fields from any other
+// goroutine (DB-offload goroutines, timers, cleanup routines). Blocking send:
+// never call from the hub loop itself or it will deadlock.
+func (h *Hub) RunOnLoop(f func()) {
+	h.tasks <- f
+}
+
+// offloadDB runs fn on a bounded worker goroutine so slow DB round trips never
+// block the hub dispatch loop (one stalled addContact used to freeze every
+// position update for every user). fn gets a timeout-bound context for its DB
+// calls. Rules inside fn: cache methods (internally locked) and Client.Send /
+// SendToClients are safe; anything touching mutable ActiveUser fields or that
+// must be ordered with other hub work goes through h.RunOnLoop.
+func (h *Hub) offloadDB(fn func(ctx context.Context)) {
+	go func() {
+		dbWriteSem <- struct{}{}
+		defer func() { <-dbWriteSem }()
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		start := time.Now()
+		fn(ctx)
+		if h.metrics != nil {
+			h.metrics.DBOffloadDuration.Observe(float64(time.Since(start).Microseconds()) / 1000.0)
+		}
+	}()
 }
 
 func (h *Hub) handleRegister(c *Client) {
@@ -301,6 +337,7 @@ func (h *Hub) handleRegister(c *Client) {
 	// M-5: track active WS connections
 	if h.metrics != nil {
 		h.metrics.WSConnectionsActive.Inc()
+		h.metrics.WSConnectionsTotal.Inc()
 	}
 
 	h.mu.Lock()
@@ -474,17 +511,25 @@ func (h *Hub) leaveAllGroupsLocked(clientID string) {
 
 func (h *Hub) handleDispatch(dm *dispatchMsg) {
 	handler, ok := h.handlers[dm.msg.Event]
-	if ok {
-		handler(dm.client, dm.msg.Data)
-	} else {
+	if !ok {
 		slog.Debug("Unknown event", "event", dm.msg.Event, "client", dm.client.ID())
+		return
 	}
+	if h.metrics == nil {
+		handler(dm.client, dm.msg.Data)
+		return
+	}
+	h.metrics.WSMessagesRecv.Inc()
+	start := time.Now()
+	handler(dm.client, dm.msg.Data)
+	h.metrics.HubDispatchDuration.WithLabelValues(dm.msg.Event).
+		Observe(float64(time.Since(start).Microseconds()) / 1000.0)
 }
 
 func (h *Hub) handleBroadcast(bm *broadcastMsg) {
 	for _, id := range bm.targetIDs {
 		if cli := h.GetClient(id); cli != nil {
-			cli.Send(bm.event, bm.data)
+			cli.SendRaw(bm.event, bm.raw)
 		}
 	}
 }
@@ -521,6 +566,10 @@ func (h *Hub) HandleUpgrade(w http.ResponseWriter, r *http.Request, sessionData 
 	} else {
 		acceptOpts = &websocket.AcceptOptions{InsecureSkipVerify: true}
 	}
+	// permessage-deflate without context takeover: repetitive JSON frames
+	// (userUpdate payloads share most keys) compress well, and no-takeover
+	// keeps per-connection memory flat on the 512 MB instance.
+	acceptOpts.CompressionMode = websocket.CompressionNoContextTakeover
 	conn, err := websocket.Accept(w, r, acceptOpts)
 	if err != nil {
 		slog.Warn("WebSocket upgrade failed", "error", err, "userID", userID)
@@ -575,10 +624,20 @@ func (h *Hub) SendToClient(clientID string, event string, data interface{}) {
 }
 
 // SendToClients sends an event to multiple clients.
+// The payload is encoded once here (on the caller's goroutine) and the same
+// bytes are fanned out to every recipient — not re-marshaled per client.
 // H-4: drops to Warn (was Debug) and increments BroadcastDropped counter when channel is full.
 func (h *Hub) SendToClients(clientIDs []string, event string, data interface{}) {
+	if len(clientIDs) == 0 {
+		return
+	}
+	raw, err := EncodeMessage(event, data)
+	if err != nil {
+		slog.Debug("Failed to encode broadcast", "event", event, "error", err)
+		return
+	}
 	select {
-	case h.broadcast <- &broadcastMsg{targetIDs: clientIDs, event: event, data: data}:
+	case h.broadcast <- &broadcastMsg{targetIDs: clientIDs, event: event, raw: raw}:
 	default:
 		slog.Warn("Broadcast channel full, dropping", "event", event, "targets", len(clientIDs))
 		if h.metrics != nil {
@@ -663,14 +722,17 @@ func (h *Hub) loadUserSettings(user *cache.ActiveUser) {
 		}
 		return // non-fatal: defaults are all zero-values
 	}
-	user.QuietHoursEnabled = s.QuietHoursEnabled
-	user.QuietHoursStart = s.QuietHoursStart
-	user.QuietHoursEnd = s.QuietHoursEnd
-	user.HeartbeatEnabled = s.HeartbeatEnabled
-	user.HeartbeatDeadline = s.HeartbeatDeadline
-	user.HeartbeatLastSignal = s.HeartbeatLastSignal
-	user.EmergencyPhone1 = s.EmergencyPhone1
-	user.EmergencyPhone2 = s.EmergencyPhone2
-	// F5: load speed alert threshold
-	user.SpeedAlertThresholdMs = s.SpeedAlertThresholdMs
+	// Apply on the hub loop — ActiveUser fields are only mutated there.
+	h.RunOnLoop(func() {
+		user.QuietHoursEnabled = s.QuietHoursEnabled
+		user.QuietHoursStart = s.QuietHoursStart
+		user.QuietHoursEnd = s.QuietHoursEnd
+		user.HeartbeatEnabled = s.HeartbeatEnabled
+		user.HeartbeatDeadline = s.HeartbeatDeadline
+		user.HeartbeatLastSignal = s.HeartbeatLastSignal
+		user.EmergencyPhone1 = s.EmergencyPhone1
+		user.EmergencyPhone2 = s.EmergencyPhone2
+		// F5: load speed alert threshold
+		user.SpeedAlertThresholdMs = s.SpeedAlertThresholdMs
+	})
 }

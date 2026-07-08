@@ -2,11 +2,17 @@
   import { createEventDispatcher, onMount, onDestroy } from 'svelte';
   import { themeStore, THEMES } from '../../lib/stores/theme.js';
 
-  export let open = false;
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [open]
+   */
+
+  /** @type {Props} */
+  let { open = $bindable(false) } = $props();
 
   const dispatch = createEventDispatcher();
 
-  let current = 'dark';
+  let current = $state('dark');
   let unsubscribe;
 
   onMount(() => {
@@ -33,20 +39,20 @@
   const CATS = { classic: 'Classic', premium: 'Premium', genz: 'Gen-Z' };
   const CATS_ORDER = ['classic', 'premium', 'genz'];
 
-  $: grouped = CATS_ORDER.map(cat => ({
+  let grouped = $derived(CATS_ORDER.map(cat => ({
     cat,
     label: CATS[cat],
     themes: THEMES.filter(t => t.category === cat),
-  }));
+  })));
 </script>
 
-<svelte:window on:keydown={onKeydown} />
+<svelte:window onkeydown={onKeydown} />
 
 {#if open}
   <!-- Backdrop -->
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <div class="picker-backdrop" on:click={close} aria-hidden="true"></div>
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="picker-backdrop" onclick={close} aria-hidden="true"></div>
 
   <!-- Panel -->
   <div
@@ -60,7 +66,7 @@
 
     <div class="picker-header">
       <h3 class="picker-title">Choose Theme</h3>
-      <button class="picker-close" on:click={close} aria-label="Close theme picker">
+      <button class="picker-close" onclick={close} aria-label="Close theme picker">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
           <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
         </svg>
@@ -78,7 +84,7 @@
                 class:active={current === theme.id}
                 class:animated={theme.animated}
                 data-theme-id={theme.id}
-                on:click={() => select(theme.id)}
+                onclick={() => select(theme.id)}
                 title={theme.name}
                 aria-pressed={current === theme.id}
                 aria-label="{theme.name} — {theme.desc}"

@@ -2,17 +2,37 @@
   import { createEventDispatcher } from 'svelte';
   import { haptics } from '../../lib/haptics.js';
 
-  export let isTracking = false;
-  export let followMode = false;
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [isTracking]
+   * @property {boolean} [followMode]
+   */
+
+  /** @type {Props} */
+  let { isTracking = false, followMode = false } = $props();
 
   const dispatch = createEventDispatcher();
+
+  // Brief scale-pulse confirmation when center-on-me is tapped
+  let centerPulse = $state(false);
+  let pulseTimer;
+  function centerOnMe() {
+    haptics.tap();
+    dispatch('centerOnMe');
+    centerPulse = false;
+    // re-trigger on rapid taps
+    requestAnimationFrame(() => { centerPulse = true; });
+    clearTimeout(pulseTimer);
+    pulseTimer = setTimeout(() => { centerPulse = false; }, 420);
+  }
 </script>
 
 <div class="fab-cluster" role="group" aria-label="Map controls">
   <!-- Secondary: center-on-me -->
   <button
-    class="fab fab--secondary"
-    on:click={() => { haptics.tap(); dispatch('centerOnMe'); }}
+    class="fab fab--secondary tactile"
+    class:center-pulse={centerPulse}
+    onclick={centerOnMe}
     title="Center map on me"
     aria-label="Center map on me"
   >
@@ -24,9 +44,9 @@
 
   <!-- Secondary: follow-mode -->
   <button
-    class="fab fab--secondary"
+    class="fab fab--secondary tactile"
     class:follow-active={followMode}
-    on:click={() => { haptics.tap(); dispatch('toggleFollow'); }}
+    onclick={() => { haptics.tap(); dispatch('toggleFollow'); }}
     title={followMode ? 'Stop following me' : 'Follow me automatically'}
     aria-label={followMode ? 'Stop following me' : 'Follow me automatically'}
     aria-pressed={followMode}
@@ -42,9 +62,9 @@
 
   <!-- Primary: tracking toggle -->
   <button
-    class="fab fab--primary"
+    class="fab fab--primary tactile"
     class:tracking={isTracking}
-    on:click={() => dispatch('toggleTracking')}
+    onclick={() => dispatch('toggleTracking')}
     title={isTracking ? 'Stop sharing location' : 'Share my location'}
     aria-label={isTracking ? 'Stop sharing location' : 'Share my location'}
     aria-pressed={isTracking}
@@ -69,7 +89,8 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
+    /* Slightly more breathing room between stacked FABs */
+    gap: var(--space-3);
   }
 
   .fab {
@@ -88,6 +109,18 @@
 
   .fab:active {
     transform: scale(0.93) !important;
+  }
+
+  /* Brief scale-pulse confirmation on center-on-me (transform-only) */
+  .fab--secondary.center-pulse {
+    animation: center-confirm 420ms var(--ease-spring, cubic-bezier(0.34,1.56,0.64,1));
+  }
+
+  @keyframes center-confirm {
+    0%   { transform: scale(1); }
+    35%  { transform: scale(1.16); }
+    70%  { transform: scale(0.97); }
+    100% { transform: scale(1); }
   }
 
   /* Primary FAB — 56px, blue gradient */
@@ -168,7 +201,8 @@
 
   @media (prefers-reduced-motion: reduce) {
     .fab,
-    .fab--primary.tracking {
+    .fab--primary.tracking,
+    .fab--secondary.center-pulse {
       animation: none;
       transition: none;
     }

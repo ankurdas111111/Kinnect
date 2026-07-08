@@ -1,0 +1,105 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   OKLCH CORE PALETTE — perceptually-uniform re-expression of the core scales
+   defined in global.css :root (gray / primary / success / warning / danger).
+
+   Every value below is an EXACT colorimetric conversion of the original hex —
+   rendered output is identical. This file MUST be imported after global.css
+   and BEFORE styles/themes.css (named-theme overrides like [data-theme="vapor"]
+   redefine --primary-* and must keep winning via source order).
+
+   Scale is OKLCH so future adjustments are perceptually uniform — tweak L for
+   lightness steps, C for saturation, H for hue shifts without surprises.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Neutral (Slate) — OKLCH */
+  --gray-50:  oklch(0.9841 0.0034 247.86);  /* #f8fafc */
+  --gray-100: oklch(0.9683 0.0069 247.9);   /* #f1f5f9 */
+  --gray-200: oklch(0.9288 0.0126 255.51);  /* #e2e8f0 */
+  --gray-300: oklch(0.869 0.0198 252.89);   /* #cbd5e1 */
+  --gray-400: oklch(0.7107 0.0351 256.79);  /* #94a3b8 */
+  --gray-500: oklch(0.5544 0.0407 257.42);  /* #64748b */
+  --gray-600: oklch(0.4455 0.0374 257.3);   /* #475569 */
+  --gray-700: oklch(0.3717 0.0392 257.2);   /* #334155 */
+  --gray-800: oklch(0.2795 0.0368 260.03);  /* #1e293b */
+  --gray-900: oklch(0.2077 0.0398 265.75);  /* #0f172a */
+  --gray-950: oklch(0.1213 0.0248 256.3);   /* #020617 */
+
+  /* Primary (Kinnect Teal) — OKLCH */
+  --primary-50:  oklch(0.9836 0.0142 180.72);  /* #f0fdfa */
+  --primary-100: oklch(0.9527 0.0498 180.83);  /* #ccfbf1 */
+  --primary-200: oklch(0.91 0.0927 180.43);    /* #99f6e4 */
+  --primary-300: oklch(0.8549 0.125 181.07);   /* #5eead4 */
+  --primary-400: oklch(0.7845 0.1325 181.91);  /* #2dd4bf */
+  --primary-500: oklch(0.7037 0.123 182.5);    /* #14b8a6 */
+  --primary-600: oklch(0.6002 0.1038 184.71);  /* #0d9488 */
+  --primary-700: oklch(0.5109 0.086 186.39);   /* #0f766e */
+  --primary-800: oklch(0.4369 0.0706 188.23);  /* #115e59 */
+  --primary-900: oklch(0.3861 0.0591 188.42);  /* #134e4a */
+
+  /* Success (Emerald) — OKLCH */
+  --success-400: oklch(0.7729 0.1535 163.22);  /* #34d399 */
+  --success-500: oklch(0.6959 0.149 162.48);   /* #10b981 */
+  --success-600: oklch(0.596 0.1274 163.23);   /* #059669 */
+  --success-700: oklch(0.5081 0.1049 165.61);  /* #047857 */
+
+  /* Warning (Amber) — OKLCH */
+  --warning-400: oklch(0.8369 0.1644 84.43);   /* #fbbf24 */
+  --warning-500: oklch(0.7686 0.1647 70.08);   /* #f59e0b */
+  --warning-600: oklch(0.6658 0.1574 58.32);   /* #d97706 */
+  --warning-700: oklch(0.5553 0.1455 48.98);   /* #b45309 */
+
+  /* Danger (Red) — OKLCH */
+  --danger-400: oklch(0.7106 0.1661 22.21);    /* #f87171 */
+  --danger-500: oklch(0.6368 0.2078 25.33);    /* #ef4444 */
+  --danger-600: oklch(0.5771 0.2152 27.32);    /* #dc2626 */
+  --danger-700: oklch(0.5054 0.1904 27.52);    /* #b91c1c */
+
+  /* ── Shared accent tokens (added by hex-migration audit) ─────────────────
+     These values were hardcoded 2+ times across components; tokenized so the
+     no-hardcoded-hex rule can be enforced. Kept as the original hex (exact). */
+  --indigo-50:  #eef2ff;
+  --indigo-200: #c7d2fe;
+  --indigo-300: #a5b4fc;
+  --indigo-400: #818cf8;
+  --indigo-500: #6366f1;
+  --indigo-600: #4f46e5;
+  --blue-500:   #3b82f6;
+  --green-400:  #4ade80;
+  --green-500:  #22c55e;
+  --cyan-400:   #22d3ee;
+  --violet-300: #c4b5fd;
+  --violet-400: #a78bfa;
+  --violet-600: #7c3aed;
+  --rose-400:   #fb7185;
+  --danger-300:  #fca5a5;   /* extends danger scale — red-300 */
+  --warning-300: #fcd34d;   /* extends warning scale — amber-300 */
+  --surface-midnight: #1a1a2e;  /* deep navy panel bg (FeatureGuide, Monitoring, MainApp) */
+
+  /* ── Freshness/status tokens ─────────────────────────────────────────────
+     FreshnessChip referenced these with hex fallbacks but they were never
+     defined ("phantom tokens" — the fallbacks rendered). Defined here at the
+     exact same values so the references resolve to real, themeable tokens. */
+  --status-live:    var(--green-500);    /* was fallback #22c55e */
+  --status-stale:   var(--warning-500);  /* was fallback #f59e0b */
+  --status-offline: var(--gray-400);     /* was fallback #94a3b8 */
+  --status-sos:     var(--danger-500);   /* was fallback #ef4444 */
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MODERN TYPOGRAPHY MICRO-WINS (Baseline-safe)
+   Additive layer for the heading/body rules defined in global.css.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Balanced line-breaks on headings — mirrors the heading selector list used
+   by global.css "Premium Typography Polish". Unsupported browsers ignore it. */
+h1, h2, h3, h4, h5, h6,
+.hero-headline, .section-title, .cta-title, .feature-title,
+.step-title, .panel-header h3, .auth-card h2 {
+  text-wrap: balance;
+}
+
+/* Prettier rag + orphan avoidance on body paragraphs */
+p {
+  text-wrap: pretty;
+}

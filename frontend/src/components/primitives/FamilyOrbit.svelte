@@ -1,4 +1,6 @@
 <script>
+  import { stopPropagation } from 'svelte/legacy';
+
   /**
    * FamilyOrbit — Interactive 3D Holographic Radar
    *
@@ -14,16 +16,16 @@
   import { getUserColor } from '../../lib/getUserColor.js';
 
   // ── Scene ──────────────────────────────────────────────────────────────
-  let sceneEl;
-  let sceneSize = 400;
+  let sceneEl = $state();
+  let sceneSize = $state(400);
 
   const BASE  = 72;
   const STEP  = 24;
   const MAX   = 6;
   const SAT_D = 32;
 
-  $: CX = sceneSize / 2;
-  $: CY = sceneSize / 2;
+  let CX = $derived(sceneSize / 2);
+  let CY = $derived(sceneSize / 2);
 
   // ── 3D projection ─────────────────────────────────────────────────────
   const TILT  = 68 * (Math.PI / 180);
@@ -41,10 +43,10 @@
   }
 
   // ── Reactive data ─────────────────────────────────────────────────────
-  $: allMembers = Array.from($otherUsers.values());
-  $: overflow   = allMembers.length - MAX;
+  let allMembers = $derived(Array.from($otherUsers.values()));
+  let overflow   = $derived(allMembers.length - MAX);
 
-  $: orbitDescs = allMembers.slice(0, MAX).map((user, i) => {
+  let orbitDescs = $derived(allMembers.slice(0, MAX).map((user, i) => {
     const isSos    = !!user.sos?.active;
     const isOnline = user.online !== false;
     const isMoving = isOnline && (user.speed || 0) > 1;
@@ -54,12 +56,12 @@
     const angSpd   = (2 * Math.PI) / period;
     const phase    = (i / Math.max(allMembers.length, 1)) * 2 * Math.PI;
     return { user, color, r, angSpd, phase, isSos, isOnline, isMoving };
-  });
+  }));
 
   // ── Canvas + state ────────────────────────────────────────────────────
-  let canvas;
+  let canvas = $state();
   let rafId, t0 = 0, lastFrame = 0;
-  let renderList = [];
+  let renderList = $state([]);
   let scanAngle = 0;
   let elapsed = 0;
 
@@ -67,7 +69,7 @@
 
   // ── Interactive effects ───────────────────────────────────────────────
   let ripples = [];      // { x, y, t, maxR, color }
-  let coreBurst = 0;     // 0..1 burst animation progress
+  let coreBurst = $state(0);     // 0..1 burst animation progress
   let coreBurstTime = 0;
 
   function addRipple(x, y, isCenter = false) {
@@ -441,12 +443,12 @@
   });
 </script>
 
-<!-- svelte-ignore a11y-no-static-element-interactions -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="fo-scene"
   bind:this={sceneEl}
   style="width:{sceneSize}px;height:{sceneSize}px"
-  on:pointerdown={handlePointer}
+  onpointerdown={handlePointer}
   aria-label="Family orbital view — tap to interact"
 >
   <canvas bind:this={canvas} class="fo-canvas" aria-hidden="true"></canvas>
@@ -455,7 +457,7 @@
   <button
     class="fo-core"
     class:fo-core-burst={coreBurst > 0}
-    on:click|stopPropagation={() => addRipple(sceneSize/2, sceneSize/2, true)}
+    onclick={stopPropagation(() => addRipple(sceneSize/2, sceneSize/2, true))}
     aria-label="{$authUser?.displayName || 'You'} — tap for pulse"
   >
     <div class="fo-core-glow" aria-hidden="true"></div>
@@ -488,7 +490,7 @@
         z-index:{Math.round((sat.depth + 160) * 10) + 1};
         font-size:{Math.max(8, 10 * sat.scale)}px;
       "
-      on:click|stopPropagation={() => { addRipple(sat.x, sat.y); locate(sat.user); }}
+      onclick={stopPropagation(() => { addRipple(sat.x, sat.y); locate(sat.user); })}
       aria-label="{sat.user.displayName} — {sat.isSos ? 'SOS' : sat.isMoving ? 'Moving' : sat.isOnline ? 'Online' : 'Offline'}"
     >
       <span class="fo-init">{initials(sat.user.displayName)}</span>
@@ -518,7 +520,7 @@
       <button
         class="fo-tag" class:fo-tag-sos={sat.isSos} class:fo-tag-off={!sat.isOnline}
         style="--c:{sat.color}"
-        on:click={() => locate(sat.user)} role="listitem"
+        onclick={() => locate(sat.user)} role="listitem"
       >
         <span class="fo-td"></span>
         <span class="fo-tn">{sat.user.displayName}</span>

@@ -1,4 +1,6 @@
 <script>
+  import { run } from 'svelte/legacy';
+
   /**
    * Input — Animated floating-label input
    *
@@ -21,40 +23,61 @@
   import { createEventDispatcher } from 'svelte';
   import { onMount } from 'svelte';
 
-  export let label       = '';
-  export let type        = 'text';
-  export let value       = '';
-  export let placeholder = '';
-  export let hint        = '';
-  export let error       = '';
-  export let success     = false;
-  export let disabled    = false;
-  export let size        = 'md';
-  export let id          = '';
+  /**
+   * @typedef {Object} Props
+   * @property {string} [label]
+   * @property {string} [type]
+   * @property {string} [value]
+   * @property {string} [placeholder]
+   * @property {string} [hint]
+   * @property {string} [error]
+   * @property {boolean} [success]
+   * @property {boolean} [disabled]
+   * @property {string} [size]
+   * @property {string} [id]
+   * @property {import('svelte').Snippet} [prefix]
+   * @property {import('svelte').Snippet} [suffix]
+   */
+
+  /** @type {Props} */
+  let {
+    label = '',
+    type = 'text',
+    value = $bindable(''),
+    placeholder = '',
+    hint = '',
+    error = '',
+    success = false,
+    disabled = false,
+    size = 'md',
+    id = '',
+    prefix,
+    suffix
+  } = $props();
 
   const dispatch = createEventDispatcher();
 
   // Auto-generate stable id
-  let uid;
+  let uid = $state();
   onMount(() => {
     uid = id || ('input-' + Math.random().toString(36).slice(2, 8));
   });
 
-  let focused = false;
-  let inputEl;
+  let focused = $state(false);
+  let inputEl = $state();
 
   // Label float: 0 = resting, 1 = floated
   const labelY = tweened(0, { duration: 180, easing: cubicOut });
   const labelScale = tweened(1, { duration: 180, easing: cubicOut });
 
-  $: floated = focused || (value !== '' && value !== null && value !== undefined);
+  let floated = $derived(focused || (value !== '' && value !== null && value !== undefined));
 
-  $: {
+  run(() => {
     labelY.set(floated ? -1 : 0);
     labelScale.set(floated ? 0.78 : 1);
-  }
+  });
 
-  $: stateClass = error ? 'state-error' : success ? 'state-success' : focused ? 'state-focused' : '';
+  let stateClass = $derived(error ? 'state-error' : success ? 'state-success' : focused ? 'state-focused' : '');
 
   function onFocus(e) {
     focused = true;
@@ -73,12 +96,12 @@
   }
 </script>
 
-<div class="field field-{size}" class:disabled class:has-prefix={$$slots.prefix} class:has-suffix={$$slots.suffix}>
+<div class="field field-{size}" class:disabled class:has-prefix={prefix} class:has-suffix={suffix}>
   <div class="field-inner {stateClass}">
     <!-- Prefix slot -->
-    {#if $$slots.prefix}
+    {#if prefix}
       <span class="field-adornment field-prefix" aria-hidden="true">
-        <slot name="prefix" />
+        {@render prefix?.()}
       </span>
     {/if}
 
@@ -94,10 +117,10 @@
       aria-label={label || undefined}
       aria-describedby={hint || error ? (uid + '-desc') : undefined}
       aria-invalid={error ? 'true' : undefined}
-      on:focus={onFocus}
-      on:blur={onBlur}
-      on:input={onInput}
-      on:change={onChange}
+      onfocus={onFocus}
+      onblur={onBlur}
+      oninput={onInput}
+      onchange={onChange}
     />
 
     <!-- Floating label -->
@@ -116,9 +139,9 @@
     {/if}
 
     <!-- Suffix slot -->
-    {#if $$slots.suffix}
+    {#if suffix}
       <span class="field-adornment field-suffix" aria-hidden="true">
-        <slot name="suffix" />
+        {@render suffix?.()}
       </span>
     {/if}
 

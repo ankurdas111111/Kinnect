@@ -429,67 +429,71 @@ func (h *Hub) queuePositionBroadcast(user *cache.ActiveUser, data map[string]int
 	}
 	h.pendingPositions[user.SocketID] = positionBroadcast{user: user, data: data}
 	if h.positionTimer == nil {
-		h.positionTimer = time.AfterFunc(batchIntervalMs*time.Millisecond, h.flushPositionBroadcasts)
+		// The flush reads mutable ActiveUser fields (quiet hours, schedules), so it
+		// must run on the hub loop — the timer goroutine only schedules it there.
+		h.positionTimer = time.AfterFunc(batchIntervalMs*time.Millisecond, func() {
+			h.RunOnLoop(h.flushPositionBroadcasts)
+		})
 	}
 }
 
 // flushPositionBroadcasts sends all queued position updates.
+// All updates a recipient can see in this tick are grouped into a single
+// "userUpdates" array frame — one frame per recipient per 40ms tick instead
+// of one frame per (sender, recipient) pair.
 // Applies quiet hours privacy jitter for non-guardian recipients when active.
+// Always runs on the hub dispatch goroutine (via RunOnLoop).
 func (h *Hub) flushPositionBroadcasts() {
 	h.positionTimerMu.Lock()
-	batch := make(map[string]positionBroadcast)
-	for k, v := range h.pendingPositions {
-		batch[k] = v
-	}
+	batch := h.pendingPositions
 	h.pendingPositions = make(map[string]positionBroadcast)
 	h.positionTimer = nil
 	h.positionTimerMu.Unlock()
 
 	serverTs := time.Now().UnixMilli()
+	perRecipient := make(map[string][]map[string]interface{})
+
 	for _, pb := range batch {
-		// Copy the shared sanitized map before mutating — prevents data race with
-		// the dispatch goroutine which may still hold a reference to the original.
+		// Copy the shared sanitized map before mutating — the position handler
+		// may still hold a reference to the original.
 		data := make(map[string]interface{}, len(pb.data)+1)
 		for k, v := range pb.data {
 			data[k] = v
 		}
 		data["serverTs"] = serverTs
-		pb.data = data
 		user := pb.user
 
-		// Apply quiet hours jitter and schedule filtering per recipient
 		quietActive := user.QuietHoursEnabled && isQuietHoursNow(user.QuietHoursStart, user.QuietHoursEnd)
 		hasSchedule := h.Cache.HasSharingSchedules(user.UserID)
-		if quietActive || hasSchedule {
-			sids := h.Cache.GetVisibleSocketIDs(user)
-			for _, sid := range sids {
-				recipient := h.Cache.GetActiveUser(sid)
-				if recipient == nil {
-					h.SendToClient(sid, "userUpdate", pb.data)
-					continue
-				}
-				// Check adaptive schedule: if sender has rules, verify this recipient is in a window
-				if hasSchedule {
-					recipRooms := h.Cache.GetUserRooms(recipient.UserID)
-					if !h.Cache.IsScheduleVisible(user.UserID, recipient.UserID, recipRooms) {
-						continue // this recipient is outside the sharing window — skip
+		sids := h.Cache.GetVisibleSocketIDs(user)
+		var coarse map[string]interface{} // built once per sender, shared by all coarsened recipients
+
+		for _, sid := range sids {
+			payload := data
+			if quietActive || hasSchedule {
+				if recipient := h.Cache.GetActiveUser(sid); recipient != nil {
+					// Check adaptive schedule: if sender has rules, verify this recipient is in a window
+					if hasSchedule {
+						recipRooms := h.Cache.GetUserRooms(recipient.UserID)
+						if !h.Cache.IsScheduleVisible(user.UserID, recipient.UserID, recipRooms) {
+							continue // this recipient is outside the sharing window — skip
+						}
 					}
-				}
-				// Apply quiet hours jitter for non-guardian contacts
-				if quietActive {
-					isGuardian := h.Cache.IsGuardianOf(recipient.UserID, user.UserID)
-					if isGuardian {
-						h.SendToClient(sid, "userUpdate", pb.data)
-					} else {
-						h.SendToClient(sid, "userUpdate", copyMapWithCoarsened(pb.data))
+					// Apply quiet hours jitter for non-guardian contacts
+					if quietActive && !h.Cache.IsGuardianOf(recipient.UserID, user.UserID) {
+						if coarse == nil {
+							coarse = copyMapWithCoarsened(data)
+						}
+						payload = coarse
 					}
-				} else {
-					h.SendToClient(sid, "userUpdate", pb.data)
 				}
 			}
-		} else {
-			h.emitToVisible(user, "userUpdate", pb.data)
+			perRecipient[sid] = append(perRecipient[sid], payload)
 		}
+	}
+
+	for sid, updates := range perRecipient {
+		h.SendToClient(sid, "userUpdates", updates)
 	}
 }
 

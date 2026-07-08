@@ -271,18 +271,11 @@ func (h *Hub) handlePosition(c *Client, data json.RawMessage) {
 			go func(distM int, addMin bool) {
 				defer func() { <-dbWriteSem }()
 				bCtx := context.Background()
-				// users.last_* snapshot
+				// users.last_* snapshot + F9 daily activity + F10 trail row,
+				// combined into one round trip (CTE bundle).
 				speedStr := fmt.Sprintf("%.2f", spd)
-				_ = db.UpdateUserLocation(bCtx, h.pool.DB, uid, lat, lng, speedStr, now)
-				// F9: upsert daily activity
-				if err := db.UpsertDailyActivity(bCtx, h.pool.DB, uid, distM, addMin, now); err != nil {
-					slog.Warn("UpsertDailyActivity failed", "userId", uid, "error", err)
-				}
-				// F10: append position_history row for trail replay
-				if _, err := h.pool.DB.ExecContext(bCtx,
-					`INSERT INTO position_history(user_id,lat,lng,speed,ts) VALUES($1,$2,$3,$4,$5)`,
-					uid, lat, lng, spd, now); err != nil {
-					slog.Warn("position_history insert failed", "userId", uid, "error", err)
+				if err := db.PersistPositionBundle(bCtx, h.pool.DB, uid, lat, lng, speedStr, spd, now, distM, addMin); err != nil {
+					slog.Warn("position persist bundle failed", "userId", uid, "error", err)
 				}
 			}(distDelta, addMinute)
 		default:
@@ -742,29 +735,36 @@ func (h *Hub) handleCreateRoom(c *Client, data json.RawMessage) {
 		roomName = "Room " + code
 	}
 	createdAt := time.Now().UnixMilli()
+	userID := user.UserID
 
-	roomDbID, err := db.CreateRoom(context.Background(), h.pool.DB, code, roomName, user.UserID, createdAt)
-	if err != nil {
-		slog.Error("Failed to create room", "error", err)
-		c.Send("roomError", map[string]interface{}{"message": "Failed to create room"})
-		return
-	}
+	// DB round trips run off the hub loop; cache + ActiveUser mutations return
+	// to the loop afterwards (see offloadDB contract).
+	h.offloadDB(func(ctx context.Context) {
+		roomDbID, err := db.CreateRoom(ctx, h.pool.DB, code, roomName, userID, createdAt)
+		if err != nil {
+			slog.Error("Failed to create room", "error", err)
+			c.Send("roomError", map[string]interface{}{"message": "Failed to create room"})
+			return
+		}
 
-	// Persist creator as admin member — must match cache.AddRoom which sets Members[createdBy]=admin.
-	// Without this, the room_members table has no rows and the room appears empty after a restart.
-	if err := db.AddRoomMember(context.Background(), h.pool.DB, roomDbID, user.UserID, "admin"); err != nil {
-		slog.Error("Failed to add room creator as member", "error", err)
-		_ = db.DeleteRoom(context.Background(), h.pool.DB, roomDbID)
-		c.Send("roomError", map[string]interface{}{"message": "Failed to create room"})
-		return
-	}
+		// Persist creator as admin member — must match cache.AddRoom which sets Members[createdBy]=admin.
+		// Without this, the room_members table has no rows and the room appears empty after a restart.
+		if err := db.AddRoomMember(ctx, h.pool.DB, roomDbID, userID, "admin"); err != nil {
+			slog.Error("Failed to add room creator as member", "error", err)
+			_ = db.DeleteRoom(ctx, h.pool.DB, roomDbID)
+			c.Send("roomError", map[string]interface{}{"message": "Failed to create room"})
+			return
+		}
 
-	h.Cache.AddRoom(code, roomDbID, roomName, user.UserID, createdAt)
-	user.Rooms = h.Cache.GetUserRooms(user.UserID)
-	h.invalidateVisibility(user.UserID)
+		h.RunOnLoop(func() {
+			h.Cache.AddRoom(code, roomDbID, roomName, userID, createdAt)
+			user.Rooms = h.Cache.GetUserRooms(userID)
+			h.invalidateVisibility(userID)
 
-	c.Send("roomCreated", map[string]interface{}{"code": code, "name": roomName})
-	h.emitMyRooms(c, user.UserID)
+			c.Send("roomCreated", map[string]interface{}{"code": code, "name": roomName})
+			h.emitMyRooms(c, userID)
+		})
+	})
 }
 
 // generateUniqueRoomCode generates a unique 6-char room code.
@@ -803,25 +803,32 @@ func (h *Hub) handleJoinRoom(c *Client, data json.RawMessage) {
 		c.Send("roomError", map[string]interface{}{"message": "Room not found"})
 		return
 	}
+	roomDbID := room.DbID
+	roomName := room.Name
+	userID := user.UserID
 
-	if err := db.AddRoomMember(context.Background(), h.pool.DB, room.DbID, user.UserID, "member"); err != nil {
-		slog.Error("Failed to add room member", "error", err)
-		c.Send("roomError", map[string]interface{}{"message": "Failed to join"})
-		return
-	}
+	h.offloadDB(func(ctx context.Context) {
+		if err := db.AddRoomMember(ctx, h.pool.DB, roomDbID, userID, "member"); err != nil {
+			slog.Error("Failed to add room member", "error", err)
+			c.Send("roomError", map[string]interface{}{"message": "Failed to join"})
+			return
+		}
 
-	h.Cache.AddRoomMember(code, user.UserID, "member")
-	user.Rooms = h.Cache.GetUserRooms(user.UserID)
+		h.RunOnLoop(func() {
+			h.Cache.AddRoomMember(code, userID, "member")
+			user.Rooms = h.Cache.GetUserRooms(userID)
 
-	memberIDs := make([]string, 0, len(room.Members))
-	for mid := range room.Members {
-		memberIDs = append(memberIDs, mid)
-	}
-	h.invalidateVisibilityForUsers(memberIDs)
+			memberIDs := make([]string, 0, len(room.Members))
+			for mid := range room.Members {
+				memberIDs = append(memberIDs, mid)
+			}
+			h.invalidateVisibilityForUsers(memberIDs)
 
-	c.Send("roomJoined", map[string]interface{}{"code": code, "name": room.Name})
-	h.emitMyRooms(c, user.UserID)
-	h.scheduleVisibilityRefresh(c, user)
+			c.Send("roomJoined", map[string]interface{}{"code": code, "name": roomName})
+			h.emitMyRooms(c, userID)
+			h.scheduleVisibilityRefresh(c, user)
+		})
+	})
 }
 
 // handleLeaveRoom leaves a room.
@@ -848,29 +855,38 @@ func (h *Hub) handleLeaveRoom(c *Client, data json.RawMessage) {
 	if room == nil {
 		return
 	}
+	roomDbID := room.DbID
+	userID := user.UserID
 
-	if err := db.RemoveRoomMember(context.Background(), h.pool.DB, room.DbID, user.UserID); err != nil {
-		slog.Error("Failed to remove room member", "error", err)
-		return
-	}
+	h.offloadDB(func(ctx context.Context) {
+		if err := db.RemoveRoomMember(ctx, h.pool.DB, roomDbID, userID); err != nil {
+			slog.Error("Failed to remove room member", "error", err)
+			return
+		}
 
-	h.Cache.RemoveRoomMember(code, user.UserID)
-	if len(room.Members) <= 1 {
-		_ = db.DeleteRoom(context.Background(), h.pool.DB, room.DbID)
-		h.Cache.DeleteRoom(code)
-	}
+		h.RunOnLoop(func() {
+			h.Cache.RemoveRoomMember(code, userID)
+			if len(room.Members) <= 1 {
+				h.Cache.DeleteRoom(code)
+				// Fire-and-forget like before: a failed delete only orphans a row.
+				h.offloadDB(func(ctx context.Context) {
+					_ = db.DeleteRoom(ctx, h.pool.DB, roomDbID)
+				})
+			}
 
-	user.Rooms = h.Cache.GetUserRooms(user.UserID)
-	memberIDs := make([]string, 0, len(room.Members))
-	for mid := range room.Members {
-		memberIDs = append(memberIDs, mid)
-	}
-	memberIDs = append(memberIDs, user.UserID)
-	h.invalidateVisibilityForUsers(memberIDs)
+			user.Rooms = h.Cache.GetUserRooms(userID)
+			memberIDs := make([]string, 0, len(room.Members))
+			for mid := range room.Members {
+				memberIDs = append(memberIDs, mid)
+			}
+			memberIDs = append(memberIDs, userID)
+			h.invalidateVisibilityForUsers(memberIDs)
 
-	c.Send("roomLeft", map[string]interface{}{"code": code})
-	h.emitMyRooms(c, user.UserID)
-	h.scheduleVisibilityRefresh(c, user)
+			c.Send("roomLeft", map[string]interface{}{"code": code})
+			h.emitMyRooms(c, userID)
+			h.scheduleVisibilityRefresh(c, user)
+		})
+	})
 }
 
 // handleAddContact adds a contact by share code.
@@ -898,49 +914,55 @@ func (h *Hub) handleAddContact(c *Client, data json.RawMessage) {
 		return
 	}
 
-	targetID := h.Cache.GetUserIDByShareCode(shareCode)
-	if targetID == "" {
-		// Cache miss: fall back to DB (handles users registered after last cache load)
-		var err error
-		targetID, err = db.GetUserIDByShareCode(context.Background(), h.pool.DB, shareCode)
-		if err != nil || targetID == "" {
-			c.Send("contactError", map[string]interface{}{"message": "No user found with that code"})
+	userID := user.UserID
+
+	h.offloadDB(func(ctx context.Context) {
+		targetID := h.Cache.GetUserIDByShareCode(shareCode)
+		if targetID == "" {
+			// Cache miss: fall back to DB (handles users registered after last cache load)
+			var err error
+			targetID, err = db.GetUserIDByShareCode(ctx, h.pool.DB, shareCode)
+			if err != nil || targetID == "" {
+				c.Send("contactError", map[string]interface{}{"message": "No user found with that code"})
+				return
+			}
+			// Warm the cache so future lookups hit memory
+			h.Cache.WarmShareCode(shareCode, targetID)
+		}
+		if targetID == userID {
+			c.Send("contactError", map[string]interface{}{"message": "That's your own code — share it with someone else to connect"})
 			return
 		}
-		// Warm the cache so future lookups hit memory
-		h.Cache.WarmShareCode(shareCode, targetID)
-	}
-	if targetID == user.UserID {
-		c.Send("contactError", map[string]interface{}{"message": "That's your own code — share it with someone else to connect"})
-		return
-	}
 
-	// Already contacts? Tell them explicitly instead of silently doing nothing.
-	if h.Cache.AreContacts(user.UserID, targetID) {
-		c.Send("contactError", map[string]interface{}{"message": "You're already connected with this person"})
-		return
-	}
-
-	if err := db.AddContactBidirectional(context.Background(), h.pool.DB, user.UserID, targetID); err != nil {
-		slog.Error("Failed to add contact", "error", err)
-		c.Send("contactError", map[string]interface{}{"message": "Failed to add contact"})
-		return
-	}
-
-	h.Cache.AddContactBidirectional(user.UserID, targetID)
-	h.invalidateVisibilityForUsers([]string{user.UserID, targetID})
-
-	c.Send("contactAdded", map[string]interface{}{"userId": targetID, "displayName": h.Cache.GetDisplayName(targetID)})
-	h.emitMyContacts(c, user.UserID)
-	h.scheduleVisibilityRefresh(c, user)
-
-	if other := h.GetClientByUserID(targetID); other != nil {
-		ou := h.Cache.GetActiveUser(other.ID())
-		if ou != nil {
-			h.emitMyContacts(other, targetID)
-			h.scheduleVisibilityRefresh(other, ou)
+		// Already contacts? Tell them explicitly instead of silently doing nothing.
+		if h.Cache.AreContacts(userID, targetID) {
+			c.Send("contactError", map[string]interface{}{"message": "You're already connected with this person"})
+			return
 		}
-	}
+
+		if err := db.AddContactBidirectional(ctx, h.pool.DB, userID, targetID); err != nil {
+			slog.Error("Failed to add contact", "error", err)
+			c.Send("contactError", map[string]interface{}{"message": "Failed to add contact"})
+			return
+		}
+
+		h.RunOnLoop(func() {
+			h.Cache.AddContactBidirectional(userID, targetID)
+			h.invalidateVisibilityForUsers([]string{userID, targetID})
+
+			c.Send("contactAdded", map[string]interface{}{"userId": targetID, "displayName": h.Cache.GetDisplayName(targetID)})
+			h.emitMyContacts(c, userID)
+			h.scheduleVisibilityRefresh(c, user)
+
+			if other := h.GetClientByUserID(targetID); other != nil {
+				ou := h.Cache.GetActiveUser(other.ID())
+				if ou != nil {
+					h.emitMyContacts(other, targetID)
+					h.scheduleVisibilityRefresh(other, ou)
+				}
+			}
+		})
+	})
 }
 
 // handleRemoveContact removes a contact.
@@ -963,25 +985,29 @@ func (h *Hub) handleRemoveContact(c *Client, data json.RawMessage) {
 		return
 	}
 
-	if err := db.RemoveContactBidirectional(context.Background(), h.pool.DB, user.UserID, targetID); err != nil {
-		slog.Error("Failed to remove contact", "error", err)
-		return
-	}
-
-	h.Cache.RemoveContactBidirectional(user.UserID, targetID)
-	h.invalidateVisibilityForUsers([]string{user.UserID, targetID})
-
-	c.Send("contactRemoved", map[string]interface{}{"userId": targetID})
-	h.emitMyContacts(c, user.UserID)
-	h.scheduleVisibilityRefresh(c, user)
-
-	if other := h.GetClientByUserID(targetID); other != nil {
-		ou := h.Cache.GetActiveUser(other.ID())
-		if ou != nil {
-			h.emitMyContacts(other, targetID)
-			h.scheduleVisibilityRefresh(other, ou)
+	userID := user.UserID
+	h.offloadDB(func(ctx context.Context) {
+		if err := db.RemoveContactBidirectional(ctx, h.pool.DB, userID, targetID); err != nil {
+			slog.Error("Failed to remove contact", "error", err)
+			return
 		}
-	}
+		h.RunOnLoop(func() {
+			h.Cache.RemoveContactBidirectional(userID, targetID)
+			h.invalidateVisibilityForUsers([]string{userID, targetID})
+
+			c.Send("contactRemoved", map[string]interface{}{"userId": targetID})
+			if u := h.Cache.GetActiveUser(c.ID()); u != nil {
+				h.emitMyContacts(c, userID)
+				h.scheduleVisibilityRefresh(c, u)
+			}
+			if other := h.GetClientByUserID(targetID); other != nil {
+				if ou := h.Cache.GetActiveUser(other.ID()); ou != nil {
+					h.emitMyContacts(other, targetID)
+					h.scheduleVisibilityRefresh(other, ou)
+				}
+			}
+		})
+	})
 }
 
 // handleCreateLiveLink creates a live sharing link.
@@ -1023,16 +1049,20 @@ func (h *Hub) handleCreateLiveLink(c *Client, data json.RawMessage) {
 	expiresAt := h.parseExpiresIn(expStr)
 	token := generateLiveToken()
 	createdAt := time.Now().UnixMilli()
+	userID := user.UserID
 
-	if err := db.CreateLiveToken(context.Background(), h.pool.DB, token, user.UserID, expiresAt, createdAt); err != nil {
-		slog.Error("Failed to create live token", "error", err)
-		c.Send("liveLinkError", map[string]interface{}{"message": "Failed to create link"})
-		return
-	}
-
-	h.Cache.AddLiveToken(token, user.UserID, expiresAt, createdAt)
-	c.Send("liveLinkCreated", map[string]interface{}{"token": token, "expiresAt": expiresAt})
-	h.emitMyLiveLinks(c, user.UserID)
+	h.offloadDB(func(ctx context.Context) {
+		if err := db.CreateLiveToken(ctx, h.pool.DB, token, userID, expiresAt, createdAt); err != nil {
+			slog.Error("Failed to create live token", "error", err)
+			c.Send("liveLinkError", map[string]interface{}{"message": "Failed to create link"})
+			return
+		}
+		h.RunOnLoop(func() {
+			h.Cache.AddLiveToken(token, userID, expiresAt, createdAt)
+			c.Send("liveLinkCreated", map[string]interface{}{"token": token, "expiresAt": expiresAt})
+			h.emitMyLiveLinks(c, userID)
+		})
+	})
 }
 
 func generateLiveToken() string {
@@ -1066,11 +1096,16 @@ func (h *Hub) handleRevokeLiveLink(c *Client, data json.RawMessage) {
 		return
 	}
 
-	_ = db.DeleteLiveToken(context.Background(), h.pool.DB, token)
-	h.Cache.DeleteLiveToken(token)
-	h.SendToGroup("live:"+token, "liveExpired", map[string]interface{}{"message": "Link revoked"})
-	c.Send("liveLinkRevoked", map[string]interface{}{"token": token})
-	h.emitMyLiveLinks(c, user.UserID)
+	userID := user.UserID
+	h.offloadDB(func(ctx context.Context) {
+		_ = db.DeleteLiveToken(ctx, h.pool.DB, token)
+		h.RunOnLoop(func() {
+			h.Cache.DeleteLiveToken(token)
+			h.SendToGroup("live:"+token, "liveExpired", map[string]interface{}{"message": "Link revoked"})
+			c.Send("liveLinkRevoked", map[string]interface{}{"token": token})
+			h.emitMyLiveLinks(c, userID)
+		})
+	})
 }
 
 // handleSendPulse broadcasts a "I'm OK" or "Need help, call me" pulse to visible users.
@@ -1523,16 +1558,20 @@ func (h *Hub) handleRequestRoomAdmin(c *Client, data json.RawMessage) {
 	createdAt := time.Now().UnixMilli()
 	entry := &db.RoomAdminRequestEntry{Type: "roomAdmin", From: user.UserID, RoomCode: code, ExpiresIn: expPtr, CreatedAt: createdAt, Approvals: make(map[string]bool), Denials: make(map[string]bool)}
 
-	if err := db.CreateRoomAdminRequest(context.Background(), h.pool.DB, code, user.UserID, expPtr, createdAt); err != nil {
-		return
-	}
-	h.Cache.AddRoomAdminRequest(entry)
-
-	for mid := range room.Members {
-		if cli := h.GetClientByUserID(mid); cli != nil {
-			h.emitMyRooms(cli, mid)
+	userID := user.UserID
+	h.offloadDB(func(ctx context.Context) {
+		if err := db.CreateRoomAdminRequest(ctx, h.pool.DB, code, userID, expPtr, createdAt); err != nil {
+			return
 		}
-	}
+		h.RunOnLoop(func() {
+			h.Cache.AddRoomAdminRequest(entry)
+			for mid := range room.Members {
+				if cli := h.GetClientByUserID(mid); cli != nil {
+					h.emitMyRooms(cli, mid)
+				}
+			}
+		})
+	})
 }
 
 // handleVoteRoomAdmin votes on room admin request.
@@ -1566,59 +1605,69 @@ func (h *Hub) handleVoteRoomAdmin(c *Client, data json.RawMessage) {
 		return
 	}
 
-	_ = db.UpsertRoomAdminVote(context.Background(), h.pool.DB, roomCode, targetUserID, user.UserID, vote)
-	h.Cache.AddRoomAdminVote(roomCode, targetUserID, user.UserID, vote)
+	voterID := user.UserID
+	h.offloadDB(func(ctx context.Context) {
+		_ = db.UpsertRoomAdminVote(ctx, h.pool.DB, roomCode, targetUserID, voterID, vote)
+		h.RunOnLoop(func() {
+			h.Cache.AddRoomAdminVote(roomCode, targetUserID, voterID, vote)
 
-	reqs := h.Cache.GetRoomAdminRequests(roomCode)
-	var targetReq *db.RoomAdminRequestEntry
-	for _, r := range reqs {
-		if r.From == targetUserID {
-			targetReq = r
-			break
-		}
-	}
-	if targetReq == nil {
-		return
-	}
+			reqs := h.Cache.GetRoomAdminRequests(roomCode)
+			var targetReq *db.RoomAdminRequestEntry
+			for _, r := range reqs {
+				if r.From == targetUserID {
+					targetReq = r
+					break
+				}
+			}
+			if targetReq == nil {
+				return
+			}
 
-	totalEligible := len(room.Members) - 1
-	if totalEligible <= 0 {
-		return
-	}
-	majority := totalEligible/2 + 1
+			totalEligible := len(room.Members) - 1
+			if totalEligible <= 0 {
+				return
+			}
+			majority := totalEligible/2 + 1
 
-	if len(targetReq.Approvals) >= majority {
-		expStr := ""
-		if targetReq.ExpiresIn != nil {
-			expStr = *targetReq.ExpiresIn
-		}
-		expiresAt := h.parseExpiresIn(expStr)
-		h.Cache.SetRoomMemberRole(roomCode, targetUserID, "admin", expiresAt)
-		_ = db.SetRoomMemberRole(context.Background(), h.pool.DB, room.DbID, targetUserID, "admin", expiresAt)
-		_ = db.DeleteRoomAdminRequest(context.Background(), h.pool.DB, roomCode, targetUserID)
-		h.Cache.RemoveRoomAdminRequest(roomCode, targetUserID)
-		for mid := range room.Members {
-			if cli := h.GetClientByUserID(mid); cli != nil {
-				h.SendToClient(cli.ID(), "roomAdminUpdated", map[string]interface{}{"roomCode": roomCode, "userId": targetUserID, "role": "admin", "expiresAt": expiresAt})
-				h.emitMyRooms(cli, mid)
+			if len(targetReq.Approvals) >= majority {
+				expStr := ""
+				if targetReq.ExpiresIn != nil {
+					expStr = *targetReq.ExpiresIn
+				}
+				expiresAt := h.parseExpiresIn(expStr)
+				h.Cache.SetRoomMemberRole(roomCode, targetUserID, "admin", expiresAt)
+				h.Cache.RemoveRoomAdminRequest(roomCode, targetUserID)
+				for mid := range room.Members {
+					if cli := h.GetClientByUserID(mid); cli != nil {
+						h.SendToClient(cli.ID(), "roomAdminUpdated", map[string]interface{}{"roomCode": roomCode, "userId": targetUserID, "role": "admin", "expiresAt": expiresAt})
+						h.emitMyRooms(cli, mid)
+					}
+				}
+				dbID := room.DbID
+				h.offloadDB(func(ctx2 context.Context) {
+					_ = db.SetRoomMemberRole(ctx2, h.pool.DB, dbID, targetUserID, "admin", expiresAt)
+					_ = db.DeleteRoomAdminRequest(ctx2, h.pool.DB, roomCode, targetUserID)
+				})
+			} else if len(targetReq.Denials) >= majority {
+				h.Cache.RemoveRoomAdminRequest(roomCode, targetUserID)
+				for mid := range room.Members {
+					if cli := h.GetClientByUserID(mid); cli != nil {
+						h.SendToClient(cli.ID(), "roomAdminUpdated", map[string]interface{}{"roomCode": roomCode, "userId": targetUserID, "role": "denied", "expiresAt": nil})
+						h.emitMyRooms(cli, mid)
+					}
+				}
+				h.offloadDB(func(ctx2 context.Context) {
+					_ = db.DeleteRoomAdminRequest(ctx2, h.pool.DB, roomCode, targetUserID)
+				})
+			} else {
+				for mid := range room.Members {
+					if cli := h.GetClientByUserID(mid); cli != nil {
+						h.emitMyRooms(cli, mid)
+					}
+				}
 			}
-		}
-	} else if len(targetReq.Denials) >= majority {
-		_ = db.DeleteRoomAdminRequest(context.Background(), h.pool.DB, roomCode, targetUserID)
-		h.Cache.RemoveRoomAdminRequest(roomCode, targetUserID)
-		for mid := range room.Members {
-			if cli := h.GetClientByUserID(mid); cli != nil {
-				h.SendToClient(cli.ID(), "roomAdminUpdated", map[string]interface{}{"roomCode": roomCode, "userId": targetUserID, "role": "denied", "expiresAt": nil})
-				h.emitMyRooms(cli, mid)
-			}
-		}
-	} else {
-		for mid := range room.Members {
-			if cli := h.GetClientByUserID(mid); cli != nil {
-				h.emitMyRooms(cli, mid)
-			}
-		}
-	}
+		})
+	})
 }
 
 // handleRevokeRoomAdmin revokes room admin role.
@@ -1655,14 +1704,18 @@ func (h *Hub) handleRevokeRoomAdmin(c *Client, data json.RawMessage) {
 		return
 	}
 
-	h.Cache.SetRoomMemberRole(roomCode, targetUserID, "member", nil)
-	_ = db.SetRoomMemberRole(context.Background(), h.pool.DB, room.DbID, targetUserID, "member", nil)
-
-	for mid := range room.Members {
-		if cli := h.GetClientByUserID(mid); cli != nil {
-			h.SendToClient(cli.ID(), "roomAdminUpdated", map[string]interface{}{"roomCode": roomCode, "userId": targetUserID, "role": "member", "expiresAt": nil})
-		}
-	}
+	dbID := room.DbID
+	h.offloadDB(func(ctx context.Context) {
+		_ = db.SetRoomMemberRole(ctx, h.pool.DB, dbID, targetUserID, "member", nil)
+		h.RunOnLoop(func() {
+			h.Cache.SetRoomMemberRole(roomCode, targetUserID, "member", nil)
+			for mid := range room.Members {
+				if cli := h.GetClientByUserID(mid); cli != nil {
+					h.SendToClient(cli.ID(), "roomAdminUpdated", map[string]interface{}{"roomCode": roomCode, "userId": targetUserID, "role": "member", "expiresAt": nil})
+				}
+			}
+		})
+	})
 }
 
 // handleRequestGuardian requests guardian role (guardian initiates).
@@ -1717,19 +1770,24 @@ func (h *Hub) handleRequestGuardian(c *Client, data json.RawMessage) {
 	// KR-012: store the real expiry timestamp so it can be enforced, not just displayed.
 	pendingExpiresAt := h.parseExpiresIn(expiresIn)
 	entry := &db.GuardianshipEntry{Status: "pending", InitiatedBy: "guardian", ExpiresAt: pendingExpiresAt, CreatedAt: time.Now().UnixMilli()}
-	h.Cache.SetGuardianship(user.UserID, wardID, entry)
-	_ = db.CreateGuardianship(context.Background(), h.pool.DB, user.UserID, wardID, "pending", pendingExpiresAt, entry.CreatedAt, "guardian")
+	guardianID := user.UserID
+	fromName := user.DisplayName
 
-	h.Cache.AddPendingRequest(wardID+":guardian", map[string]interface{}{"type": "guardian", "from": user.UserID, "expiresIn": expiresIn})
-
-	if wardCli := h.GetClientByUserID(wardID); wardCli != nil {
-		wardCli.Send("guardianRequest", map[string]interface{}{"fromUserId": user.UserID, "fromName": user.DisplayName, "expiresIn": expiresIn, "initiatedBy": "guardian"})
-		h.emitMyGuardians(wardCli, wardID)
-		h.emitPendingRequests(wardCli, wardID)
-	}
-	// KR-002: use guardianInfo (not contactError) so success isn't rendered as an error banner.
-	c.Send("guardianInfo", map[string]interface{}{"message": "Guardian request sent"})
-	h.emitMyGuardians(c, user.UserID)
+	h.offloadDB(func(ctx context.Context) {
+		_ = db.CreateGuardianship(ctx, h.pool.DB, guardianID, wardID, "pending", pendingExpiresAt, entry.CreatedAt, "guardian")
+		h.RunOnLoop(func() {
+			h.Cache.SetGuardianship(guardianID, wardID, entry)
+			h.Cache.AddPendingRequest(wardID+":guardian", map[string]interface{}{"type": "guardian", "from": guardianID, "expiresIn": expiresIn})
+			if wardCli := h.GetClientByUserID(wardID); wardCli != nil {
+				wardCli.Send("guardianRequest", map[string]interface{}{"fromUserId": guardianID, "fromName": fromName, "expiresIn": expiresIn, "initiatedBy": "guardian"})
+				h.emitMyGuardians(wardCli, wardID)
+				h.emitPendingRequests(wardCli, wardID)
+			}
+			// KR-002: use guardianInfo (not contactError) so success isn't rendered as an error banner.
+			c.Send("guardianInfo", map[string]interface{}{"message": "Guardian request sent"})
+			h.emitMyGuardians(c, guardianID)
+		})
+	})
 }
 
 // handleInviteGuardian invites someone to be guardian (ward initiates).
@@ -1784,19 +1842,24 @@ func (h *Hub) handleInviteGuardian(c *Client, data json.RawMessage) {
 	// KR-012: store the real expiry timestamp so it can be enforced, not just displayed.
 	pendingExpiresAt := h.parseExpiresIn(expiresIn)
 	entry := &db.GuardianshipEntry{Status: "pending", InitiatedBy: "ward", ExpiresAt: pendingExpiresAt, CreatedAt: time.Now().UnixMilli()}
-	h.Cache.SetGuardianship(guardianID, user.UserID, entry)
-	_ = db.CreateGuardianship(context.Background(), h.pool.DB, guardianID, user.UserID, "pending", pendingExpiresAt, entry.CreatedAt, "ward")
+	wardID := user.UserID
+	fromName := user.DisplayName
 
-	h.Cache.AddPendingRequest(guardianID+":guardianInvite", map[string]interface{}{"type": "guardianInvite", "from": user.UserID, "expiresIn": expiresIn})
-
-	if gCli := h.GetClientByUserID(guardianID); gCli != nil {
-		gCli.Send("guardianInvite", map[string]interface{}{"fromUserId": user.UserID, "fromName": user.DisplayName, "expiresIn": expiresIn, "initiatedBy": "ward"})
-		h.emitMyGuardians(gCli, guardianID)
-		h.emitPendingRequests(gCli, guardianID)
-	}
-	// KR-002: use guardianInfo (not contactError) so success isn't rendered as an error banner.
-	c.Send("guardianInfo", map[string]interface{}{"message": "Guardian invite sent"})
-	h.emitMyGuardians(c, user.UserID)
+	h.offloadDB(func(ctx context.Context) {
+		_ = db.CreateGuardianship(ctx, h.pool.DB, guardianID, wardID, "pending", pendingExpiresAt, entry.CreatedAt, "ward")
+		h.RunOnLoop(func() {
+			h.Cache.SetGuardianship(guardianID, wardID, entry)
+			h.Cache.AddPendingRequest(guardianID+":guardianInvite", map[string]interface{}{"type": "guardianInvite", "from": wardID, "expiresIn": expiresIn})
+			if gCli := h.GetClientByUserID(guardianID); gCli != nil {
+				gCli.Send("guardianInvite", map[string]interface{}{"fromUserId": wardID, "fromName": fromName, "expiresIn": expiresIn, "initiatedBy": "ward"})
+				h.emitMyGuardians(gCli, guardianID)
+				h.emitPendingRequests(gCli, guardianID)
+			}
+			// KR-002: use guardianInfo (not contactError) so success isn't rendered as an error banner.
+			c.Send("guardianInfo", map[string]interface{}{"message": "Guardian invite sent"})
+			h.emitMyGuardians(c, wardID)
+		})
+	})
 }
 
 // handleApproveGuardian approves a guardianship.
@@ -1857,29 +1920,34 @@ func (h *Hub) handleApproveGuardian(c *Client, data json.RawMessage) {
 			}
 		}
 	}
-	h.Cache.RemovePendingRequestByFrom(pendingKey, fromID)
-
-	entry.Status = "active"
-	entry.ExpiresAt = expiresAt
-	h.Cache.SetGuardianship(gID, wID, &db.GuardianshipEntry{Status: "active", InitiatedBy: entry.InitiatedBy, ExpiresAt: expiresAt, CreatedAt: entry.CreatedAt})
-	_ = db.CreateGuardianship(context.Background(), h.pool.DB, gID, wID, "active", expiresAt, entry.CreatedAt, entry.InitiatedBy)
-
-	h.invalidateVisibilityForUsers([]string{gID, wID})
-
-	payload := map[string]interface{}{"guardianId": gID, "wardId": wID, "status": "active", "expiresAt": expiresAt}
-	c.Send("guardianUpdated", payload)
-	h.emitMyGuardians(c, user.UserID)
-	h.emitPendingRequests(c, user.UserID)
-
+	// Capture immutable values for the offload/RunOnLoop closures.
+	initiatedBy := entry.InitiatedBy
+	createdAt := entry.CreatedAt
+	userID := user.UserID
 	otherID := wID
-	if user.UserID == wID {
+	if userID == wID {
 		otherID = gID
 	}
-	if otherCli := h.GetClientByUserID(otherID); otherCli != nil {
-		otherCli.Send("guardianUpdated", payload)
-		h.emitMyGuardians(otherCli, otherID)
-		h.emitPendingRequests(otherCli, otherID)
-	}
+	payload := map[string]interface{}{"guardianId": gID, "wardId": wID, "status": "active", "expiresAt": expiresAt}
+
+	h.offloadDB(func(ctx context.Context) {
+		_ = db.CreateGuardianship(ctx, h.pool.DB, gID, wID, "active", expiresAt, createdAt, initiatedBy)
+		h.RunOnLoop(func() {
+			h.Cache.RemovePendingRequestByFrom(pendingKey, fromID)
+			h.Cache.SetGuardianship(gID, wID, &db.GuardianshipEntry{Status: "active", InitiatedBy: initiatedBy, ExpiresAt: expiresAt, CreatedAt: createdAt})
+			h.invalidateVisibilityForUsers([]string{gID, wID})
+
+			c.Send("guardianUpdated", payload)
+			h.emitMyGuardians(c, userID)
+			h.emitPendingRequests(c, userID)
+
+			if otherCli := h.GetClientByUserID(otherID); otherCli != nil {
+				otherCli.Send("guardianUpdated", payload)
+				h.emitMyGuardians(otherCli, otherID)
+				h.emitPendingRequests(otherCli, otherID)
+			}
+		})
+	})
 }
 
 // handleDenyGuardian denies a guardianship.
@@ -1919,35 +1987,45 @@ func (h *Hub) handleDenyGuardian(c *Client, data json.RawMessage) {
 		return
 	}
 
-	h.Cache.DeleteGuardianship(gID, wID)
 	fromID := guardianID
 	if fromID == "" {
 		fromID = wardID
 	}
-	h.Cache.RemovePendingRequestByFrom(pendingKey, fromID)
+	// Compute second pending-request key before leaving the hub loop.
+	var pendingKey2, keyHolder2 string
 	if guardianID != "" {
-		h.Cache.RemovePendingRequestByFrom(wID+":guardianInvite", user.UserID)
+		pendingKey2 = wID + ":guardianInvite"
+		keyHolder2 = user.UserID
 	} else {
-		h.Cache.RemovePendingRequestByFrom(gID+":guardian", user.UserID)
+		pendingKey2 = gID + ":guardian"
+		keyHolder2 = user.UserID
 	}
-	_ = db.UpdateGuardianshipStatus(context.Background(), h.pool.DB, gID, wID, "revoked")
-
-	h.invalidateVisibilityForUsers([]string{gID, wID})
-
-	payload := map[string]interface{}{"guardianId": gID, "wardId": wID, "status": "denied", "expiresAt": nil}
-	c.Send("guardianUpdated", payload)
-	h.emitMyGuardians(c, user.UserID)
-	h.emitPendingRequests(c, user.UserID)
-
+	userID := user.UserID
 	otherID := wID
-	if user.UserID == wID {
+	if userID == wID {
 		otherID = gID
 	}
-	if otherCli := h.GetClientByUserID(otherID); otherCli != nil {
-		otherCli.Send("guardianUpdated", payload)
-		h.emitMyGuardians(otherCli, otherID)
-		h.emitPendingRequests(otherCli, otherID)
-	}
+	payload := map[string]interface{}{"guardianId": gID, "wardId": wID, "status": "denied", "expiresAt": nil}
+
+	h.offloadDB(func(ctx context.Context) {
+		_ = db.UpdateGuardianshipStatus(ctx, h.pool.DB, gID, wID, "revoked")
+		h.RunOnLoop(func() {
+			h.Cache.DeleteGuardianship(gID, wID)
+			h.Cache.RemovePendingRequestByFrom(pendingKey, fromID)
+			h.Cache.RemovePendingRequestByFrom(pendingKey2, keyHolder2)
+			h.invalidateVisibilityForUsers([]string{gID, wID})
+
+			c.Send("guardianUpdated", payload)
+			h.emitMyGuardians(c, userID)
+			h.emitPendingRequests(c, userID)
+
+			if otherCli := h.GetClientByUserID(otherID); otherCli != nil {
+				otherCli.Send("guardianUpdated", payload)
+				h.emitMyGuardians(otherCli, otherID)
+				h.emitPendingRequests(otherCli, otherID)
+			}
+		})
+	})
 }
 
 // handleRevokeGuardian revokes a guardianship.
@@ -1997,27 +2075,32 @@ func (h *Hub) handleRevokeGuardian(c *Client, data json.RawMessage) {
 		}
 	}
 
-	h.Cache.DeleteGuardianship(gID, wID)
-	h.Cache.RemovePendingRequestByFrom(wID+":guardian", gID)
-	h.Cache.RemovePendingRequestByFrom(gID+":guardianInvite", wID)
-	_ = db.UpdateGuardianshipStatus(context.Background(), h.pool.DB, gID, wID, "revoked")
-
-	h.invalidateVisibilityForUsers([]string{gID, wID})
-
-	payload := map[string]interface{}{"guardianId": gID, "wardId": wID, "status": "revoked", "expiresAt": nil}
-	c.Send("guardianUpdated", payload)
-	h.emitMyGuardians(c, user.UserID)
-	h.emitPendingRequests(c, user.UserID)
-
+	userID := user.UserID
 	otherID := wID
-	if user.UserID == wID {
+	if userID == wID {
 		otherID = gID
 	}
-	if otherCli := h.GetClientByUserID(otherID); otherCli != nil {
-		otherCli.Send("guardianUpdated", payload)
-		h.emitMyGuardians(otherCli, otherID)
-		h.emitPendingRequests(otherCli, otherID)
-	}
+	payload := map[string]interface{}{"guardianId": gID, "wardId": wID, "status": "revoked", "expiresAt": nil}
+
+	h.offloadDB(func(ctx context.Context) {
+		_ = db.UpdateGuardianshipStatus(ctx, h.pool.DB, gID, wID, "revoked")
+		h.RunOnLoop(func() {
+			h.Cache.DeleteGuardianship(gID, wID)
+			h.Cache.RemovePendingRequestByFrom(wID+":guardian", gID)
+			h.Cache.RemovePendingRequestByFrom(gID+":guardianInvite", wID)
+			h.invalidateVisibilityForUsers([]string{gID, wID})
+
+			c.Send("guardianUpdated", payload)
+			h.emitMyGuardians(c, userID)
+			h.emitPendingRequests(c, userID)
+
+			if otherCli := h.GetClientByUserID(otherID); otherCli != nil {
+				otherCli.Send("guardianUpdated", payload)
+				h.emitMyGuardians(otherCli, otherID)
+				h.emitPendingRequests(otherCli, otherID)
+			}
+		})
+	})
 }
 
 // ── Consumer product features ──────────────────────────────────────────────────
@@ -2134,31 +2217,38 @@ func (h *Hub) handleShareRide(c *Client, data json.RawMessage) {
 	expiresAtPtr := &expiresAt
 	token := generateLiveToken()
 	createdAt := time.Now().UnixMilli()
+	userID := user.UserID
 
-	if err := db.CreateLiveToken(context.Background(), h.pool.DB, token, user.UserID, expiresAtPtr, createdAt); err != nil {
-		slog.Error("handleShareRide: failed to create live token", "error", err)
-		c.Send("rideShareError", map[string]interface{}{"message": "Failed to create ride link"})
-		return
-	}
+	h.offloadDB(func(ctx context.Context) {
+		if err := db.CreateLiveToken(ctx, h.pool.DB, token, userID, expiresAtPtr, createdAt); err != nil {
+			slog.Error("handleShareRide: failed to create live token", "error", err)
+			c.Send("rideShareError", map[string]interface{}{"message": "Failed to create ride link"})
+			return
+		}
+		h.RunOnLoop(func() {
+			h.Cache.AddLiveToken(token, userID, expiresAtPtr, createdAt)
+			u := h.Cache.GetActiveUser(c.ID())
+			if u == nil {
+				return
+			}
+			u.RideShareActive = true
+			u.RideShareVehicle = vehicle
+			u.RideShareDest = dest
+			u.RideShareToken = token
 
-	h.Cache.AddLiveToken(token, user.UserID, expiresAtPtr, createdAt)
+			// Tell the initiating client the token (for URL construction + WhatsApp share)
+			c.Send("rideShareStarted", map[string]interface{}{
+				"token":   token,
+				"vehicle": vehicle,
+				"dest":    dest,
+			})
 
-	user.RideShareActive = true
-	user.RideShareVehicle = vehicle
-	user.RideShareDest = dest
-	user.RideShareToken = token
-
-	// Tell the initiating client the token (for URL construction + WhatsApp share)
-	c.Send("rideShareStarted", map[string]interface{}{
-		"token":   token,
-		"vehicle": vehicle,
-		"dest":    dest,
+			// Broadcast updated state to visible peers via userUpdate
+			sanitized := h.Cache.SanitizeUser(u)
+			sanitized["online"] = true
+			h.emitToVisibleAndSelf(u, "userUpdate", sanitized)
+		})
 	})
-
-	// Broadcast updated state to visible peers via userUpdate
-	sanitized := h.Cache.SanitizeUser(user)
-	sanitized["online"] = true
-	h.emitToVisibleAndSelf(user, "userUpdate", sanitized)
 }
 
 // handleEndRide ends a ride-share session, revoking the live link.

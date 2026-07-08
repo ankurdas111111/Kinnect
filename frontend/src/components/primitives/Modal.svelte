@@ -1,22 +1,39 @@
 <script>
+  import { run } from 'svelte/legacy';
+
   import { createEventDispatcher, onMount, onDestroy, tick } from 'svelte';
   import { fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
 
-  export let open = false;
-  export let urgent = false;
-  export let title = '';
-  export let size = 'md';
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [open]
+   * @property {boolean} [urgent]
+   * @property {string} [title]
+   * @property {string} [size]
+   * @property {import('svelte').Snippet} [children]
+   * @property {import('svelte').Snippet} [footer]
+   */
+
+  /** @type {Props} */
+  let {
+    open = false,
+    urgent = false,
+    title = '',
+    size = 'md',
+    children,
+    footer
+  } = $props();
 
   // Stable ID for aria-labelledby — derived from title, ASCII-safe fallback
-  $: titleId = title
+  let titleId = $derived(title
     ? 'modal-title-' + title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 32)
-    : null;
+    : null);
 
   const dispatch = createEventDispatcher();
-  let dialogEl;
-  let lastFocusedEl = null;
-  let wasOpen = false;
+  let dialogEl = $state();
+  let lastFocusedEl = $state(null);
+  let wasOpen = $state(false);
 
   function dismiss() {
     dispatch('close');
@@ -59,9 +76,11 @@
     }
   });
 
-  $: if (typeof document !== 'undefined') {
-    document.body.style.overflow = open ? 'hidden' : '';
-  }
+  run(() => {
+    if (typeof document !== 'undefined') {
+      document.body.style.overflow = open ? 'hidden' : '';
+    }
+  });
 
   function getFocusable() {
     if (!dialogEl) return [];
@@ -70,29 +89,33 @@
     ));
   }
 
-  $: if (open && !wasOpen) {
-    wasOpen = true;
-    lastFocusedEl = document.activeElement;
-    tick().then(() => {
-      var focusable = getFocusable();
-      if (focusable.length) focusable[0].focus();
-      else dialogEl?.focus();
-    });
-  }
-
-  $: if (!open && wasOpen) {
-    wasOpen = false;
-    if (lastFocusedEl && typeof lastFocusedEl.focus === 'function') {
-      lastFocusedEl.focus();
+  run(() => {
+    if (open && !wasOpen) {
+      wasOpen = true;
+      lastFocusedEl = document.activeElement;
+      tick().then(() => {
+        var focusable = getFocusable();
+        if (focusable.length) focusable[0].focus();
+        else dialogEl?.focus();
+      });
     }
-  }
+  });
+
+  run(() => {
+    if (!open && wasOpen) {
+      wasOpen = false;
+      if (lastFocusedEl && typeof lastFocusedEl.focus === 'function') {
+        lastFocusedEl.focus();
+      }
+    }
+  });
 </script>
 
 {#if open}
   <div
     class="modal-backdrop"
     class:urgent
-    on:click={onBackdropClick}
+    onclick={onBackdropClick}
     transition:fade={{ duration: 180 }}
     role="presentation"
   >
@@ -109,17 +132,17 @@
       {#if title}
         <div class="modal-header">
           <h3 id={titleId} class="modal-title" class:urgent>{title}</h3>
-          <button class="btn btn-icon btn-ghost modal-close" on:click={dismiss} aria-label="Close">
+          <button class="btn btn-icon btn-ghost modal-close" onclick={dismiss} aria-label="Close">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
       {/if}
       <div class="modal-body">
-        <slot />
+        {@render children?.()}
       </div>
-      {#if $$slots.footer}
+      {#if footer}
         <div class="modal-footer">
-          <slot name="footer" />
+          {@render footer?.()}
         </div>
       {/if}
     </div>

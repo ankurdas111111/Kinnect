@@ -1,4 +1,6 @@
 <script>
+  import { preventDefault } from 'svelte/legacy';
+
   /**
    * Landing — Premium scroll-based storytelling page for Kinnect
    *
@@ -26,7 +28,7 @@
   import { push } from 'svelte-spa-router';
 
   // ── Hero tilt ─────────────────────────────────────────────────────────────
-  let heroCardEl;
+  let heroCardEl = $state();
   let heroRaf = null;
   let hcx = 0, hcy = 0, htx = 0, hty = 0;
 
@@ -71,7 +73,7 @@
     { value: 2,     label: 'Sec avg update speed', suffix: 's' },
     { value: 180,   label: 'Countries supported',  suffix: '+' },
   ];
-  let statDisplays = stats.map(() => 0);
+  let statDisplays = $state(stats.map(() => 0));
   let statsVisible = false;
   let statsEl;
 
@@ -160,7 +162,7 @@
   ];
 
   // ── Interactive demo state ────────────────────────────────────────────────
-  let demoTab = 'map';
+  let demoTab = $state('map');
   const demoTabs = ['map', 'alerts', 'chat'];
 
   // ── Live ping animation ────────────────────────────────────────────────────
@@ -179,8 +181,8 @@
   });
 
   // ── CTA email ─────────────────────────────────────────────────────────────
-  let ctaEmail = '';
-  let ctaSubmitted = false;
+  let ctaEmail = $state('');
+  let ctaSubmitted = $state(false);
 
   function onCtaSubmit() {
     if (!ctaEmail) return;
@@ -195,9 +197,9 @@
 <div class="landing" aria-label="Kinnect landing page">
 
   <!-- ═══════ HERO ════════════════════════════════════════════════════════ -->
-  <section class="hero" on:mousemove={onHeroMouseMove} on:mouseleave={onHeroMouseLeave}>
+  <section class="hero" onmousemove={onHeroMouseMove} onmouseleave={onHeroMouseLeave}>
     <!-- Background atmosphere -->
-    <div class="hero-bg" aria-hidden="true">
+    <div class="hero-bg fx-ambient" aria-hidden="true">
       <!-- TECHNIQUE 1: @property Aurora background layer -->
       <div class="hero-aurora aurora-hero-bg" aria-hidden="true"></div>
       <div class="hero-orb hero-orb-1"></div>
@@ -253,12 +255,14 @@
           >
             <Button variant="primary" size="lg" on:click={() => push('/register')}>
               Start for free
-              <svelte:fragment slot="icon">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <line x1="3" y1="8" x2="13" y2="8"/>
-                  <polyline points="9 4 13 8 9 12"/>
-                </svg>
-              </svelte:fragment>
+              {#snippet icon()}
+
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <line x1="3" y1="8" x2="13" y2="8"/>
+                    <polyline points="9 4 13 8 9 12"/>
+                  </svg>
+
+                          {/snippet}
             </Button>
 
             <Button variant="ghost" size="lg" on:click={() => push('/login')}>
@@ -473,7 +477,7 @@
                   class:active={demoTab === tab}
                   role="tab"
                   aria-selected={demoTab === tab}
-                  on:click={() => demoTab = tab}
+                  onclick={() => demoTab = tab}
                 >
                   {tab.charAt(0).toUpperCase() + tab.slice(1)}
                 </button>
@@ -584,7 +588,7 @@
         {#if !ctaSubmitted}
           <form
             class="cta-form"
-            on:submit|preventDefault={onCtaSubmit}
+            onsubmit={preventDefault(onCtaSubmit)}
             aria-label="Sign up form"
           >
             <div class="cta-input-wrap">
@@ -637,20 +641,23 @@
     overflow-x: hidden;
   }
 
+  /* Viewport-proportional container: fills 92% of the viewport up to 1440px.
+     Mobile (<768px) keeps the original full-width + --space-4 padding. */
   .landing-container {
-    max-width: 1120px;
-    margin: 0 auto;
+    width: min(92vw, 90rem);
+    margin-inline: auto;
     padding: 0 var(--space-6);
   }
 
   @media (max-width: 767px) {
-    .landing-container { padding: 0 var(--space-4); }
+    .landing-container { width: 100%; padding: 0 var(--space-4); }
   }
 
   /* ── Hero ────────────────────────────────────────────────────────────────── */
   .hero {
     position: relative;
     min-height: 100vh;
+    min-height: 100svh; /* small-viewport units where supported */
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -676,19 +683,19 @@
   }
   .hero-orb-1 {
     width: 600px; height: 600px;
-    background: radial-gradient(circle, rgba(20,184,166,0.16) 0%, transparent 65%);
+    background: radial-gradient(circle, var(--primary-500-20, rgba(20,184,166,0.16)) 0%, transparent 65%);
     top: -10%; left: -10%;
     animation: orb-drift-a 24s ease-in-out infinite;
   }
   .hero-orb-2 {
     width: 500px; height: 500px;
-    background: radial-gradient(circle, rgba(168,85,247,0.12) 0%, transparent 65%);
+    background: radial-gradient(circle, var(--violet-400-20, rgba(168,85,247,0.12)) 0%, transparent 65%);
     top: 20%; right: -8%;
     animation: orb-drift-b 30s ease-in-out infinite;
   }
   .hero-orb-3 {
     width: 400px; height: 400px;
-    background: radial-gradient(circle, rgba(236,72,153,0.08) 0%, transparent 65%);
+    background: radial-gradient(circle, color-mix(in oklch, var(--secondary-500, #ec4899) 8%, transparent) 0%, transparent 65%);
     bottom: 0; left: 40%;
     animation: orb-drift-a 20s ease-in-out infinite reverse;
   }
@@ -730,11 +737,11 @@
     100%{ transform: translateY(0);  opacity:1; }
   }
 
-  /* Hero layout */
+  /* Hero layout — gap scales with the viewport above the tablet breakpoint */
   .hero-layout {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: var(--space-16);
+    gap: clamp(var(--space-16), 6vw, 7rem);
     align-items: center;
   }
 
@@ -778,9 +785,11 @@
   }
 
   /* TECHNIQUE 8: letter-spacing -0.03em on large heading */
+  /* Same 5vw slope as before, but the cap now lands at 5rem (~1600px) instead
+     of plateauing at 3.5rem (~1120px). Mobile minimum unchanged. */
   .hero-headline {
     font-family: var(--font-display);
-    font-size: clamp(2.25rem, 5vw, 3.5rem);
+    font-size: clamp(2.25rem, 5vw, 5rem);
     font-weight: 800;
     line-height: 1.10;
     letter-spacing: -0.03em;
@@ -807,10 +816,10 @@
   }
 
   .hero-tagline {
-    font-size: var(--text-lg);
+    font-size: clamp(var(--text-lg), 1.1vw, 1.375rem);
     color: var(--text-secondary);
     line-height: var(--leading-relaxed);
-    max-width: 460px;
+    max-width: clamp(460px, 34vw, 620px);
     margin-bottom: var(--space-8);
   }
 
@@ -856,8 +865,9 @@
   }
 
   /* TECHNIQUE 6: Liquid Glass 2.0 on mockup card */
+  /* Viewport-proportional: 300px floor (old fixed width) up to 520px at 2000px+ */
   .mockup-card {
-    width: 300px;
+    width: clamp(300px, 26vw, 520px);
     background: rgba(13, 11, 20, 0.85);
     border: 1px solid rgba(168,85,247,0.22);
     border-top-color: rgba(200,120,255,0.40);
@@ -900,10 +910,10 @@
   }
   /* ping-dot, ping-ring, ping-ring-2 defined in global.css TECHNIQUE 9 block */
 
-  /* Mini map */
+  /* Mini map — height scales with the wider desktop card */
   .mockup-map {
     position: relative;
-    height: 140px;
+    height: clamp(140px, 12vw, 230px);
     overflow: hidden;
     background:
       linear-gradient(135deg, rgba(20,184,166,0.06) 0%, rgba(168,85,247,0.06) 100%),
@@ -1077,7 +1087,7 @@
 
   /* ── Stats bar ────────────────────────────────────────────────────────────── */
   .stats-bar {
-    padding: var(--space-10) 0;
+    padding: clamp(var(--space-10), 4vw, 4rem) 0;
     border-top: 1px solid var(--border-subtle);
     border-bottom: 1px solid var(--border-subtle);
     background: var(--surface-1, rgba(168,85,247,0.04));
@@ -1113,7 +1123,7 @@
   /* TECHNIQUE 8: tabular-nums + letter-spacing */
   .stat-value {
     font-family: var(--font-display);
-    font-size: var(--text-3xl);
+    font-size: clamp(var(--text-3xl), 2.6vw, 3.25rem);
     font-weight: 800;
     letter-spacing: -0.03em;
     text-rendering: optimizeLegibility;
@@ -1142,7 +1152,7 @@
     flex-direction: column;
     align-items: center;
     text-align: center;
-    margin-bottom: var(--space-12, 48px);
+    margin-bottom: clamp(var(--space-12, 48px), 4vw, 4.5rem);
     width: 100%;
   }
 
@@ -1157,9 +1167,10 @@
   }
 
   /* TECHNIQUE 8: -0.025em letter-spacing on section titles */
+  /* Same slope, cap raised 2.5rem → 3.25rem for desktop presence */
   .section-title {
     font-family: var(--font-display);
-    font-size: clamp(1.75rem, 3.5vw, 2.5rem);
+    font-size: clamp(1.75rem, 3.5vw, 3.25rem);
     font-weight: 800;
     line-height: 1.15;
     letter-spacing: -0.025em;
@@ -1170,13 +1181,13 @@
 
   /* ── Features ─────────────────────────────────────────────────────────────── */
   .features {
-    padding: var(--space-16) 0 var(--space-12);
+    padding: clamp(var(--space-16), 7vw, 7rem) 0 clamp(var(--space-12), 5vw, 5rem);
   }
 
   .features-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: var(--space-4);
+    gap: clamp(var(--space-4), 1.5vw, var(--space-8));
   }
 
   @media (max-width: 900px) {
@@ -1219,11 +1230,14 @@
 
 
   /* ── How it works ─────────────────────────────────────────────────────────── */
-  .how-it-works { padding: var(--space-12) 0; }
+  .how-it-works { padding: clamp(var(--space-12), 5vw, 5rem) 0; }
 
+  /* --steps-gap drives both the flex gap and the connector span so the line
+     always bridges the (viewport-scaled) gap exactly */
   .steps-track {
+    --steps-gap: clamp(var(--space-6), 2.5vw, var(--space-10));
     display: flex;
-    gap: var(--space-6);
+    gap: var(--steps-gap);
     align-items: flex-start;
   }
 
@@ -1259,7 +1273,7 @@
     position: absolute;
     top: 22px;
     left: 52px;
-    right: calc(-1 * var(--space-6));
+    right: calc(-1 * var(--steps-gap, var(--space-6)));
     height: 1px;
     background: linear-gradient(90deg, rgba(168,85,247,0.5) 0%, rgba(168,85,247,0.12) 100%);
     pointer-events: none;
@@ -1286,11 +1300,12 @@
 
 
   /* ── Demo section ─────────────────────────────────────────────────────────── */
-  .demo-section { padding: var(--space-12) 0 var(--space-16); }
+  .demo-section { padding: clamp(var(--space-12), 5vw, 5rem) 0 clamp(var(--space-16), 7vw, 7rem); }
 
   /* TECHNIQUE 6: Liquid Glass 2.0 on demo frame */
+  /* Frame scales with the viewport: 640px floor (old cap) up to 880px */
   .demo-frame {
-    max-width: 640px;
+    max-width: clamp(640px, 46vw, 880px);
     margin: 0 auto;
     background: var(--surface-1, rgba(13,11,20,0.70));
     border: 1px solid var(--border-default);
@@ -1339,12 +1354,12 @@
     background: rgba(20,184,166,0.05);
   }
 
-  .demo-content { min-height: 260px; }
+  .demo-content { min-height: clamp(260px, 18vw, 340px); }
 
-  /* Demo map */
+  /* Demo map — height tracks the wider desktop frame */
   .demo-map {
     position: relative;
-    height: 260px;
+    height: clamp(260px, 18vw, 340px);
     overflow: hidden;
     background: rgba(8,8,20,0.70);
   }
@@ -1476,7 +1491,7 @@
   /* ── CTA section ────────────────────────────────────────────────────────── */
   .cta-section {
     position: relative;
-    padding: var(--space-16) 0 var(--space-10);
+    padding: clamp(var(--space-16), 7vw, 7rem) 0 clamp(var(--space-10), 4vw, 4rem);
     overflow: hidden;
     border-top: 1px solid var(--border-subtle);
   }
@@ -1509,21 +1524,21 @@
     gap: var(--space-5);
   }
 
-  /* TECHNIQUE 8: heading polish */
+  /* TECHNIQUE 8: heading polish — cap raised to match section titles */
   .cta-title {
     font-family: var(--font-display);
-    font-size: clamp(1.75rem, 3.5vw, 2.5rem);
+    font-size: clamp(1.75rem, 3.5vw, 3.25rem);
     font-weight: 800;
     letter-spacing: -0.025em;
     text-rendering: optimizeLegibility;
     color: var(--text-primary);
-    max-width: 600px;
+    max-width: clamp(600px, 42vw, 760px);
   }
 
   .cta-sub {
     font-size: var(--text-base);
     color: var(--text-secondary);
-    max-width: 420px;
+    max-width: clamp(420px, 30vw, 520px);
     line-height: var(--leading-relaxed);
     margin-top: calc(-1 * var(--space-2));
   }
@@ -1532,7 +1547,7 @@
     display: flex;
     gap: var(--space-3);
     width: 100%;
-    max-width: 460px;
+    max-width: clamp(460px, 32vw, 560px);
     align-items: flex-end;
   }
 

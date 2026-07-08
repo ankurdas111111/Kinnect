@@ -1,20 +1,23 @@
 <script>
+  import { run } from 'svelte/legacy';
+
+  
   /**
-   * SosParticleBurst — CSS-only particle burst for SOS activation.
-   *
-   * 12 particles radiate outward from the center on trigger.
-   * Zero JS per frame — pure CSS animation with custom properties.
-   * GPU only: animates transform + opacity.
-   *
-   * Usage:
-   *   <SosParticleBurst active={sosActive} />
-   *
-   * Props:
-   *   active — triggers the burst animation when true
-   *   color  — particle color (default danger red)
+   * @typedef {Object} Props
+   * @property {boolean} [active] - SosParticleBurst — CSS-only particle burst for SOS activation.
+12 particles radiate outward from the center on trigger.
+Zero JS per frame — pure CSS animation with custom properties.
+GPU only: animates transform + opacity.
+Usage:
+<SosParticleBurst active={sosActive} />
+Props:
+active — triggers the burst animation when true
+color  — particle color (default danger red)
+   * @property {string} [color]
    */
-  export let active = false;
-  export let color = 'rgba(239, 68, 68, 0.9)';
+
+  /** @type {Props} */
+  let { active = false, color = 'rgba(239, 68, 68, 0.9)' } = $props();
 
   // 12 particles, evenly distributed around the circle
   const PARTICLE_COUNT = 12;
@@ -27,8 +30,10 @@
   }));
 
   // Key to re-trigger burst on each SOS activation
-  let burstKey = 0;
-  $: if (active) burstKey++;
+  let burstKey = $state(0);
+  run(() => {
+    if (active) burstKey++;
+  });
 </script>
 
 {#if active}

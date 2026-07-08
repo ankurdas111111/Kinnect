@@ -48,4 +48,16 @@ export const LocalNotifications = {
 
 export const registerPlugin = () => ({});
 
+// Minimal shims for plugins that import these from @capacitor/core
+// (e.g. @capgo/capacitor-live-activities) — never used at runtime on web.
+export const Capacitor = {
+  getPlatform: () => 'web',
+  isNativePlatform: () => false
+};
+export class WebPlugin {
+  addListener() { return Promise.resolve(listenerHandle); }
+  removeAllListeners() { return Promise.resolve(); }
+  notifyListeners() {}
+}
+
 export default {};

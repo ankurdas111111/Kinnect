@@ -3,9 +3,21 @@
   import { fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
 
-  export let activeTab = 'info';
-  export let isAdmin = false;
-  export let collapsed = false;
+  /**
+   * @typedef {Object} Props
+   * @property {string} [activeTab]
+   * @property {boolean} [isAdmin]
+   * @property {boolean} [collapsed]
+   * @property {import('svelte').Snippet} [children]
+   */
+
+  /** @type {Props} */
+  let {
+    activeTab = $bindable('info'),
+    isAdmin = false,
+    collapsed = $bindable(false),
+    children
+  } = $props();
 
   const dispatch = createEventDispatcher();
 
@@ -50,15 +62,15 @@
   class="sidebar"
   class:collapsed
   aria-label="Side panel"
-  transition:fly={{ x: -400, duration: 250, easing: cubicOut }}
+  transition:fly={{ x: -420, duration: 250, easing: cubicOut }}
 >
   <div class="sidebar-tabs" role="tablist" aria-label="Panel tabs">
     {#each tabs as tab}
       <button
         class="sidebar-tab"
         class:active={activeTab === tab.id && !collapsed}
-        on:click={() => selectTab(tab.id)}
-        on:keydown={(e) => onTabKeydown(e, tab.id)}
+        onclick={() => selectTab(tab.id)}
+        onkeydown={(e) => onTabKeydown(e, tab.id)}
         role="tab"
         aria-selected={activeTab === tab.id && !collapsed}
         tabindex={activeTab === tab.id && !collapsed ? 0 : -1}
@@ -85,11 +97,11 @@
 
   {#if !collapsed}
     <div class="sidebar-content" role="tabpanel" aria-label={activeTab}>
-      <slot />
+      {@render children?.()}
     </div>
   {/if}
 
-  <button class="sidebar-collapse-btn btn btn-icon btn-ghost" on:click={toggleCollapse} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+  <button class="sidebar-collapse-btn btn btn-icon btn-ghost" onclick={toggleCollapse} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform:{collapsed ? 'rotate(180deg)' : 'none'};transition:transform 0.2s">
       <polyline points="15 18 9 12 15 6"/>
     </svg>
@@ -235,6 +247,21 @@
     }
     .sidebar.collapsed {
       width: var(--sidebar-collapsed);
+    }
+  }
+
+  /*
+   * Desktop: width is driven by var(--sidebar-width), which AppLayout
+   * overrides to clamp(300px, 23vw, 420px) at >=1024px. The inline clamp
+   * fallback keeps the sidebar proportional even if this component is
+   * ever rendered outside AppLayout.
+   */
+  @media (min-width: 1024px) {
+    .sidebar {
+      width: var(--sidebar-width, clamp(300px, 23vw, 420px));
+    }
+    .sidebar.collapsed {
+      width: var(--sidebar-collapsed, 56px);
     }
   }
 </style>

@@ -1,16 +1,24 @@
 <script>
+  import { run } from 'svelte/legacy';
+
   import { createEventDispatcher, onMount, onDestroy, tick } from 'svelte';
 
-  export let open = false;
-  export let items = [];
-  export let label = 'Select';
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [open]
+   * @property {any} [items]
+   * @property {string} [label]
+   */
+
+  /** @type {Props} */
+  let { open = $bindable(false), items = [], label = 'Select' } = $props();
 
   const dispatch = createEventDispatcher();
-  let containerEl;
-  let activeIndex = -1;
-  let triggerEl;
-  let listboxEl;
-  let optionEls = [];
+  let containerEl = $state();
+  let activeIndex = $state(-1);
+  let triggerEl = $state();
+  let listboxEl = $state();
+  let optionEls = $state([]);
 
   function toggle() {
     open = !open;
@@ -68,21 +76,23 @@
     if (typeof document !== 'undefined') document.removeEventListener('click', onOutsideClick, true);
   });
 
-  $: if (open && activeIndex >= 0) {
-    tick().then(() => {
-      var el = optionEls[activeIndex];
-      if (el) el.focus();
-      else if (listboxEl) listboxEl.focus();
-    });
-  }
+  run(() => {
+    if (open && activeIndex >= 0) {
+      tick().then(() => {
+        var el = optionEls[activeIndex];
+        if (el) el.focus();
+        else if (listboxEl) listboxEl.focus();
+      });
+    }
+  });
 </script>
 
 <div class="dropdown" bind:this={containerEl}>
   <button
     class="btn btn-sm btn-primary dropdown-trigger"
     bind:this={triggerEl}
-    on:click={toggle}
-    on:keydown={onKeydown}
+    onclick={toggle}
+    onkeydown={onKeydown}
     aria-haspopup="listbox"
     aria-expanded={open}
     aria-label={label}
@@ -101,9 +111,9 @@
           aria-selected={i === activeIndex}
           tabindex="-1"
           bind:this={optionEls[i]}
-          on:click={() => select(item, i)}
-          on:mouseenter={() => activeIndex = i}
-          on:keydown={onKeydown}
+          onclick={() => select(item, i)}
+          onmouseenter={() => activeIndex = i}
+          onkeydown={onKeydown}
         >
           {item.label || item}
         </li>

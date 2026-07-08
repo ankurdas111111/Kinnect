@@ -1,7 +1,5 @@
 import API_BASE from './env.js';
 
-const REALTIME_PROTOCOL = String(import.meta.env.VITE_REALTIME_PROTOCOL || 'ws').toLowerCase();
-
 function buildWsUrl(base) {
   const origin = base || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
   // Ensure we use secure WebSocket (wss://) on HTTPS, regular ws:// on HTTP
@@ -39,6 +37,26 @@ class WsCompatSocket {
         this.ioListeners[event].push(cb);
       }
     };
+    this._bfcacheClosed = false;
+    // bfcache friendliness: an open WebSocket disqualifies a page from the
+    // back/forward cache. pagehide with persisted=true means the page is
+    // entering bfcache — close cleanly and reconnect on pageshow restore.
+    // (persisted is false on real unloads and this never fires on mobile
+    // app backgrounding, so the offline-grace flow is untouched.)
+    if (typeof window !== 'undefined') {
+      window.addEventListener('pagehide', (e) => {
+        if (e.persisted && this.connected) {
+          this._bfcacheClosed = true;
+          this.disconnect();
+        }
+      });
+      window.addEventListener('pageshow', (e) => {
+        if (e.persisted && this._bfcacheClosed) {
+          this._bfcacheClosed = false;
+          this.connect();
+        }
+      });
+    }
     if (options.autoConnect !== false) this.connect();
   }
 
@@ -169,63 +187,9 @@ class WsCompatSocket {
 }
 
 /**
- * Create a realtime socket. Uses WsCompatSocket (raw WS) when
- * VITE_REALTIME_PROTOCOL=ws (Go V3 backend), otherwise falls back
- * to Socket.IO client (V1/V2 backends).
- *
- * Socket.IO dependencies are loaded via dynamic import() so they are
- * completely tree-shaken from the bundle in ws mode.
+ * Create a realtime socket — raw WebSocket against the Go backend's /ws
+ * endpoint, wrapped in a Socket.IO-compatible surface (on/off/emit/io.on).
  */
 export function createRealtimeSocket(options = {}) {
-  if (REALTIME_PROTOCOL === 'ws') {
-    return new WsCompatSocket(API_BASE || undefined, options);
-  }
-
-  // Lazy-load socket.io-client so the entire library is eliminated from
-  // the production bundle when building for the Go V3 backend (ws mode).
-  let socket = null;
-  const pending = Promise.all([
-    import('socket.io-client'),
-    import('socket.io-msgpack-parser')
-  ]).then(([{ io }, msgpackParser]) => {
-    const socketBase = API_BASE || undefined;
-    const s = io(socketBase, {
-      transports: ['websocket'],
-      parser: msgpackParser,
-      ...options
-    });
-    if (socket) {
-      Object.assign(socket, { _real: s });
-      for (const [ev, cbs] of Object.entries(socket._pending || {})) {
-        cbs.forEach(cb => s.on(ev, cb));
-      }
-      if (socket._autoConnect) s.connect();
-    }
-    return s;
-  });
-
-  // Return a thin proxy that queues calls until dynamic import resolves
-  socket = {
-    _real: null,
-    _pending: {},
-    _autoConnect: options.autoConnect !== false,
-    connected: false,
-    id: null,
-    io: { on: () => {} },
-    on(ev, cb) {
-      if (this._real) { this._real.on(ev, cb); return; }
-      if (!this._pending[ev]) this._pending[ev] = [];
-      this._pending[ev].push(cb);
-    },
-    off(ev, cb) { if (this._real) this._real.off(ev, cb); },
-    emit(...args) { if (this._real) this._real.emit(...args); },
-    connect() { if (this._real) this._real.connect(); else this._autoConnect = true; },
-    disconnect() { if (this._real) this._real.disconnect(); else this._autoConnect = false; },
-    get _ready() { return pending; }
-  };
-  return socket;
-}
-
-export function isRawWsMode() {
-  return REALTIME_PROTOCOL === 'ws';
+  return new WsCompatSocket(API_BASE || undefined, options);
 }

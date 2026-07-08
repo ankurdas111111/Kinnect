@@ -1,28 +1,40 @@
 <script>
-  import { onMount, afterUpdate } from 'svelte';
+  import { onMount, } from 'svelte';
 
-  export let items = [];
-  export let itemHeight = 72;   // estimated px per item
-  export let overscan = 3;      // extra items above/below viewport
+  /**
+   * @typedef {Object} Props
+   * @property {any} [items]
+   * @property {number} [itemHeight] - estimated px per item
+   * @property {number} [overscan] - extra items above/below viewport
+   * @property {import('svelte').Snippet<[any]>} [children]
+   */
 
-  let containerEl;
-  let scrollTop = 0;
-  let viewportHeight = 0;
+  /** @type {Props} */
+  let {
+    items = [],
+    itemHeight = 72,
+    overscan = 3,
+    children
+  } = $props();
+
+  let containerEl = $state();
+  let scrollTop = $state(0);
+  let viewportHeight = $state(0);
   let rafId = null;
 
-  $: totalHeight = items.length * itemHeight;
+  let totalHeight = $derived(items.length * itemHeight);
 
-  $: startIndex = Math.max(0, Math.floor(scrollTop / itemHeight) - overscan);
-  $: endIndex = Math.min(
+  let startIndex = $derived(Math.max(0, Math.floor(scrollTop / itemHeight) - overscan));
+  let endIndex = $derived(Math.min(
     items.length,
     Math.ceil((scrollTop + viewportHeight) / itemHeight) + overscan
-  );
+  ));
 
-  $: visibleItems = items.slice(startIndex, endIndex).map((item, i) => ({
+  let visibleItems = $derived(items.slice(startIndex, endIndex).map((item, i) => ({
     item,
     index: startIndex + i,
     top: (startIndex + i) * itemHeight,
-  }));
+  })));
 
   function onScroll(e) {
     if (rafId) return;
@@ -47,7 +59,7 @@
 <div
   class="virtual-list"
   bind:this={containerEl}
-  on:scroll={onScroll}
+  onscroll={onScroll}
 >
   <div class="virtual-spacer" style="height:{totalHeight}px; position:relative;">
     {#each visibleItems as { item, index, top } (item.socketId ?? item.id ?? index)}
@@ -55,7 +67,7 @@
         class="virtual-item"
         style="position:absolute;top:{top}px;left:0;right:0;height:{itemHeight}px;"
       >
-        <slot {item} {index} />
+        {@render children?.({ item, index, })}
       </div>
     {/each}
   </div>

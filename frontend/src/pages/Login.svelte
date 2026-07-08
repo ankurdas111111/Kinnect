@@ -1,4 +1,6 @@
 <script>
+  import { preventDefault } from 'svelte/legacy';
+
   import { push } from 'svelte-spa-router';
   import { authUser, loadSession } from '../lib/stores/auth.js';
   import { apiPost, fetchCsrf, clearCsrf } from '../lib/api.js';
@@ -9,19 +11,19 @@
   import AnimatedMeshBackground from '../components/primitives/AnimatedMeshBackground.svelte';
   import KineticText from '../components/primitives/KineticText.svelte';
 
-  let mode = 'email';
-  let loginId = '';
-  let password = '';
-  let showPassword = false;
-  let countryIso = 'IN';
-  let mobileDigits = '';
-  let error = '';
-  let loading = false;
-  let redirecting = false;
-  let mobileHint = '';
-  let emailTouched = false;
-  let passwordTouched = false;
-  let mobileTouched = false;
+  let mode = $state('email');
+  let loginId = $state('');
+  let password = $state('');
+  let showPassword = $state(false);
+  let countryIso = $state('IN');
+  let mobileDigits = $state('');
+  let error = $state('');
+  let loading = $state(false);
+  let redirecting = $state(false);
+  let mobileHint = $state('');
+  let emailTouched = $state(false);
+  let passwordTouched = $state(false);
+  let mobileTouched = $state(false);
 
   onMount(() => {
     if ($authUser) push('/');
@@ -43,10 +45,10 @@
     return r.valid;
   }
 
-  $: emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginId.trim());
-  $: emailError = emailTouched && loginId.trim() && !emailValid;
-  $: mobileValid = mobileDigits ? validateMobileLength(countryIso, mobileDigits).valid : false;
-  $: passwordError = passwordTouched && password.length > 0 && password.length < 6;
+  let emailValid = $derived(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginId.trim()));
+  let emailError = $derived(emailTouched && loginId.trim() && !emailValid);
+  let mobileValid = $derived(mobileDigits ? validateMobileLength(countryIso, mobileDigits).valid : false);
+  let passwordError = $derived(passwordTouched && password.length > 0 && password.length < 6);
 
   function onModeToggleKeydown(e, current) {
     var order = ['email', 'mobile'];
@@ -123,13 +125,16 @@
 </script>
 
 <div class="auth-page page-enter">
-  <!-- 2026 Animated Mesh Background — aurora orbs + spatial grid + particles -->
-  <AnimatedMeshBackground grid={true} particles={true} />
+  <!-- 2026 Animated Mesh Background — aurora orbs + spatial grid + particles.
+       Wrapped in .fx-ambient so calm mode fades the decorative layer. -->
+  <div class="fx-ambient">
+    <AnimatedMeshBackground grid={true} particles={true} />
+  </div>
 
   <div class="auth-brand">
     <div class="auth-brand-inner">
       <!-- Decorative floating location pins (visual background element) -->
-      <div class="auth-brand-deco" aria-hidden="true">
+      <div class="auth-brand-deco fx-ambient" aria-hidden="true">
         <svg class="deco-map" viewBox="0 0 340 280" fill="none" xmlns="http://www.w3.org/2000/svg">
           <!-- Connection lines between pins -->
           <line x1="90" y1="80" x2="180" y2="130" stroke="rgba(99,102,241,0.22)" stroke-width="1.5" stroke-dasharray="5 4"/>
@@ -214,10 +219,10 @@
         </div>
       {/if}
 
-      <form on:submit|preventDefault={handleSubmit} novalidate>
+      <form onsubmit={preventDefault(handleSubmit)} novalidate>
         <div class="auth-toggle" role="tablist" aria-label="Login method">
-          <button type="button" class="auth-toggle-btn" class:active={mode === 'email'} on:click={() => mode = 'email'} on:keydown={(e) => onModeToggleKeydown(e, 'email')} role="tab" aria-selected={mode === 'email'} tabindex={mode === 'email' ? 0 : -1}>Email</button>
-          <button type="button" class="auth-toggle-btn" class:active={mode === 'mobile'} on:click={() => mode = 'mobile'} on:keydown={(e) => onModeToggleKeydown(e, 'mobile')} role="tab" aria-selected={mode === 'mobile'} tabindex={mode === 'mobile' ? 0 : -1}>Mobile</button>
+          <button type="button" class="auth-toggle-btn" class:active={mode === 'email'} onclick={() => mode = 'email'} onkeydown={(e) => onModeToggleKeydown(e, 'email')} role="tab" aria-selected={mode === 'email'} tabindex={mode === 'email' ? 0 : -1}>Email</button>
+          <button type="button" class="auth-toggle-btn" class:active={mode === 'mobile'} onclick={() => mode = 'mobile'} onkeydown={(e) => onModeToggleKeydown(e, 'mobile')} role="tab" aria-selected={mode === 'mobile'} tabindex={mode === 'mobile' ? 0 : -1}>Mobile</button>
         </div>
 
         {#if mode === 'email'}
@@ -234,7 +239,7 @@
                 placeholder="you@example.com"
                 autocomplete="email"
                 enterkeyhint="next"
-                on:blur={() => emailTouched = true}
+                onblur={() => emailTouched = true}
               />
               {#if emailTouched && emailValid}
                 <span class="input-icon valid" aria-hidden="true">&#10003;</span>
@@ -249,7 +254,7 @@
           <div class="auth-field" transition:slide={{ duration: 180, axis: 'y' }}>
             <label for="login_mobile">Mobile number</label>
             <div class="auth-phone-row">
-              <select class="auth-cc-select" bind:value={countryIso} on:change={validateMobile} aria-label="Country code">
+              <select class="auth-cc-select" bind:value={countryIso} onchange={validateMobile} aria-label="Country code">
                 {#each COUNTRY_CODES as c}
                   <option value={c[1]}>{c[3]} {c[0]}</option>
                 {/each}
@@ -264,7 +269,7 @@
                 placeholder={mobilePlaceholder()}
                 inputmode="numeric"
                 enterkeyhint="next"
-                on:blur={() => { mobileTouched = true; validateMobile(); }}
+                onblur={() => { mobileTouched = true; validateMobile(); }}
               />
             </div>
             {#if mobileTouched && mobileHint}<span class="auth-hint error">{mobileHint}</span>{/if}
@@ -283,9 +288,9 @@
               placeholder="••••••••"
               autocomplete="current-password"
               enterkeyhint="go"
-              on:blur={() => passwordTouched = true}
+              onblur={() => passwordTouched = true}
             />
-            <button type="button" class="input-icon input-icon--toggle" on:click={() => showPassword = !showPassword} aria-label={showPassword ? 'Hide password' : 'Show password'}>
+            <button type="button" class="input-icon input-icon--toggle" onclick={() => showPassword = !showPassword} aria-label={showPassword ? 'Hide password' : 'Show password'}>
               {#if showPassword}
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
               {:else}
@@ -298,7 +303,7 @@
           {/if}
         </div>
 
-        <button class="auth-submit" type="submit" disabled={loading} class:redirecting={redirecting}>
+        <button class="auth-submit tactile" type="submit" disabled={loading} class:redirecting={redirecting}>
           {#if loading}
             <span class="submit-spinner" aria-hidden="true"></span>
             {redirecting ? 'Opening dashboard...' : 'Signing in...'}
@@ -391,6 +396,49 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  /* ── Staggered field entrance ─────────────────────────────────────────────
+     Form controls rise + fade in sequentially. GPU-only (transform/opacity).
+     Per-child delay derived from --stagger-step (40ms). Scoped overrides beat
+     the global auth.css definitions. */
+  .auth-card form > .auth-toggle,
+  .auth-card form > .auth-field,
+  .auth-card form > .auth-submit {
+    animation: field-rise var(--duration-normal, 240ms) var(--ease-out, cubic-bezier(0.4, 0, 0.2, 1)) both;
+  }
+  .auth-card form > *:nth-child(1) { animation-delay: calc(var(--stagger-step, 40ms) * 1); }
+  .auth-card form > *:nth-child(2) { animation-delay: calc(var(--stagger-step, 40ms) * 2); }
+  .auth-card form > *:nth-child(3) { animation-delay: calc(var(--stagger-step, 40ms) * 3); }
+  .auth-card form > *:nth-child(4) { animation-delay: calc(var(--stagger-step, 40ms) * 4); }
+
+  @keyframes field-rise {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Calm error cue ───────────────────────────────────────────────────────
+     Replaces the jarring shake with a brief danger-tint flash. The banner
+     itself stays still; a pointer-events-free overlay fades its opacity from
+     full to zero (GPU-only), reading as a soft border + background flash. */
+  .auth-error {
+    animation: none;
+    position: relative;
+    overflow: hidden;
+  }
+  .auth-error::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    border: 1px solid var(--danger-500-20, rgba(239, 68, 68, 0.20));
+    background: var(--danger-500-20, rgba(239, 68, 68, 0.20));
+    pointer-events: none;
+    animation: error-tint-flash 700ms var(--ease-out, cubic-bezier(0.4, 0, 0.2, 1)) both;
+  }
+  @keyframes error-tint-flash {
+    0%   { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
   /* Submit button transitions to success green after redirect */
   :global(.auth-submit.redirecting) {
     background: linear-gradient(135deg, var(--success-500, #10b981) 0%, var(--success-700, #047857) 100%) !important;
@@ -399,5 +447,20 @@
       0 3px 8px rgba(16, 185, 129, 0.25),
       inset 0 1px 0 rgba(255, 255, 255, 0.22) !important;
     transition: background 300ms var(--ease-out), box-shadow 300ms var(--ease-out) !important;
+  }
+
+  /* ── Reduced motion — disable the new decorative entrances/cues ──────────── */
+  @media (prefers-reduced-motion: reduce) {
+    .auth-card form > .auth-toggle,
+    .auth-card form > .auth-field,
+    .auth-card form > .auth-submit {
+      animation: none;
+      opacity: 1;
+      transform: none;
+    }
+    .auth-error::after {
+      animation: none;
+      opacity: 0;
+    }
   }
 </style>

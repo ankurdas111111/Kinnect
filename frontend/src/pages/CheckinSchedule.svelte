@@ -1,4 +1,6 @@
 <script>
+  import { run } from 'svelte/legacy';
+
   import { onMount, onDestroy } from 'svelte';
   import { push } from 'svelte-spa-router';
   import { fly, fade } from 'svelte/transition';
@@ -7,25 +9,29 @@
   import { mySafetyStatus } from '../lib/stores/map.js';
   import { banner } from '../lib/stores/sos.js';
   import { socket } from '../lib/socket.js';
+  import Card from '../components/primitives/Card.svelte';
+  import EmptyState from '../components/primitives/EmptyState.svelte';
 
-  $: if (!$authUser) push('/login');
+  run(() => {
+    if (!$authUser) push('/login');
+  });
 
   // ── Local config mirrors the server state ──────────────────────────────────
-  let enabled = false;
-  let intervalMinutes = 15;
-  let overdueMinutes = 5;
-  let lastCheckInAt = null;
-  let dirty = false;
-  let saving = false;
+  let enabled = $state(false);
+  let intervalMinutes = $state(15);
+  let overdueMinutes = $state(5);
+  let lastCheckInAt = $state(null);
+  let dirty = $state(false);
+  let saving = $state(false);
 
   // ── History log (session-scoped) ───────────────────────────────────────────
-  let log = [];
+  let log = $state([]);
   function addLog(type, text) {
     log = [{ type, text, ts: Date.now() }, ...log].slice(0, 50);
   }
 
   // ── Countdown timer ────────────────────────────────────────────────────────
-  let countdownMs = null;
+  let countdownMs = $state(null);
   let countdownInterval = null;
 
   function updateCountdown() {
@@ -140,15 +146,35 @@
     return `${m / 60}h`;
   }
 
-  $: countdownClass = countdownMs != null && countdownMs <= 0 ? 'countdown-due'
-    : countdownMs != null && countdownMs < 120000 ? 'countdown-soon' : 'countdown-ok';
+  let countdownClass = $derived(countdownMs != null && countdownMs <= 0 ? 'countdown-due'
+    : countdownMs != null && countdownMs < 120000 ? 'countdown-soon' : 'countdown-ok');
+
+  // Ring state mirrors the countdown urgency (drives conic color + glow)
+  let ringClass = $derived(countdownMs != null && countdownMs <= 0 ? 'ring-due'
+    : countdownMs != null && countdownMs < 120000 ? 'ring-soon' : 'ring-ok');
+
+  let isDue = $derived(countdownMs != null && countdownMs <= 0);
+
+  // Fraction of the interval still remaining → arc fill %. 0 when overdue/idle.
+  let ringPct = $derived(
+    countdownMs == null || intervalMinutes <= 0
+      ? 0
+      : Math.max(0, Math.min(100, Math.round((countdownMs / (intervalMinutes * 60 * 1000)) * 100)))
+  );
+
+  // Glow color for history Cards, keyed on event type.
+  function logGlow(type) {
+    if (type === 'ok') return 'success';
+    if (type === 'missed') return 'danger';
+    return 'primary';
+  }
 </script>
 
 <div class="page-shell page-enter aurora-ambient">
 
   <!-- ── Top bar ─────────────────────────────────────────────────────────── -->
   <header class="page-header">
-    <button class="back-btn" on:click={() => push('/')} aria-label="Back to map">
+    <button class="back-btn" onclick={() => push('/')} aria-label="Back to map">
       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 5-7 7 7 7"/></svg>
     </button>
     <div class="header-title-block">
@@ -162,23 +188,47 @@
 
   <div class="page-content">
 
-    <!-- ── Live countdown card ─────────────────────────────────────────────── -->
+    <!-- ── Live countdown ring ─────────────────────────────────────────────── -->
     {#if enabled}
-      <div class="countdown-card" in:fly={{ y: 12, duration: 240, easing: cubicOut }}>
-        <div class="countdown-label">Next check-in in</div>
-        <div class="countdown-value {countdownClass}">
-          {formatCountdown(countdownMs)}
+      <div class="countdown-card" class:countdown-card-urgent={isDue} in:fly={{ y: 12, duration: 240, easing: cubicOut }}>
+        <span class="countdown-heading">Next check-in</span>
+
+        <div
+          class="ring {ringClass}"
+          style="--ring-pct: {ringPct}%"
+          role="img"
+          aria-label="Time until next check-in: {formatCountdown(countdownMs)}"
+        >
+          <div class="ring-inner">
+            <span class="ring-value {countdownClass}">{formatCountdown(countdownMs)}</span>
+            {#if countdownMs != null && countdownMs > 0}
+              <span class="ring-caption">remaining</span>
+            {/if}
+          </div>
         </div>
+
         {#if lastCheckInAt}
           <div class="countdown-meta">Last: {formatRelative(lastCheckInAt)} · {formatTime(lastCheckInAt)}</div>
         {:else}
           <div class="countdown-meta">No check-in recorded yet</div>
         {/if}
 
-        <button class="imok-btn" on:click={imOk} aria-label="Send I'm OK check-in">
+        <button class="imok-btn tactile" onclick={imOk} aria-label="Send I'm OK check-in">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
           I'm OK
         </button>
+      </div>
+    {:else}
+      <div in:fade={{ duration: 200 }}>
+        <EmptyState
+          title="No check-in schedule yet"
+          body="Turn on monitoring below and we'll pulse a reminder on your interval — your family is alerted only if you miss it."
+          tone="primary"
+        >
+          {#snippet icon()}
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
+          {/snippet}
+        </EmptyState>
       </div>
     {/if}
 
@@ -195,7 +245,7 @@
           role="switch"
           aria-checked={enabled}
           aria-label="Enable check-in monitoring"
-          on:click={() => { enabled = !enabled; dirty = true; }}
+          onclick={() => { enabled = !enabled; dirty = true; }}
         >
           <span class="toggle-knob"></span>
         </button>
@@ -211,11 +261,11 @@
       <div class="pill-group" role="group" aria-label="Check-in interval">
         {#each INTERVALS as m}
           <button
-            class="pill-btn"
+            class="pill-btn tactile"
             class:pill-active={intervalMinutes === m}
             disabled={!enabled}
             aria-pressed={intervalMinutes === m}
-            on:click={() => { intervalMinutes = m; markDirty(); }}
+            onclick={() => { intervalMinutes = m; markDirty(); }}
           >{intervalLabel(m)}</button>
         {/each}
       </div>
@@ -230,11 +280,11 @@
       <div class="pill-group" role="group" aria-label="Overdue tolerance">
         {#each OVERDUE as m}
           <button
-            class="pill-btn"
+            class="pill-btn tactile"
             class:pill-active={overdueMinutes === m}
             disabled={!enabled}
             aria-pressed={overdueMinutes === m}
-            on:click={() => { overdueMinutes = m; markDirty(); }}
+            onclick={() => { overdueMinutes = m; markDirty(); }}
           >{m}m</button>
         {/each}
       </div>
@@ -243,7 +293,7 @@
     <!-- ── Save ────────────────────────────────────────────────────────────── -->
     {#if dirty}
       <div in:fly={{ y: 8, duration: 200, easing: cubicOut }}>
-        <button class="save-btn" on:click={save} disabled={saving} aria-label="Save check-in settings">
+        <button class="save-btn" onclick={save} disabled={saving} aria-label="Save check-in settings">
           {#if saving}
             <span class="saving-spinner" aria-hidden="true"></span>
             Saving…
@@ -270,18 +320,19 @@
     {#if log.length > 0}
       <section class="log-section">
         <div class="log-header">
-          <span class="settings-label">Session log</span>
-          <button class="clear-log-btn" on:click={() => log = []} aria-label="Clear session log">Clear</button>
+          <span class="section-heading">Session log</span>
+          <button class="clear-log-btn" onclick={() => log = []} aria-label="Clear session log">Clear</button>
         </div>
         <div class="log-list" aria-live="polite" aria-label="Check-in event log">
           {#each log as entry (entry.ts)}
-            <div
-              class="log-entry log-{entry.type}"
-              in:fly={{ x: -8, duration: 180, easing: cubicOut }}
-            >
-              <span class="log-dot" aria-hidden="true"></span>
-              <span class="log-text">{entry.text}</span>
-              <span class="log-time">{formatRelative(entry.ts)}</span>
+            <div class="log-wrap" in:fly={{ x: -8, duration: 180, easing: cubicOut }}>
+              <Card variant="glass" padding="sm" hover={false} glow={logGlow(entry.type)}>
+                <div class="log-entry log-{entry.type}">
+                  <span class="log-dot" aria-hidden="true"></span>
+                  <span class="log-text">{entry.text}</span>
+                  <span class="log-time">{formatRelative(entry.ts)}</span>
+                </div>
+              </Card>
             </div>
           {/each}
         </div>
@@ -316,8 +367,8 @@
   }
 
   .back-btn {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -341,11 +392,12 @@
 
   .page-title {
     font-family: var(--font-display);
-    font-size: var(--text-lg);
+    font-size: var(--text-xl);
     font-weight: 800;
     color: var(--text-primary);
     margin: 0;
     line-height: 1.2;
+    letter-spacing: -0.02em;
   }
 
   .page-subtitle {
@@ -357,9 +409,9 @@
     font-family: var(--font-display);
     font-size: var(--text-xs);
     font-weight: 700;
-    color: #22c55e;
-    background: rgba(34, 197, 94, 0.12);
-    border: 1px solid rgba(34, 197, 94, 0.28);
+    color: var(--success-500);
+    background: var(--success-500-12);
+    border: 1px solid var(--success-500-20);
     border-radius: var(--radius-full);
     padding: 3px 10px;
   }
@@ -377,8 +429,9 @@
 
   /* ── Countdown card ──────────────────────────────────────────────────────── */
   .countdown-card {
-    background: linear-gradient(135deg, rgba(99,102,241,0.12) 0%, rgba(139,92,246,0.08) 100%);
-    border: 1px solid rgba(99,102,241,0.22);
+    position: relative;
+    background: linear-gradient(135deg, var(--primary-500-12) 0%, var(--primary-500-08) 100%);
+    border: 1px solid var(--primary-500-20);
     border-radius: var(--radius-2xl, 20px);
     padding: var(--space-5, 20px) var(--space-4);
     display: flex;
@@ -386,27 +439,91 @@
     align-items: center;
     gap: var(--space-2);
     text-align: center;
+    transition: border-color 300ms var(--ease-out), background 300ms var(--ease-out);
   }
 
-  .countdown-label {
+  .countdown-card-urgent {
+    border-color: var(--danger-500-20);
+    background: linear-gradient(135deg, var(--danger-500-12) 0%, var(--danger-500-20) 100%);
+  }
+
+  .countdown-heading {
+    font-family: var(--font-display);
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: 700;
     color: var(--text-tertiary);
     text-transform: uppercase;
     letter-spacing: 0.08em;
   }
 
-  .countdown-value {
+  /* ── Conic-gradient progress ring ────────────────────────────────────────── */
+  .ring {
+    position: relative;
+    width: 184px;
+    height: 184px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    margin: var(--space-2) 0;
+    background: conic-gradient(
+      from -90deg,
+      var(--ring-color, var(--primary-500)) var(--ring-pct, 0%),
+      var(--surface-inset) 0
+    );
+  }
+  .ring-ok   { --ring-color: var(--primary-500); }
+  .ring-soon { --ring-color: var(--warning-500); }
+  .ring-due  { --ring-color: var(--danger-500); }
+
+  /* Pulsing danger glow when overdue — opacity-only (GPU safe) */
+  .ring-due::before {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
+    box-shadow: 0 0 30px 4px var(--danger-500-20);
+    pointer-events: none;
+    animation: ring-glow 1.4s ease-in-out infinite;
+  }
+
+  @keyframes ring-glow {
+    0%, 100% { opacity: 0.35; }
+    50%       { opacity: 1; }
+  }
+
+  .ring-inner {
+    width: calc(100% - 26px);
+    height: calc(100% - 26px);
+    border-radius: 50%;
+    background: var(--surface-1);
+    border: 1px solid var(--border-subtle);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+  }
+
+  .ring-value {
     font-family: var(--font-display);
-    font-size: clamp(32px, 8vw, 48px);
+    font-size: clamp(22px, 6vw, 30px);
     font-weight: 900;
     letter-spacing: -0.02em;
-    line-height: 1;
+    line-height: 1.05;
+    text-align: center;
+    padding: 0 var(--space-2);
     transition: color 300ms var(--ease-out);
   }
 
+  .ring-caption {
+    font-size: var(--text-2xs, 10px);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-tertiary);
+  }
+
   .countdown-ok   { color: var(--primary-400); }
-  .countdown-soon { color: #f59e0b; }
+  .countdown-soon { color: var(--warning-500); }
   .countdown-due  { color: var(--danger-500); animation: pulse-due 1s ease-in-out infinite; }
 
   @keyframes pulse-due {
@@ -416,6 +533,7 @@
 
   @media (prefers-reduced-motion: reduce) {
     .countdown-due { animation: none; }
+    .ring-due::before { animation: none; opacity: 0.6; }
   }
 
   .countdown-meta {
@@ -425,25 +543,26 @@
 
   .imok-btn {
     margin-top: var(--space-2);
+    min-height: 44px;
     display: inline-flex;
     align-items: center;
     gap: var(--space-2);
     padding: 10px 28px;
     background: var(--primary-600);
-    color: white;
+    color: var(--text-inverse, white);
     border: none;
     border-radius: var(--radius-full);
     font-family: var(--font-display);
     font-size: var(--text-sm);
     font-weight: 700;
     cursor: pointer;
-    box-shadow: var(--glow-primary, 0 0 16px rgba(99,102,241,0.35)), 0 2px 8px rgba(0,0,0,0.25);
+    box-shadow: var(--glow-primary), 0 2px 8px var(--shadow-color, rgba(0,0,0,0.25));
     transition: transform 150ms var(--ease-spring), box-shadow 200ms var(--ease-out), background 150ms;
   }
   .imok-btn:hover {
     background: var(--primary-500);
     transform: translateY(-1px) scale(1.03);
-    box-shadow: var(--glow-primary, 0 0 22px rgba(99,102,241,0.5)), 0 4px 14px rgba(0,0,0,0.3);
+    box-shadow: var(--glow-primary), 0 4px 14px var(--shadow-color, rgba(0,0,0,0.3));
   }
   .imok-btn:active { transform: scale(0.97); }
 
@@ -476,8 +595,9 @@
 
   .settings-label {
     font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 700;
+    font-size: var(--text-base);
+    font-weight: 800;
+    letter-spacing: -0.01em;
     color: var(--text-primary);
   }
 
@@ -485,6 +605,14 @@
     font-size: var(--text-xs);
     color: var(--text-tertiary);
     line-height: 1.45;
+  }
+
+  .section-heading {
+    font-family: var(--font-display);
+    font-size: var(--text-base);
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
   }
 
   /* ── Toggle switch ───────────────────────────────────────────────────────── */
@@ -508,8 +636,8 @@
     width: 22px;
     height: 22px;
     border-radius: 50%;
-    background: white;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+    background: var(--text-inverse, white);
+    box-shadow: 0 1px 4px var(--shadow-color, rgba(0,0,0,0.25));
     transition: transform 200ms var(--ease-spring);
   }
   .toggle-on .toggle-knob { transform: translateX(20px); }
@@ -523,6 +651,7 @@
 
   .pill-btn {
     padding: 5px 14px;
+    min-height: 44px;
     font-family: var(--font-display);
     font-size: var(--text-xs);
     font-weight: 600;
@@ -531,26 +660,26 @@
     background: var(--surface-2);
     color: var(--text-secondary);
     cursor: pointer;
-    transition: background 120ms, color 120ms, transform 120ms var(--ease-spring), box-shadow 150ms;
+    transition: background 120ms, color 120ms, box-shadow 150ms;
     min-width: 44px;
     text-align: center;
   }
   .pill-btn:hover:not(:disabled) { background: var(--surface-3, var(--surface-2)); color: var(--text-primary); }
   .pill-btn.pill-active {
     background: var(--primary-600);
-    color: white;
+    color: var(--text-inverse, white);
     border-color: var(--primary-500);
-    box-shadow: var(--glow-primary, 0 0 10px rgba(99,102,241,0.3));
-    transform: scale(1.05);
+    box-shadow: var(--glow-primary);
   }
   .pill-btn:disabled { cursor: not-allowed; }
 
   /* ── Save button ─────────────────────────────────────────────────────────── */
   .save-btn {
     width: 100%;
+    min-height: 44px;
     padding: 14px;
     background: var(--primary-600);
-    color: white;
+    color: var(--text-inverse, white);
     border: none;
     border-radius: var(--radius-xl);
     font-family: var(--font-display);
@@ -561,7 +690,7 @@
     align-items: center;
     justify-content: center;
     gap: var(--space-2);
-    box-shadow: var(--glow-primary, 0 0 16px rgba(99,102,241,0.3));
+    box-shadow: var(--glow-primary);
     transition: background 150ms, transform 150ms var(--ease-spring), opacity 200ms;
   }
   .save-btn:hover { background: var(--primary-500); transform: translateY(-1px); }
@@ -571,8 +700,8 @@
   .saving-spinner {
     width: 14px;
     height: 14px;
-    border: 2px solid rgba(255,255,255,0.3);
-    border-top-color: white;
+    border: 2px solid var(--primary-500-30);
+    border-top-color: var(--text-inverse, white);
     border-radius: 50%;
     animation: spin 0.7s linear infinite;
     flex-shrink: 0;
@@ -636,7 +765,7 @@
     border-radius: var(--radius-sm);
     transition: color 120ms, background 120ms;
   }
-  .clear-log-btn:hover { color: var(--danger-400); background: rgba(239,68,68,0.07); }
+  .clear-log-btn:hover { color: var(--danger-400); background: var(--danger-500-12); }
 
   .log-list {
     display: flex;
@@ -648,10 +777,6 @@
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    padding: 8px var(--space-3);
-    background: var(--surface-1);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
     font-size: var(--text-xs);
   }
 
@@ -661,7 +786,7 @@
     border-radius: 50%;
     flex-shrink: 0;
   }
-  .log-ok      .log-dot { background: #22c55e; }
+  .log-ok      .log-dot { background: var(--success-500); }
   .log-request .log-dot { background: var(--primary-500); }
   .log-missed  .log-dot { background: var(--danger-500); }
 

@@ -14,29 +14,29 @@
   const dispatch = createEventDispatcher();
 
   // ── State machine ──────────────────────────────────────────────────────
-  let view = 'search'; // 'search' | 'preview' | 'navigating'
+  let view = $state('search'); // 'search' | 'preview' | 'navigating'
 
   // Search
-  let query = '';
-  let results = [];
-  let loading = false;
-  let open = false;
-  let inputEl;
+  let query = $state('');
+  let results = $state([]);
+  let loading = $state(false);
+  let open = $state(false);
+  let inputEl = $state();
   let debounceTimer;
-  let highlightIdx = -1;
+  let highlightIdx = $state(-1);
 
   // Place + directions
-  let selectedPlace = null;
-  let mode = 'car';
-  let route = null;
-  let allRoutes = {};
-  let loadingMode = null;
+  let selectedPlace = $state(null);
+  let mode = $state('car');
+  let route = $state(null);
+  let allRoutes = $state({});
+  let loadingMode = $state(null);
 
   // Navigation
-  let currentStepIdx = 0;
-  $: currentStep = route?.steps?.[currentStepIdx] || null;
-  $: nextStep = route?.steps?.[currentStepIdx + 1] || null;
-  $: isLastStep = currentStepIdx >= (route?.steps?.length || 1) - 1;
+  let currentStepIdx = $state(0);
+  let currentStep = $derived(route?.steps?.[currentStepIdx] || null);
+  let nextStep = $derived(route?.steps?.[currentStepIdx + 1] || null);
+  let isLastStep = $derived(currentStepIdx >= (route?.steps?.length || 1) - 1);
 
   // ── Search ─────────────────────────────────────────────────────────────
   function onInput() {
@@ -203,14 +203,14 @@
         <span class="nav-eta-dist">{formatDist(route.distance)} · {selectedPlace?.name || ''}</span>
       </div>
       <div class="nav-controls">
-        <button class="nav-ctrl" on:click={prevTurn} disabled={currentStepIdx === 0} aria-label="Previous step">
+        <button class="nav-ctrl" onclick={prevTurn} disabled={currentStepIdx === 0} aria-label="Previous step">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
         <span class="nav-step-count">{currentStepIdx + 1}/{route.steps.length}</span>
-        <button class="nav-ctrl" on:click={nextTurn} disabled={isLastStep} aria-label="Next step">
+        <button class="nav-ctrl" onclick={nextTurn} disabled={isLastStep} aria-label="Next step">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
-        <button class="nav-stop" on:click={stopNav}>Exit</button>
+        <button class="nav-stop" onclick={stopNav}>Exit</button>
       </div>
     </div>
   </div>
@@ -223,7 +223,7 @@
     <!-- Search bar -->
     <div class="ps-bar">
       {#if view === 'preview'}
-        <button class="ps-back" on:click={reset} aria-label="Back">
+        <button class="ps-back" onclick={reset} aria-label="Back">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
       {:else}
@@ -232,10 +232,10 @@
       <input
         bind:this={inputEl}
         bind:value={query}
-        on:input={onInput}
-        on:focus={onFocus}
-        on:blur={onBlur}
-        on:keydown={onKeydown}
+        oninput={onInput}
+        onfocus={onFocus}
+        onblur={onBlur}
+        onkeydown={onKeydown}
         class="ps-input"
         type="text"
         placeholder={view === 'preview' ? selectedPlace?.name : "Search places, addresses..."}
@@ -244,7 +244,7 @@
       />
       {#if loading || loadingMode}<div class="ps-spinner"></div>{/if}
       {#if query && view === 'search'}
-        <button class="ps-clear" on:click={reset} aria-label="Clear">
+        <button class="ps-clear" onclick={reset} aria-label="Clear">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       {/if}
@@ -255,7 +255,7 @@
       <ul class="ps-results">
         {#each results as r, i}
           <li>
-            <button type="button" class="ps-result" class:ps-result-hl={i === highlightIdx} on:click={() => selectPlace(r)}>
+            <button type="button" class="ps-result" class:ps-result-hl={i === highlightIdx} onclick={() => selectPlace(r)}>
               <div class="ps-result-icon">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
               </div>
@@ -275,7 +275,7 @@
         <!-- Mode tabs -->
         <div class="ps-modes">
           {#each [['car','Car'],['foot','Walk'],['bike','Cycle']] as [m, label]}
-            <button class="ps-mode" class:ps-mode-on={mode === m} class:ps-mode-loading={loadingMode === m} on:click={() => switchMode(m)}>
+            <button class="ps-mode" class:ps-mode-on={mode === m} class:ps-mode-loading={loadingMode === m} onclick={() => switchMode(m)}>
               <span class="ps-mode-label">{label}</span>
               {#if allRoutes[m]}
                 <span class="ps-mode-eta">{formatDuration(allRoutes[m].duration)}</span>
@@ -313,11 +313,11 @@
 
           <!-- Actions -->
           <div class="ps-actions">
-            <button class="ps-btn ps-btn-start" on:click={startNav}>
+            <button class="ps-btn ps-btn-start" onclick={startNav}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
               Start
             </button>
-            <button class="ps-btn ps-btn-walk" on:click={() => dispatch('setDestination', selectedPlace)}>
+            <button class="ps-btn ps-btn-walk" onclick={() => dispatch('setDestination', selectedPlace)}>
               Walk With Me
             </button>
           </div>

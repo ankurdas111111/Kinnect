@@ -29,18 +29,24 @@
 
   const dispatch = createEventDispatcher();
 
-  export let peerName = 'Contact';
-  export let unlocking = false;
-  export let error = '';
+  /**
+   * @typedef {Object} Props
+   * @property {string} [peerName]
+   * @property {boolean} [unlocking]
+   * @property {string} [error]
+   */
 
-  let pinDigits = [];
-  let pinShake = false;
-  let pinInputEl;
-  let unlockSuccess = false;
+  /** @type {Props} */
+  let { peerName = 'Contact', unlocking = false, error = '' } = $props();
+
+  let pinDigits = $state([]);
+  let pinShake = $state(false);
+  let pinInputEl = $state();
+  let unlockSuccess = $state(false);
   let _shakeTimer = null;
 
-  $: pin = pinDigits.join('');
-  $: pinReady = pin.length >= 4;
+  let pin = $derived(pinDigits.join(''));
+  let pinReady = $derived(pin.length >= 4);
 
   onMount(() => {
     setTimeout(() => pinInputEl?.focus(), 120);
@@ -143,8 +149,8 @@
         autocomplete="one-time-code"
         autocorrect="off"
         autocapitalize="none"
-        on:input={handleInput}
-        on:keydown={handleKeydown}
+        oninput={handleInput}
+        onkeydown={handleKeydown}
         aria-describedby={error ? 'gate-pin-err' : 'gate-pin-hint'}
         disabled={unlocking}
       />
@@ -161,7 +167,7 @@
       class="gate-btn scv-cta-btn"
       class:gate-btn--ready={pinReady}
       class:scv-cta-btn--active={pinReady}
-      on:click={submit}
+      onclick={submit}
       disabled={unlocking || !pinReady}
       type="button"
       aria-label={pinReady ? 'Open note' : 'Enter at least 4 digits'}

@@ -1,11 +1,13 @@
 <script>
+  import { run } from 'svelte/legacy';
+
   import { fly, slide } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { sosNarratives, activeSosUsers } from '../lib/stores/sos.js';
   import { otherUsers } from '../lib/stores/map.js';
 
   // Collect all SOS-active users that sent a medicalCard
-  $: sosWithCard = (() => {
+  let sosWithCard = $derived((() => {
     const result = [];
     for (const [userId] of $activeSosUsers) {
       const narrative = $sosNarratives.get(userId);
@@ -18,29 +20,31 @@
       }
     }
     return result;
-  })();
+  })());
 
-  $: current = sosWithCard[0] || null;
-  $: extras  = sosWithCard.length - 1;
+  let current = $derived(sosWithCard[0] || null);
+  let extras  = $derived(sosWithCard.length - 1);
 
-  let expanded = false;
-  $: if (!current) expanded = false;
+  let expanded = $state(false);
+  run(() => {
+    if (!current) expanded = false;
+  });
 
   function toggle() { expanded = !expanded; }
 
   // Returns true when the card has any visible medical data beyond contacts
-  $: hasMedical = current && (
+  let hasMedical = $derived(current && (
     current.card.bloodType  ||
     current.card.allergies?.trim()  ||
     current.card.medications?.trim() ||
     current.card.conditions?.trim()
-  );
+  ));
 
-  $: contacts = current?.card.emergencyContacts?.length
+  let contacts = $derived(current?.card.emergencyContacts?.length
     ? current.card.emergencyContacts.filter(c => c.name || c.phone)
     : (current?.card.emergencyName || current?.card.emergencyPhone)
       ? [{ name: current.card.emergencyName, phone: current.card.emergencyPhone, relation: '' }]
-      : [];
+      : []);
 </script>
 
 {#if current}
@@ -53,7 +57,7 @@
     out:fly={{ y: 20, duration: 200, easing: cubicOut }}
   >
     <!-- ── Collapsed pill ───────────────────────────────────────── -->
-    <button class="sf-pill" on:click={toggle} aria-expanded={expanded}>
+    <button class="sf-pill" onclick={toggle} aria-expanded={expanded}>
       <span class="sf-pulse" aria-hidden="true"></span>
 
       {#if current.card.bloodType}
@@ -270,6 +274,7 @@
     align-items: center;
     gap: 7px;
     padding: 10px 12px;
+    min-height: 44px;
     background: transparent;
     border: none;
     cursor: pointer;
@@ -277,7 +282,7 @@
     -webkit-tap-highlight-color: transparent;
     transition: background var(--duration-fast) var(--ease-out);
   }
-  .sf-pill:hover { background: rgba(239, 68, 68, 0.14); }
+  .sf-pill:hover { background: var(--danger-500-12); }
 
   /* Pulsing live dot */
   .sf-pulse {
@@ -285,7 +290,7 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: #ef4444;
+    background: var(--danger-500);
     box-shadow:
       0 0 6px rgba(239, 68, 68, 0.80),
       0 0 12px rgba(239, 68, 68, 0.45),
@@ -309,7 +314,7 @@
     border-radius: 6px;
     background: rgba(239, 68, 68, 0.22);
     border: 1px solid rgba(239, 68, 68, 0.50);
-    color: #fca5a5;
+    color: var(--danger-300);
     font-size: 11px;
     font-weight: 800;
     letter-spacing: 0.03em;
@@ -334,7 +339,7 @@
     font-weight: 800;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #f87171;
+    color: var(--danger-400);
     background: rgba(239, 68, 68, 0.15);
     border: 1px solid rgba(239, 68, 68, 0.30);
     border-radius: 5px;
@@ -386,12 +391,12 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.07em;
-    color: #f87171;
+    color: var(--danger-400);
   }
   .sf-bt-value {
     font-size: 26px;
     font-weight: 900;
-    color: #fca5a5;
+    color: var(--danger-300);
     letter-spacing: -0.04em;
     line-height: 1;
     font-variant-numeric: tabular-nums;
@@ -411,7 +416,7 @@
   }
   .sf-med-icon {
     flex-shrink: 0;
-    color: #f87171;
+    color: var(--danger-400);
     margin-top: 2px;
     display: flex;
   }
@@ -428,7 +433,7 @@
     letter-spacing: 0.07em;
     color: rgba(255, 255, 255, 0.35);
   }
-  .sf-med-row-alert .sf-med-label { color: #f87171; }
+  .sf-med-row-alert .sf-med-label { color: var(--danger-400); }
   .sf-med-value {
     font-size: 12px;
     font-weight: 500;
@@ -490,9 +495,9 @@
     min-height: 44px;
     min-width: 44px;
     border-radius: 9px;
-    background: rgba(16, 185, 129, 0.18);
+    background: var(--success-500-20, rgba(16, 185, 129, 0.18));
     border: 1px solid rgba(16, 185, 129, 0.35);
-    color: #34d399;
+    color: var(--success-400);
     font-size: 11px;
     font-weight: 700;
     text-decoration: none;
@@ -515,7 +520,7 @@
   .sf-call-btn:active { transform: scale(0.95); }
 
   .sf-phone-link {
-    color: #34d399;
+    color: var(--success-400);
     text-decoration: none;
     font-weight: 600;
   }
@@ -527,6 +532,16 @@
     }
     .sf-pulse {
       animation: none;
+    }
+    .sf-chevron {
+      transition: none;
+    }
+    .sf-call-btn {
+      transition: background var(--duration-fast) var(--ease-out);
+    }
+    .sf-call-btn:hover,
+    .sf-call-btn:active {
+      transform: none;
     }
   }
 

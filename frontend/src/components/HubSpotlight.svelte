@@ -1,14 +1,16 @@
 <script>
+  import { self } from 'svelte/legacy';
+
   import { onMount } from 'svelte';
   import { fade, fly } from 'svelte/transition';
   import { push } from 'svelte-spa-router';
 
   const SEEN_KEY = 'kinnect_hub_seen_v2';
 
-  let visible = false;
-  let hole = { x: 0, y: 0, w: 0, h: 0 };
-  let tooltipLeft = 0;
-  let tooltipTop = 0;
+  let visible = $state(false);
+  let hole = $state({ x: 0, y: 0, w: 0, h: 0 });
+  let tooltipLeft = $state(0);
+  let tooltipTop = $state(0);
   const PAD = 10;
   const TOOLTIP_W = 304;
 
@@ -53,14 +55,14 @@
 </script>
 
 {#if visible}
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
     class="hs-overlay"
     role="dialog"
     aria-modal="true"
     aria-label="Discover the Hub"
-    on:click|self={dismiss}
+    onclick={self(dismiss)}
     transition:fade={{ duration: 320 }}
   >
     <!-- Amber spotlight ring positioned exactly over Hub button -->
@@ -110,8 +112,8 @@
       </ul>
 
       <div class="hs-actions">
-        <button class="hs-btn-primary" on:click={explore}>Explore Hub</button>
-        <button class="hs-btn-ghost"   on:click={dismiss}>Maybe later</button>
+        <button class="hs-btn-primary" onclick={explore}>Explore Hub</button>
+        <button class="hs-btn-ghost"   onclick={dismiss}>Maybe later</button>
       </div>
     </div>
   </div>

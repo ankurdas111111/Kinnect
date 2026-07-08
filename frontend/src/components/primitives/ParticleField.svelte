@@ -1,21 +1,28 @@
 <script>
+  
   /**
-   * ParticleField — Lightweight CSS-only ambient particle background.
-   *
-   * Uses CSS custom properties + animations — zero canvas, zero JS per-frame.
-   * GPU-composited: only animates transform + opacity.
-   * Respects prefers-reduced-motion (disables via CSS).
-   *
-   * Props:
-   *   count      — number of particles (default 20, mobile-safe)
-   *   color      — particle color (default brand teal)
-   *   maxSize    — max particle size in px (default 3)
-   *   className  — additional CSS class on container
+   * @typedef {Object} Props
+   * @property {number} [count] - ParticleField — Lightweight CSS-only ambient particle background.
+Uses CSS custom properties + animations — zero canvas, zero JS per-frame.
+GPU-composited: only animates transform + opacity.
+Respects prefers-reduced-motion (disables via CSS).
+Props:
+count      — number of particles (default 20, mobile-safe)
+color      — particle color (default brand teal)
+maxSize    — max particle size in px (default 3)
+className  — additional CSS class on container
+   * @property {string} [color]
+   * @property {number} [maxSize]
+   * @property {string} [className]
    */
-  export let count = 20;
-  export let color = 'rgba(20, 184, 166, 0.35)';
-  export let maxSize = 3;
-  export let className = '';
+
+  /** @type {Props} */
+  let {
+    count = 20,
+    color = 'rgba(20, 184, 166, 0.35)',
+    maxSize = 3,
+    className = ''
+  } = $props();
 
   // Generate particles with deterministic pseudo-random positions
   // using a simple LCG — no Math.random() so SSR is safe

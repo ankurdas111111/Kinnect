@@ -1,0 +1,144 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   MODERNIZATION FX LAYER — 2026 direction: refined Liquid Glass, tactile
+   "squishy" press, bento layout, and the calm-mode / performance budget.
+
+   Import order: AFTER themes.css so the [data-fx] overrides always win for
+   blur/animation. Base tokens are additive and don't touch theme colors.
+   Driven by lib/stores/effects.js (sets <html data-fx="full|calm|minimal">).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Tactile / squishy press ─────────────────────────────────────────────
+     GPU-only (transform). Pair with lib/haptics.js on real presses. */
+  --press-scale: 0.96;
+  --press-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --press-duration: 120ms;
+
+  /* ── Bento layout ────────────────────────────────────────────────────────
+     Asymmetric modular grid — larger tiles draw the eye first. */
+  --bento-gap: var(--space-3);
+  --bento-cols: 4;
+
+  /* ── Liquid Glass edge-light ─────────────────────────────────────────────
+     A single source for the top-edge accent line duplicated across
+     Modal / BottomSheet / Toast / Card. Use via `.fx-edge-line`. */
+  --glass-edge-light: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklch, var(--primary-400) 55%, transparent) 30%,
+    color-mix(in oklch, var(--primary-400) 55%, transparent) 70%,
+    transparent 100%
+  );
+
+  /* ── color-mix() opacity variants ────────────────────────────────────────
+     Replaces one-off rgba() tints (e.g. Landing hero orbs) with themeable
+     tokens. Perceptual mixing in OKLCH. */
+  --primary-500-08: color-mix(in oklch, var(--primary-500) 8%,  transparent);
+  --primary-500-12: color-mix(in oklch, var(--primary-500) 12%, transparent);
+  --primary-500-20: color-mix(in oklch, var(--primary-500) 20%, transparent);
+  --primary-500-30: color-mix(in oklch, var(--primary-500) 30%, transparent);
+  --primary-500-50: color-mix(in oklch, var(--primary-500) 50%, transparent);
+  --danger-500-12:  color-mix(in oklch, var(--danger-500) 12%,  transparent);
+  --danger-500-20:  color-mix(in oklch, var(--danger-500) 20%,  transparent);
+  --success-500-12: color-mix(in oklch, var(--success-500) 12%, transparent);
+  --success-500-20: color-mix(in oklch, var(--success-500) 20%, transparent);
+  --violet-400-20:  color-mix(in oklch, var(--violet-400) 20%,  transparent);
+
+  /* ── FX flags (read by JS / keyframes) ───────────────────────────────────
+     Overridden per data-fx level below. 1 = allowed, 0 = suppressed. */
+  --fx-ambient-opacity: 1;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CALM MODE — reduce blur cost + ambient motion. `:root[data-fx=…]` = (0,2,0),
+   beats [data-theme] (0,1,0), so these win regardless of active theme.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root[data-fx="calm"] {
+  --glass-blur:     blur(10px) saturate(1.3);
+  --glass-blur-sm:  blur(6px)  saturate(1.2);
+  --glass-3d-blur:  blur(12px) saturate(1.4);
+  --fx-ambient-opacity: 0.5;
+}
+
+:root[data-fx="minimal"] {
+  /* No backdrop-filter at all — fall back to the strong (near-solid) surface
+     so glass panels stay legible without blur. */
+  --glass-blur:     none;
+  --glass-blur-sm:  none;
+  --glass-3d-blur:  none;
+  --glass-bg:       var(--glass-bg-strong);
+  --glass-3d:       var(--glass-bg-strong);
+  --fx-ambient-opacity: 0;
+}
+
+/* Minimal = the user opted out of decorative motion. Neutralize ambient
+   animation without breaking functional transitions (sheets, focus rings). */
+:root[data-fx="minimal"] .fx-ambient,
+:root[data-fx="minimal"] .fx-decor-anim {
+  animation: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   UTILITIES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Bento grid — larger cards via span helpers. Collapses to 2 cols on mobile. */
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--bento-cols, 4), minmax(0, 1fr));
+  gap: var(--bento-gap);
+}
+.bento-col-2 { grid-column: span 2; }
+.bento-col-3 { grid-column: span 3; }
+.bento-col-4 { grid-column: span 4; }
+.bento-row-2 { grid-row: span 2; }
+
+@media (max-width: 767px) {
+  .bento-grid { --bento-cols: 2; }
+  .bento-col-3, .bento-col-4 { grid-column: span 2; }
+}
+
+/* Tactile press — squish + settle on active. transform-only (GPU). */
+.tactile {
+  transition: transform var(--press-duration) var(--press-spring);
+  will-change: transform;
+}
+.tactile:active {
+  transform: scale(var(--press-scale));
+}
+
+/* Refined Liquid Glass surface (for elements that aren't <Card>). */
+.fx-glass {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-top-color: var(--glass-border-strong);
+  box-shadow: var(--glass-shadow);
+}
+
+/* Standard top-edge accent line — one definition for all glass surfaces. */
+.fx-edge-line {
+  position: absolute;
+  top: 0;
+  left: 12%;
+  right: 12%;
+  height: 1px;
+  background: var(--glass-edge-light);
+  box-shadow: 0 0 6px var(--primary-500-30);
+  pointer-events: none;
+  border-radius: 0 0 2px 2px;
+}
+
+/* Ambient decorative layer (orbs, particles, meshes). Fades with calm mode,
+   vanishes in minimal — components should ALSO js-gate WebGL/particle counts. */
+.fx-ambient {
+  opacity: var(--fx-ambient-opacity);
+  transition: opacity var(--duration-slow) var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tactile { transition: none; }
+  .tactile:active { transform: none; }
+}

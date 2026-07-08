@@ -9,15 +9,15 @@
     initWebRTCSocketHandlers,
   } from '../lib/webrtc.js';
 
-  export let user;
+  let { user } = $props();
 
   onMount(() => { initWebRTCSocketHandlers(); });
 
-  $: pttActive =
-    ($callState === 'calling' || $callState === 'connected') &&
-    $callPeer?.userID === user?.userId;
+  let pttActive =
+    $derived(($callState === 'calling' || $callState === 'connected') &&
+    $callPeer?.userID === user?.userId);
 
-  $: callDisabled = !user?.online || ($callState !== 'idle' && !pttActive);
+  let callDisabled = $derived(!user?.online || ($callState !== 'idle' && !pttActive));
 
   function handleTalk() {
     startCall(user.userId, user.displayName || user.name || user.userId);
@@ -40,7 +40,7 @@
       Calling
       <span class="dots"><span>.</span><span>.</span><span>.</span></span>
     </span>
-    <button class="btn-cancel" on:click={hangup} aria-label="Cancel call">End</button>
+    <button class="btn-cancel" onclick={hangup} aria-label="Cancel call">End</button>
   </div>
 
 {:else if pttActive && $callState === 'connected'}
@@ -48,9 +48,9 @@
   <div class="call-bar connected" role="status" aria-live="polite">
     <button
       class="btn-ptt"
-      on:pointerdown={handlePointerDown}
-      on:pointerup={handlePointerUp}
-      on:pointerleave={handlePointerUp}
+      onpointerdown={handlePointerDown}
+      onpointerup={handlePointerUp}
+      onpointerleave={handlePointerUp}
       aria-label="Hold to talk"
       style="touch-action: none; user-select: none;"
     >
@@ -62,14 +62,14 @@
       </svg>
       Hold to Talk
     </button>
-    <button class="btn-cancel" on:click={hangup} aria-label="End call">End</button>
+    <button class="btn-cancel" onclick={hangup} aria-label="End call">End</button>
   </div>
 
 {:else}
   <!-- Idle — compact Talk button for card-actions row -->
   <button
     class="btn btn-secondary btn-sm action-btn talk-btn"
-    on:click={handleTalk}
+    onclick={handleTalk}
     disabled={callDisabled}
     aria-label="Start walkie-talkie with {user?.displayName || user?.name || 'this person'}"
     title={user?.online ? 'Walkie-talkie' : 'User is offline'}

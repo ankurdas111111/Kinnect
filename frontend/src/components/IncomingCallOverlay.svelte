@@ -15,7 +15,7 @@
 
 {#if $incomingOffer && $callState === 'idle'}
   <!-- Backdrop -->
-  <div class="backdrop" on:click={decline} aria-hidden="true"></div>
+  <div class="backdrop" onclick={decline} aria-hidden="true"></div>
 
   <!-- Bottom-sheet card -->
   <div
@@ -40,8 +40,8 @@
     </div>
 
     <div class="call-actions">
-      <button class="btn-decline" on:click={decline} aria-label="Decline call">Decline</button>
-      <button class="btn-accept" on:click={accept} aria-label="Accept call from {$incomingOffer.fromName}">Accept</button>
+      <button class="btn-decline" onclick={decline} aria-label="Decline call">Decline</button>
+      <button class="btn-accept" onclick={accept} aria-label="Accept call from {$incomingOffer.fromName}">Accept</button>
     </div>
   </div>
 {/if}

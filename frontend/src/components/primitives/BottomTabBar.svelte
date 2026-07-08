@@ -2,10 +2,21 @@
   import { createEventDispatcher } from 'svelte';
   import { haptics } from '../../lib/haptics.js';
 
-  export let activeTab = 'track';
-  export let isAdmin = false;
-  export let isTracking = false;
-  export let hasNotification = false;
+  /**
+   * @typedef {Object} Props
+   * @property {string} [activeTab]
+   * @property {boolean} [isAdmin]
+   * @property {boolean} [isTracking]
+   * @property {boolean} [hasNotification]
+   */
+
+  /** @type {Props} */
+  let {
+    activeTab = 'track',
+    isAdmin = false,
+    isTracking = false,
+    hasNotification = false
+  } = $props();
 
   const dispatch = createEventDispatcher();
   const tabOrder = ['track', 'people', 'share', 'safety', 'me'];
@@ -38,8 +49,8 @@
     selectTab(tabOrder[nextIdx]);
   }
 
-  $: activeIndex = tabOrder.indexOf(activeTab);
-  $: pillOffset = activeIndex >= 0 ? activeIndex * (100 / tabOrder.length) : 0;
+  let activeIndex = $derived(tabOrder.indexOf(activeTab));
+  let pillOffset = $derived(activeIndex >= 0 ? activeIndex * (100 / tabOrder.length) : 0);
 </script>
 
 <div class="bottom-tabs" role="tablist" aria-label="Navigation">
@@ -60,8 +71,8 @@
     class="tab-item"
     class:active={activeTab === 'track'}
     class:tracking-active={isTracking}
-    on:click={() => selectTab('track')}
-    on:keydown={(e) => onTabKeydown(e, 'track')}
+    onclick={() => selectTab('track')}
+    onkeydown={(e) => onTabKeydown(e, 'track')}
     role="tab"
     aria-selected={activeTab === 'track'}
     tabindex={activeTab === 'track' ? 0 : -1}
@@ -83,8 +94,8 @@
   <button
     class="tab-item"
     class:active={activeTab === 'people'}
-    on:click={() => selectTab('people')}
-    on:keydown={(e) => onTabKeydown(e, 'people')}
+    onclick={() => selectTab('people')}
+    onkeydown={(e) => onTabKeydown(e, 'people')}
     role="tab"
     aria-selected={activeTab === 'people'}
     tabindex={activeTab === 'people' ? 0 : -1}
@@ -103,8 +114,8 @@
   <button
     class="tab-item"
     class:active={activeTab === 'share'}
-    on:click={() => selectTab('share')}
-    on:keydown={(e) => onTabKeydown(e, 'share')}
+    onclick={() => selectTab('share')}
+    onkeydown={(e) => onTabKeydown(e, 'share')}
     role="tab"
     aria-selected={activeTab === 'share'}
     tabindex={activeTab === 'share' ? 0 : -1}
@@ -123,8 +134,8 @@
   <button
     class="tab-item"
     class:active={activeTab === 'safety'}
-    on:click={() => selectTab('safety')}
-    on:keydown={(e) => onTabKeydown(e, 'safety')}
+    onclick={() => selectTab('safety')}
+    onkeydown={(e) => onTabKeydown(e, 'safety')}
     role="tab"
     aria-selected={activeTab === 'safety'}
     tabindex={activeTab === 'safety' ? 0 : -1}
@@ -146,8 +157,8 @@
   <button
     class="tab-item"
     class:active={activeTab === 'me'}
-    on:click={() => selectTab('me')}
-    on:keydown={(e) => onTabKeydown(e, 'me')}
+    onclick={() => selectTab('me')}
+    onkeydown={(e) => onTabKeydown(e, 'me')}
     role="tab"
     aria-selected={activeTab === 'me'}
     tabindex={activeTab === 'me' ? 0 : -1}
@@ -215,10 +226,10 @@
     border-top-color: rgba(45, 212, 191, 0.60);
     border-radius: var(--radius-lg);
     pointer-events: none;
-    /* Spring physics slide */
+    /* Spring physics slide — snappier so the active tab reads instantly */
     /* Transition left for accurate tab-aligned positioning.
        left: calc(4px + N * 20%) positions exactly at tab slot center. */
-    transition: left 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: left 250ms cubic-bezier(0.34, 1.56, 0.64, 1);
     z-index: 0;
     /* Holographic shimmer — traveling highlight */
     overflow: hidden;
@@ -250,7 +261,7 @@
     bottom: calc(7px + var(--safe-bottom, 0px));
     border-radius: var(--radius-lg);
     pointer-events: none;
-    transition: left 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: left 250ms cubic-bezier(0.34, 1.56, 0.64, 1);
     z-index: 0;
     box-shadow:
       0 4px 20px rgba(20, 184, 166, 0.38),
@@ -356,17 +367,13 @@
   /* Tracking tab: success green tint */
   .tracking-active { color: var(--success-400) !important; text-shadow: 0 0 10px rgba(52, 211, 153, 0.45) !important; }
 
-  /* ── Label ─────────────────────────────────────────────────────────────── */
+  /* ── Label — enlarged for legibility ──────────────────────────────────── */
   .tab-label {
-    font-size: var(--text-2xs);
+    font-size: var(--text-xs, 12px);
     font-weight: 700;
-    letter-spacing: 0.025em;
+    letter-spacing: 0.02em;
     line-height: 1;
     transition: opacity var(--duration-fast) var(--ease-out);
-  }
-
-  @media (min-width: 390px) {
-    .tab-label { font-size: var(--text-xs, 12px); }
   }
 
   /* ── Icon wrapper ──────────────────────────────────────────────────────── */
@@ -377,23 +384,24 @@
     justify-content: center;
   }
 
-  /* ── Tracking dot — neon aurora pulse ─────────────────────────────────── */
+  /* ── Tracking dot — larger calm LIVE pulse ────────────────────────────── */
   .tracking-dot {
     position: absolute;
     top: -3px;
     right: -3px;
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
     background: var(--success-400);
     border-radius: 50%;
     border: 2px solid rgba(5, 5, 18, 0.92);
-    /* Neon glow pulse */
-    animation: neon-breathe-live 2s ease-in-out infinite;
+    /* Calm live glow — softer than neon */
+    box-shadow: var(--glow-live-sm);
+    animation: neon-breathe-live 2.2s ease-in-out infinite;
   }
 
   :global([data-theme="light"]) .tracking-dot {
     border-color: rgba(252, 252, 255, 0.94);
-    animation: aurora-pulse 2s ease-in-out infinite;
+    animation: aurora-pulse 2.2s ease-in-out infinite;
   }
 
   /* ── Notification dot — neon red ───────────────────────────────────────── */

@@ -6,25 +6,28 @@
   import { canManage } from '../lib/stores/guardians.js';
   import { banner } from '../lib/stores/sos.js';
 
-  export let embedded = false;
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [embedded]
+   */
+
+  /** @type {Props} */
+  let { embedded = false } = $props();
 
   const dispatch = createEventDispatcher();
 
-  $: isAdmin = $authUser && $authUser.role === 'admin';
-  $: hasManageables = isAdmin || $canManage.size > 0;
 
-  let targetId = 'me';
-  let autoSosEnabled = false;
-  let noMoveMin = 5;
-  let hardStopMin = 2;
-  let geofenceEnabled = false;
-  let geofenceRadius = 0;
-  let checkInEnabled = false;
-  let checkInIntervalMin = 5;
-  let checkInOverdueMin = 7;
-  let keepForever = false;
+  let targetId = $state('me');
+  let autoSosEnabled = $state(false);
+  let noMoveMin = $state(5);
+  let hardStopMin = $state(2);
+  let geofenceEnabled = $state(false);
+  let geofenceRadius = $state(0);
+  let checkInEnabled = $state(false);
+  let checkInIntervalMin = $state(5);
+  let checkInOverdueMin = $state(7);
+  let keepForever = $state(false);
 
-  $: targetOptions = buildTargetOptions($otherUsers, $canManage, isAdmin);
 
   function buildTargetOptions(users, cm, admin) {
     const opts = [{ value: 'me', label: ($authUser?.displayName || 'Me') + ' (me)' }];
@@ -83,6 +86,9 @@
     banner.set({ type: 'info', text: 'Admin settings applied.', actions: [] });
     setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 1500);
   }
+  let isAdmin = $derived($authUser && $authUser.role === 'admin');
+  let hasManageables = $derived(isAdmin || $canManage.size > 0);
+  let targetOptions = $derived(buildTargetOptions($otherUsers, $canManage, isAdmin));
 </script>
 
 {#if hasManageables}
@@ -149,13 +155,13 @@
         </div>
       {/if}
 
-      <button class="btn btn-primary full-width mt-4" on:click={applySettings}>Save</button>
+      <button class="btn btn-primary full-width mt-4" onclick={applySettings}>Save</button>
     </div>
   {:else}
     <div class="panel-shell panel-left panel-base">
       <div class="panel-header">
         <h3>Safety Settings</h3>
-        <button class="btn btn-icon btn-ghost" aria-label="Close admin panel" on:click={() => dispatch('close')}>
+        <button class="btn btn-icon btn-ghost" aria-label="Close admin panel" onclick={() => dispatch('close')}>
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
@@ -181,7 +187,7 @@
         <div class="section">
           <label class="toggle"><input type="checkbox" bind:checked={checkInEnabled}><span class="toggle-track"></span>Check-In</label>
         </div>
-        <button class="btn btn-primary full-width mt-4" on:click={applySettings}>Save</button>
+        <button class="btn btn-primary full-width mt-4" onclick={applySettings}>Save</button>
       </div>
     </div>
   {/if}

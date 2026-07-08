@@ -1,12 +1,17 @@
 <script>
+  import { run } from 'svelte/legacy';
+
   import { onMount, onDestroy } from 'svelte';
+  import { cubicOut } from 'svelte/easing';
   import { push } from 'svelte-spa-router';
   import { authUser } from '../lib/stores/auth.js';
   import { toasts } from '../lib/stores/toast.js';
   import { socket } from '../lib/socket.js';
 
   // ── Auth guard ────────────────────────────────────────────────────────────
-  $: if (!$authUser) push('/login');
+  run(() => {
+    if (!$authUser) push('/login');
+  });
 
   // ── Storage key ──────────────────────────────────────────────────────────
   const STORAGE_KEY = 'kinnect_emergency_profile';
@@ -36,14 +41,14 @@
   const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
   // ── State ─────────────────────────────────────────────────────────────────
-  let profile = { ...DEFAULTS };
-  let openSections = { personal: true, contacts: false, medical: false, responder: false, qr: false, panicRelay: false };
-  let saving = false;
+  let profile = $state({ ...DEFAULTS });
+  let openSections = $state({ personal: true, contacts: false, medical: false, responder: false, qr: false, panicRelay: false });
+  let saving = $state(false);
 
   // ── Panic Relay phones (persisted server-side) ──────────────────────────
-  let panicPhone1 = '';
-  let panicPhone2 = '';
-  let panicSaving = false;
+  let panicPhone1 = $state('');
+  let panicPhone2 = $state('');
+  let panicSaving = $state(false);
 
   function savePanicPhones() {
     panicSaving = true;
@@ -52,14 +57,14 @@
   }
 
   // ── Heartbeat settings (persisted server-side) ──────────────────────────
-  let heartbeatEnabled = false;
-  let heartbeatDeadline = '10:00';
+  let heartbeatEnabled = $state(false);
+  let heartbeatDeadline = $state('10:00');
 
   function saveHeartbeat() {
     socket.emit('setHeartbeat', { enabled: heartbeatEnabled, deadline: heartbeatDeadline });
     toasts.add(heartbeatEnabled ? 'Heartbeat check enabled' : 'Heartbeat check disabled');
   }
-  let saveSuccess = false;
+  let saveSuccess = $state(false);
   let saveTimer = null;
 
   // ── Phone validation ──────────────────────────────────────────────────────
@@ -83,25 +88,30 @@
     'conditions', 'allergies', 'medications', 'doctorName', 'doctorPhone'
   ];
 
-  $: filledCount = TRACKED_FIELDS.filter(f => {
+  let filledCount = $derived(TRACKED_FIELDS.filter(f => {
     if (f === 'emergencyContacts') return profile.emergencyContacts?.length > 0;
     return profile[f] && String(profile[f]).trim() !== '';
-  }).length;
-  $: progress = Math.round((filledCount / TRACKED_FIELDS.length) * 100);
-  $: isComplete = progress === 100;
+  }).length);
+  let progress = $derived(Math.round((filledCount / TRACKED_FIELDS.length) * 100));
+  let isComplete = $derived(progress === 100);
+
+  // ── Completeness ring geometry (surfaces the EXISTING `progress` value) ────
+  const RING_R = 20;
+  const RING_CIRC = 2 * Math.PI * RING_R;
+  let ringOffset = $derived(RING_CIRC * (1 - progress / 100));
 
   // ── Validation errors ─────────────────────────────────────────────────────
-  $: contactPhoneErrors = (profile.emergencyContacts || []).map(c =>
+  let contactPhoneErrors = $derived((profile.emergencyContacts || []).map(c =>
     c.phone && !isValidPhone(c.phone) ? 'Enter a valid phone number' : ''
-  );
-  $: doctorPhoneError = profile.doctorPhone && !isValidPhone(profile.doctorPhone)
+  ));
+  let doctorPhoneError = $derived(profile.doctorPhone && !isValidPhone(profile.doctorPhone)
     ? 'Enter a valid phone number'
-    : '';
-  $: dobError = profile.dob && !isValidDob(profile.dob)
+    : '');
+  let dobError = $derived(profile.dob && !isValidDob(profile.dob)
     ? 'Enter a valid date of birth'
-    : '';
+    : '');
 
-  $: hasErrors = !!(doctorPhoneError || dobError || contactPhoneErrors.some(Boolean));
+  let hasErrors = $derived(!!(doctorPhoneError || dobError || contactPhoneErrors.some(Boolean)));
 
   // ── Load from localStorage ────────────────────────────────────────────────
   onMount(() => {
@@ -143,9 +153,11 @@
   }
 
   // ── Pre-fill name when auth resolves ─────────────────────────────────────
-  $: if ($authUser?.displayName && !profile.fullName) {
-    profile.fullName = $authUser.displayName;
-  }
+  run(() => {
+    if ($authUser?.displayName && !profile.fullName) {
+      profile.fullName = $authUser.displayName;
+    }
+  });
 
   // ── Save to localStorage ──────────────────────────────────────────────────
   function save() {
@@ -192,6 +204,18 @@
     openSections[key] = !openSections[key];
   }
 
+  // ── Accordion reveal: max-height + opacity, GPU-friendly, reduced-motion safe
+  function reveal(node, { duration = 280 } = {}) {
+    const full = node.scrollHeight;
+    const reduce = typeof window !== 'undefined'
+      && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    return {
+      duration: reduce ? 0 : duration,
+      easing: cubicOut,
+      css: (t) => `max-height:${t * full}px; opacity:${t}; overflow:hidden;`
+    };
+  }
+
   // ── Last updated label ────────────────────────────────────────────────────
   function fmtDate(iso) {
     if (!iso) return null;
@@ -203,10 +227,10 @@
     } catch { return null; }
   }
 
-  $: lastUpdatedLabel = fmtDate(profile.updatedAt);
+  let lastUpdatedLabel = $derived(fmtDate(profile.updatedAt));
 
   // ── SOS info text ─────────────────────────────────────────────────────────
-  $: shareCode = $authUser?.shareCode ?? '';
+  let shareCode = $derived($authUser?.shareCode ?? '');
 </script>
 
 <!-- ════════════════════════════════════════════════════════════════════════════
@@ -217,9 +241,9 @@
   <!-- ── Header ─────────────────────────────────────────────────────────── -->
   <header class="ep-header">
     <button
-      class="ep-back-btn"
+      class="ep-back-btn tactile"
       aria-label="Back to map"
-      on:click={() => push('/')}
+      onclick={() => push('/')}
     >
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
            stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -232,11 +256,11 @@
     </div>
 
     <button
-      class="ep-save-btn"
+      class="ep-save-btn tactile"
       class:ep-save-btn--success={saveSuccess}
       aria-label="Save emergency profile"
       disabled={saving || hasErrors}
-      on:click={save}
+      onclick={save}
     >
       {#if saveSuccess}
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -258,39 +282,51 @@
   <!-- ── Scrollable body ────────────────────────────────────────────────── -->
   <main class="ep-body">
 
-    <!-- Status badge -->
-    <div class="ep-badge-row" aria-live="polite">
-      <span class="ep-badge" class:ep-badge--complete={isComplete} class:ep-badge--incomplete={!isComplete}>
-        {#if isComplete}
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <polyline points="20 6 9 17 4 12"/>
-          </svg>
-          Profile Complete
-        {:else}
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="12" y1="8" x2="12" y2="12"/>
-            <line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
-          Incomplete
-        {/if}
-      </span>
-
-      {#if lastUpdatedLabel}
-        <span class="ep-last-updated">Updated {lastUpdatedLabel}</span>
-      {/if}
-    </div>
-
-    <!-- Progress bar -->
-    <div class="ep-progress-wrap" role="group" aria-label="Profile completion">
-      <div class="ep-progress-header">
-        <span class="ep-progress-label">Profile completion</span>
-        <span class="ep-progress-pct">{progress}%</span>
+    <!-- ── Completeness meter (surfaces existing `progress` value) ───────── -->
+    <div class="ep-meter-card" aria-live="polite">
+      <div
+        class="ep-meter-ring"
+        role="progressbar"
+        aria-valuenow={progress}
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-label="Profile completion"
+      >
+        <svg viewBox="0 0 44 44" width="56" height="56" aria-hidden="true">
+          <circle class="ep-ring-track" cx="22" cy="22" r={RING_R} />
+          <circle
+            class="ep-ring-fill"
+            class:ep-ring-fill--complete={isComplete}
+            cx="22" cy="22" r={RING_R}
+            stroke-dasharray={RING_CIRC}
+            stroke-dashoffset={ringOffset}
+          />
+        </svg>
+        <span class="ep-ring-pct">{progress}<span class="ep-ring-pct-sign">%</span></span>
       </div>
-      <div class="ep-progress-track" role="progressbar" aria-valuenow={progress} aria-valuemin="0" aria-valuemax="100">
-        <div class="ep-progress-fill" style="width: {progress}%"></div>
+
+      <div class="ep-meter-info">
+        <span class="ep-badge" class:ep-badge--complete={isComplete} class:ep-badge--incomplete={!isComplete}>
+          {#if isComplete}
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            Profile Complete
+          {:else}
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            Incomplete
+          {/if}
+        </span>
+        <span class="ep-meter-count">{filledCount} of {TRACKED_FIELDS.length} key fields complete</span>
+        {#if lastUpdatedLabel}
+          <span class="ep-last-updated">Updated {lastUpdatedLabel}</span>
+        {/if}
       </div>
     </div>
 
@@ -310,13 +346,13 @@
     </div>
 
     <!-- ── Section 1: Personal Info ─────────────────────────────────────── -->
-    <section class="ep-section" aria-labelledby="section-personal-heading">
+    <section class="ep-section" class:ep-section--open={openSections.personal} aria-labelledby="section-personal-heading">
       <button
         class="ep-section-header"
         id="section-personal-btn"
         aria-expanded={openSections.personal}
         aria-controls="section-personal-body"
-        on:click={() => toggleSection('personal')}
+        onclick={() => toggleSection('personal')}
       >
         <span class="ep-section-icon" aria-hidden="true">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -335,7 +371,7 @@
       </button>
 
       {#if openSections.personal}
-        <div class="ep-section-body" id="section-personal-body" role="region" aria-labelledby="section-personal-heading">
+        <div class="ep-section-body" id="section-personal-body" role="region" aria-labelledby="section-personal-heading" transition:reveal>
 
           <div class="ep-field">
             <label for="ep-fullname" class="ep-label">
@@ -370,8 +406,15 @@
             {/if}
           </div>
 
-          <div class="ep-field">
-            <span class="ep-label" id="ep-bloodtype-label">Blood Type</span>
+          <!-- Blood type — prominent medical card -->
+          <div class="ep-med-card ep-med-card--blood">
+            <span class="ep-med-card-title" id="ep-bloodtype-label">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+              </svg>
+              Blood Type
+            </span>
             <div
               class="ep-blood-grid"
               role="group"
@@ -380,10 +423,10 @@
               {#each BLOOD_TYPES as bt}
                 <button
                   type="button"
-                  class="ep-blood-pill"
+                  class="ep-blood-pill tactile"
                   class:ep-blood-pill--selected={profile.bloodType === bt}
                   aria-pressed={profile.bloodType === bt}
-                  on:click={() => { profile.bloodType = profile.bloodType === bt ? '' : bt; }}
+                  onclick={() => { profile.bloodType = profile.bloodType === bt ? '' : bt; }}
                 >
                   {bt}
                 </button>
@@ -396,13 +439,13 @@
     </section>
 
     <!-- ── Section 2: Emergency Contacts ────────────────────────────────── -->
-    <section class="ep-section" aria-labelledby="section-contacts-heading">
+    <section class="ep-section" class:ep-section--open={openSections.contacts} aria-labelledby="section-contacts-heading">
       <button
         class="ep-section-header"
         id="section-contacts-btn"
         aria-expanded={openSections.contacts}
         aria-controls="section-contacts-body"
-        on:click={() => toggleSection('contacts')}
+        onclick={() => toggleSection('contacts')}
       >
         <span class="ep-section-icon" aria-hidden="true">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -423,17 +466,17 @@
       </button>
 
       {#if openSections.contacts}
-        <div class="ep-section-body" id="section-contacts-body" role="region" aria-labelledby="section-contacts-heading">
+        <div class="ep-section-body" id="section-contacts-body" role="region" aria-labelledby="section-contacts-heading" transition:reveal>
 
           {#each profile.emergencyContacts as contact, i}
             <div class="ep-contact-card">
               <div class="ep-contact-header">
                 <span class="ep-contact-num">Contact {i + 1}</span>
                 <button
-                  class="ep-remove-btn"
+                  class="ep-remove-btn tactile"
                   type="button"
                   aria-label="Remove contact {i + 1}"
-                  on:click={() => removeContact(i)}
+                  onclick={() => removeContact(i)}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                        stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -510,7 +553,7 @@
           {/if}
 
           {#if profile.emergencyContacts.length < MAX_CONTACTS}
-            <button class="ep-add-contact-btn" type="button" on:click={addContact}>
+            <button class="ep-add-contact-btn tactile" type="button" onclick={addContact}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <line x1="12" y1="5" x2="12" y2="19"/>
@@ -525,8 +568,8 @@
     </section>
 
     <!-- ── Panic Relay: External SMS escalation ──────────────────────────── -->
-    <section class="ep-section">
-      <button class="ep-section-header" on:click={() => openSections.panicRelay = !openSections.panicRelay}>
+    <section class="ep-section" class:ep-section--open={openSections.panicRelay}>
+      <button class="ep-section-header" onclick={() => openSections.panicRelay = !openSections.panicRelay}>
         <span class="ep-section-icon" aria-hidden="true">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.63A2 2 0 012 .92h3"/><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
         </span>
@@ -536,13 +579,13 @@
         </span>
       </button>
       {#if openSections.panicRelay}
-        <div class="ep-section-body">
+        <div class="ep-section-body" transition:reveal>
           <p class="ep-hint">If no one acknowledges your SOS within 3 minutes, Kinnect sends an SMS with your live location to these phone numbers.</p>
-          <label class="ep-field-label">Emergency Phone 1</label>
-          <input class="ep-input" type="tel" bind:value={panicPhone1} placeholder="+91 98765 43210" maxlength="20" />
-          <label class="ep-field-label" style="margin-top:8px">Emergency Phone 2 (optional)</label>
-          <input class="ep-input" type="tel" bind:value={panicPhone2} placeholder="+91 98765 43210" maxlength="20" />
-          <button class="ep-save-btn" style="margin-top:12px" on:click={savePanicPhones} disabled={panicSaving}>
+          <label class="ep-field-label" for="ep-panic-1">Emergency Phone 1</label>
+          <input id="ep-panic-1" class="ep-input" type="tel" bind:value={panicPhone1} placeholder="+91 98765 43210" maxlength="20" />
+          <label class="ep-field-label ep-field-label--spaced" for="ep-panic-2">Emergency Phone 2 (optional)</label>
+          <input id="ep-panic-2" class="ep-input" type="tel" bind:value={panicPhone2} placeholder="+91 98765 43210" maxlength="20" />
+          <button class="ep-save-btn ep-save-btn--inline tactile" onclick={savePanicPhones} disabled={panicSaving}>
             {panicSaving ? 'Saving...' : 'Save SMS Contacts'}
           </button>
         </div>
@@ -550,8 +593,8 @@
     </section>
 
     <!-- ── Heartbeat Check: daily wellness pulse ───────────────────────────── -->
-    <section class="ep-section">
-      <button class="ep-section-header" on:click={() => openSections = { ...openSections, heartbeat: !openSections.heartbeat }}>
+    <section class="ep-section" class:ep-section--open={openSections.heartbeat}>
+      <button class="ep-section-header" onclick={() => openSections = { ...openSections, heartbeat: !openSections.heartbeat }}>
         <span class="ep-section-icon" aria-hidden="true">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
         </span>
@@ -561,28 +604,28 @@
         </span>
       </button>
       {#if openSections.heartbeat}
-        <div class="ep-section-body">
+        <div class="ep-section-body" transition:reveal>
           <p class="ep-hint">If you don't open the app or share location by the deadline, your family gets a gentle "Haven't heard from you today" notification.</p>
-          <label class="ep-field-label" style="display:flex;align-items:center;gap:8px">
-            <input type="checkbox" bind:checked={heartbeatEnabled} on:change={saveHeartbeat} />
+          <label class="ep-field-label ep-field-label--check">
+            <input type="checkbox" bind:checked={heartbeatEnabled} onchange={saveHeartbeat} />
             Enable daily heartbeat check
           </label>
           {#if heartbeatEnabled}
-            <label class="ep-field-label" style="margin-top:8px">Deadline (UTC)</label>
-            <input class="ep-input" type="time" bind:value={heartbeatDeadline} on:change={saveHeartbeat} />
+            <label class="ep-field-label ep-field-label--spaced" for="ep-heartbeat-deadline">Deadline (UTC)</label>
+            <input id="ep-heartbeat-deadline" class="ep-input" type="time" bind:value={heartbeatDeadline} onchange={saveHeartbeat} />
           {/if}
         </div>
       {/if}
     </section>
 
     <!-- ── Section 3: Medical Info ───────────────────────────────────────── -->
-    <section class="ep-section" aria-labelledby="section-medical-heading">
+    <section class="ep-section" class:ep-section--open={openSections.medical} aria-labelledby="section-medical-heading">
       <button
         class="ep-section-header"
         id="section-medical-btn"
         aria-expanded={openSections.medical}
         aria-controls="section-medical-body"
-        on:click={() => toggleSection('medical')}
+        onclick={() => toggleSection('medical')}
       >
         <span class="ep-section-icon" aria-hidden="true">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -600,10 +643,11 @@
       </button>
 
       {#if openSections.medical}
-        <div class="ep-section-body" id="section-medical-body" role="region" aria-labelledby="section-medical-heading">
+        <div class="ep-section-body" id="section-medical-body" role="region" aria-labelledby="section-medical-heading" transition:reveal>
 
-          <div class="ep-field">
-            <label for="ep-conditions" class="ep-label">Medical Conditions</label>
+          <!-- Conditions — medical card -->
+          <div class="ep-med-card">
+            <label for="ep-conditions" class="ep-med-card-title">Medical Conditions</label>
             <textarea
               id="ep-conditions"
               class="ep-textarea"
@@ -616,8 +660,17 @@
             <span id="ep-conditions-desc" class="ep-field-hint">List all diagnosed conditions</span>
           </div>
 
-          <div class="ep-field">
-            <label for="ep-allergies" class="ep-label">Allergies</label>
+          <!-- Allergies — critical medical card -->
+          <div class="ep-med-card ep-med-card--allergy">
+            <label for="ep-allergies" class="ep-med-card-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              Allergies
+            </label>
             <textarea
               id="ep-allergies"
               class="ep-textarea"
@@ -679,13 +732,13 @@
     </section>
 
     <!-- ── Section 3: First Responder Notes ─────────────────────────────── -->
-    <section class="ep-section" aria-labelledby="section-responder-heading">
+    <section class="ep-section" class:ep-section--open={openSections.responder} aria-labelledby="section-responder-heading">
       <button
         class="ep-section-header"
         id="section-responder-btn"
         aria-expanded={openSections.responder}
         aria-controls="section-responder-body"
-        on:click={() => toggleSection('responder')}
+        onclick={() => toggleSection('responder')}
       >
         <span class="ep-section-icon" aria-hidden="true">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -704,7 +757,7 @@
       </button>
 
       {#if openSections.responder}
-        <div class="ep-section-body" id="section-responder-body" role="region" aria-labelledby="section-responder-heading">
+        <div class="ep-section-body" id="section-responder-body" role="region" aria-labelledby="section-responder-heading" transition:reveal>
 
           <div class="ep-field">
             <label for="ep-language" class="ep-label">Preferred Language</label>
@@ -736,13 +789,13 @@
     </section>
 
     <!-- ── Section 4: QR / Share info ───────────────────────────────────── -->
-    <section class="ep-section" aria-labelledby="section-qr-heading">
+    <section class="ep-section" class:ep-section--open={openSections.qr} aria-labelledby="section-qr-heading">
       <button
         class="ep-section-header"
         id="section-qr-btn"
         aria-expanded={openSections.qr}
         aria-controls="section-qr-body"
-        on:click={() => toggleSection('qr')}
+        onclick={() => toggleSection('qr')}
       >
         <span class="ep-section-icon" aria-hidden="true">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -766,7 +819,7 @@
       </button>
 
       {#if openSections.qr}
-        <div class="ep-section-body" id="section-qr-body" role="region" aria-labelledby="section-qr-heading">
+        <div class="ep-section-body" id="section-qr-body" role="region" aria-labelledby="section-qr-heading" transition:reveal>
 
           <div class="ep-qr-info-card" role="note">
             <span class="ep-qr-info-icon" aria-hidden="true">
@@ -811,11 +864,11 @@
 
     <!-- Bottom save button (convenience) -->
     <button
-      class="ep-save-bottom-btn"
+      class="ep-save-bottom-btn tactile"
       class:ep-save-bottom-btn--success={saveSuccess}
       disabled={saving || hasErrors}
       aria-label="Save emergency profile"
-      on:click={save}
+      onclick={save}
     >
       {#if saveSuccess}
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -858,10 +911,10 @@
     z-index: 100;
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: env(safe-area-inset-top, 0px) 16px 0;
-    padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
-    padding-bottom: 12px;
+    gap: var(--space-2);
+    padding: env(safe-area-inset-top, 0px) var(--space-4) 0;
+    padding-top: calc(env(safe-area-inset-top, 0px) + var(--space-3));
+    padding-bottom: var(--space-3);
     background: var(--surface-2, rgba(255,255,255,0.92));
     backdrop-filter: blur(20px) saturate(1.6);
     -webkit-backdrop-filter: blur(20px) saturate(1.6);
@@ -873,9 +926,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 38px;
-    height: 38px;
-    border-radius: 10px;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-md, 10px);
     border: 1px solid var(--border-default, rgba(15,23,42,0.10));
     background: var(--surface-1, rgba(255,255,255,0.80));
     color: var(--text-primary, #0f172a);
@@ -901,10 +954,10 @@
     flex-shrink: 0;
     display: flex;
     align-items: center;
-    gap: 5px;
-    height: 36px;
-    padding: 0 14px;
-    border-radius: 10px;
+    gap: var(--space-1-5);
+    min-height: 44px;
+    padding: 0 var(--space-4);
+    border-radius: var(--radius-md, 10px);
     border: none;
     background: var(--primary-500, #6366f1);
     color: #fff;
@@ -925,44 +978,110 @@
   }
   .ep-save-btn--success {
     background: var(--success-500, #10b981) !important;
-    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.30) !important;
+    box-shadow: 0 4px 14px var(--success-500-20, rgba(16, 185, 129, 0.30)) !important;
+  }
+  .ep-save-btn--inline {
+    justify-content: center;
+    width: 100%;
+    margin-top: var(--space-3);
   }
 
   /* ── Body ─────────────────────────────────────────────────────────────── */
   .ep-body {
     flex: 1;
-    padding: 20px 16px calc(env(safe-area-inset-bottom, 0px) + 32px);
+    padding: var(--space-5) var(--space-4) calc(env(safe-area-inset-bottom, 0px) + var(--space-8));
     max-width: 640px;
     width: 100%;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--space-3);
   }
 
-  /* ── Status badge row ─────────────────────────────────────────────────── */
-  .ep-badge-row {
+  /* ── Completeness meter card ──────────────────────────────────────────── */
+  .ep-meter-card {
     display: flex;
     align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
+    gap: var(--space-4);
+    padding: var(--space-4);
+    border-radius: var(--radius-xl, 20px);
+    background: var(--surface-2, rgba(255,255,255,0.92));
+    border: 1px solid var(--border-default, rgba(15,23,42,0.10));
+    box-shadow: var(--shadow-sm, 0 2px 6px rgba(0,0,0,0.06));
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  .ep-meter-ring {
+    position: relative;
+    flex-shrink: 0;
+    width: 56px;
+    height: 56px;
+    display: grid;
+    place-items: center;
+  }
+  .ep-meter-ring svg {
+    display: block;
+    transform: rotate(-90deg);
+  }
+  .ep-ring-track {
+    fill: none;
+    stroke: var(--gray-200, #e2e8f0);
+    stroke-width: 4;
+  }
+  .ep-ring-fill {
+    fill: none;
+    stroke: var(--primary-500, #6366f1);
+    stroke-width: 4;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 500ms var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)),
+                stroke 250ms ease;
+  }
+  .ep-ring-fill--complete { stroke: var(--success-500, #10b981); }
+  .ep-ring-pct {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-size: var(--text-sm, 0.875rem);
+    font-weight: 700;
+    color: var(--text-primary, #0f172a);
+    font-variant-numeric: tabular-nums;
+  }
+  .ep-ring-pct-sign {
+    font-size: 0.62em;
+    font-weight: 600;
+    color: var(--text-tertiary, #94a3b8);
+    margin-left: 1px;
+  }
+  .ep-meter-info {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1-5);
+    min-width: 0;
+  }
+  .ep-meter-count {
+    font-size: var(--text-sm, 0.875rem);
+    font-weight: 500;
+    color: var(--text-secondary, #475569);
   }
 
+  /* ── Status badge ─────────────────────────────────────────────────────── */
   .ep-badge {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 4px 11px;
-    border-radius: 9999px;
+    gap: var(--space-1-5);
+    align-self: flex-start;
+    padding: var(--space-1) var(--space-2-5);
+    border-radius: var(--radius-full, 9999px);
     font-size: var(--text-xs, 0.75rem);
     font-weight: 700;
     letter-spacing: 0.02em;
     text-transform: uppercase;
   }
   .ep-badge--complete {
-    background: rgba(16, 185, 129, 0.12);
+    background: var(--success-500-12, rgba(16, 185, 129, 0.12));
     color: var(--success-600, #059669);
-    border: 1px solid rgba(16, 185, 129, 0.25);
+    border: 1px solid var(--success-500-20, rgba(16, 185, 129, 0.25));
   }
   .ep-badge--incomplete {
     background: rgba(245, 158, 11, 0.10);
@@ -975,47 +1094,12 @@
     color: var(--text-tertiary, #94a3b8);
   }
 
-  /* ── Progress bar ─────────────────────────────────────────────────────── */
-  .ep-progress-wrap {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-  .ep-progress-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .ep-progress-label {
-    font-size: var(--text-xs, 0.75rem);
-    font-weight: 500;
-    color: var(--text-secondary, #475569);
-  }
-  .ep-progress-pct {
-    font-size: var(--text-xs, 0.75rem);
-    font-weight: 700;
-    color: var(--primary-500, #6366f1);
-    font-variant-numeric: tabular-nums;
-  }
-  .ep-progress-track {
-    height: 6px;
-    border-radius: 9999px;
-    background: var(--gray-200, #e2e8f0);
-    overflow: hidden;
-  }
-  .ep-progress-fill {
-    height: 100%;
-    border-radius: 9999px;
-    background: linear-gradient(90deg, var(--primary-500, #6366f1), var(--primary-400, #818cf8));
-    transition: width 400ms cubic-bezier(0.16, 1, 0.3, 1);
-  }
-
   /* ── Warning card ─────────────────────────────────────────────────────── */
   .ep-warning-card {
     display: flex;
     align-items: flex-start;
-    gap: 10px;
-    padding: 12px 14px;
+    gap: var(--space-2-5);
+    padding: var(--space-3) var(--space-3-5);
     border-radius: var(--radius-lg, 14px);
     background: rgba(245, 158, 11, 0.08);
     border: 1px solid rgba(245, 158, 11, 0.22);
@@ -1031,7 +1115,7 @@
     line-height: var(--leading-relaxed, 1.625);
   }
 
-  /* ── Section card ─────────────────────────────────────────────────────── */
+  /* ── Section card (glass) ─────────────────────────────────────────────── */
   .ep-section {
     border-radius: var(--radius-xl, 20px);
     background: var(--surface-2, rgba(255,255,255,0.92));
@@ -1040,14 +1124,22 @@
     overflow: hidden;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
+    transition: box-shadow 240ms var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)),
+                border-color 240ms ease;
+  }
+  .ep-section--open {
+    border-color: var(--primary-500-20, rgba(99, 102, 241, 0.20));
+    box-shadow: var(--shadow-md, 0 6px 20px rgba(0,0,0,0.10)),
+                var(--glow-primary-sm, 0 0 12px rgba(99, 102, 241, 0.18));
   }
 
   .ep-section-header {
     width: 100%;
+    min-height: 44px;
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 15px 16px;
+    gap: var(--space-2-5);
+    padding: var(--space-3-5) var(--space-4);
     border: none;
     background: transparent;
     cursor: pointer;
@@ -1055,7 +1147,7 @@
     transition: background 120ms ease;
   }
   .ep-section-header:hover {
-    background: rgba(99, 102, 241, 0.04);
+    background: var(--primary-500-08, rgba(99, 102, 241, 0.04));
   }
 
   .ep-section-icon {
@@ -1065,9 +1157,13 @@
     justify-content: center;
     width: 34px;
     height: 34px;
-    border-radius: 9px;
-    background: rgba(99, 102, 241, 0.10);
+    border-radius: var(--radius-sm2, 9px);
+    background: var(--primary-500-12, rgba(99, 102, 241, 0.10));
     color: var(--primary-500, #6366f1);
+    transition: background 240ms ease;
+  }
+  .ep-section--open .ep-section-icon {
+    background: var(--primary-500-20, rgba(99, 102, 241, 0.20));
   }
 
   .ep-section-title {
@@ -1083,17 +1179,17 @@
     color: var(--text-tertiary, #94a3b8);
     display: flex;
     align-items: center;
-    transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+    transition: transform 220ms var(--ease-spring, cubic-bezier(0.16, 1, 0.3, 1));
   }
   .ep-section-chevron--open {
     transform: rotate(180deg);
   }
 
   .ep-section-body {
-    padding: 4px 16px 18px;
+    padding: var(--space-1) var(--space-4) var(--space-4);
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: var(--space-3-5);
     border-top: 1px solid var(--border-subtle, rgba(15,23,42,0.06));
   }
 
@@ -1101,15 +1197,12 @@
   .ep-field {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: var(--space-1-5);
   }
   .ep-field-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-  .ep-field--half {
-    /* inherits from grid */
+    gap: var(--space-2-5);
   }
 
   .ep-label {
@@ -1119,6 +1212,26 @@
     display: block;
   }
 
+  .ep-field-label {
+    font-size: var(--text-sm, 0.875rem);
+    font-weight: 500;
+    color: var(--text-secondary, #475569);
+    display: block;
+  }
+  .ep-field-label--spaced { margin-top: var(--space-2); }
+  .ep-field-label--check {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 44px;
+  }
+
+  .ep-hint {
+    font-size: var(--text-sm, 0.875rem);
+    color: var(--text-secondary, #475569);
+    line-height: var(--leading-relaxed, 1.625);
+  }
+
   .ep-required {
     color: var(--danger-500, #ef4444);
     margin-left: 2px;
@@ -1126,8 +1239,8 @@
 
   .ep-input {
     width: 100%;
-    height: 42px;
-    padding: 0 12px;
+    height: 44px;
+    padding: 0 var(--space-3);
     border-radius: var(--radius-input, 10px);
     border: 1px solid var(--border-default, rgba(15,23,42,0.10));
     background: var(--surface-3, rgba(255,255,255,0.60));
@@ -1142,20 +1255,20 @@
   .ep-input:focus {
     outline: none;
     border-color: var(--primary-500, #6366f1);
-    box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+    box-shadow: 0 0 0 3px var(--primary-500-12, rgba(99,102,241,0.12));
   }
   .ep-input--error {
     border-color: var(--danger-500, #ef4444);
   }
   .ep-input--error:focus {
     border-color: var(--danger-500, #ef4444);
-    box-shadow: 0 0 0 3px rgba(239,68,68,0.12);
+    box-shadow: 0 0 0 3px var(--danger-500-12, rgba(239,68,68,0.12));
   }
 
   .ep-textarea {
     width: 100%;
     min-height: 72px;
-    padding: 10px 12px;
+    padding: var(--space-2-5) var(--space-3);
     border-radius: var(--radius-input, 10px);
     border: 1px solid var(--border-default, rgba(15,23,42,0.10));
     background: var(--surface-3, rgba(255,255,255,0.60));
@@ -1171,7 +1284,7 @@
   .ep-textarea:focus {
     outline: none;
     border-color: var(--primary-500, #6366f1);
-    box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+    box-shadow: 0 0 0 3px var(--primary-500-12, rgba(99,102,241,0.12));
   }
 
   .ep-field-hint {
@@ -1184,25 +1297,53 @@
     font-weight: 500;
   }
 
+  /* ── Medical card containers ──────────────────────────────────────────── */
+  .ep-med-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-3-5);
+    border-radius: var(--radius-lg, 14px);
+    background: var(--surface-3, rgba(255,255,255,0.60));
+    border: 1px solid var(--border-subtle, rgba(15,23,42,0.06));
+  }
+  .ep-med-card--blood,
+  .ep-med-card--allergy {
+    background: var(--danger-500-12, rgba(239, 68, 68, 0.08));
+    border-color: var(--danger-500-20, rgba(239, 68, 68, 0.20));
+  }
+  .ep-med-card-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-sm, 0.875rem);
+    font-weight: 600;
+    color: var(--text-primary, #0f172a);
+  }
+  .ep-med-card--blood .ep-med-card-title,
+  .ep-med-card--allergy .ep-med-card-title {
+    color: var(--danger-600, #dc2626);
+  }
+
   /* ── Blood type pill grid ─────────────────────────────────────────────── */
   .ep-blood-grid {
     display: flex;
     flex-wrap: wrap;
-    gap: 7px;
+    gap: var(--space-2);
     margin-top: 2px;
   }
   .ep-blood-pill {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    height: 36px;
-    min-width: 54px;
-    padding: 0 12px;
-    border-radius: 9999px;
-    border: 1.5px solid var(--border-default, rgba(15,23,42,0.10));
-    background: var(--surface-3, rgba(255,255,255,0.60));
-    font-size: var(--text-sm, 0.875rem);
-    font-weight: 600;
+    min-height: 44px;
+    min-width: 56px;
+    padding: 0 var(--space-3);
+    border-radius: var(--radius-full, 9999px);
+    border: 1.5px solid var(--border-default, rgba(15,23,42,0.14));
+    background: var(--surface-1, rgba(255,255,255,0.80));
+    font-size: var(--text-base, 1rem);
+    font-weight: 700;
     color: var(--text-secondary, #475569);
     cursor: pointer;
     transition: border-color 150ms ease, background 150ms ease, color 150ms ease, transform 100ms ease;
@@ -1214,7 +1355,7 @@
   .ep-blood-pill:active { transform: scale(0.93); }
   .ep-blood-pill--selected {
     border-color: var(--danger-500, #ef4444);
-    background: rgba(239, 68, 68, 0.08);
+    background: var(--danger-500-20, rgba(239, 68, 68, 0.15));
     color: var(--danger-600, #dc2626);
   }
   .ep-blood-pill--selected:hover {
@@ -1225,11 +1366,11 @@
   /* ── QR / share card ──────────────────────────────────────────────────── */
   .ep-qr-info-card {
     display: flex;
-    gap: 12px;
-    padding: 14px;
+    gap: var(--space-3);
+    padding: var(--space-3-5);
     border-radius: var(--radius-lg, 14px);
-    background: rgba(99, 102, 241, 0.05);
-    border: 1px solid rgba(99, 102, 241, 0.15);
+    background: var(--primary-500-08, rgba(99, 102, 241, 0.05));
+    border: 1px solid var(--primary-500-12, rgba(99, 102, 241, 0.15));
   }
   .ep-qr-info-icon {
     flex-shrink: 0;
@@ -1239,7 +1380,7 @@
   .ep-qr-info-text {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
   .ep-qr-title {
     font-size: var(--text-sm, 0.875rem);
@@ -1252,14 +1393,14 @@
     line-height: var(--leading-relaxed, 1.625);
   }
   .ep-watch-link-block {
-    margin-top: 8px;
-    padding: 10px 12px;
+    margin-top: var(--space-2);
+    padding: var(--space-2-5) var(--space-3);
     border-radius: var(--radius-md, 10px);
     background: var(--surface-inset, #f1f5f9);
     border: 1px solid var(--border-subtle, rgba(15,23,42,0.06));
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--space-1);
   }
   .ep-watch-link-label {
     font-size: var(--text-xs, 0.75rem);
@@ -1286,10 +1427,10 @@
   .ep-privacy-note {
     display: flex;
     align-items: flex-start;
-    gap: 7px;
+    gap: var(--space-1-5);
     font-size: var(--text-xs, 0.75rem);
     color: var(--text-tertiary, #94a3b8);
-    padding: 0 4px;
+    padding: 0 var(--space-1);
     line-height: var(--leading-relaxed, 1.625);
   }
   .ep-privacy-note svg {
@@ -1302,7 +1443,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: var(--space-2);
     width: 100%;
     height: 52px;
     border-radius: var(--radius-button, 14px);
@@ -1315,7 +1456,7 @@
     cursor: pointer;
     transition: background 150ms ease, transform 120ms ease, box-shadow 150ms ease;
     box-shadow: var(--shadow-primary, 0 4px 14px rgba(79,70,229,0.30));
-    margin-top: 4px;
+    margin-top: var(--space-1);
   }
   .ep-save-bottom-btn:hover:not(:disabled) {
     background: var(--primary-600, #4f46e5);
@@ -1329,7 +1470,7 @@
   }
   .ep-save-bottom-btn--success {
     background: var(--success-500, #10b981) !important;
-    box-shadow: 0 4px 14px rgba(16,185,129,0.30) !important;
+    box-shadow: 0 4px 14px var(--success-500-20, rgba(16,185,129,0.30)) !important;
   }
 
   /* ── Section count badge ─────────────────────────────────────────────── */
@@ -1339,9 +1480,9 @@
     justify-content: center;
     min-width: 20px;
     height: 20px;
-    padding: 0 6px;
-    border-radius: 9999px;
-    background: rgba(99,102,241,0.12);
+    padding: 0 var(--space-1-5);
+    border-radius: var(--radius-full, 9999px);
+    background: var(--primary-500-12, rgba(99,102,241,0.12));
     color: var(--primary-500, #6366f1);
     font-size: var(--text-xs, 0.75rem);
     font-weight: 700;
@@ -1352,10 +1493,10 @@
   .ep-contact-card {
     border: 1px solid var(--border-default, rgba(15,23,42,0.10));
     border-radius: var(--radius-lg, 14px);
-    padding: 14px;
+    padding: var(--space-3-5);
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: var(--space-2-5);
     background: var(--surface-3, rgba(255,255,255,0.60));
   }
 
@@ -1377,22 +1518,22 @@
     justify-content: center;
     width: 44px;
     height: 44px;
-    border: 1px solid rgba(239,68,68,0.20);
-    border-radius: 7px;
-    background: rgba(239,68,68,0.05);
+    border: 1px solid var(--danger-500-20, rgba(239,68,68,0.20));
+    border-radius: var(--radius-sm, 7px);
+    background: var(--danger-500-12, rgba(239,68,68,0.05));
     color: var(--danger-500, #ef4444);
     cursor: pointer;
     transition: background 150ms ease;
   }
-  .ep-remove-btn:hover { background: rgba(239,68,68,0.14); }
+  .ep-remove-btn:hover { background: var(--danger-500-20, rgba(239,68,68,0.14)); }
 
   .ep-add-contact-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 7px;
+    gap: var(--space-1-5);
     width: 100%;
-    height: 42px;
+    min-height: 44px;
     border: 1.5px dashed var(--border-default, rgba(15,23,42,0.15));
     border-radius: var(--radius-input, 10px);
     background: transparent;
@@ -1404,7 +1545,7 @@
     transition: background 150ms ease, border-color 150ms ease;
   }
   .ep-add-contact-btn:hover {
-    background: rgba(99,102,241,0.06);
+    background: var(--primary-500-08, rgba(99,102,241,0.06));
     border-color: var(--primary-400, #818cf8);
   }
 
@@ -1412,7 +1553,7 @@
     font-size: var(--text-sm, 0.875rem);
     color: var(--text-tertiary, #94a3b8);
     text-align: center;
-    padding: 8px 4px;
+    padding: var(--space-2) var(--space-1);
     line-height: 1.6;
   }
 
@@ -1428,6 +1569,12 @@
     }
   }
 
+  /* ── Reduced motion ───────────────────────────────────────────────────── */
+  @media (prefers-reduced-motion: reduce) {
+    .ep-ring-fill { transition: none; }
+    .ep-section-chevron { transition: none; }
+  }
+
   @media (prefers-color-scheme: dark) {
     .ep-root {
       background: #0b0f1a;
@@ -1436,11 +1583,12 @@
       background: rgba(15, 23, 42, 0.92);
       border-color: rgba(255,255,255,0.08);
     }
+    .ep-meter-card,
     .ep-section {
       background: rgba(30, 41, 59, 0.80);
       border-color: rgba(255,255,255,0.08);
     }
-    .ep-section-header:hover { background: rgba(99, 102, 241, 0.08); }
+    .ep-section-header:hover { background: var(--primary-500-12, rgba(99, 102, 241, 0.08)); }
     .ep-input,
     .ep-textarea {
       background: rgba(15, 23, 42, 0.60);
@@ -1457,12 +1605,17 @@
       color: #94a3b8;
     }
     .ep-blood-pill--selected {
-      background: rgba(239,68,68,0.15);
+      background: var(--danger-500-20, rgba(239,68,68,0.15));
+      color: #fca5a5;
     }
     .ep-back-btn {
       background: rgba(30,41,59,0.80);
       border-color: rgba(255,255,255,0.10);
       color: #f1f5f9;
+    }
+    .ep-med-card {
+      background: rgba(15, 23, 42, 0.50);
+      border-color: rgba(255,255,255,0.06);
     }
     .ep-watch-link-block {
       background: rgba(15, 23, 42, 0.60);
@@ -1471,15 +1624,21 @@
       background: rgba(245,158,11,0.10);
     }
     .ep-qr-info-card {
-      background: rgba(99,102,241,0.08);
+      background: var(--primary-500-12, rgba(99,102,241,0.08));
     }
     .ep-header-heading,
     .ep-section-title,
-    .ep-qr-title {
+    .ep-qr-title,
+    .ep-ring-pct,
+    .ep-med-card-title {
       color: #f1f5f9;
     }
-    .ep-progress-track {
-      background: rgba(255,255,255,0.10);
+    .ep-med-card--blood .ep-med-card-title,
+    .ep-med-card--allergy .ep-med-card-title {
+      color: #fca5a5;
+    }
+    .ep-ring-track {
+      stroke: rgba(255,255,255,0.10);
     }
     .ep-contact-card {
       background: rgba(15,23,42,0.50);

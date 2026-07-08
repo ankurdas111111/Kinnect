@@ -1,13 +1,29 @@
 <script>
+  import { run } from 'svelte/legacy';
+
   import { onMount } from 'svelte';
   import { socket } from '../lib/socket.js';
   import { networkGraph } from '../lib/stores/network.js';
   import { focusUser } from '../lib/stores/map.js';
   import { getUserColor } from '../lib/getUserColor.js';
 
-  export let embedded = false;
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [embedded]
+   */
 
-  const edgeColors = { contact: '#818cf8', guardian: '#f59e0b', ward: '#f59e0b', room: '#14b8a6' };
+  /** @type {Props} */
+  let { embedded = false } = $props();
+
+  // Design tokens (global.css / tokens-oklch.css). Applied via inline style,
+  // not SVG presentation attributes — var() is not valid in attributes.
+  const edgeColors = {
+    contact: 'var(--indigo-400)',
+    guardian: 'var(--warning-500)',
+    ward: 'var(--warning-500)',
+    room: 'var(--primary-500)',
+  };
+  const EDGE_FALLBACK = 'var(--presence-gone)';
 
   function refresh() {
     socket.emit('getNetworkGraph');
@@ -16,70 +32,72 @@
   onMount(refresh);
 
   // Simple spring-force layout — runs once when graph data arrives
-  let layoutNodes = [];
-  let layoutEdges = [];
+  let layoutNodes = $state([]);
+  let layoutEdges = $state([]);
   const W = 320, H = 320;
   const CX = W / 2, CY = H / 2;
 
-  $: if ($networkGraph) {
-    const nodes = $networkGraph.nodes || [];
-    const edges = $networkGraph.edges || [];
+  run(() => {
+    if ($networkGraph) {
+      const nodes = $networkGraph.nodes || [];
+      const edges = $networkGraph.edges || [];
 
-    // Place nodes in a circle initially
-    const count = nodes.length;
-    const r = Math.min(CX, CY) * 0.72;
-    layoutNodes = nodes.map((n, i) => {
-      const angle = (2 * Math.PI * i) / count - Math.PI / 2;
-      // Self node goes to center
-      return {
-        ...n,
-        x: n.role === 'self' ? CX : CX + r * Math.cos(angle),
-        y: n.role === 'self' ? CY : CY + r * Math.sin(angle),
-      };
-    });
+      // Place nodes in a circle initially
+      const count = nodes.length;
+      const r = Math.min(CX, CY) * 0.72;
+      layoutNodes = nodes.map((n, i) => {
+        const angle = (2 * Math.PI * i) / count - Math.PI / 2;
+        // Self node goes to center
+        return {
+          ...n,
+          x: n.role === 'self' ? CX : CX + r * Math.cos(angle),
+          y: n.role === 'self' ? CY : CY + r * Math.sin(angle),
+        };
+      });
 
-    // Run a few iterations of force-directed layout
-    const nodeMap = new Map(layoutNodes.map(n => [n.id, n]));
-    for (let iter = 0; iter < 60; iter++) {
-      // Repulsion
-      for (let i = 0; i < layoutNodes.length; i++) {
-        for (let j = i + 1; j < layoutNodes.length; j++) {
-          const a = layoutNodes[i], b = layoutNodes[j];
-          const dx = b.x - a.x, dy = b.y - a.y;
+      // Run a few iterations of force-directed layout
+      const nodeMap = new Map(layoutNodes.map(n => [n.id, n]));
+      for (let iter = 0; iter < 60; iter++) {
+        // Repulsion
+        for (let i = 0; i < layoutNodes.length; i++) {
+          for (let j = i + 1; j < layoutNodes.length; j++) {
+            const a = layoutNodes[i], b = layoutNodes[j];
+            const dx = b.x - a.x, dy = b.y - a.y;
+            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            const f = 1200 / (dist * dist);
+            const fx = (dx / dist) * f, fy = (dy / dist) * f;
+            a.x -= fx * 0.15; a.y -= fy * 0.15;
+            b.x += fx * 0.15; b.y += fy * 0.15;
+          }
+        }
+        // Attraction along edges
+        for (const e of edges) {
+          const s = nodeMap.get(e.source), t = nodeMap.get(e.target);
+          if (!s || !t) continue;
+          const dx = t.x - s.x, dy = t.y - s.y;
           const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-          const f = 1200 / (dist * dist);
+          const f = (dist - 80) * 0.04;
           const fx = (dx / dist) * f, fy = (dy / dist) * f;
-          a.x -= fx * 0.15; a.y -= fy * 0.15;
-          b.x += fx * 0.15; b.y += fy * 0.15;
+          if (s.role !== 'self') { s.x += fx; s.y += fy; }
+          if (t.role !== 'self') { t.x -= fx; t.y -= fy; }
+        }
+        // Clamp
+        for (const n of layoutNodes) {
+          n.x = Math.max(24, Math.min(W - 24, n.x));
+          n.y = Math.max(24, Math.min(H - 24, n.y));
         }
       }
-      // Attraction along edges
-      for (const e of edges) {
-        const s = nodeMap.get(e.source), t = nodeMap.get(e.target);
-        if (!s || !t) continue;
-        const dx = t.x - s.x, dy = t.y - s.y;
-        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const f = (dist - 80) * 0.04;
-        const fx = (dx / dist) * f, fy = (dy / dist) * f;
-        if (s.role !== 'self') { s.x += fx; s.y += fy; }
-        if (t.role !== 'self') { t.x -= fx; t.y -= fy; }
-      }
-      // Clamp
-      for (const n of layoutNodes) {
-        n.x = Math.max(24, Math.min(W - 24, n.x));
-        n.y = Math.max(24, Math.min(H - 24, n.y));
-      }
-    }
 
-    const nodeMapFinal = new Map(layoutNodes.map(n => [n.id, n]));
-    layoutEdges = edges.map(e => ({
-      ...e,
-      x1: nodeMapFinal.get(e.source)?.x ?? CX,
-      y1: nodeMapFinal.get(e.source)?.y ?? CY,
-      x2: nodeMapFinal.get(e.target)?.x ?? CX,
-      y2: nodeMapFinal.get(e.target)?.y ?? CY,
-    }));
-  }
+      const nodeMapFinal = new Map(layoutNodes.map(n => [n.id, n]));
+      layoutEdges = edges.map(e => ({
+        ...e,
+        x1: nodeMapFinal.get(e.source)?.x ?? CX,
+        y1: nodeMapFinal.get(e.source)?.y ?? CY,
+        x2: nodeMapFinal.get(e.target)?.x ?? CX,
+        y2: nodeMapFinal.get(e.target)?.y ?? CY,
+      }));
+    }
+  });
 
   function clickNode(node) {
     // Find the socket ID for this user and focus on map
@@ -90,7 +108,7 @@
 <div class="panel-body network-panel" class:embedded>
   <div class="network-header">
     <span class="card-eyebrow">Your Network</span>
-    <button class="refresh-btn" on:click={refresh} aria-label="Refresh network graph">
+    <button class="refresh-btn" onclick={refresh} aria-label="Refresh network graph">
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.07-8.14"/></svg>
     </button>
   </div>
@@ -102,9 +120,9 @@
   {:else}
     <!-- Legend -->
     <div class="legend-row">
-      <span class="legend-item"><span class="legend-dot" style="background:#818cf8"></span>Contact</span>
-      <span class="legend-item"><span class="legend-dot" style="background:#f59e0b"></span>Guardian</span>
-      <span class="legend-item"><span class="legend-dot" style="background:#14b8a6"></span>Room</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--indigo-400)"></span>Contact</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--warning-500)"></span>Guardian</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--primary-500)"></span>Room</span>
     </div>
 
     <svg width={W} height={H} viewBox="0 0 {W} {H}" class="network-svg">
@@ -112,31 +130,31 @@
       {#each layoutEdges as e}
         <line
           x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2}
-          stroke={edgeColors[e.kind] || '#6b7280'}
+          style="stroke: {edgeColors[e.kind] || EDGE_FALLBACK}"
           stroke-width="1.5"
           stroke-opacity="0.5"
         />
       {/each}
       <!-- Nodes -->
       {#each layoutNodes as n}
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
         <g
           class="network-node"
           transform="translate({n.x},{n.y})"
-          on:click={() => clickNode(n)}
+          onclick={() => clickNode(n)}
           role="button"
           tabindex="0"
           aria-label="{n.name} — {n.role}"
         >
           <circle
             r={n.role === 'self' ? 18 : 14}
-            fill={n.role === 'self' ? '#818cf8' : getUserColor(n.id)}
+            style="fill: {n.role === 'self' ? 'var(--indigo-400)' : getUserColor(n.id)}"
             fill-opacity={n.online ? 1 : 0.4}
             stroke={n.online ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.2)'}
             stroke-width="1.5"
           />
           {#if !n.online}
-            <circle r={n.role === 'self' ? 18 : 14} fill="none" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="3 2"/>
+            <circle r={n.role === 'self' ? 18 : 14} fill="none" style="stroke: var(--presence-gone)" stroke-width="1.5" stroke-dasharray="3 2"/>
           {/if}
           <text
             text-anchor="middle"

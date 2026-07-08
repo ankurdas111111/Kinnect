@@ -40,26 +40,28 @@ func (h *Hub) handleGetDailyActivity(c *Client, data json.RawMessage) {
 		}
 	}
 
-	rows, err := db.GetDailyActivity(context.Background(), h.pool.DB, targetUserID, 30)
-	if err != nil {
+	h.offloadDB(func(ctx context.Context) {
+		rows, err := db.GetDailyActivity(ctx, h.pool.DB, targetUserID, 30)
+		if err != nil {
+			c.Send("dailyActivity", map[string]interface{}{
+				"userId": targetUserID,
+				"days":   []interface{}{},
+			})
+			return
+		}
+
+		days := make([]map[string]interface{}, 0, len(rows))
+		for _, r := range rows {
+			days = append(days, map[string]interface{}{
+				"date":          r.Date,
+				"distanceM":     r.DistanceM,
+				"activeMinutes": r.ActiveMinutes,
+				"updatedAt":     r.UpdatedAt,
+			})
+		}
 		c.Send("dailyActivity", map[string]interface{}{
 			"userId": targetUserID,
-			"days":   []interface{}{},
+			"days":   days,
 		})
-		return
-	}
-
-	days := make([]map[string]interface{}, 0, len(rows))
-	for _, r := range rows {
-		days = append(days, map[string]interface{}{
-			"date":          r.Date,
-			"distanceM":     r.DistanceM,
-			"activeMinutes": r.ActiveMinutes,
-			"updatedAt":     r.UpdatedAt,
-		})
-	}
-	c.Send("dailyActivity", map[string]interface{}{
-		"userId": targetUserID,
-		"days":   days,
 	})
 }

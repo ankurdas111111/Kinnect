@@ -21,6 +21,7 @@ import (
 )
 
 func main() {
+	startedAt := time.Now()
 	cfg, err := config.Load()
 	if err != nil {
 		slog.Error("Failed to load config", "error", err)
@@ -116,6 +117,7 @@ func main() {
 	}
 
 	hub := ws.NewHub(c, pool, cfg)
+	hub.SetMetrics(metrics)
 	go hub.Run(ctx)
 	go hub.StartPositionPurger(ctx)
 	hub.StartCleanupRoutines(ctx)
@@ -146,7 +148,15 @@ func main() {
 			slog.Info("Redis/Valkey wired for session storage")
 		}
 	}
-	handler := api.NewRouter(cfg, pool, c, store, hub, redisCache)
+	// Only pass the Redis health checker when Redis actually connected: a nil
+	// *RedisCache wrapped in the interface defeats the handler's nil check and
+	// panics /health on every request (typed-nil footgun).
+	var handler http.Handler
+	if redisCache != nil {
+		handler = api.NewRouter(cfg, pool, c, store, hub, redisCache)
+	} else {
+		handler = api.NewRouter(cfg, pool, c, store, hub)
+	}
 	go func() {
 		if err := monServer.Start(); err != nil && err != http.ErrServerClosed {
 			slog.Error("Monitoring server error", "error", err)
@@ -170,6 +180,24 @@ func main() {
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("HTTP server error", "error", err)
+		}
+	}()
+
+	metrics.StartupDuration.Set(float64(time.Since(startedAt).Milliseconds()))
+	// Sample uptime and DB pool stats every 15s.
+	go func() {
+		ticker := time.NewTicker(15 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				metrics.ProcessUptime.Set(time.Since(startedAt).Seconds())
+				stats := pool.DB.Stats()
+				metrics.DBConnectionsActive.Set(float64(stats.InUse))
+				metrics.DBConnectionsIdle.Set(float64(stats.Idle))
+			}
 		}
 	}()
 

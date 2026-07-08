@@ -1,4 +1,6 @@
 <script>
+  import { run } from 'svelte/legacy';
+
   /**
    * SosParticleBurst — visual confirmation burst when SOS is triggered.
    * Renders a full-screen particle explosion in danger-red to signal
@@ -13,15 +15,21 @@
   import { fade } from 'svelte/transition';
   import { createEventDispatcher, onDestroy } from 'svelte';
 
-  export let active = false;
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [active]
+   */
+
+  /** @type {Props} */
+  let { active = false } = $props();
 
   const dispatch = createEventDispatcher();
-  let _timer;
+  let _timer = $state();
 
-  $: {
+  run(() => {
     clearTimeout(_timer);
     if (active) _timer = setTimeout(() => dispatch('done'), 900);
-  }
+  });
 
   onDestroy(() => clearTimeout(_timer));
 </script>

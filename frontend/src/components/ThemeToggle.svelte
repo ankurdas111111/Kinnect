@@ -3,8 +3,8 @@
   import { themeStore, THEMES } from '../lib/stores/theme.js';
   import ThemePicker from './primitives/ThemePicker.svelte';
 
-  let pickerOpen = false;
-  let currentTheme = 'dark';
+  let pickerOpen = $state(false);
+  let currentTheme = $state('dark');
   let unsubscribe;
 
   onMount(() => {
@@ -12,12 +12,12 @@
   });
   onDestroy(() => { if (unsubscribe) unsubscribe(); });
 
-  $: themeData = THEMES.find(t => t.id === currentTheme) || THEMES[0];
+  let themeData = $derived(THEMES.find(t => t.id === currentTheme) || THEMES[0]);
 </script>
 
 <button
   class="btn btn-icon btn-ghost theme-btn"
-  on:click={() => pickerOpen = true}
+  onclick={() => pickerOpen = true}
   title="Change theme — currently {themeData.name}"
   aria-label="Change theme"
   style="--th-accent: {themeData.colors.accent}"

@@ -29,3 +29,6 @@ backend/kinnect-server
 backend/kinnect-v3
 backend/server
 backend/*.exe
+# Oracle deploy secrets
+deploy/oracle/.env
+deploy/oracle/edge/.env

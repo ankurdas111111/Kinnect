@@ -5,23 +5,25 @@
    */
   import { placeAlerts, speedAlerts } from '../lib/stores/places.js';
 
-  export let places = [];          // savedPlaces array (for selects)
-  export let visibleUsers = [];    // users available to alert on
-  export let getUserName;          // fn(userId) → string
-  export let iconEmoji = {};
 
-  export let onAddPlaceAlert;      // fn(targetId, placeId, onArrive, onDepart)
-  export let onRemovePlaceAlert;   // fn(alertId)
-  export let onAddSpeedAlert;      // fn(targetId, thresholdKmh)
-  export let onRemoveSpeedAlert;   // fn(alertId)
+  let {
+    places = [],
+    visibleUsers = [],
+    getUserName,
+    iconEmoji = {},
+    onAddPlaceAlert,
+    onRemovePlaceAlert,
+    onAddSpeedAlert,
+    onRemoveSpeedAlert
+  } = $props();
 
-  let alertTargetId = '';
-  let alertPlaceId = '';
-  let alertOnArrive = true;
-  let alertOnDepart = true;
+  let alertTargetId = $state('');
+  let alertPlaceId = $state('');
+  let alertOnArrive = $state(true);
+  let alertOnDepart = $state(true);
 
-  let speedTargetId = '';
-  let speedThreshold = 80;
+  let speedTargetId = $state('');
+  let speedThreshold = $state(80);
 
   function handleAddPlaceAlert() {
     if (!alertTargetId || !alertPlaceId) return;
@@ -70,7 +72,7 @@
         </div>
         <button
           class="icon-action icon-action--danger"
-          on:click={() => onRemovePlaceAlert(alert.id)}
+          onclick={() => onRemovePlaceAlert(alert.id)}
           aria-label="Remove alert: {getUserName(alert.targetId)} at {alert.placeName}"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
@@ -109,7 +111,7 @@
       </div>
       <button
         class="btn btn-primary btn-sm"
-        on:click={handleAddPlaceAlert}
+        onclick={handleAddPlaceAlert}
         disabled={!alertTargetId || !alertPlaceId || (!alertOnArrive && !alertOnDepart)}
       >
         Add Alert
@@ -147,7 +149,7 @@
         </div>
         <button
           class="icon-action icon-action--danger"
-          on:click={() => onRemoveSpeedAlert(sa.id)}
+          onclick={() => onRemoveSpeedAlert(sa.id)}
           aria-label="Remove speed alert for {getUserName(sa.targetId)}"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
@@ -180,7 +182,7 @@
       </label>
       <button
         class="btn btn-primary btn-sm"
-        on:click={handleAddSpeedAlert}
+        onclick={handleAddSpeedAlert}
         disabled={!speedTargetId}
         style="min-height: 44px;"
       >

@@ -1,4 +1,6 @@
 <script>
+  import { passive } from 'svelte/legacy';
+
   /**
    * Card — Interactive glass card with depth effects
    *
@@ -11,20 +13,43 @@
    *   clickable — adds cursor:pointer and active press
    *   intensity — tilt max degrees (default 8)
    *   noise     — enable CSS feTurbulence noise texture overlay (TECHNIQUE 4, default true)
+   *   span      — bento grid column span (1–4) when placed in a .bento-grid
+   *   tactile   — squishy scale-press on tap (non-tilt cards only)
    */
   import { spring } from 'svelte/motion';
   import { createEventDispatcher } from 'svelte';
 
-  export let variant   = 'default';
-  export let hover     = true;
-  export let tilt      = false;
-  export let glow      = null;
-  export let padding   = 'md';
-  export let clickable = false;
-  export let intensity = 8;
   // TECHNIQUE 4: noise texture — enabled by default on default/elevated/glass variants,
-  // disabled on outlined (transparent bg) variants where it's not meaningful
-  export let noise     = variant !== 'outlined';
+  
+  /**
+   * @typedef {Object} Props
+   * @property {string} [variant]
+   * @property {boolean} [hover]
+   * @property {boolean} [tilt]
+   * @property {any} [glow]
+   * @property {string} [padding]
+   * @property {boolean} [clickable]
+   * @property {number} [intensity]
+   * @property {any} [noise] - disabled on outlined (transparent bg) variants where it's not meaningful
+   * @property {number} [span] - bento grid column span (1–4)
+   * @property {boolean} [tactile] - squishy scale-press on tap (non-tilt only)
+   * @property {import('svelte').Snippet} [children]
+   */
+
+  /** @type {Props} */
+  let {
+    variant = 'default',
+    hover = true,
+    tilt = false,
+    glow = null,
+    padding = 'md',
+    clickable = false,
+    intensity = 8,
+    noise = variant !== 'outlined',
+    span = 1,
+    tactile = false,
+    children
+  } = $props();
 
   const dispatch = createEventDispatcher();
 
@@ -32,11 +57,11 @@
   const pressZ = spring(0, { stiffness: 500, damping: 30 });
 
   // Tilt state
-  let el;
+  let el = $state();
   let raf = null;
   let cx = 0, cy = 0, tx = 0, ty = 0;
-  let hovering = false;
-  let sx = 50, sy = 50; // shine position %
+  let hovering = $state(false);
+  let sx = $state(50), sy = $state(50); // shine position %
 
   function lerp(a, b, t) { return a + (b - a) * t; }
 
@@ -96,25 +121,27 @@
   }
 </script>
 
-<!-- svelte-ignore a11y-no-static-element-interactions -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="card card-{variant} pad-{padding}"
   class:hover-lift={hover}
   class:clickable
   class:noise-surface={noise}
+  class:tactile={tactile && !tilt}
   class:glow-primary={glow === 'primary'}
   class:glow-success={glow === 'success'}
   class:glow-danger={glow === 'danger'}
   class:glow-warning={glow === 'warning'}
   class:tilt-active={tilt}
+  style:grid-column={span > 1 ? `span ${span}` : undefined}
   bind:this={el}
-  on:mousemove={onMouseMove}
-  on:mouseleave={onMouseLeave}
-  on:touchmove|passive={onTouchMove}
-  on:touchend={onTouchEnd}
-  on:pointerdown={onPointerDown}
-  on:pointerup={onPointerUp}
-  on:click={onClick}
+  onmousemove={onMouseMove}
+  onmouseleave={onMouseLeave}
+  use:passive={['touchmove', () => onTouchMove]}
+  ontouchend={onTouchEnd}
+  onpointerdown={onPointerDown}
+  onpointerup={onPointerUp}
+  onclick={onClick}
   role={clickable ? 'button' : undefined}
   tabindex={clickable ? 0 : undefined}
 >
@@ -130,7 +157,7 @@
   <!-- Top-edge glow line (always rendered, themed by glow prop) -->
   <div class="card-edge-line" aria-hidden="true"></div>
 
-  <slot />
+  {@render children?.()}
 </div>
 
 <style>
@@ -278,14 +305,14 @@
     left: 12%;
     right: 12%;
     height: 1px;
-    background: linear-gradient(
+    background: var(--glass-edge-light, linear-gradient(
       90deg,
       transparent 0%,
       rgba(20, 184, 166, 0.55) 30%,
       rgba(20, 184, 166, 0.55) 70%,
       transparent 100%
-    );
-    box-shadow: 0 0 6px rgba(20, 184, 166, 0.30);
+    ));
+    box-shadow: 0 0 6px var(--primary-500-30, rgba(20, 184, 166, 0.30));
     pointer-events: none;
     border-radius: 0 0 2px 2px;
   }

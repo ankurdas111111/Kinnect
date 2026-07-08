@@ -1,4 +1,6 @@
 <script>
+  import { run } from 'svelte/legacy';
+
   import { onMount, onDestroy } from 'svelte';
   import { push, querystring } from 'svelte-spa-router';
   import { fly, fade } from 'svelte/transition';
@@ -6,41 +8,29 @@
   import { authUser } from '../lib/stores/auth.js';
   import { otherUsers } from '../lib/stores/map.js';
   import { socket } from '../lib/socket.js';
+  import Card from '../components/primitives/Card.svelte';
+  import Skeleton from '../components/primitives/Skeleton.svelte';
 
-  $: if (!$authUser) push('/login');
 
-  // ── Parse userId from query string ─────────────────────────────────────────
-  $: params = new URLSearchParams($querystring || '');
-  $: targetUserId = params.get('userId') || '';
-  $: targetUser = targetUserId
-    ? (() => { for (const [, u] of $otherUsers) { if (u.userId === targetUserId) return u; } return null; })()
-    : null;
-  $: displayName = targetUser?.displayName || targetUserId || 'Route';
 
   // ── Trail data & playback state ─────────────────────────────────────────────
-  let points = [];
-  let loading = false;
-  let error = null;
-  let windowMinutes = 60;
+  let points = $state([]);
+  let loading = $state(false);
+  let error = $state(null);
+  let windowMinutes = $state(60);
   const WINDOWS = [15, 30, 60];
 
-  let mapEl;
+  let mapEl = $state();
   let map = null;
   let mapReady = false;
 
   // Playback
-  let playing = false;
-  let playProgress = 0;
-  let playIndex = 0;
+  let playing = $state(false);
+  let playProgress = $state(0);
+  let playIndex = $state(0);
   let playTimer = null;
   let movingMarker = null;
 
-  // Stats
-  $: totalPoints = points.length;
-  $: totalDistKm = calcDist(points);
-  $: durationMin = points.length > 1
-    ? Math.round((points[points.length-1].ts - points[0].ts) / 60000)
-    : 0;
 
   function calcDist(pts) {
     let d = 0;
@@ -195,7 +185,6 @@
     requestTrail();
   }
 
-  $: currentTs = points[playIndex]?.ts;
   function fmtTs(ts) {
     if (!ts) return '--:--';
     return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -214,6 +203,25 @@
     socket.off('trailError', onTrailError);
     if (map) map.remove();
   });
+  run(() => {
+    if (!$authUser) push('/login');
+  });
+  // ── Parse userId from query string ─────────────────────────────────────────
+  let params = $derived(new URLSearchParams($querystring || ''));
+  let targetUserId = $derived(params.get('userId') || '');
+  let targetUser = $derived(targetUserId
+    ? (() => { for (const [, u] of $otherUsers) { if (u.userId === targetUserId) return u; } return null; })()
+    : null);
+  let displayName = $derived(targetUser?.displayName || targetUserId || 'Route');
+  // Stats
+  let totalPoints = $derived(points.length);
+  let totalDistKm = $derived(calcDist(points));
+  let durationMin = $derived(points.length > 1
+    ? Math.round((points[points.length-1].ts - points[0].ts) / 60000)
+    : 0);
+  let currentTs = $derived(points[playIndex]?.ts);
+  // Fraction (0–1) driving the transform-based progress fill
+  let playFrac = $derived(Math.max(0, Math.min(1, playProgress / 100)));
 </script>
 
 <svelte:head>
@@ -234,7 +242,7 @@
 <div class="replay-page page-enter aurora-ambient">
   <!-- Header -->
   <header class="rp-header">
-    <button class="icon-btn" on:click={() => push('/')} aria-label="Back to map">
+    <button class="icon-btn" onclick={() => push('/')} aria-label="Back to map">
       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
     </button>
     <div class="rp-title-group">
@@ -245,9 +253,9 @@
     <div class="window-pills" role="group" aria-label="Time window">
       {#each WINDOWS as w}
         <button
-          class="window-pill"
+          class="window-pill tactile"
           class:active={windowMinutes === w}
-          on:click={() => setWindow(w)}
+          onclick={() => setWindow(w)}
           aria-pressed={windowMinutes === w}
           aria-label="{w} minutes"
         >{w}m</button>
@@ -261,9 +269,9 @@
       <div class="map-overlay" transition:fade={{ duration: 200 }}>
         <!-- Skeleton shimmer instead of spinner -->
         <div class="load-skeleton" role="status" aria-label="Loading route…" aria-busy="true">
-          <div class="skel-line skel-line--wide"></div>
-          <div class="skel-line skel-line--mid"></div>
-          <div class="skel-line skel-line--short"></div>
+          <Skeleton variant="line" width="100%" height="12px" />
+          <Skeleton variant="line" width="70%" height="12px" />
+          <Skeleton variant="line" width="45%" height="12px" />
         </div>
         <p class="overlay-hint">Loading route…</p>
       </div>
@@ -274,7 +282,7 @@
         </div>
         <p class="empty-title">Choose someone to replay</p>
         <p class="empty-sub">Open a person's card on the map and tap <strong>Route History</strong> to see their journey here.</p>
-        <button class="action-btn" on:click={() => push('/')}>Open Map</button>
+        <button class="action-btn" onclick={() => push('/')}>Open Map</button>
       </div>
     {:else if error}
       <div class="map-overlay" transition:fade={{ duration: 200 }}>
@@ -282,7 +290,7 @@
           <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r="0.5" fill="currentColor"/></svg>
         </div>
         <p class="err-msg">{error}</p>
-        <button class="action-btn" on:click={requestTrail}>Try again</button>
+        <button class="action-btn" onclick={requestTrail}>Try again</button>
       </div>
     {/if}
   </div>
@@ -290,20 +298,41 @@
   <!-- Controls panel -->
   {#if !loading && !error && points.length > 0}
     <div class="controls-panel" transition:fly={{ y: 200, duration: 320, easing: cubicOut }}>
-      <!-- Stats row -->
-      <div class="stats-row" role="region" aria-label="Route statistics">
-        <div class="stat-chip">
-          <span class="stat-val">{totalPoints}</span>
-          <span class="stat-lbl">points</span>
-        </div>
-        <div class="stat-chip">
-          <span class="stat-val">{totalDistKm} km</span>
-          <span class="stat-lbl">distance</span>
-        </div>
-        <div class="stat-chip">
-          <span class="stat-val">{durationMin} min</span>
-          <span class="stat-lbl">duration</span>
-        </div>
+      <!-- Stats bento -->
+      <div class="stats-bento bento-grid" style="--bento-cols: 3;" role="region" aria-label="Route statistics">
+        <Card variant="glass" padding="sm" hover={false}>
+          <div class="stat">
+            <span class="stat-icon" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg>
+            </span>
+            <span class="stat-text">
+              <span class="stat-val">{totalDistKm}<span class="stat-unit">km</span></span>
+              <span class="stat-lbl">Distance</span>
+            </span>
+          </div>
+        </Card>
+        <Card variant="glass" padding="sm" hover={false}>
+          <div class="stat">
+            <span class="stat-icon" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
+            </span>
+            <span class="stat-text">
+              <span class="stat-val">{durationMin}<span class="stat-unit">min</span></span>
+              <span class="stat-lbl">Duration</span>
+            </span>
+          </div>
+        </Card>
+        <Card variant="glass" padding="sm" hover={false}>
+          <div class="stat">
+            <span class="stat-icon" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+            </span>
+            <span class="stat-text">
+              <span class="stat-val">{totalPoints}</span>
+              <span class="stat-lbl">Points</span>
+            </span>
+          </div>
+        </Card>
       </div>
 
       <!-- Scrubber + timestamp -->
@@ -313,20 +342,24 @@
           aria-live="polite"
           aria-label="Current time: {fmtTs(currentTs)}"
         >{fmtTs(currentTs)}</time>
-        <input
-          type="range"
-          min="0"
-          max="100"
-          step="1"
-          value={playProgress}
-          style="--val: {playProgress}%"
-          on:input={onScrub}
-          class="scrubber"
-          aria-label="Playback position"
-          aria-valuemin="0"
-          aria-valuemax="100"
-          aria-valuenow={playProgress}
-        />
+        <div class="scrubber-wrap" style="--frac: {playFrac};">
+          <div class="scrubber-track" aria-hidden="true">
+            <div class="scrubber-fill"></div>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            value={playProgress}
+            oninput={onScrub}
+            class="scrubber"
+            aria-label="Playback position"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow={playProgress}
+          />
+        </div>
         <span class="ts-end">{fmtTs(points[points.length-1]?.ts)}</span>
       </div>
 
@@ -334,7 +367,7 @@
       <button
         class="play-btn"
         class:playing
-        on:click={togglePlay}
+        onclick={togglePlay}
         aria-label={playing ? 'Pause playback' : 'Play route'}
         aria-pressed={playing}
       >
@@ -404,10 +437,10 @@
   .rp-title {
     margin: 0;
     font-family: var(--font-display);
-    font-size: var(--text-xl);
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    line-height: 1.2;
+    font-size: var(--text-2xl);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.15;
   }
 
   .rp-sub {
@@ -444,8 +477,8 @@
   }
   .window-pill:hover { background: var(--surface-active); }
   .window-pill.active {
-    background: rgba(20, 184, 166, 0.16);
-    border-color: rgba(20, 184, 166, 0.35);
+    background: var(--primary-500-20);
+    border-color: var(--primary-500-30);
     color: var(--primary-400);
   }
   .window-pill:focus-visible {
@@ -484,21 +517,6 @@
     flex-direction: column;
     gap: var(--space-2);
     width: 180px;
-  }
-
-  .skel-line {
-    height: var(--space-3);
-    border-radius: var(--radius-sm);
-    background: var(--skeleton-base, rgba(255,255,255,0.06));
-    animation: skel-pulse 1.6s ease-in-out infinite;
-  }
-  .skel-line--wide  { width: 100%; }
-  .skel-line--mid   { width: 70%; }
-  .skel-line--short { width: 45%; }
-
-  @keyframes skel-pulse {
-    0%, 100% { opacity: 0.4; }
-    50%       { opacity: 1; }
   }
 
   .overlay-hint {
@@ -542,8 +560,8 @@
     width: 56px;
     height: 56px;
     border-radius: var(--radius-full);
-    background: rgba(239, 68, 68, 0.10);
-    border: 1px solid rgba(239, 68, 68, 0.18);
+    background: var(--danger-500-12);
+    border: 1px solid var(--danger-500-20);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -562,8 +580,8 @@
     padding: var(--space-2) var(--space-5);
     min-height: 44px;
     border-radius: var(--radius-full);
-    background: rgba(20, 184, 166, 0.14);
-    border: 1px solid rgba(20, 184, 166, 0.30);
+    background: var(--primary-500-20);
+    border: 1px solid var(--primary-500-30);
     color: var(--primary-400);
     font-family: var(--font-display);
     font-size: var(--text-sm);
@@ -572,7 +590,7 @@
     transition: background var(--duration-fast) var(--ease-out);
     touch-action: manipulation;
   }
-  .action-btn:hover { background: rgba(20, 184, 166, 0.24); }
+  .action-btn:hover { background: var(--primary-500-30); }
   .action-btn:focus-visible {
     outline: 2px solid var(--primary-500);
     outline-offset: 2px;
@@ -591,31 +609,56 @@
     flex-shrink: 0;
   }
 
-  .stats-row {
-    display: flex;
-    gap: var(--space-2-5);
-    justify-content: center;
+  /* ── Stats bento ─────────────────────────────────────────────────────────── */
+  .stats-bento {
+    --bento-gap: var(--space-2-5);
   }
 
-  .stat-chip {
+  .stat {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 2px;
-    background: var(--surface-inset);
-    border: 1px solid var(--border-subtle);
+    gap: var(--space-1-5);
+    text-align: center;
+  }
+
+  .stat-icon {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
     border-radius: var(--radius-md);
-    padding: var(--space-2) var(--space-3-5);
-    min-width: 72px;
-    flex: 1;
+    background: var(--primary-500-12);
+    color: var(--primary-400);
+  }
+  .stat-icon :global(svg) { width: 18px; height: 18px; }
+
+  .stat-text {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    min-width: 0;
   }
 
   .stat-val {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 2px;
     font-family: var(--font-display);
-    font-size: var(--text-base);
-    font-weight: 700;
+    font-size: var(--text-lg);
+    font-weight: 800;
     color: var(--text-primary);
     font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+
+  .stat-unit {
+    font-size: var(--text-xs);
+    font-weight: 700;
+    color: var(--text-tertiary);
   }
 
   .stat-lbl {
@@ -625,7 +668,7 @@
     letter-spacing: 0.06em;
   }
 
-  /* Scrubber row */
+  /* ── Scrubber / progress bar ─────────────────────────────────────────────── */
   .scrubber-row {
     display: flex;
     align-items: center;
@@ -641,25 +684,54 @@
     font-family: var(--font-mono);
   }
 
-  .scrubber {
+  /* Layered progress: transform-scaled fill behind an accessible transparent range input */
+  .scrubber-wrap {
+    position: relative;
     flex: 1;
-    height: var(--space-1);
+    display: flex;
+    align-items: center;
+    height: 44px;
+  }
+
+  .scrubber-track {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 6px;
+    border-radius: var(--radius-full);
+    background: var(--surface-inset);
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .scrubber-fill {
+    position: absolute;
+    inset: 0;
+    transform-origin: left center;
+    transform: scaleX(var(--frac, 0));
+    background: linear-gradient(90deg, var(--primary-600), var(--primary-400));
+    border-radius: inherit;
+    transition: transform 120ms var(--ease-out);
+  }
+
+  .scrubber {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    width: 100%;
+    height: 44px;
+    margin: 0;
     -webkit-appearance: none;
     appearance: none;
-    border-radius: var(--radius-full);
-    background: linear-gradient(
-      to right,
-      var(--primary-500) var(--val, 0%),
-      var(--surface-inset) var(--val, 0%)
-    );
+    background: transparent;
     cursor: pointer;
     outline: none;
-    transition: opacity var(--duration-fast) var(--ease-out);
   }
 
   .scrubber:focus-visible {
     outline: 2px solid var(--primary-500);
     outline-offset: 3px;
+    border-radius: var(--radius-full);
   }
 
   .scrubber::-webkit-slider-thumb {
@@ -667,7 +739,7 @@
     width: var(--space-5);
     height: var(--space-5);
     border-radius: var(--radius-full);
-    background: white;
+    background: var(--text-inverse, white);
     border: 2.5px solid var(--primary-500);
     box-shadow: var(--shadow-sm);
     cursor: pointer;
@@ -682,7 +754,7 @@
     width: var(--space-5);
     height: var(--space-5);
     border-radius: var(--radius-full);
-    background: white;
+    background: var(--text-inverse, white);
     border: 2.5px solid var(--primary-500);
     cursor: pointer;
   }
@@ -713,7 +785,7 @@
   }
 
   .play-btn:hover {
-    box-shadow: var(--shadow-primary), 0 8px 32px rgba(20, 184, 166, 0.30);
+    box-shadow: var(--shadow-primary), var(--glow-primary);
   }
 
   .play-btn:active { transform: scale(0.97); }
@@ -731,7 +803,7 @@
 
   /* ── Reduced motion ──────────────────────────────────────────────────────── */
   @media (prefers-reduced-motion: reduce) {
-    .skel-line { animation: none; opacity: 0.6; }
+    .scrubber-fill { transition: none; }
     .scrubber::-webkit-slider-thumb:hover { transform: none; }
     .play-btn:hover { box-shadow: var(--shadow-primary); }
     .play-btn:active { transform: none; }

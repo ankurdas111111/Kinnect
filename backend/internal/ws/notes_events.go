@@ -45,34 +45,42 @@ func (h *Hub) handlePostRoomNote(c *Client, data json.RawMessage) {
 	}
 
 	now := time.Now().UnixMilli()
-	noteID, err := db.InsertRoomNote(context.Background(), h.pool.DB, room.DbID, user.UserID, body, now)
-	if err != nil {
-		slog.Warn("InsertRoomNote failed", "roomCode", roomCode, "userId", user.UserID, "error", err)
-		return
-	}
+	authorID := user.UserID
+	authorName := user.DisplayName
+	dbID := room.DbID
 
-	// Enforce 20-note cap per room (async — non-critical)
-	go func() {
-		if err := db.EnforceRoomNoteCap(context.Background(), h.pool.DB, room.DbID); err != nil {
-			slog.Warn("EnforceRoomNoteCap failed", "roomCode", roomCode, "error", err)
+	h.offloadDB(func(ctx context.Context) {
+		noteID, err := db.InsertRoomNote(ctx, h.pool.DB, dbID, authorID, body, now)
+		if err != nil {
+			slog.Warn("InsertRoomNote failed", "roomCode", roomCode, "userId", authorID, "error", err)
+			return
 		}
-	}()
 
-	payload := map[string]interface{}{
-		"id":         noteID,
-		"roomCode":   roomCode,
-		"authorId":   user.UserID,
-		"authorName": user.DisplayName,
-		"body":       body,
-		"createdAt":  now,
-	}
+		// Enforce 20-note cap per room (async — non-critical, already offloaded pattern).
+		go func() {
+			if err := db.EnforceRoomNoteCap(context.Background(), h.pool.DB, dbID); err != nil {
+				slog.Warn("EnforceRoomNoteCap failed", "roomCode", roomCode, "error", err)
+			}
+		}()
 
-	// Broadcast to all currently-online room members (including author).
-	for mid := range room.Members {
-		if cli := h.GetClientByUserID(mid); cli != nil {
-			h.SendToClient(cli.ID(), "roomNoteAdded", payload)
+		payload := map[string]interface{}{
+			"id":         noteID,
+			"roomCode":   roomCode,
+			"authorId":   authorID,
+			"authorName": authorName,
+			"body":       body,
+			"createdAt":  now,
 		}
-	}
+
+		// room.Members iteration must happen on the hub loop.
+		h.RunOnLoop(func() {
+			for mid := range room.Members {
+				if cli := h.GetClientByUserID(mid); cli != nil {
+					h.SendToClient(cli.ID(), "roomNoteAdded", payload)
+				}
+			}
+		})
+	})
 }
 
 // handleDeleteRoomNote deletes a note from a room's bulletin board. (F8)
@@ -107,20 +115,26 @@ func (h *Hub) handleDeleteRoomNote(c *Client, data json.RawMessage) {
 		return
 	}
 
-	if err := db.DeleteRoomNote(context.Background(), h.pool.DB, noteID, user.UserID); err != nil {
-		slog.Warn("DeleteRoomNote failed", "noteId", noteID, "userId", user.UserID, "error", err)
-		return
-	}
-
+	authorID := user.UserID
 	payload := map[string]interface{}{
 		"noteId":   noteID,
 		"roomCode": roomCode,
 	}
-	for mid := range room.Members {
-		if cli := h.GetClientByUserID(mid); cli != nil {
-			h.SendToClient(cli.ID(), "roomNoteDeleted", payload)
+
+	h.offloadDB(func(ctx context.Context) {
+		if err := db.DeleteRoomNote(ctx, h.pool.DB, noteID, authorID); err != nil {
+			slog.Warn("DeleteRoomNote failed", "noteId", noteID, "userId", authorID, "error", err)
+			return
 		}
-	}
+		// room.Members iteration must happen on the hub loop.
+		h.RunOnLoop(func() {
+			for mid := range room.Members {
+				if cli := h.GetClientByUserID(mid); cli != nil {
+					h.SendToClient(cli.ID(), "roomNoteDeleted", payload)
+				}
+			}
+		})
+	})
 }
 
 // handleGetRoomNotes returns the last 20 notes for a room. (F8)
@@ -150,21 +164,24 @@ func (h *Hub) handleGetRoomNotes(c *Client, data json.RawMessage) {
 		return
 	}
 
-	rows, err := db.GetRoomNotes(context.Background(), h.pool.DB, room.DbID)
-	if err != nil {
-		c.Send("roomNotes", map[string]interface{}{"roomCode": roomCode, "notes": []interface{}{}})
-		return
-	}
+	dbID := room.DbID
+	h.offloadDB(func(ctx context.Context) {
+		rows, err := db.GetRoomNotes(ctx, h.pool.DB, dbID)
+		if err != nil {
+			c.Send("roomNotes", map[string]interface{}{"roomCode": roomCode, "notes": []interface{}{}})
+			return
+		}
 
-	notes := make([]map[string]interface{}, 0, len(rows))
-	for _, r := range rows {
-		notes = append(notes, map[string]interface{}{
-			"id":         r.ID,
-			"authorId":   r.AuthorID,
-			"authorName": r.AuthorName,
-			"body":       r.Body,
-			"createdAt":  r.CreatedAt,
-		})
-	}
-	c.Send("roomNotes", map[string]interface{}{"roomCode": roomCode, "notes": notes})
+		notes := make([]map[string]interface{}, 0, len(rows))
+		for _, r := range rows {
+			notes = append(notes, map[string]interface{}{
+				"id":         r.ID,
+				"authorId":   r.AuthorID,
+				"authorName": r.AuthorName,
+				"body":       r.Body,
+				"createdAt":  r.CreatedAt,
+			})
+		}
+		c.Send("roomNotes", map[string]interface{}{"roomCode": roomCode, "notes": notes})
+	})
 }

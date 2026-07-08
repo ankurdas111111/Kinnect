@@ -1,4 +1,6 @@
 <script>
+  import { run } from 'svelte/legacy';
+
   /**
    * GlobeCanvas v3 — Dot-Matrix Data Globe
    *
@@ -12,31 +14,39 @@
   import { myLocation, otherUsers } from '../../lib/stores/map.js';
   import { getUserColor } from '../../lib/getUserColor.js';
 
-  export let size = 340;
+  /**
+   * @typedef {Object} Props
+   * @property {number} [size]
+   */
 
-  let canvas;
+  /** @type {Props} */
+  let { size = 340 } = $props();
+
+  let canvas = $state();
   let rafId;
   let t0 = 0, elapsed = 0, lastFrame = 0;
 
-  let rotY = 0.38, rotX = 0.22;
-  let isDragging = false;
+  let rotY = $state(0.38), rotX = $state(0.22);
+  let isDragging = $state(false);
   let dragVelY = 0, dragVelX = 0;
   let lastPX = 0, lastPY = 0;
-  let interacted = false;
-  let hasAutoFaced = false;
+  let interacted = $state(false);
+  let hasAutoFaced = $state(false);
 
   const AUTO_SPEED = 0.0018;
   const DEG = Math.PI / 180;
 
-  $: R  = size * 0.44;
-  $: CX = size / 2;
-  $: CY = size / 2;
+  let R  = $derived(size * 0.44);
+  let CX = $derived(size / 2);
+  let CY = $derived(size / 2);
 
-  $: if ($myLocation?.latitude != null && $myLocation?.longitude != null && !hasAutoFaced) {
-    rotY = Math.PI / 2 - $myLocation.longitude * DEG;
-    rotX = Math.atan(Math.sin($myLocation.latitude * DEG)) * 0.85;
-    hasAutoFaced = true;
-  }
+  run(() => {
+    if ($myLocation?.latitude != null && $myLocation?.longitude != null && !hasAutoFaced) {
+      rotY = Math.PI / 2 - $myLocation.longitude * DEG;
+      rotX = Math.atan(Math.sin($myLocation.latitude * DEG)) * 0.85;
+      hasAutoFaced = true;
+    }
+  });
 
   // ── Light direction (view-space, upper-left) ──────────────────────────
   const LX = -0.48, LY = 0.44, LZ = 0.76;
@@ -496,17 +506,17 @@
   onDestroy(() => { if (rafId) cancelAnimationFrame(rafId); });
 </script>
 
-<!-- svelte-ignore a11y-no-static-element-interactions -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="gc-wrap" style="--sz:{size}px">
   <canvas
     bind:this={canvas}
     width={size} height={size}
     class="gc-canvas"
     class:gc-dragging={isDragging}
-    on:pointerdown={onPointerDown}
-    on:pointermove={onPointerMove}
-    on:pointerup={onPointerUp}
-    on:pointercancel={onPointerUp}
+    onpointerdown={onPointerDown}
+    onpointermove={onPointerMove}
+    onpointerup={onPointerUp}
+    onpointercancel={onPointerUp}
     aria-label="Interactive Earth — drag to rotate"
   ></canvas>
   {#if !interacted}

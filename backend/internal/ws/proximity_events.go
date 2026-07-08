@@ -63,20 +63,21 @@ func (h *Hub) handleSetProximityAlert(c *Client, data json.RawMessage) {
 	}
 
 	now := time.Now().UnixMilli()
-	entry, err := db.UpsertProximityAlert(context.Background(), h.pool.DB, user.UserID, targetUserID, radiusM, now)
-	if err != nil {
-		c.Send("proximityAlertError", map[string]interface{}{"error": "db_error"})
-		return
-	}
-
-	h.Cache.UpsertProximityAlert(entry)
-
-	c.Send("proximityAlertSet", map[string]interface{}{
-		"id":           entry.ID,
-		"targetUserId": entry.TargetID,
-		"radiusM":      entry.RadiusM,
-		"enabled":      entry.Enabled,
-		"createdAt":    now,
+	ownerID := user.UserID
+	h.offloadDB(func(ctx context.Context) {
+		entry, err := db.UpsertProximityAlert(ctx, h.pool.DB, ownerID, targetUserID, radiusM, now)
+		if err != nil {
+			c.Send("proximityAlertError", map[string]interface{}{"error": "db_error"})
+			return
+		}
+		h.Cache.UpsertProximityAlert(entry)
+		c.Send("proximityAlertSet", map[string]interface{}{
+			"id":           entry.ID,
+			"targetUserId": entry.TargetID,
+			"radiusM":      entry.RadiusM,
+			"enabled":      entry.Enabled,
+			"createdAt":    now,
+		})
 	})
 }
 
@@ -100,11 +101,13 @@ func (h *Hub) handleRemoveProximityAlert(c *Client, data json.RawMessage) {
 		return
 	}
 
-	_ = db.DeleteProximityAlert(context.Background(), h.pool.DB, user.UserID, targetUserID)
-	h.Cache.RemoveProximityAlert(user.UserID, targetUserID)
-
-	c.Send("proximityAlertRemoved", map[string]interface{}{
-		"targetUserId": targetUserID,
+	ownerID := user.UserID
+	h.offloadDB(func(ctx context.Context) {
+		_ = db.DeleteProximityAlert(ctx, h.pool.DB, ownerID, targetUserID)
+		h.Cache.RemoveProximityAlert(ownerID, targetUserID)
+		c.Send("proximityAlertRemoved", map[string]interface{}{
+			"targetUserId": targetUserID,
+		})
 	})
 }
 
@@ -120,22 +123,25 @@ func (h *Hub) handleListProximityAlerts(c *Client, _ json.RawMessage) {
 		return
 	}
 
-	rows, err := db.GetProximityAlertsForOwner(context.Background(), h.pool.DB, user.UserID)
-	if err != nil {
-		c.Send("proximityAlerts", map[string]interface{}{"alerts": []interface{}{}})
-		return
-	}
+	ownerID := user.UserID
+	h.offloadDB(func(ctx context.Context) {
+		rows, err := db.GetProximityAlertsForOwner(ctx, h.pool.DB, ownerID)
+		if err != nil {
+			c.Send("proximityAlerts", map[string]interface{}{"alerts": []interface{}{}})
+			return
+		}
 
-	alerts := make([]map[string]interface{}, 0, len(rows))
-	for _, r := range rows {
-		alerts = append(alerts, map[string]interface{}{
-			"id":              r.ID,
-			"targetUserId":    r.TargetID,
-			"targetName":      h.Cache.GetDisplayName(r.TargetID),
-			"radiusM":         r.RadiusM,
-			"enabled":         r.Enabled,
-			"lastTriggeredAt": r.LastTriggeredAt,
-		})
-	}
-	c.Send("proximityAlerts", map[string]interface{}{"alerts": alerts})
+		alerts := make([]map[string]interface{}, 0, len(rows))
+		for _, r := range rows {
+			alerts = append(alerts, map[string]interface{}{
+				"id":              r.ID,
+				"targetUserId":    r.TargetID,
+				"targetName":      h.Cache.GetDisplayName(r.TargetID),
+				"radiusM":         r.RadiusM,
+				"enabled":         r.Enabled,
+				"lastTriggeredAt": r.LastTriggeredAt,
+			})
+		}
+		c.Send("proximityAlerts", map[string]interface{}{"alerts": alerts})
+	})
 }
