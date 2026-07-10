@@ -5,7 +5,7 @@
   // maplibregl is loaded dynamically inside onMount so the main bundle
   // does not block on the ~283 kB maplibre chunk at parse time.
   let maplibregl = $state();
-  import { otherUsers, myLocation, mySocketId, mySafetyStatus, focusUser, mapFlyTo, routeGeometry, navigationState, mapTappedUser, mapChatRequest } from '../lib/stores/map.js';
+  import { otherUsers, myLocation, mySocketId, mySafetyStatus, focusUser, mapFlyTo, routeGeometry, navigationState, mapTappedUser, mapChatRequest, navFollow } from '../lib/stores/map.js';
   import { recentTrailResult } from '../lib/stores/trail.js';
   import { emitGetRecentTrail } from '../lib/socket.js';
   import { haptics } from '../lib/haptics.js';
@@ -57,6 +57,11 @@
   let prevNavLat = $state(null);
   let prevNavLng = $state(null);
   let currentBearing = $state(0); // degrees, 0=north, 90=east
+
+  // navFollow subscription (camera-follow driven by PlaceSearch follower)
+  let _navFollowUnsub = null;
+  let _navFollowPrevActive = false;
+  let _navFollowLastEaseTo = 0;
 
   /** Compute bearing in degrees from point A to point B */
   function computeBearing(lat1, lng1, lat2, lng2) {
@@ -311,11 +316,36 @@
     if (isMobile) {
       map.getCanvas().addEventListener('touchend', onCanvasDoubleTap, { passive: false, capture: true });
     }
+
+    // ── navFollow: camera-follow driven by the PlaceSearch follower ───────
+    // Subscribe after map is created so the initial callback (active=false) is a no-op.
+    _navFollowUnsub = navFollow.subscribe(nf => {
+      if (!map) return;
+      const now = Date.now();
+      if (nf.active) {
+        // Throttle: skip if we issued an easeTo <900 ms ago
+        if (now - _navFollowLastEaseTo < 900) return;
+        _navFollowLastEaseTo = now;
+        map.easeTo({
+          center: [nf.lng, nf.lat],
+          bearing: nf.bearing,
+          zoom: Math.max(map.getZoom(), 16.5),
+          pitch: 50,
+          duration: 950,
+          essential: true,
+        });
+      } else if (_navFollowPrevActive) {
+        // active just flipped false — reset to flat north-up view
+        map.easeTo({ pitch: 0, bearing: 0, duration: 600 });
+      }
+      _navFollowPrevActive = nf.active;
+    });
   });
 
   onDestroy(() => {
     cancelAllAnimations();
     if (renderUsersRaf) cancelAnimationFrame(renderUsersRaf);
+    _navFollowUnsub?.();
     for (const m of markers.values()) m.remove();
     markers.clear();
     for (const p of markerPopups.values()) p.remove();

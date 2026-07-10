@@ -26,6 +26,10 @@ type Config struct {
 	TwilioAccountSID string
 	TwilioAuthToken  string
 	TwilioFromNumber string // E.164 format, e.g. +15551234567
+
+	// Ola Maps — optional; enables Ola place search + routing. Falls back to
+	// Photon / OSRM when empty.
+	OlaMapsAPIKey string
 }
 
 const (
@@ -112,6 +116,7 @@ func Load() (*Config, error) {
 		TwilioAccountSID:   os.Getenv("TWILIO_ACCOUNT_SID"),
 		TwilioAuthToken:    os.Getenv("TWILIO_AUTH_TOKEN"),
 		TwilioFromNumber:   os.Getenv("TWILIO_FROM_NUMBER"),
+		OlaMapsAPIKey:      os.Getenv("OLA_MAPS_API_KEY"),
 	}, nil
 }
 

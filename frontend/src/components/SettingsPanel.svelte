@@ -961,6 +961,15 @@
     color: var(--warning-400, #fbbf24);
   }
 
+  @media (max-width: 767px) {
+    .settings-panel {
+      width: 100%;
+      max-width: 100%;
+      max-height: 100dvh;
+      overflow-y: auto;
+    }
+  }
+
   /* ── Reduced motion ─────────────────────────────────────────────── */
   @media (prefers-reduced-motion: reduce) {
     .toggle-knob,

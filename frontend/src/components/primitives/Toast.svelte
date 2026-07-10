@@ -91,7 +91,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
-    max-width: 380px;
+    max-width: min(85vw, 380px);
     pointer-events: none;
   }
 

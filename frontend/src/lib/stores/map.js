@@ -54,3 +54,12 @@ export const mapTappedUser = writable(null);
  * MainApp consumes and resets to null.
  */
 export const mapChatRequest = writable(null);
+
+/**
+ * Navigation camera-follow state. Set by PlaceSearch (via createFollower onUpdate) while
+ * navigation is active. Map.svelte subscribes and calls map.easeTo() on each update.
+ *
+ * active=true  → map smoothly follows at zoom≥16.5, pitch 50°, bearing from GPS course
+ * active=false → map resets to pitch 0 / bearing 0
+ */
+export const navFollow = writable({ active: false, lat: 0, lng: 0, bearing: 0 });

@@ -924,7 +924,7 @@
      * list minimal and let child backgrounds provide the visual boundary.
      */
     width: 100%;
-    max-width: 440px;
+    max-width: min(100vw, 440px);
     height: min(86dvh, 660px);
     box-shadow:
       0 32px 80px rgba(0, 0, 0, 0.9),
@@ -971,6 +971,15 @@
       height: 90dvh;
       height: 90svh;
       animation: scp-slide-up 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
+    }
+  }
+
+  /* Landscape phones: cap panel height so it doesn't exceed the short viewport */
+  @media (orientation: landscape) and (max-height: 500px) {
+    .scp {
+      height: auto;
+      max-height: 92dvh;
+      overflow-y: auto;
     }
   }
 

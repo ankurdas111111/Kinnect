@@ -183,7 +183,7 @@
     flex-direction: column;
     align-items: center;
     gap: var(--space-3);
-    max-width: 260px;
+    max-width: min(100%, 260px);
     width: 100%;
     box-shadow: 0 24px 60px rgba(0,0,0,0.5);
     animation: qr-slide-up 220ms var(--ease-spring, cubic-bezier(0.34,1.56,0.64,1)) both;

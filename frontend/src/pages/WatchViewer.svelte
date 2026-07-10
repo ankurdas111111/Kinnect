@@ -245,7 +245,7 @@
   }
 
   .watch-name {
-    font-size: 32px;
+    font-size: clamp(1.5rem, 2.4vw, 2rem);
     font-weight: 900;
     letter-spacing: -0.03em;
     margin: 0;

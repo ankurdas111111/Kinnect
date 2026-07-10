@@ -182,8 +182,8 @@
       0 0 0 1px rgba(255,255,255,0.04);
     backdrop-filter: var(--glass-3d-blur, blur(28px) saturate(1.8));
     -webkit-backdrop-filter: var(--glass-3d-blur, blur(28px) saturate(1.8));
-    overflow: hidden;
-    max-height: 90vh;
+    overflow-y: auto;
+    max-height: min(85dvh, 40rem);
     display: flex;
     flex-direction: column;
     /* 3D spring entrance animation */
@@ -210,9 +210,9 @@
     pointer-events: none;
   }
 
-  .modal-card.sm { width: 340px; max-width: 100%; }
-  .modal-card.md { width: 420px; max-width: 100%; }
-  .modal-card.lg { width: 560px; max-width: 100%; }
+  .modal-card.sm { width: min(90vw, 340px); max-width: 100%; }
+  .modal-card.md { width: min(90vw, 420px); max-width: 100%; }
+  .modal-card.lg { width: min(90vw, 560px); max-width: 100%; }
 
   .modal-card.urgent {
     border-color: rgba(239, 68, 68, 0.40);

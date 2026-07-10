@@ -1379,6 +1379,15 @@
     font-weight: 500;
   }
 
+  @media (max-width: 767px) {
+    .sharing-root {
+      width: 100%;
+      max-width: 100%;
+      max-height: 100dvh;
+      overflow-y: auto;
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .qa-live-dot { animation: none; }
     .person-avatar-circle.state-sos { animation: none; }

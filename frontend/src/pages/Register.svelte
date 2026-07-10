@@ -8,7 +8,11 @@
   import { toasts } from '../lib/stores/toast.js';
   import { onMount } from 'svelte';
   import AnimatedMeshBackground from '../components/primitives/AnimatedMeshBackground.svelte';
-  import KineticText from '../components/primitives/KineticText.svelte';
+
+  // Headline animates per-WORD (not per-character) so line breaks can only
+  // happen at word boundaries — never mid-word ("fa / mily").
+  const headlineText = 'Join your family network';
+  const headlineWords = headlineText.split(' ');
 
   let showPassword = $state(false);
   let showConfirm = $state(false);
@@ -208,15 +212,13 @@
         </svg>
       </div>
       <div class="auth-brand-badge">Kinnect = Kin + Connect</div>
-      <!-- KineticText — per-character spring entrance for the brand headline -->
-      <KineticText
-        text="Join your family network"
-        tag="h1"
-        delay={120}
-        stagger={36}
-        className="auth-brand-h1"
-        once={true}
-      />
+      <!-- Kinetic headline — word-atomic spans (never breaks mid-word) with a
+           staggered spring entrance. Styles live in auth.css (.kinetic-word). -->
+      <h1 class="auth-brand-h1" aria-label={headlineText}>
+        {#each headlineWords as word, i}
+          <span class="kinetic-word" aria-hidden="true" style="animation-delay: {120 + i * 100}ms">{word}</span>
+        {/each}
+      </h1>
       <p>Know where your family is, anytime. Private, secure, always free.</p>
       <ul class="auth-brand-features">
         <li><span class="feature-check" aria-hidden="true"></span> See your family on a live map</li>
@@ -413,16 +415,6 @@
 
 <style>
   @import '../styles/auth.css';
-
-  /* KineticText headline */
-  :global(.auth-brand-h1) {
-    font-size: clamp(2rem, 3.5vw, 2.75rem);
-    font-weight: 800;
-    color: var(--auth-page-text, #ffffff);
-    line-height: 1.15;
-    letter-spacing: -0.03em;
-    margin-bottom: var(--space-4);
-  }
 
   /* Decorative location-pin cluster */
   .auth-brand-deco {

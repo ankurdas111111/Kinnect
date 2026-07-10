@@ -211,9 +211,9 @@
       transform: translate(-50%, -50%);
       border-radius: var(--radius-2xl);
       border: 1px solid var(--glass-border-strong);
-      max-width: 560px;
+      max-width: min(92vw, 560px);
       width: 100%;
-      max-height: 90vh;
+      max-height: min(85dvh, 44rem);
       animation: panel-scale-in 280ms var(--ease-spring) both;
     }
     @keyframes panel-scale-in {

@@ -544,7 +544,7 @@
   .d-back:hover { background: rgba(255,255,255,0.10); color: var(--text-primary); }
   .d-back:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
   .d-clock {
-    font-size: 20px; font-weight: 700; letter-spacing: -0.03em;
+    font-size: clamp(1.125rem, 1.4vw, 1.25rem); font-weight: 700; letter-spacing: -0.03em;
     color: var(--text-primary); font-variant-numeric: tabular-nums;
     font-family: var(--font-display, system-ui);
   }
@@ -714,7 +714,7 @@
     letter-spacing: 0.08em; color: var(--text-tertiary);
   }
   .d-sh-val {
-    font-size: 40px; font-weight: 800; line-height: 1; letter-spacing: -0.05em;
+    font-size: clamp(1.875rem, 2.9vw, 2.5rem); font-weight: 800; line-height: 1; letter-spacing: -0.05em;
     font-family: var(--font-display, system-ui); font-variant-numeric: tabular-nums;
   }
   .d-sh-badge {
@@ -1089,7 +1089,7 @@
   }
   .d-qg-mark {
     display: block;
-    font-size: 36px; font-family: Georgia, serif;
+    font-size: clamp(1.75rem, 2.6vw, 2.25rem); font-family: Georgia, serif;
     color: rgba(139,92,246,0.14);
     line-height: 1; margin-bottom: -8px;
     user-select: none; pointer-events: none;
@@ -1160,7 +1160,7 @@
     font-family: var(--font-mono, monospace);
   }
   .d-side-big {
-    font-size: 38px; font-weight: 800;
+    font-size: clamp(1.875rem, 2.7vw, 2.375rem); font-weight: 800;
     color: rgba(255,255,255,0.90);
     line-height: 1; letter-spacing: -0.05em;
     font-family: var(--font-display, system-ui);

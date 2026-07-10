@@ -102,7 +102,7 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    max-height: 200px;
+    max-height: min(200px, 30dvh);
     overflow-y: auto;
   }
 

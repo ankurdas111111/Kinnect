@@ -1,11 +1,12 @@
 /**
- * Geocoding, Place Search (Photon), and Routing (OSRM).
+ * Geocoding, Place Search, and Routing — via backend proxies.
  *
- * - Reverse geocoding: proxied through our backend (/api/geocode → Nominatim)
- * - Place search: Photon API by Komoot — instant autocomplete, no rate limit
- * - Routing: OSRM public server — free driving/walking/cycling directions
+ * - Reverse geocoding: /api/geocode       → Nominatim
+ * - Place search:      /api/search        → proxied autocomplete
+ * - Routing:           /api/route         → proxied routing (FOSSGIS/Ola)
  */
 
+import { apiGet } from './api.js';
 import API_BASE from './env.js';
 
 // ── Reverse geocoding ────────────────────────────────────────────────────
@@ -41,100 +42,78 @@ export function shortLabel(geo) {
   return parts.join(', ') || geo.city || geo.displayName?.split(',')[0] || '';
 }
 
-// ── Place Search — Photon (Komoot) ───────────────────────────────────────
-// Fast autocomplete, no API key, no strict rate limit.
-// https://photon.komoot.io/
+// ── Place Search — via backend proxy ─────────────────────────────────────
+// GET /api/search?q=<query>&lat=<f>&lng=<f>
+// → { results: [{ name, sub, lat, lng, type }] }
 
 export async function searchPlaces(query, options = {}) {
   if (!query || query.length < 2) return [];
 
   const { limit = 6, lat, lng } = options;
-  const params = new URLSearchParams({
-    q: query,
-    limit: String(limit),
-    lang: 'en',
-  });
-  // Bias results toward user's location if available
+  const params = new URLSearchParams({ q: query });
   if (lat != null && lng != null) {
     params.set('lat', String(lat));
-    params.set('lon', String(lng));
+    params.set('lng', String(lng));
   }
+  if (limit !== 6) params.set('limit', String(limit));
 
   try {
-    const res = await fetch(`https://photon.komoot.io/api/?${params}`);
-    if (!res.ok) return [];
-    const data = await res.json();
-    if (!data.features) return [];
-
-    return data.features.map(f => {
-      const p = f.properties || {};
-      const [fLng, fLat] = f.geometry?.coordinates || [0, 0];
-      const name = p.name || p.street || p.city || query;
-      const sub = [p.street, p.city || p.town || p.village, p.state]
-        .filter(Boolean)
-        .filter(s => s !== name)
-        .join(', ');
-      return {
-        lat: fLat,
-        lng: fLng,
-        name,
-        sub,
-        type: p.osm_value || p.type || '',
-        city: p.city || p.town || p.village || '',
-        state: p.state || '',
-        country: p.country || '',
-        displayName: [name, sub].filter(Boolean).join(', '),
-      };
-    });
+    const data = await apiGet(`/api/search?${params}`);
+    if (!data?.results) return [];
+    return data.results.map(r => ({
+      lat: r.lat,
+      lng: r.lng,
+      name: r.name || '',
+      sub: r.sub || '',
+      type: r.type || '',
+      distanceM: r.distanceM || 0,
+      city: '',
+      state: '',
+      country: '',
+      displayName: [r.name, r.sub].filter(Boolean).join(', '),
+    }));
   } catch {
     return [];
   }
 }
 
-// ── Routing — OSRM (free public server) ──────────────────────────────────
-// Returns { distance (m), duration (s), geometry (GeoJSON coords), steps }
-
-const OSRM_BASE = 'https://routing.openstreetmap.de';
+// ── Routing — via backend proxy ──────────────────────────────────────────
+// GET /api/route?mode=car|foot|bike|scooter&from=<lat,lng>&to=<lat,lng>
+// → { distanceM, durationS, geometry: GeoJSON LineString, steps: [{ instruction, distanceM, lat, lng }] }
 
 /**
- * Get driving/walking/cycling directions between two points.
+ * Get directions between two points.
  * @param {number} fromLat
  * @param {number} fromLng
  * @param {number} toLat
  * @param {number} toLng
- * @param {'car'|'foot'|'bike'} mode
- * @returns {{ distance, duration, geometry, steps, summary }}
+ * @param {'car'|'foot'|'bike'|'scooter'} mode
+ * @returns {{ distance, duration, geometry, steps, summary } | null}
  */
 export async function getDirections(fromLat, fromLng, toLat, toLng, mode = 'car') {
-  const profile = mode === 'foot' ? 'routed-foot' : mode === 'bike' ? 'routed-bike' : 'routed-car';
-  const coords = `${fromLng},${fromLat};${toLng},${toLat}`;
-  const url = `${OSRM_BASE}/${profile}/route/v1/driving/${coords}?overview=full&geometries=geojson&steps=true`;
+  const params = new URLSearchParams({
+    mode,
+    from: `${fromLat},${fromLng}`,
+    to: `${toLat},${toLng}`,
+  });
 
   try {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data.code !== 'Ok' || !data.routes?.length) return null;
+    const data = await apiGet(`/api/route?${params}`);
+    if (!data || data.ok === false || !data.geometry) return null;
 
-    const route = data.routes[0];
-    const leg = route.legs?.[0];
     return {
-      distance: route.distance,       // meters
-      duration: route.duration,        // seconds
-      geometry: route.geometry,        // GeoJSON LineString
-      steps: (leg?.steps || []).map(s => ({
-        instruction: s.maneuver?.type === 'turn'
-          ? `Turn ${s.maneuver.modifier || ''} onto ${s.name || 'road'}`
-          : s.maneuver?.type === 'depart'
-          ? `Head ${s.maneuver.modifier || 'north'} on ${s.name || 'road'}`
-          : s.maneuver?.type === 'arrive'
-          ? 'You have arrived'
-          : `${s.maneuver?.type || 'Continue'} ${s.maneuver?.modifier || ''} on ${s.name || 'road'}`.trim(),
-        distance: s.distance,
-        duration: s.duration,
-        name: s.name || '',
+      distance: data.distanceM,
+      duration: data.durationS,
+      geometry: data.geometry,
+      steps: (data.steps || []).map(s => ({
+        instruction: s.instruction || '',
+        distance: s.distanceM ?? 0,
+        duration: null,
+        name: '',
+        lat: s.lat,
+        lng: s.lng,
       })),
-      summary: leg?.summary || '',
+      summary: '',
     };
   } catch {
     return null;

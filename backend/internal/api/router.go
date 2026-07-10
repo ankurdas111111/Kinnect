@@ -32,6 +32,8 @@ func NewRouter(cfg *config.Config, pool *db.Pool, c *cache.Cache, store *auth.Se
 	adminHandler := &AdminHandler{db: pool.DB, cache: c}
 	metricsHandler := NewMetricsHandler(hub)
 	geocodeHandler := NewGeoHandler()
+	searchHandler := NewSearchHandler(cfg.OlaMapsAPIKey)
+	routeHandler := NewRouteHandler(cfg.OlaMapsAPIKey)
 	placesHandler := &PlacesHandler{db: pool.DB, cache: c}
 
 	// API routes
@@ -57,6 +59,12 @@ func NewRouter(cfg *config.Config, pool *db.Pool, c *cache.Cache, store *auth.Se
 
 	// Geocoding proxy (Nominatim, rate-limited, cached)
 	mux.Handle("GET /api/geocode", http.HandlerFunc(geocodeHandler.ReverseGeocode))
+
+	// Place search proxy (Ola Maps → Photon fallback, LRU-cached 15 min)
+	mux.Handle("GET /api/search", RequireAuth(http.HandlerFunc(searchHandler.Search)))
+
+	// Routing proxy (Ola Maps Directions / FOSSGIS OSRM, LRU-cached 5 min)
+	mux.Handle("GET /api/route", RequireAuth(http.HandlerFunc(routeHandler.Route)))
 
 	// Saved places CRUD (F4)
 	mux.Handle("GET /api/places", RequireAuth(http.HandlerFunc(placesHandler.List)))

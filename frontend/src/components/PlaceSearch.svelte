@@ -1,20 +1,35 @@
 <script>
   /**
-   * PlaceSearch — Google Maps-style search + in-app navigation.
+   * PlaceSearch — search, mode-aware preview, and live turn-by-turn navigation.
    *
    * States:
-   *   'search'    — search bar + autocomplete
-   *   'preview'   — place selected, mode tabs + steps + Start button
-   *   'navigating'— compact next-turn HUD, map has full space
+   *   'search'     — blended search bar + dropdown (Saved / Recent / Places)
+   *   'preview'    — place selected, mode tabs + steps + Start button
+   *   'navigating' — compact next-turn HUD with live follower ETA
    */
   import { createEventDispatcher, onDestroy } from 'svelte';
   import { searchPlaces, getDirections, formatDuration, formatDist } from '../lib/geocode.js';
-  import { myLocation, navigationState } from '../lib/stores/map.js';
+  import { myLocation, navigationState, navFollow } from '../lib/stores/map.js';
+  import { haptics } from '../lib/haptics.js';
+  import { savedPlaces as savedPlacesStore } from '../lib/stores/places.js';
+  import { searchHistory } from '../lib/stores/searchHistory.js';
+  import { createFollower } from '../lib/navigation.js';
+  import { toasts } from '../lib/stores/toast.js';
+  import SearchResults from './placeSearch/SearchResults.svelte';
 
   const dispatch = createEventDispatcher();
 
-  // ── State machine ──────────────────────────────────────────────────────
-  let view = $state('search'); // 'search' | 'preview' | 'navigating'
+  // ── Constants ─────────────────────────────────────────────────────────────
+  const SCOOTER_D = 'M5 17a2 2 0 1 0 4 0 2 2 0 0 0-4 0m10 0a2 2 0 1 0 4 0 2 2 0 0 0-4 0M7 17h2m5 0h3m-3 0V8.5l-4-3H5.5A1.5 1.5 0 0 0 4 7v3h3M14 5h3l3 3';
+  const MODES = [
+    { id: 'car',     label: 'Car' },
+    { id: 'foot',    label: 'Walk' },
+    { id: 'bike',    label: 'Cycle' },
+    { id: 'scooter', label: 'Scooter', svgD: SCOOTER_D },
+  ];
+
+  // ── State machine ──────────────────────────────────────────────────────────
+  let view = $state('search');
 
   // Search
   let query = $state('');
@@ -34,40 +49,97 @@
 
   // Navigation
   let currentStepIdx = $state(0);
+  let liveEta = $state(null);
+  let liveRemainingM = $state(null);
+  let liveDistanceToStepM = $state(null); // live distance to the upcoming step maneuver
+  let _prevNavStepIdx = 0;               // tracks step changes for haptic feedback
+  let locUnsub = null;
+  let follower = null;
+
+  // Derived steps
   let currentStep = $derived(route?.steps?.[currentStepIdx] || null);
   let nextStep = $derived(route?.steps?.[currentStepIdx + 1] || null);
   let isLastStep = $derived(currentStepIdx >= (route?.steps?.length || 1) - 1);
 
-  // ── Search ─────────────────────────────────────────────────────────────
+  // ── Blended search sections ───────────────────────────────────────────────
+  let savedMatches = $derived.by(() => {
+    const sp = $savedPlacesStore;
+    if (!Array.isArray(sp) || !sp.length) return [];
+    const q = query.toLowerCase().trim();
+    const filtered = q ? sp.filter(p => p.name?.toLowerCase().includes(q)) : sp.slice(0, 3);
+    return filtered.slice(0, 3).map(p => ({ _source: 'saved', name: p.name, sub: '', lat: p.lat, lng: p.lng, icon: p.icon || 'pin' }));
+  });
+
+  let recentMatches = $derived.by(() => {
+    const q = query.toLowerCase().trim();
+    const hist = $searchHistory;
+    const filtered = q ? hist.filter(h => h.name?.toLowerCase().includes(q)) : hist.slice(0, 5);
+    return filtered.slice(0, 5).map(h => ({ _source: 'recent', name: h.name, sub: h.sub || '', lat: h.lat, lng: h.lng, mode: h.mode, ts: h.ts }));
+  });
+
+  let flatItems = $derived([
+    ...savedMatches,
+    ...recentMatches,
+    ...results.map(r => ({ ...r, _source: 'place' })),
+  ]);
+
+  // ── Search ────────────────────────────────────────────────────────────────
   function onInput() {
     clearTimeout(debounceTimer);
     highlightIdx = -1;
     if (selectedPlace) reset();
-    if (query.length < 2) { results = []; open = false; return; }
+    if (query.length < 2) { results = []; return; }
     loading = true;
     debounceTimer = setTimeout(doSearch, 180);
+  }
+
+  // Persist the freshest fix so searches before GPS lock (or with location
+  // off) can still be proximity-ranked from the last known position.
+  $effect(() => {
+    if ($myLocation?.latitude) {
+      try {
+        localStorage.setItem('kinnect_last_fix',
+          JSON.stringify({ lat: $myLocation.latitude, lng: $myLocation.longitude }));
+      } catch (_) {}
+    }
+  });
+
+  function searchBias() {
+    if ($myLocation?.latitude) return { lat: $myLocation.latitude, lng: $myLocation.longitude };
+    try {
+      const last = JSON.parse(localStorage.getItem('kinnect_last_fix') || 'null');
+      if (last?.lat) return last;
+    } catch (_) {}
+    return null;
   }
 
   async function doSearch() {
     if (query.length < 2) { loading = false; return; }
     const opts = {};
-    if ($myLocation?.latitude) { opts.lat = $myLocation.latitude; opts.lng = $myLocation.longitude; }
+    const bias = searchBias();
+    if (bias) { opts.lat = bias.lat; opts.lng = bias.lng; }
     results = await searchPlaces(query, opts);
     loading = false;
-    open = results.length > 0;
   }
 
-  function onFocus() { if (results.length > 0 && view === 'search') open = true; }
+  function onFocus() { if (view === 'search') open = true; }
   function onBlur() { setTimeout(() => { open = false; }, 220); }
+
   function onKeydown(e) {
     if (e.key === 'Escape') { if (view !== 'search') reset(); else { open = false; inputEl?.blur(); } return; }
-    if (!open || !results.length) return;
-    if (e.key === 'ArrowDown') { e.preventDefault(); highlightIdx = Math.min(highlightIdx + 1, results.length - 1); }
-    if (e.key === 'ArrowUp') { e.preventDefault(); highlightIdx = Math.max(highlightIdx - 1, 0); }
-    if (e.key === 'Enter' && highlightIdx >= 0) { e.preventDefault(); selectPlace(results[highlightIdx]); }
+    if (!open || !flatItems.length) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); highlightIdx = Math.min(highlightIdx + 1, flatItems.length - 1); }
+    if (e.key === 'ArrowUp')   { e.preventDefault(); highlightIdx = Math.max(highlightIdx - 1, 0); }
+    if (e.key === 'Enter' && highlightIdx >= 0) { e.preventDefault(); selectItem(flatItems[highlightIdx]); }
   }
 
-  // ── Place selection ────────────────────────────────────────────────────
+  // ── Place selection ───────────────────────────────────────────────────────
+  function selectItem(item) {
+    const storedMode = item._source === 'recent' ? item.mode : null;
+    selectPlace({ name: item.name, sub: item.sub || '', lat: item.lat, lng: item.lng, type: item.type || '' })
+      .then(() => { if (storedMode && storedMode !== mode) switchMode(storedMode); });
+  }
+
   async function selectPlace(r) {
     selectedPlace = r;
     query = r.name;
@@ -79,22 +151,24 @@
     view = 'preview';
     dispatch('select', { lat: r.lat, lng: r.lng, name: r.name });
     inputEl?.blur();
+    searchHistory.add({ name: r.name, sub: r.sub || '', lat: r.lat, lng: r.lng, mode });
     if ($myLocation?.latitude) {
       await fetchRoute('car');
-      fetchRoute('foot'); // background
+      fetchRoute('foot');
     }
   }
 
   async function fetchRoute(m) {
-    if (!selectedPlace || !$myLocation?.latitude) return;
-    if (allRoutes[m]) { switchMode(m); return; }
+    if (!selectedPlace || !$myLocation?.latitude) return null;
+    if (allRoutes[m]) { switchMode(m); return allRoutes[m]; }
     loadingMode = m;
     const r = await getDirections($myLocation.latitude, $myLocation.longitude, selectedPlace.lat, selectedPlace.lng, m);
     loadingMode = null;
-    if (!r) return;
+    if (!r) return null;
     allRoutes[m] = r;
     if (m === mode || !route) { mode = m; route = r; emitRoute(); }
     allRoutes = allRoutes;
+    return r;
   }
 
   function switchMode(m) {
@@ -107,52 +181,83 @@
     if (route?.geometry) dispatch('route', { geometry: route.geometry, dest: selectedPlace, duration: route.duration, distance: route.distance });
   }
 
-  // ── Navigation ─────────────────────────────────────────────────────────
+  // ── Navigation + follower ─────────────────────────────────────────────────
+  function attachFollower(r) {
+    follower?.stop();
+    _prevNavStepIdx = 0;
+    follower = createFollower({
+      geometry: r.geometry,
+      durationS: r.duration,
+      distanceM: r.distance,
+      mode,
+      steps: r.steps,
+      onUpdate: u => {
+        liveEta = u.etaS;
+        liveRemainingM = u.remainingDistanceM;
+        liveDistanceToStepM = u.distanceToStepM;
+        // Auto-advance the current step and fire haptic on change
+        if (u.currentStepIndex !== _prevNavStepIdx) {
+          _prevNavStepIdx = u.currentStepIndex;
+          currentStepIdx = u.currentStepIndex;
+          try { haptics.tap(); } catch (_) {}
+        }
+        navFollow.set({ active: true, lat: u.snappedLat, lng: u.snappedLng, bearing: u.bearing });
+      },
+      onOffRoute: async () => { const nr = await fetchRoute(mode); if (nr) attachFollower(nr); },
+      onArrive: () => { toasts.success(`Arrived at ${selectedPlace?.name || 'destination'}`); stopNav(); },
+    });
+  }
+
   function startNav() {
     view = 'navigating';
     currentStepIdx = 0;
-    navigationState.set({
-      active: true,
-      destLat: selectedPlace.lat,
-      destLng: selectedPlace.lng,
-      destName: selectedPlace.name,
-      routeCoords: route?.geometry?.coordinates || [],
+    _prevNavStepIdx = 0;
+    liveEta = null;
+    liveRemainingM = null;
+    liveDistanceToStepM = null;
+    navigationState.set({ active: true, destLat: selectedPlace.lat, destLng: selectedPlace.lng, destName: selectedPlace.name, routeCoords: route?.geometry?.coordinates || [] });
+    // Immediately zoom-in to the user's current position so the map snaps to nav
+    // view before the first follower update arrives.
+    const initLoc = $myLocation;
+    if (initLoc?.latitude) {
+      navFollow.set({ active: true, lat: initLoc.latitude, lng: initLoc.longitude, bearing: 0 });
+    }
+    if (route?.geometry) attachFollower(route);
+    locUnsub = myLocation.subscribe(loc => {
+      if (loc?.latitude && follower) follower.feed({ lat: loc.latitude, lng: loc.longitude, timestamp: Date.now() });
     });
+  }
+
+  function cleanupNav() {
+    locUnsub?.(); locUnsub = null;
+    follower?.stop(); follower = null;
+    liveEta = null; liveRemainingM = null; liveDistanceToStepM = null;
+    navFollow.set({ active: false, lat: 0, lng: 0, bearing: 0 });
   }
 
   function stopNav() {
     view = 'preview';
     currentStepIdx = 0;
     navigationState.set({ active: false });
+    cleanupNav();
   }
 
-  function nextTurn() {
-    if (!isLastStep) currentStepIdx++;
-  }
+  function nextTurn() { if (!isLastStep) currentStepIdx++; }
+  function prevTurn() { if (currentStepIdx > 0) currentStepIdx--; }
 
-  function prevTurn() {
-    if (currentStepIdx > 0) currentStepIdx--;
-  }
-
-  // ── Reset ──────────────────────────────────────────────────────────────
+  // ── Reset ─────────────────────────────────────────────────────────────────
   function reset() {
-    query = '';
-    results = [];
-    open = false;
-    selectedPlace = null;
-    route = null;
-    allRoutes = {};
-    view = 'search';
-    currentStepIdx = 0;
-    highlightIdx = -1;
+    query = ''; results = []; open = false; selectedPlace = null;
+    route = null; allRoutes = {}; view = 'search'; currentStepIdx = 0; highlightIdx = -1;
     navigationState.set({ active: false });
+    cleanupNav();
     dispatch('clearRoute');
     inputEl?.focus();
   }
 
-  onDestroy(() => clearTimeout(debounceTimer));
+  onDestroy(() => { clearTimeout(debounceTimer); cleanupNav(); });
 
-  // ── Turn icons ─────────────────────────────────────────────────────────
+  // ── Turn icons ────────────────────────────────────────────────────────────
   function turnIcon(text) {
     if (!text) return '→';
     const t = text.toLowerCase();
@@ -190,7 +295,7 @@
     <div class="nav-turn-card">
       <div class="nav-turn-icon">{turnIconLarge(currentStep.instruction)}</div>
       <div class="nav-turn-body">
-        <span class="nav-turn-dist">{currentStep.distance > 10 ? formatDist(currentStep.distance) : ''}</span>
+        <span class="nav-turn-dist">{#if liveDistanceToStepM != null && liveDistanceToStepM > 10}in {formatDist(liveDistanceToStepM)}{:else if currentStep.distance > 10}{formatDist(currentStep.distance)}{/if}</span>
         <span class="nav-turn-text">{currentStep.instruction}</span>
       </div>
     </div>
@@ -199,8 +304,8 @@
     {/if}
     <div class="nav-bottom">
       <div class="nav-eta">
-        <span class="nav-eta-time">{formatDuration(route.duration)}</span>
-        <span class="nav-eta-dist">{formatDist(route.distance)} · {selectedPlace?.name || ''}</span>
+        <span class="nav-eta-time">{formatDuration(liveEta ?? route?.duration)}</span>
+        <span class="nav-eta-dist">{formatDist(liveRemainingM ?? route?.distance)} · {selectedPlace?.name || ''}</span>
       </div>
       <div class="nav-controls">
         <button class="nav-ctrl" onclick={prevTurn} disabled={currentStepIdx === 0} aria-label="Previous step">
@@ -241,6 +346,9 @@
         placeholder={view === 'preview' ? selectedPlace?.name : "Search places, addresses..."}
         autocomplete="off"
         spellcheck="false"
+        role="combobox"
+        aria-autocomplete="list"
+        aria-expanded={open && flatItems.length > 0}
       />
       {#if loading || loadingMode}<div class="ps-spinner"></div>{/if}
       {#if query && view === 'search'}
@@ -250,36 +358,31 @@
       {/if}
     </div>
 
-    <!-- Autocomplete results -->
-    {#if open && results.length > 0}
-      <ul class="ps-results">
-        {#each results as r, i}
-          <li>
-            <button type="button" class="ps-result" class:ps-result-hl={i === highlightIdx} onclick={() => selectPlace(r)}>
-              <div class="ps-result-icon">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-              </div>
-              <div class="ps-result-text">
-                <span class="ps-result-name">{r.name}</span>
-                {#if r.sub}<span class="ps-result-sub">{r.sub}</span>{/if}
-              </div>
-            </button>
-          </li>
-        {/each}
-      </ul>
+    <!-- Blended dropdown: Saved / Recent / Places -->
+    {#if open && flatItems.length > 0}
+      <SearchResults
+        {savedMatches}
+        {recentMatches}
+        placeResults={results.map(r => ({ ...r, _source: 'place' }))}
+        {highlightIdx}
+        onselect={selectItem}
+      />
     {/if}
 
     <!-- Preview: mode tabs + summary + steps + actions -->
     {#if view === 'preview' && $myLocation?.latitude}
       <div class="ps-nav">
-        <!-- Mode tabs -->
+        <!-- Mode tabs (car / walk / cycle / scooter) -->
         <div class="ps-modes">
-          {#each [['car','Car'],['foot','Walk'],['bike','Cycle']] as [m, label]}
-            <button class="ps-mode" class:ps-mode-on={mode === m} class:ps-mode-loading={loadingMode === m} onclick={() => switchMode(m)}>
-              <span class="ps-mode-label">{label}</span>
-              {#if allRoutes[m]}
-                <span class="ps-mode-eta">{formatDuration(allRoutes[m].duration)}</span>
-              {:else if loadingMode === m}
+          {#each MODES as m}
+            <button class="ps-mode" class:ps-mode-on={mode === m.id} class:ps-mode-loading={loadingMode === m.id} onclick={() => switchMode(m.id)}>
+              {#if m.svgD}
+                <svg class="ps-mode-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d={m.svgD}/></svg>
+              {/if}
+              <span class="ps-mode-label">{m.label}</span>
+              {#if allRoutes[m.id]}
+                <span class="ps-mode-eta">{formatDuration(allRoutes[m.id].duration)}</span>
+              {:else if loadingMode === m.id}
                 <span class="ps-mode-eta">...</span>
               {/if}
             </button>
@@ -291,15 +394,13 @@
           <div class="ps-summary">
             <span class="ps-summary-time">{formatDuration(route.duration)}</span>
             <span class="ps-summary-dist">({formatDist(route.distance)})</span>
-            {#if route.summary}
-              <span class="ps-summary-via">via {route.summary}</span>
-            {/if}
+            {#if route.summary}<span class="ps-summary-via">via {route.summary}</span>{/if}
           </div>
 
-          <!-- Steps (always visible, scrollable) -->
+          <!-- Steps -->
           {#if route.steps?.length}
             <ol class="ps-steps">
-              {#each route.steps as step, i}
+              {#each route.steps as step}
                 <li class="ps-step">
                   <span class="ps-step-icon">{turnIcon(step.instruction)}</span>
                   <div class="ps-step-body">
@@ -321,6 +422,7 @@
               Walk With Me
             </button>
           </div>
+          <p class="ps-attr">Routes &copy; OSM contributors &middot; FOSSGIS/Ola</p>
         {:else if loadingMode}
           <div class="ps-loading"><div class="ps-spinner"></div> Getting directions...</div>
         {/if}
@@ -331,7 +433,7 @@
 
 <style>
   /* ══════════════════════════════════════════════════════════════════════ */
-  /* NAVIGATION HUD — compact, Google Maps-style next-turn bar            */
+  /* NAVIGATION HUD                                                        */
   /* ══════════════════════════════════════════════════════════════════════ */
   .nav-hud {
     background: rgba(5,8,18,0.94);
@@ -353,58 +455,23 @@
   .nav-turn-icon {
     width: 44px; height: 44px; border-radius: 12px;
     background: #3b82f6; color: #fff;
-    font-size: 22px; font-weight: 700;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
+    font-size: clamp(1.25rem, 1.6vw, 1.375rem); font-weight: 700;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
   }
   .nav-turn-body { flex: 1; min-width: 0; }
-  .nav-turn-dist {
-    display: block; font-size: 18px; font-weight: 800; color: #fff;
-    font-family: var(--font-display, system-ui); letter-spacing: -0.02em;
-  }
-  .nav-turn-text {
-    display: block; font-size: 12px; color: rgba(255,255,255,0.65);
-    line-height: 1.3; margin-top: 1px;
-  }
-  .nav-then {
-    padding: 6px 16px; font-size: 11px; color: rgba(255,255,255,0.30);
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-  }
-  .nav-bottom {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 8px 12px 10px;
-  }
+  .nav-turn-dist { display: block; font-size: 18px; font-weight: 800; color: #fff; font-family: var(--font-display, system-ui); letter-spacing: -0.02em; }
+  .nav-turn-text { display: block; font-size: 12px; color: rgba(255,255,255,0.65); line-height: 1.3; margin-top: 1px; }
+  .nav-then { padding: 6px 16px; font-size: 11px; color: rgba(255,255,255,0.30); border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .nav-bottom { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px 10px; }
   .nav-eta { flex: 1; min-width: 0; }
-  .nav-eta-time {
-    font-size: 14px; font-weight: 800; color: #10b981;
-    font-family: var(--font-display, system-ui);
-  }
-  .nav-eta-dist {
-    display: block; font-size: 10px; color: rgba(255,255,255,0.25);
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
+  .nav-eta-time { font-size: 14px; font-weight: 800; color: #10b981; font-family: var(--font-display, system-ui); }
+  .nav-eta-dist { display: block; font-size: 10px; color: rgba(255,255,255,0.25); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .nav-controls { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-  .nav-ctrl {
-    width: 44px; height: 44px; border-radius: 8px; border: none;
-    background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.5);
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer;
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-  }
+  .nav-ctrl { width: 44px; height: 44px; border-radius: 8px; border: none; background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.5); display: flex; align-items: center; justify-content: center; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   .nav-ctrl:hover { background: rgba(255,255,255,0.10); color: #fff; }
   .nav-ctrl:disabled { opacity: 0.2; cursor: default; }
-  .nav-step-count {
-    font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.25);
-    min-width: 28px; text-align: center;
-  }
-  .nav-stop {
-    padding: 6px 12px; border-radius: 8px; font-size: 11px; font-weight: 700;
-    background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.22);
-    color: #f87171; cursor: pointer; margin-left: 4px;
-    min-height: 44px; touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-  }
+  .nav-step-count { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.25); min-width: 28px; text-align: center; }
+  .nav-stop { padding: 6px 12px; border-radius: 8px; font-size: 11px; font-weight: 700; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.22); color: #f87171; cursor: pointer; margin-left: 4px; min-height: 44px; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   .nav-stop:hover { background: rgba(239,68,68,0.22); }
 
   /* ══════════════════════════════════════════════════════════════════════ */
@@ -412,14 +479,7 @@
   /* ══════════════════════════════════════════════════════════════════════ */
   .ps-wrap { position: relative; width: min(380px, calc(100vw - 24px)); z-index: 20; }
 
-  .ps-bar {
-    display: flex; align-items: center; gap: 6px;
-    background: rgba(5,8,18,0.88);
-    backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 14px; padding: 9px 12px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-  }
+  .ps-bar { display: flex; align-items: center; gap: 6px; background: rgba(5,8,18,0.88); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 9px 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
   .ps-bar:focus-within { border-color: rgba(99,102,241,0.35); box-shadow: 0 4px 20px rgba(0,0,0,0.3), 0 0 0 3px rgba(99,102,241,0.08); }
   .ps-icon { color: rgba(255,255,255,0.30); flex-shrink: 0; }
   .ps-back { display: flex; align-items: center; justify-content: center; background: none; border: none; color: rgba(255,255,255,0.5); cursor: pointer; flex-shrink: 0; padding: 0; min-width: 44px; min-height: 44px; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
@@ -432,15 +492,6 @@
   .ps-spinner { width: 14px; height: 14px; border: 2px solid rgba(99,102,241,0.25); border-top-color: rgba(99,102,241,0.8); border-radius: 50%; animation: ps-spin 0.5s linear infinite; flex-shrink: 0; }
   @keyframes ps-spin { to { transform: rotate(360deg); } }
 
-  .ps-results { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: rgba(8,12,24,0.96); backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 4px; list-style: none; margin: 0; max-height: 300px; overflow-y: auto; box-shadow: 0 12px 40px rgba(0,0,0,0.5); }
-  .ps-result { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; min-height: 44px; border-radius: 10px; cursor: pointer; transition: background 0.1s; touch-action: manipulation; -webkit-tap-highlight-color: transparent; background: transparent; border: none; width: 100%; text-align: left; }
-  .ps-result:hover, .ps-result-hl { background: rgba(99,102,241,0.10); }
-  .ps-result:active { background: rgba(99,102,241,0.18); }
-  .ps-result-icon { color: rgba(99,102,241,0.55); flex-shrink: 0; margin-top: 1px; }
-  .ps-result-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
-  .ps-result-name { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.88); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .ps-result-sub { font-size: 11px; color: rgba(255,255,255,0.30); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
   /* Nav panel */
   .ps-nav { margin-top: 4px; background: rgba(8,12,24,0.96); backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; box-shadow: 0 12px 40px rgba(0,0,0,0.5); overflow: hidden; }
   .ps-modes { display: flex; border-bottom: 1px solid rgba(255,255,255,0.06); }
@@ -451,9 +502,10 @@
   .ps-mode-loading { opacity: 0.4; }
   .ps-mode-eta { font-size: 11px; font-weight: 800; }
   .ps-mode-label { font-size: 10px; font-weight: 600; opacity: 0.5; }
+  .ps-mode-svg { opacity: 0.7; }
 
   .ps-summary { padding: 10px 14px 6px; display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
-  .ps-summary-time { font-size: 22px; font-weight: 800; color: #fff; font-family: var(--font-display, system-ui); letter-spacing: -0.03em; }
+  .ps-summary-time { font-size: clamp(1.25rem, 1.6vw, 1.375rem); font-weight: 800; color: #fff; font-family: var(--font-display, system-ui); letter-spacing: -0.03em; }
   .ps-summary-dist { font-size: 13px; color: rgba(255,255,255,0.35); }
   .ps-summary-via { width: 100%; font-size: 11px; color: rgba(255,255,255,0.20); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -465,13 +517,15 @@
   .ps-step-text { font-size: 12px; color: rgba(255,255,255,0.70); display: block; line-height: 1.4; }
   .ps-step-meta { font-size: 10px; color: rgba(255,255,255,0.22); }
 
-  .ps-actions { display: flex; gap: 6px; padding: 8px 10px 10px; border-top: 1px solid rgba(255,255,255,0.05); }
+  .ps-actions { display: flex; gap: 6px; padding: 8px 10px 4px; border-top: 1px solid rgba(255,255,255,0.05); }
   .ps-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 11px 8px; min-height: 44px; border-radius: 12px; font-size: 13px; font-weight: 700; border: none; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
   .ps-btn:active { transform: scale(0.97); }
   .ps-btn-start { background: #3b82f6; color: #fff; box-shadow: 0 2px 12px rgba(59,130,246,0.35); }
   .ps-btn-start:hover { background: #2563eb; }
   .ps-btn-walk { background: rgba(99,102,241,0.12); color: var(--primary-300, #a5b4fc); border: 1px solid rgba(99,102,241,0.22); }
   .ps-btn-walk:hover { background: rgba(99,102,241,0.20); }
+
+  .ps-attr { margin: 0; padding: 5px 12px 8px; font-size: 9px; color: rgba(255,255,255,0.15); text-align: center; }
 
   .ps-loading { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 16px; font-size: 12px; color: rgba(255,255,255,0.30); }
 </style>

@@ -1,5 +1,6 @@
 // ── Cache configuration ────────────────────────────────────────────────────
-const CACHE_VERSION = 'v2';
+// v3: drop poisoned tile caches that hold an expired TileJSON index
+const CACHE_VERSION = 'v3';
 const STATIC_CACHE = `kinnect-static-${CACHE_VERSION}`;
 const TILE_CACHE = `kinnect-tiles-${CACHE_VERSION}`;
 const TILE_CACHE_MAX = 500;
@@ -36,9 +37,29 @@ self.addEventListener('fetch', (event) => {
   var url;
   try { url = new URL(request.url); } catch (_) { return; }
 
-  // ── 1. Cache-first for OpenFreeMap tiles ────────────────────────────────
-  // Tiles are immutable at a given z/x/y so cache indefinitely (up to limit).
+  // ── 1. OpenFreeMap: cache-first for tile FILES, network-first for indexes ─
+  // Actual tiles/fonts/sprites are immutable at their URL → cache indefinitely.
+  // BUT the TileJSON index (/planet) points at DATED tile paths that expire
+  // server-side; caching it forever eventually 403s every tile → blank map.
   if (url.hostname === 'tiles.openfreemap.org') {
+    var isTileFile = /\.(pbf|png|jpg|jpeg|webp)(\?|$)/.test(url.pathname);
+    if (!isTileFile) {
+      // TileJSON / index: network-first, cached copy only as offline fallback.
+      event.respondWith(
+        caches.open(TILE_CACHE).then(async function(cache) {
+          try {
+            var fresh = await fetch(request);
+            if (fresh.ok) cache.put(request, fresh.clone());
+            return fresh;
+          } catch (_) {
+            var fallback = await cache.match(request);
+            if (fallback) return fallback;
+            throw _;
+          }
+        })
+      );
+      return;
+    }
     event.respondWith(
       caches.open(TILE_CACHE).then(async function(cache) {
         var cached = await cache.match(request);

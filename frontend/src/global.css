@@ -164,11 +164,11 @@
 
   /* ── Layout ─────────────────────────────────────────────────────────── */
   --navbar-height: 56px;
-  --panel-width: 380px;
+  --panel-width: min(380px, calc(100vw - 2 * var(--space-4)));
   --sidebar-width: 400px;
   --sidebar-collapsed: 56px;
-  --sidebar-tablet: 320px;
-  --right-panel-width: 380px;
+  --sidebar-tablet: min(320px, 40vw);
+  --right-panel-width: min(380px, calc(100vw - 2 * var(--space-4)));
   --bottom-tab-height: 56px;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);

@@ -9,7 +9,11 @@
   import { onMount } from 'svelte';
   import { slide } from 'svelte/transition';
   import AnimatedMeshBackground from '../components/primitives/AnimatedMeshBackground.svelte';
-  import KineticText from '../components/primitives/KineticText.svelte';
+
+  // Headline animates per-WORD (not per-character) so line breaks can only
+  // happen at word boundaries — never mid-word ("f / amily").
+  const headlineText = 'Keep your family close';
+  const headlineWords = headlineText.split(' ');
 
   let mode = $state('email');
   let loginId = $state('');
@@ -176,15 +180,13 @@
         </svg>
       </div>
       <div class="auth-brand-badge">Kinnect = Kin + Connect</div>
-      <!-- KineticText — per-character spring entrance for the brand headline -->
-      <KineticText
-        text="Keep your family close"
-        tag="h1"
-        delay={120}
-        stagger={38}
-        className="auth-brand-h1"
-        once={true}
-      />
+      <!-- Kinetic headline — word-atomic spans (never breaks mid-word) with a
+           staggered spring entrance. Styles live in auth.css (.kinetic-word). -->
+      <h1 class="auth-brand-h1" aria-label={headlineText}>
+        {#each headlineWords as word, i}
+          <span class="kinetic-word" aria-hidden="true" style="animation-delay: {120 + i * 110}ms">{word}</span>
+        {/each}
+      </h1>
       <p>Always know your family is safe. Real-time location sharing, built for families who care.</p>
       <ul class="auth-brand-features">
         <li><span class="feature-check" aria-hidden="true"></span> See your family on a live map</li>
@@ -320,16 +322,6 @@
 
 <style>
   @import '../styles/auth.css';
-
-  /* KineticText headline — matches auth.css h1 sizing but uses span chars */
-  :global(.auth-brand-h1) {
-    font-size: clamp(2rem, 3.5vw, 2.75rem);
-    font-weight: 800;
-    color: var(--auth-page-text, #ffffff);
-    line-height: 1.15;
-    letter-spacing: -0.03em;
-    margin-bottom: var(--space-4);
-  }
 
   /* Decorative location-pin cluster */
   .auth-brand-deco {

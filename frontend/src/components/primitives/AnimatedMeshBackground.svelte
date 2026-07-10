@@ -65,8 +65,8 @@ start. Now uses left:calc(50% - 150px) for centering instead.
 
   .amb-blob {
     position: absolute;
-    width: 700px;
-    height: 700px;
+    width: min(700px, 60vw);
+    height: min(700px, 60vw);
     border-radius: 50%;
     background: radial-gradient(
       circle at center,
@@ -85,8 +85,8 @@ start. Now uses left:calc(50% - 150px) for centering instead.
   .amb-blob::after {
     content: '';
     position: absolute;
-    width: 500px;
-    height: 500px;
+    width: min(500px, 45vw);
+    height: min(500px, 45vw);
     border-radius: 50%;
     background: radial-gradient(
       circle at center,
@@ -112,14 +112,14 @@ start. Now uses left:calc(50% - 150px) for centering instead.
   }
 
   .amb-orb-1 {
-    width: 500px; height: 500px;
+    width: min(500px, 45vw); height: min(500px, 45vw);
     background: radial-gradient(circle, rgba(20, 184, 166, 0.22) 0%, transparent 65%);
     top: -120px; right: -100px;
     animation: amb-drift-3 20s ease-in-out infinite;
   }
 
   .amb-orb-2 {
-    width: 400px; height: 400px;
+    width: min(400px, 38vw); height: min(400px, 38vw);
     background: radial-gradient(circle, rgba(16, 185, 129, 0.16) 0%, transparent 65%);
     bottom: 10%; left: -80px;
     animation: amb-drift-2 26s ease-in-out infinite reverse;
@@ -129,7 +129,7 @@ start. Now uses left:calc(50% - 150px) for centering instead.
      with keyframes starting at translate(0,0) — caused a visible snap at t=0.
      Fixed: center using left:calc(50% - 150px) (half of 300px width) instead. */
   .amb-orb-3 {
-    width: 300px; height: 300px;
+    width: min(300px, 30vw); height: min(300px, 30vw);
     background: radial-gradient(circle, rgba(6, 182, 212, 0.12) 0%, transparent 65%);
     top: 40%;
     left: calc(50% - 150px);
