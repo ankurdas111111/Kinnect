@@ -10,7 +10,24 @@
    them here — a second identity contradicts the rebrand.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* Map basemap treatment for the night theme lives in Map.svelte /
-   public/map-style.json wiring — see Phase 1.6 of the makeover plan.
-   (The old vapor hue-rotate tile filter targeted a dead .leaflet-tile-pane
-   selector and was removed with the theme.) */
+/* ── VIGIL night basemap (Phase 1.6) ─────────────────────────────────────
+   The OpenFreeMap liberty style is light; in the Vigil theme the tile
+   canvas gets a dark-map filter tuned toward the indigo canvas. Scoped to
+   the MapLibre CANVAS only — HTML markers/popups are siblings, so lantern
+   markers keep their true member hues (≥3:1 against the darkened tiles;
+   the wheel sits at L 0.65 over tiles pushed to ~L 0.25).
+
+   NOTE the old vapor filter targeted a dead .leaflet-tile-pane selector —
+   dark themes have been showing LIGHT tiles since the MapLibre migration;
+   this is the first working night basemap. The filter is static (no
+   animation) so it costs one composite, not one per frame. If profiling
+   on mid-range WebViews ever says otherwise, the escape hatch is a real
+   dark style fork of public/map-style.json, not a cheaper filter. */
+[data-theme="dark"] .maplibregl-canvas {
+  filter: invert(1) hue-rotate(205deg) saturate(0.55) brightness(0.75) contrast(1.05);
+}
+
+/* Soften the map edges into the indigo canvas (chrome, not tiles) */
+[data-theme="dark"] .map-container {
+  background: var(--surface-0);
+}
