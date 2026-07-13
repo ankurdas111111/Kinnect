@@ -1,0 +1,273 @@
+/**
+ * emergency.css — shared field/card styles for the Emergency Profile split.
+ * Imported ONCE by EmergencyProfile.svelte (the orchestrator) so the field
+ * grammar is identical across every components/emergency/* child without
+ * duplicating scoped <style> blocks. All values are tokens — no raw hex.
+ *
+ * Every input/textarea carries a 16px font floor (iOS zoom prevention) and a
+ * 44px min height.
+ */
+
+/* ── Field ────────────────────────────────────────────────────────────────── */
+.ep-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1-5);
+}
+.ep-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2-5);
+}
+
+.ep-label,
+.ep-field-label {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-secondary);
+  display: block;
+}
+.ep-field-label--spaced { margin-top: var(--space-2); }
+
+.ep-hint {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: var(--leading-relaxed, 1.625);
+}
+
+.ep-required {
+  color: var(--danger-500);
+  margin-left: 2px;
+}
+.ep-optional {
+  color: var(--text-tertiary);
+  font-weight: 400;
+}
+
+.ep-input {
+  width: 100%;
+  height: 44px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-input, 10px);
+  border: 1px solid var(--border-default);
+  background: var(--surface-3);
+  /* 16px floor — never below to prevent iOS zoom-on-focus */
+  font-size: max(16px, var(--text-base, 1rem));
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  transition: border-color 150ms var(--ease-out), box-shadow 150ms var(--ease-out);
+  appearance: none;
+  -webkit-appearance: none;
+}
+.ep-input::placeholder { color: var(--text-tertiary); }
+.ep-input:focus {
+  outline: none;
+  border-color: var(--primary-500);
+  box-shadow: 0 0 0 3px var(--primary-500-12);
+}
+.ep-input--error {
+  border-color: var(--danger-500);
+}
+.ep-input--error:focus {
+  border-color: var(--danger-500);
+  box-shadow: 0 0 0 3px var(--danger-500-12);
+}
+
+.ep-textarea {
+  width: 100%;
+  min-height: 72px;
+  padding: var(--space-2-5) var(--space-3);
+  border-radius: var(--radius-input, 10px);
+  border: 1px solid var(--border-default);
+  background: var(--surface-3);
+  font-size: max(16px, var(--text-base, 1rem));
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  line-height: var(--leading-relaxed, 1.625);
+  resize: none;
+  overflow: hidden;
+  transition: border-color 150ms var(--ease-out), box-shadow 150ms var(--ease-out);
+}
+.ep-textarea::placeholder { color: var(--text-tertiary); }
+.ep-textarea:focus {
+  outline: none;
+  border-color: var(--primary-500);
+  box-shadow: 0 0 0 3px var(--primary-500-12);
+}
+
+.ep-field-hint {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+.ep-field-error {
+  font-size: var(--text-xs);
+  color: var(--danger-500);
+  font-weight: 500;
+}
+
+/* ── Medical card containers ──────────────────────────────────────────────── */
+.ep-med-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3-5);
+  border-radius: var(--radius-lg, 14px);
+  background: var(--surface-3);
+  border: 1px solid var(--border-subtle);
+}
+.ep-med-card--blood,
+.ep-med-card--allergy {
+  background: var(--danger-500-12);
+  border-color: var(--danger-500-20);
+}
+.ep-med-card-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.ep-med-card--blood .ep-med-card-title,
+.ep-med-card--allergy .ep-med-card-title {
+  color: var(--danger-600);
+}
+[data-theme='dark'] .ep-med-card--blood .ep-med-card-title,
+[data-theme='dark'] .ep-med-card--allergy .ep-med-card-title {
+  color: var(--danger-400);
+}
+
+/* ── Blood type pill grid ─────────────────────────────────────────────────── */
+.ep-blood-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: 2px;
+}
+.ep-blood-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 56px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-full, 9999px);
+  border: 1.5px solid var(--border-default);
+  background: var(--surface-1);
+  font-size: max(16px, var(--text-base, 1rem));
+  font-weight: 700;
+  color: var(--text-secondary);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: border-color 150ms var(--ease-out), background 150ms var(--ease-out),
+              color 150ms var(--ease-out), transform 100ms var(--ease-out);
+}
+.ep-blood-pill:hover {
+  border-color: var(--primary-400);
+  color: var(--primary-500);
+}
+.ep-blood-pill:active { transform: scale(0.93); }
+.ep-blood-pill--selected {
+  border-color: var(--danger-500);
+  background: var(--danger-500-20);
+  color: var(--danger-600);
+}
+.ep-blood-pill--selected:hover {
+  border-color: var(--danger-500);
+  color: var(--danger-600);
+}
+[data-theme='dark'] .ep-blood-pill--selected {
+  color: var(--danger-400);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ep-blood-pill { transition: border-color 150ms var(--ease-out), background 150ms var(--ease-out), color 150ms var(--ease-out); }
+  .ep-blood-pill:active { transform: none; }
+}
+
+/* ── Emergency contact card ───────────────────────────────────────────────── */
+.ep-contact-card {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg, 14px);
+  padding: var(--space-3-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2-5);
+  background: var(--surface-3);
+}
+.ep-contact-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.ep-contact-num {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.ep-remove-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--danger-500-20);
+  border-radius: var(--radius-sm, 7px);
+  background: var(--danger-500-12);
+  color: var(--danger-500);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 150ms var(--ease-out);
+}
+.ep-remove-btn:hover { background: var(--danger-500-20); }
+
+.ep-add-contact-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1-5);
+  width: 100%;
+  min-height: 44px;
+  border: 1.5px dashed var(--border-default);
+  border-radius: var(--radius-input, 10px);
+  background: transparent;
+  color: var(--primary-500);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 150ms var(--ease-out), border-color 150ms var(--ease-out);
+}
+.ep-add-contact-btn:hover {
+  background: var(--primary-500-08);
+  border-color: var(--primary-400);
+}
+
+/* ── Inline save button (panic relay) ─────────────────────────────────────── */
+.ep-save-inline-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1-5);
+  width: 100%;
+  min-height: 44px;
+  margin-top: var(--space-3);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md, 10px);
+  border: none;
+  background: var(--primary-500);
+  color: var(--text-on-primary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow: var(--shadow-primary);
+  transition: background 150ms var(--ease-out), transform 120ms var(--ease-out);
+}
+.ep-save-inline-btn:hover:not(:disabled) { background: var(--primary-600); }
+.ep-save-inline-btn:active:not(:disabled) { transform: scale(0.97); }
+.ep-save-inline-btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+@media (prefers-reduced-motion: reduce) {
+  .ep-save-inline-btn:active { transform: none; }
+}
