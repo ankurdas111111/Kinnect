@@ -37,6 +37,12 @@ const RGB_RE = /\brgba?\s*\(/g;
 //  - explicit lint suspensions
 const LINE_ALLOW_RE = /raw-color-ok|data:image\/svg|%23[0-9a-fA-F]{3,8}/;
 
+// Files whose entire PURPOSE is defining raw color values — the sanctioned
+// home. Everything else must consume tokens.
+const DEFINITION_FILES = new Set([
+  'frontend/src/styles/tokens-oklch.css',
+]);
+
 /** Recursively list files under dir with allowed extensions. */
 function listFiles(dir) {
   const out = [];
@@ -63,8 +69,10 @@ function countViolations(path, text) {
   let count = 0;
   const hits = [];
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (LINE_ALLOW_RE.test(line)) continue;
+    // Hex inside comments (e.g. oklch annotations `/* #f8fafc */`) is
+    // documentation, not a rendered color — strip before matching.
+    const line = lines[i].replace(/\/\*.*?\*\//g, '').replace(/(?<!:)\/\/.*$/, '');
+    if (LINE_ALLOW_RE.test(lines[i])) continue;
     const hex = line.match(HEX_RE) || [];
     // Only 3/4/6/8-digit runs are colors (avoid #12345 fragment ids).
     const hexColors = hex.filter((h) => [4, 5, 7, 9].includes(h.length));
@@ -82,6 +90,7 @@ const files = listFiles(SRC);
 const current = {};
 for (const f of files) {
   const rel = relative(ROOT, f);
+  if (DEFINITION_FILES.has(rel)) continue;
   const { count } = countViolations(f, readFileSync(f, 'utf8'));
   if (count > 0) current[rel] = count;
 }

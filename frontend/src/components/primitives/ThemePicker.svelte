@@ -36,8 +36,8 @@
   }
 
   // Category labels
-  const CATS = { classic: 'Classic', premium: 'Premium', genz: 'Gen-Z' };
-  const CATS_ORDER = ['classic', 'premium', 'genz'];
+  const CATS = { core: 'Appearance' };
+  const CATS_ORDER = ['core'];
 
   let grouped = $derived(CATS_ORDER.map(cat => ({
     cat,
@@ -99,29 +99,6 @@
                 <div class="swatch-scene" aria-hidden="true">
                   <!-- Background fill -->
                   <div class="swatch-bg"></div>
-
-                  <!-- Aurora animated orbs -->
-                  {#if theme.id === 'aurora'}
-                    <div class="swatch-aurora-blob blob-a"></div>
-                    <div class="swatch-aurora-blob blob-b"></div>
-                    <div class="swatch-aurora-blob blob-c"></div>
-                  {/if}
-
-                  <!-- Vapor grid + shimmer -->
-                  {#if theme.id === 'vapor'}
-                    <div class="swatch-vapor-grid"></div>
-                    <div class="swatch-vapor-shimmer"></div>
-                  {/if}
-
-                  <!-- Bloom scanlines + neon border -->
-                  {#if theme.id === 'bloom'}
-                    <div class="swatch-bloom-scan"></div>
-                  {/if}
-
-                  <!-- Deep ocean glow particles -->
-                  {#if theme.id === 'deep-ocean'}
-                    <div class="swatch-ocean-glow"></div>
-                  {/if}
 
                   <!-- Mini map + floating card simulation -->
                   <div class="swatch-map-strip"></div>
@@ -350,7 +327,7 @@
   .swatch-bg {
     position: absolute;
     inset: 0;
-    background: var(--sw-bg, #080810);
+    background: var(--sw-bg, var(--surface-0));
   }
 
   /* Map strip — subtle horizontal bands simulating a top-down map */
@@ -363,7 +340,7 @@
     background:
       linear-gradient(
         0deg,
-        color-mix(in srgb, var(--sw-bg, #080810) 60%, var(--sw-accent, #14b8a6)) 0%,
+        color-mix(in srgb, var(--sw-bg, var(--surface-0)) 60%, var(--sw-accent, var(--primary-500))) 0%,
         transparent 100%
       );
     opacity: 0.35;
@@ -376,8 +353,8 @@
     left: 10px;
     width: 62%;
     height: 22px;
-    background: color-mix(in srgb, var(--sw-bg, #080810) 78%, white);
-    border: 1px solid color-mix(in srgb, var(--sw-accent, #14b8a6) 20%, transparent);
+    background: color-mix(in srgb, var(--sw-bg, var(--surface-0)) 78%, white);
+    border: 1px solid color-mix(in srgb, var(--sw-accent, var(--primary-500)) 20%, transparent);
     border-radius: 5px;
     display: flex;
     align-items: center;
@@ -390,9 +367,9 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: var(--sw-accent, #14b8a6);
+    background: var(--sw-accent, var(--primary-500));
     flex-shrink: 0;
-    box-shadow: 0 0 6px color-mix(in srgb, var(--sw-accent, #14b8a6) 70%, transparent);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--sw-accent, var(--primary-500)) 70%, transparent);
   }
 
   .swatch-lines {
@@ -418,119 +395,8 @@
     height: 10px;
     border-radius: 50% 50% 50% 0;
     transform: rotate(-45deg);
-    background: var(--sw-accent, #14b8a6);
-    box-shadow: 0 0 8px color-mix(in srgb, var(--sw-accent, #14b8a6) 65%, transparent);
-  }
-
-  /* ── Aurora-specific mini-blobs ─────────────────────────────────────── */
-  .swatch-aurora-blob {
-    position: absolute;
-    border-radius: 50%;
-    filter: blur(8px);
-    animation: mini-blob 5s ease-in-out infinite alternate;
-    pointer-events: none;
-  }
-
-  .blob-a {
-    width: 50px; height: 50px;
-    background: rgba(139, 92, 246, 0.55);
-    top: -10px; left: -5px;
-    animation-delay: 0s;
-  }
-  .blob-b {
-    width: 40px; height: 40px;
-    background: rgba(20, 184, 166, 0.50);
-    top: 5px; right: 0px;
-    animation-delay: -1.8s;
-  }
-  .blob-c {
-    width: 30px; height: 30px;
-    background: rgba(6, 182, 212, 0.45);
-    bottom: 5px; left: 50%;
-    animation-delay: -3.2s;
-  }
-
-  @keyframes mini-blob {
-    from { transform: translate(0, 0) scale(1); }
-    to   { transform: translate(6px, 8px) scale(1.15); }
-  }
-
-  /* ── Vapor-specific: grid + shimmer ────────────────────────────────── */
-  .swatch-vapor-grid {
-    position: absolute;
-    inset: 0;
-    background:
-      linear-gradient(0deg, rgba(168,85,247,0.08) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(168,85,247,0.08) 1px, transparent 1px);
-    background-size: 12px 12px;
-  }
-
-  .swatch-vapor-shimmer {
-    position: absolute;
-    top: 0;
-    left: -60%;
-    width: 40%;
-    height: 100%;
-    background: linear-gradient(
-      105deg,
-      transparent 0%,
-      rgba(200,120,255,0.18) 45%,
-      rgba(236,72,153,0.14) 55%,
-      transparent 100%
-    );
-    animation: mini-shimmer 3s ease-in-out infinite;
-    pointer-events: none;
-  }
-
-  @keyframes mini-shimmer {
-    from { left: -60%; opacity: 0.7; }
-    to   { left: 120%; opacity: 0.7; }
-  }
-
-  /* ── Bloom-specific: scanlines ──────────────────────────────────────── */
-  .swatch-bloom-scan {
-    position: absolute;
-    inset: 0;
-    background: repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 3px,
-      rgba(74,222,128,0.04) 3px,
-      rgba(74,222,128,0.04) 4px
-    );
-    pointer-events: none;
-  }
-
-  /* Neon border animation on bloom swatch */
-  .swatch[data-theme-id="bloom"] .swatch-scene {
-    box-shadow:
-      inset 0 0 0 1px rgba(74,222,128,0.25),
-      0 0 12px rgba(74,222,128,0.18);
-    animation: neon-border-pulse 2s ease-in-out infinite alternate;
-  }
-
-  @keyframes neon-border-pulse {
-    from { box-shadow: inset 0 0 0 1px rgba(74,222,128,0.18), 0 0 8px rgba(74,222,128,0.12); }
-    to   { box-shadow: inset 0 0 0 1px rgba(74,222,128,0.40), 0 0 16px rgba(74,222,128,0.28); }
-  }
-
-  /* ── Deep ocean glow ────────────────────────────────────────────────── */
-  .swatch-ocean-glow {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(0,212,255,0.18) 0%, transparent 70%);
-    animation: ocean-breathe 3s ease-in-out infinite alternate;
-    pointer-events: none;
-  }
-
-  @keyframes ocean-breathe {
-    from { transform: translate(-50%,-50%) scale(0.8); opacity: 0.6; }
-    to   { transform: translate(-50%,-50%) scale(1.3); opacity: 1; }
+    background: var(--sw-accent, var(--primary-500));
+    box-shadow: 0 0 8px color-mix(in srgb, var(--sw-accent, var(--primary-500)) 65%, transparent);
   }
 
   /* ── Swatch name + desc ─────────────────────────────────────────────── */
@@ -575,9 +441,6 @@
 
   /* ── Reduced motion ─────────────────────────────────────────────────── */
   @media (prefers-reduced-motion: reduce) {
-    .swatch-aurora-blob,
-    .swatch-vapor-shimmer,
-    .swatch-ocean-glow { animation: none; }
     .picker-panel  { animation: none; }
     .picker-backdrop { animation: none; }
     .swatch:hover  { transform: none; }

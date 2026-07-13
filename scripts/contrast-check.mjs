@@ -33,16 +33,8 @@ const FILES = [
  * TODO with the phase that fixes it.
  */
 const EXCEPTIONS = [
-  // PRE-EXISTING failures in the outgoing teal palette, measured 2026-07-13.
-  // TODO(vigil-rebrand): Phase 1.1 replaces the palette and MUST delete every
-  // entry below — moonstone-500 is specced ≥4.5:1 with white, and light-mode
-  // ("Dawn") UI colors move to -600 shades that clear 3:1 on paper surfaces.
-  { theme: 'dark',  pair: 'text-on-primary/primary-500', reason: 'TODO(vigil-rebrand): white on teal #14b8a6 = 2.49' },
-  { theme: 'light', pair: 'text-on-primary/primary-500', reason: 'TODO(vigil-rebrand): white on teal #14b8a6 = 2.49' },
-  { theme: 'light', pair: 'primary-400/surface-0',       reason: 'TODO(vigil-rebrand): dark-tuned -400 on paper = 1.78' },
-  { theme: 'light', pair: 'success-500/surface-0',       reason: 'TODO(vigil-rebrand): dark-tuned -500 on paper = 2.42' },
-  { theme: 'light', pair: 'warning-500/surface-0',       reason: 'TODO(vigil-rebrand): dark-tuned -500 on paper = 2.05' },
-  { theme: 'light', pair: 'status-live/surface-0',       reason: 'TODO(vigil-rebrand): dark-tuned live-green on paper = 2.18' },
+  // Empty since the VIGIL rebrand — every asserted pair passes on real values.
+  // Adding an entry requires a documented reason + a TODO naming the fix phase.
 ];
 
 // ── CSS custom-property extraction ──────────────────────────────────────────

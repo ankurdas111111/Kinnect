@@ -12,6 +12,7 @@
     "@capacitor/local-notifications": "^8.0.2",
     "@capacitor/network": "^8.0.1",
     "@capacitor/share": "^8.0.1",
+    "@fontsource-variable/bricolage-grotesque": "^5.2.10",
     "@fontsource/jetbrains-mono": "^5.2.8",
     "@fontsource/nunito": "^5.2.7",
     "@fontsource/sora": "^5.2.8",

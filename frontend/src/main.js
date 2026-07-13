@@ -2,7 +2,11 @@ import { mount } from 'svelte';
 import App from './App.svelte';
 // Self-hosted fonts (Fontsource): no fonts.googleapis.com runtime dependency,
 // so Capacitor cold starts render branded type even fully offline.
-// Weights match what the UI uses: Sora 600/700/800, Nunito 400/600/700, JetBrains Mono 500.
+// VIGIL display face: Bricolage Grotesque variable (wght axis, humanist warmth).
+// Sora stays imported for ONE release as the --font-display fallback so slow
+// connections never flash unbranded type — remove after visual QA signs off.
+// Body: Nunito 400/600/700 (kept). Data: JetBrains Mono 500 (kept).
+import '@fontsource-variable/bricolage-grotesque';
 import '@fontsource/sora/600.css';
 import '@fontsource/sora/700.css';
 import '@fontsource/sora/800.css';
