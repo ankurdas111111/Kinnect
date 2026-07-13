@@ -9,8 +9,13 @@
   import { mySafetyStatus } from '../lib/stores/map.js';
   import { banner } from '../lib/stores/sos.js';
   import { socket } from '../lib/socket.js';
+  import { formatAge } from '../lib/presence.js';
+  import { haptics } from '../lib/haptics.js';
   import Card from '../components/primitives/Card.svelte';
   import EmptyState from '../components/primitives/EmptyState.svelte';
+  import CountdownRing from '../components/primitives/CountdownRing.svelte';
+  import ToggleControl from '../components/primitives/ToggleControl.svelte';
+  import StatusBadge from '../components/primitives/StatusBadge.svelte';
 
   run(() => {
     if (!$authUser) push('/login');
@@ -23,6 +28,8 @@
   let lastCheckInAt = $state(null);
   let dirty = $state(false);
   let saving = $state(false);
+  let saveError = $state(false);
+  let saveTimeout = null;
 
   // ── History log (session-scoped) ───────────────────────────────────────────
   let log = $state([]);
@@ -57,14 +64,6 @@
     return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   }
 
-  function formatRelative(ts) {
-    const diff = Date.now() - ts;
-    if (diff < 60000) return 'just now';
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-    return new Date(ts).toLocaleDateString();
-  }
-
   // ── Load from store ────────────────────────────────────────────────────────
   const unsubStatus = mySafetyStatus.subscribe(s => {
     const ci = s?.checkIn;
@@ -81,19 +80,38 @@
   // ── Interval / overdueMinutes changes mark dirty ───────────────────────────
   function markDirty() { dirty = true; }
 
+  // Empty-state CTA: flip monitoring on, mark dirty, scroll the toggle into view.
+  let toggleSection = $state(null);
+  function turnOnCheckins() {
+    enabled = true;
+    dirty = true;
+    haptics.tap();
+    toggleSection?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
   // ── Save ───────────────────────────────────────────────────────────────────
+  // Honest save: emit → wait for the checkInRulesSaved ack. Banner shows ONLY on
+  // {ok:true}. On {ok:false} or a 6s timeout we surface an error + keep `dirty`
+  // true so the user can retry (never silently claim success on a safety schedule).
+  // Backend field names are the canonical intervalMin/overdueMin (see
+  // docs/backend-event-contracts.md §1).
   function save() {
     if (saving) return;
     saving = true;
-    socket.emit('setCheckInRules', { enabled, intervalMinutes, overdueMinutes });
-    dirty = false;
-    setTimeout(() => { saving = false; }, 1500);
-    banner.set({ type: 'info', text: 'Check-in settings saved.', actions: [] });
-    setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 2000);
+    saveError = false;
+    socket.emit('setCheckInRules', { enabled, intervalMin: intervalMinutes, overdueMin: overdueMinutes });
+    if (saveTimeout) clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(() => {
+      if (!saving) return;
+      saving = false;
+      saveError = true;
+      haptics.error();
+    }, 6000);
   }
 
   // ── Acknowledge check-in ───────────────────────────────────────────────────
   function imOk() {
+    haptics.confirm();
     socket.emit('checkInAck');
     lastCheckInAt = Date.now();
     mySafetyStatus.update(s => ({ ...s, checkIn: { ...s.checkIn, lastCheckInAt: lastCheckInAt } }));
@@ -122,18 +140,37 @@
   const _onCheckInMissed = () => {
     addLog('missed', 'Missed check-in — your family was notified');
   };
+  // Save ack — banner shows ONLY on ok:true; ok:false surfaces the error state.
+  const _onCheckInRulesSaved = (data) => {
+    if (!saving) return;
+    if (saveTimeout) { clearTimeout(saveTimeout); saveTimeout = null; }
+    saving = false;
+    if (data?.ok) {
+      saveError = false;
+      dirty = false;
+      haptics.success();
+      banner.set({ type: 'info', text: 'Check-in settings saved.', actions: [] });
+      setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 2000);
+    } else {
+      saveError = true;
+      haptics.error();
+    }
+  };
 
   onMount(() => {
     countdownInterval = setInterval(() => updateCountdown(), 1000);
     socket.on('checkInRequest', _onCheckInRequest);
     socket.on('checkInUpdate', _onCheckInUpdate);
     socket.on('checkInMissed', _onCheckInMissed);
+    socket.on('checkInRulesSaved', _onCheckInRulesSaved);
   });
 
   onDestroy(() => {
     socket.off('checkInRequest', _onCheckInRequest);
     socket.off('checkInUpdate', _onCheckInUpdate);
     socket.off('checkInMissed', _onCheckInMissed);
+    socket.off('checkInRulesSaved', _onCheckInRulesSaved);
+    if (saveTimeout) clearTimeout(saveTimeout);
     unsubStatus();
     if (countdownInterval) clearInterval(countdownInterval);
   });
@@ -149,18 +186,18 @@
   let countdownClass = $derived(countdownMs != null && countdownMs <= 0 ? 'countdown-due'
     : countdownMs != null && countdownMs < 120000 ? 'countdown-soon' : 'countdown-ok');
 
-  // Ring state mirrors the countdown urgency (drives conic color + glow)
-  let ringClass = $derived(countdownMs != null && countdownMs <= 0 ? 'ring-due'
-    : countdownMs != null && countdownMs < 120000 ? 'ring-soon' : 'ring-ok');
-
   let isDue = $derived(countdownMs != null && countdownMs <= 0);
 
-  // Fraction of the interval still remaining → arc fill %. 0 when overdue/idle.
-  let ringPct = $derived(
-    countdownMs == null || intervalMinutes <= 0
-      ? 0
-      : Math.max(0, Math.min(100, Math.round((countdownMs / (intervalMinutes * 60 * 1000)) * 100)))
+  // ── Shared CountdownRing inputs (temporal-decay grammar, hero size) ─────────
+  // deadline = when the next check-in is due; total = the full interval window
+  // for the 100% arc. Both are reactive: the ring re-syncs when the user extends
+  // the interval or sends an "I'm OK" (moving lastCheckInAt). Null when idle.
+  let ringDeadline = $derived(
+    enabled && lastCheckInAt && intervalMinutes > 0
+      ? lastCheckInAt + intervalMinutes * 60 * 1000
+      : null
   );
+  let ringTotal = $derived(intervalMinutes > 0 ? intervalMinutes * 60 * 1000 : 1);
 
   // Glow color for history Cards, keyed on event type.
   function logGlow(type) {
@@ -182,7 +219,9 @@
       <span class="page-subtitle">Auto-safety pulse</span>
     </div>
     {#if enabled}
-      <span class="header-status-badge" in:fade={{ duration: 200 }}>Active</span>
+      <span class="header-badge-wrap" in:fade={{ duration: 200 }}>
+        <StatusBadge state="live" label="Active" />
+      </span>
     {/if}
   </header>
 
@@ -193,22 +232,31 @@
       <div class="countdown-card" class:countdown-card-urgent={isDue} in:fly={{ y: 12, duration: 240, easing: cubicOut }}>
         <span class="countdown-heading">Next check-in</span>
 
-        <div
-          class="ring {ringClass}"
-          style="--ring-pct: {ringPct}%"
-          role="img"
-          aria-label="Time until next check-in: {formatCountdown(countdownMs)}"
-        >
-          <div class="ring-inner">
+        {#if ringDeadline}
+          <!-- Shared temporal-decay ring at hero size. Deadline-flavoured label
+               (counting down TO a deadline, not remaining ON a share). -->
+          <CountdownRing
+            deadline={ringDeadline}
+            total={ringTotal}
+            size="hero"
+            label="Time until next check-in"
+          >
             <span class="ring-value {countdownClass}">{formatCountdown(countdownMs)}</span>
             {#if countdownMs != null && countdownMs > 0}
               <span class="ring-caption">remaining</span>
             {/if}
+          </CountdownRing>
+        {:else}
+          <div class="ring-idle" role="img" aria-label="Waiting for your first check-in">
+            <div class="ring-idle-inner">
+              <span class="ring-value countdown-ok">Ready</span>
+              <span class="ring-caption">tap I'm OK to start</span>
+            </div>
           </div>
-        </div>
+        {/if}
 
         {#if lastCheckInAt}
-          <div class="countdown-meta">Last: {formatRelative(lastCheckInAt)} · {formatTime(lastCheckInAt)}</div>
+          <div class="countdown-meta">Last: {formatAge(Date.now() - lastCheckInAt) || 'just now'} · {formatTime(lastCheckInAt)}</div>
         {:else}
           <div class="countdown-meta">No check-in recorded yet</div>
         {/if}
@@ -228,28 +276,21 @@
           {#snippet icon()}
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
           {/snippet}
+          {#snippet action()}
+            <button class="empty-cta tactile" onclick={turnOnCheckins}>Turn on check-ins</button>
+          {/snippet}
         </EmptyState>
       </div>
     {/if}
 
     <!-- ── Master toggle ───────────────────────────────────────────────────── -->
-    <section class="settings-card">
-      <div class="settings-row toggle-row">
-        <div class="settings-label-block">
-          <span class="settings-label">Enable check-in monitoring</span>
-          <span class="settings-hint">Contacts get an alert if you miss your check-in window</span>
-        </div>
-        <button
-          class="toggle-switch"
-          class:toggle-on={enabled}
-          role="switch"
-          aria-checked={enabled}
-          aria-label="Enable check-in monitoring"
-          onclick={() => { enabled = !enabled; dirty = true; }}
-        >
-          <span class="toggle-knob"></span>
-        </button>
-      </div>
+    <section class="settings-card" bind:this={toggleSection}>
+      <ToggleControl
+        bind:checked={enabled}
+        label="Enable check-in monitoring"
+        description="Contacts get an alert if you miss your check-in window"
+        onchange={() => { dirty = true; }}
+      />
     </section>
 
     <!-- ── Interval ────────────────────────────────────────────────────────── -->
@@ -293,10 +334,18 @@
     <!-- ── Save ────────────────────────────────────────────────────────────── -->
     {#if dirty}
       <div in:fly={{ y: 8, duration: 200, easing: cubicOut }}>
-        <button class="save-btn" onclick={save} disabled={saving} aria-label="Save check-in settings">
+        {#if saveError}
+          <p class="save-error" role="alert">
+            Couldn't save — check your connection and try again.
+          </p>
+        {/if}
+        <button class="save-btn" class:save-btn-retry={saveError} onclick={save} disabled={saving} aria-label="Save check-in settings">
           {#if saving}
             <span class="saving-spinner" aria-hidden="true"></span>
             Saving…
+          {:else if saveError}
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            Try again
           {:else}
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
             Save Settings
@@ -330,7 +379,7 @@
                 <div class="log-entry log-{entry.type}">
                   <span class="log-dot" aria-hidden="true"></span>
                   <span class="log-text">{entry.text}</span>
-                  <span class="log-time">{formatRelative(entry.ts)}</span>
+                  <span class="log-time">{formatAge(Date.now() - entry.ts) || 'just now'}</span>
                 </div>
               </Card>
             </div>
@@ -350,7 +399,7 @@
     font-family: var(--font-sans);
     display: flex;
     flex-direction: column;
-    padding-bottom: calc(env(safe-area-inset-bottom) + 32px);
+    padding-bottom: calc(var(--safe-bottom) + var(--space-8));
   }
 
   /* ── Header ──────────────────────────────────────────────────────────────── */
@@ -358,7 +407,7 @@
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    padding: calc(env(safe-area-inset-top) + 12px) var(--space-4) var(--space-3);
+    padding: calc(var(--safe-top) + var(--space-3)) var(--space-4) var(--space-3);
     background: var(--surface-0);
     border-bottom: 1px solid var(--border-subtle);
     position: sticky;
@@ -405,15 +454,9 @@
     color: var(--text-tertiary);
   }
 
-  .header-status-badge {
-    font-family: var(--font-display);
-    font-size: var(--text-xs);
-    font-weight: 700;
-    color: var(--success-500);
-    background: var(--success-500-12);
-    border: 1px solid var(--success-500-20);
-    border-radius: var(--radius-full);
-    padding: 3px 10px;
+  .header-badge-wrap {
+    display: inline-flex;
+    flex-shrink: 0;
   }
 
   /* ── Content area ────────────────────────────────────────────────────────── */
@@ -456,8 +499,8 @@
     letter-spacing: 0.08em;
   }
 
-  /* ── Conic-gradient progress ring ────────────────────────────────────────── */
-  .ring {
+  /* ── Idle ring (no first check-in yet) — static, no conic sweep ──────────── */
+  .ring-idle {
     position: relative;
     width: 184px;
     height: 184px;
@@ -465,33 +508,9 @@
     display: grid;
     place-items: center;
     margin: var(--space-2) 0;
-    background: conic-gradient(
-      from -90deg,
-      var(--ring-color, var(--primary-500)) var(--ring-pct, 0%),
-      var(--surface-inset) 0
-    );
+    background: var(--surface-inset);
   }
-  .ring-ok   { --ring-color: var(--primary-500); }
-  .ring-soon { --ring-color: var(--warning-500); }
-  .ring-due  { --ring-color: var(--danger-500); }
-
-  /* Pulsing danger glow when overdue — opacity-only (GPU safe) */
-  .ring-due::before {
-    content: '';
-    position: absolute;
-    inset: -8px;
-    border-radius: 50%;
-    box-shadow: 0 0 30px 4px var(--danger-500-20);
-    pointer-events: none;
-    animation: ring-glow 1.4s ease-in-out infinite;
-  }
-
-  @keyframes ring-glow {
-    0%, 100% { opacity: 0.35; }
-    50%       { opacity: 1; }
-  }
-
-  .ring-inner {
+  .ring-idle-inner {
     width: calc(100% - 26px);
     height: calc(100% - 26px);
     border-radius: 50%;
@@ -504,10 +523,13 @@
     gap: 2px;
   }
 
+  /* Center readout inside the shared CountdownRing children slot + idle ring.
+     (CountdownRing renders our children in the parent scope.) */
   .ring-value {
-    font-family: var(--font-display);
-    font-size: clamp(22px, 6vw, 30px);
+    font-family: var(--font-mono);
+    font-size: clamp(1.375rem, 6vw, 1.875rem);
     font-weight: 900;
+    font-variant-numeric: tabular-nums;
     letter-spacing: -0.02em;
     line-height: 1.05;
     text-align: center;
@@ -533,7 +555,6 @@
 
   @media (prefers-reduced-motion: reduce) {
     .countdown-due { animation: none; }
-    .ring-due::before { animation: none; opacity: 0.6; }
   }
 
   .countdown-meta {
@@ -583,9 +604,6 @@
     pointer-events: none;
   }
 
-  .settings-row { display: flex; align-items: center; gap: var(--space-3); }
-  .toggle-row   { justify-content: space-between; }
-
   .settings-label-block {
     display: flex;
     flex-direction: column;
@@ -614,33 +632,6 @@
     letter-spacing: -0.01em;
     color: var(--text-primary);
   }
-
-  /* ── Toggle switch ───────────────────────────────────────────────────────── */
-  .toggle-switch {
-    width: 48px;
-    height: 28px;
-    border-radius: 14px;
-    border: none;
-    cursor: pointer;
-    flex-shrink: 0;
-    position: relative;
-    transition: background 200ms var(--ease-out);
-    background: var(--surface-inset);
-    outline-offset: 3px;
-  }
-  .toggle-switch.toggle-on { background: var(--primary-600); }
-  .toggle-knob {
-    position: absolute;
-    top: 3px;
-    left: 3px;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    background: var(--text-inverse, white);
-    box-shadow: 0 1px 4px var(--shadow-color, rgba(0,0,0,0.25));
-    transition: transform 200ms var(--ease-spring);
-  }
-  .toggle-on .toggle-knob { transform: translateX(20px); }
 
   /* ── Pill buttons ────────────────────────────────────────────────────────── */
   .pill-group {
@@ -696,6 +687,39 @@
   .save-btn:hover { background: var(--primary-500); transform: translateY(-1px); }
   .save-btn:active { transform: scale(0.98); }
   .save-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+  /* Retry variant — danger-tinted so the failed save reads at a glance */
+  .save-btn-retry {
+    background: var(--danger-600, var(--danger-500));
+    box-shadow: none;
+  }
+  .save-btn-retry:hover { background: var(--danger-500); }
+
+  .save-error {
+    margin: 0 0 var(--space-2);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--danger-400);
+    text-align: center;
+    line-height: 1.4;
+  }
+
+  /* Empty-state CTA — matches pill/save action weight */
+  .empty-cta {
+    min-height: 44px;
+    padding: var(--space-2) var(--space-5);
+    background: var(--primary-600);
+    color: var(--text-inverse, white);
+    border: none;
+    border-radius: var(--radius-full);
+    font-family: var(--font-display);
+    font-size: var(--text-sm);
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: var(--glow-primary);
+    transition: background 150ms var(--ease-out);
+  }
+  .empty-cta:hover { background: var(--primary-500); }
 
   .saving-spinner {
     width: 14px;

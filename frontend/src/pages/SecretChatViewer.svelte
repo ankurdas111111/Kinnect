@@ -718,15 +718,20 @@
 <style>
   /* ── Chat accent token system — cascade into SecretChatGate / Message ── */
   :root {
-    --scv-accent:        var(--primary-500, #14b8a6);
-    --scv-accent-dim:    rgba(20, 184, 166, 0.18);
-    --scv-accent-subtle: rgba(20, 184, 166, 0.08);
-    --scv-accent-glow:   rgba(20, 184, 166, 0.28);
-    --scv-bg:            #060610;
-    --scv-surface:       #0a0a18;
-    --scv-elevated:      #0f0f20;
+    /* Accent cluster — derived from global --primary-* so rebrand flows through */
+    --scv-accent:        var(--primary-500);
+    --scv-accent-dim:    color-mix(in oklch, var(--primary-500) 18%, transparent);
+    --scv-accent-subtle: color-mix(in oklch, var(--primary-500)  8%, transparent);
+    --scv-accent-glow:   color-mix(in oklch, var(--primary-500) 28%, transparent);
+    --scv-border-accent: color-mix(in oklch, var(--primary-500) 22%, transparent);
+
+    /* Vault surfaces — intentionally darker than the app shell (privacy affect).
+       color-mix toward black keeps values derived, not hardcoded. /* raw-color-ok */
+    --scv-bg:       color-mix(in oklch, var(--surface-0) 60%, black);
+    --scv-surface:  color-mix(in oklch, var(--surface-0) 75%, black);
+    --scv-elevated: color-mix(in oklch, var(--surface-0) 90%, black);
+
     --scv-border:        rgba(255, 255, 255, 0.07);
-    --scv-border-accent: rgba(20, 184, 166, 0.22);
     /* Keyboard offset — updated by VisualViewport listener */
     --keyboard-offset: 0px;
   }
@@ -760,20 +765,20 @@
     --chat-elevated:      var(--scv-elevated);
   }
 
-  /* Ambient teal mesh — only in messages state */
+  /* Ambient accent mesh — only in messages state; suppressed at data-fx=minimal */
   .scv::before {
     content: '';
     position: fixed;
     inset: 0;
     background:
-      radial-gradient(ellipse 65% 50% at 20% 10%,  rgba(20, 184, 166, 0.07) 0%, transparent 55%),
-      radial-gradient(ellipse 50% 40% at 80% 90%,  rgba(20, 184, 166, 0.05) 0%, transparent 50%),
-      radial-gradient(ellipse 40% 35% at 60% 45%,  rgba(6, 182, 212, 0.04) 0%, transparent 55%);
+      radial-gradient(ellipse 65% 50% at 20% 10%,  color-mix(in oklch, var(--primary-500)  7%, transparent) 0%, transparent 55%),
+      radial-gradient(ellipse 50% 40% at 80% 90%,  color-mix(in oklch, var(--primary-500)  5%, transparent) 0%, transparent 50%),
+      radial-gradient(ellipse 40% 35% at 60% 45%,  color-mix(in oklch, var(--primary-400)  4%, transparent) 0%, transparent 55%);
     pointer-events: none;
     z-index: 0;
   }
 
-  /* Hex grid texture — only in messages state */
+  /* Hex grid texture — only in messages state; suppressed at data-fx=minimal */
   .scv::after {
     content: '';
     position: fixed;
@@ -781,11 +786,13 @@
     background-image:
       repeating-linear-gradient(
         0deg, transparent, transparent 28px,
-        rgba(20, 184, 166, 0.018) 28px, rgba(20, 184, 166, 0.018) 29px
+        color-mix(in oklch, var(--primary-500) 1.8%, transparent) 28px,
+        color-mix(in oklch, var(--primary-500) 1.8%, transparent) 29px
       ),
       repeating-linear-gradient(
         60deg, transparent, transparent 28px,
-        rgba(20, 184, 166, 0.012) 28px, rgba(20, 184, 166, 0.012) 29px
+        color-mix(in oklch, var(--primary-500) 1.2%, transparent) 28px,
+        color-mix(in oklch, var(--primary-500) 1.2%, transparent) 29px
       );
     pointer-events: none;
     z-index: 0;
@@ -799,6 +806,10 @@
 
   .scv--nocyber::before,
   .scv--nocyber::after { display: none; }
+
+  /* data-fx=minimal: flatten ambient decoration to solid vault bg */
+  :global([data-fx="minimal"]) .scv::before,
+  :global([data-fx="minimal"]) .scv::after { display: none; }
 
   .scv > * { position: relative; z-index: 1; }
 
@@ -838,10 +849,10 @@
   }
 
   .scv-status-icon--error {
-    background: rgba(248, 113, 113, 0.08);
-    border: 1px solid rgba(248, 113, 113, 0.22);
-    color: var(--danger-400, #f87171);
-    box-shadow: 0 0 24px rgba(248, 113, 113, 0.12);
+    background: color-mix(in oklch, var(--danger-400) 8%, transparent);
+    border: 1px solid color-mix(in oklch, var(--danger-400) 22%, transparent);
+    color: var(--danger-400);
+    box-shadow: 0 0 24px color-mix(in oklch, var(--danger-400) 12%, transparent);
   }
 
   .scv-err-msg {
@@ -902,16 +913,26 @@
     justify-content: center;
     color: var(--scv-accent);
     box-shadow:
-      0 0 0 12px rgba(20, 184, 166, 0.04),
-      0 0 0 24px rgba(20, 184, 166, 0.02),
-      0 0 48px rgba(20, 184, 166, 0.18);
+      0 0 0 12px color-mix(in oklch, var(--primary-500)  4%, transparent),
+      0 0 0 24px color-mix(in oklch, var(--primary-500)  2%, transparent),
+      0 0 48px   color-mix(in oklch, var(--primary-500) 18%, transparent);
     animation: scv-icon-breathe 5s ease-in-out infinite;
     flex-shrink: 0;
   }
 
   @keyframes scv-icon-breathe {
-    0%, 100% { box-shadow: 0 0 0 12px rgba(20,184,166,0.04), 0 0 0 24px rgba(20,184,166,0.02), 0 0 48px rgba(20,184,166,0.18); }
-    50%       { box-shadow: 0 0 0 18px rgba(20,184,166,0.03), 0 0 0 34px rgba(20,184,166,0.01), 0 0 72px rgba(20,184,166,0.28); }
+    0%, 100% {
+      box-shadow:
+        0 0 0 12px color-mix(in oklch, var(--primary-500)  4%, transparent),
+        0 0 0 24px color-mix(in oklch, var(--primary-500)  2%, transparent),
+        0 0 48px   color-mix(in oklch, var(--primary-500) 18%, transparent);
+    }
+    50% {
+      box-shadow:
+        0 0 0 18px color-mix(in oklch, var(--primary-500)  3%, transparent),
+        0 0 0 34px color-mix(in oklch, var(--primary-500)  1%, transparent),
+        0 0 72px   color-mix(in oklch, var(--primary-500) 28%, transparent);
+    }
   }
 
   .scv-gate-text {
@@ -979,7 +1000,7 @@
   .scv-field-err {
     margin: 0;
     font-size: var(--text-xs, 0.75rem);
-    color: var(--danger-400, #f87171);
+    color: var(--danger-400);
     font-weight: 500;
     text-align: left;
     font-family: var(--font-sans, 'Nunito', sans-serif);
@@ -1014,15 +1035,15 @@
   }
 
   .scv-cta-btn--active {
-    background: linear-gradient(135deg, var(--primary-400, #2dd4bf) 0%, var(--primary-600, #0d9488) 100%);
-    color: #fff;
+    background: linear-gradient(135deg, var(--primary-400) 0%, var(--primary-600) 100%);
+    color: #fff; /* raw-color-ok — white text on primary gradient, always passes contrast */
     border-color: transparent;
-    box-shadow: 0 4px 22px rgba(20, 184, 166, 0.42);
+    box-shadow: 0 4px 22px color-mix(in oklch, var(--primary-500) 42%, transparent);
   }
 
   .scv-cta-btn--active:hover:not(:disabled) {
     transform: translateY(-1px);
-    box-shadow: 0 6px 30px rgba(20, 184, 166, 0.58);
+    box-shadow: 0 6px 30px color-mix(in oklch, var(--primary-500) 58%, transparent);
   }
 
   .scv-cta-btn--active:active:not(:disabled) { transform: scale(0.97); }
@@ -1086,7 +1107,7 @@
       var(--space-3, 12px)
       var(--space-3, 12px)
       var(--space-3, 12px);
-    background: rgba(6, 6, 16, 0.92);
+    background: color-mix(in oklch, var(--scv-bg) 92%, transparent);
     backdrop-filter: blur(20px) saturate(1.4);
     -webkit-backdrop-filter: blur(20px) saturate(1.4);
     border-bottom: 1px solid var(--scv-border);
@@ -1137,11 +1158,11 @@
     gap: var(--space-1-5, 6px);
     min-height: 44px;
     padding: 0 var(--space-3, 12px);
-    background: rgba(251, 191, 36, 0.10);
-    border: 1px solid rgba(251, 191, 36, 0.25);
+    background: color-mix(in oklch, var(--warning-400) 10%, transparent);
+    border: 1px solid color-mix(in oklch, var(--warning-400) 25%, transparent);
     border-radius: var(--radius-full, 9999px);
     cursor: pointer;
-    color: rgb(251, 191, 36);
+    color: var(--warning-400);
     font-size: var(--text-xs, 0.75rem);
     font-family: var(--font-sans, 'Nunito', sans-serif);
     font-weight: 700;
@@ -1152,12 +1173,12 @@
   }
 
   .scv-panic-btn:hover {
-    background: rgba(251, 191, 36, 0.20);
-    border-color: rgba(251, 191, 36, 0.45);
-    box-shadow: 0 0 16px rgba(251, 191, 36, 0.20);
+    background: color-mix(in oklch, var(--warning-400) 20%, transparent);
+    border-color: color-mix(in oklch, var(--warning-400) 45%, transparent);
+    box-shadow: 0 0 16px color-mix(in oklch, var(--warning-400) 20%, transparent);
   }
 
-  .scv-panic-btn:focus-visible { outline: 2px solid rgb(251, 191, 36); outline-offset: 2px; }
+  .scv-panic-btn:focus-visible { outline: 2px solid var(--warning-400); outline-offset: 2px; }
 
   .scv-header-center {
     flex: 1;
@@ -1181,7 +1202,7 @@
 
   @keyframes scv-pulse-dot {
     0%, 100% { box-shadow: 0 0 0 0 var(--scv-accent-glow); }
-    50%       { box-shadow: 0 0 0 5px rgba(20, 184, 166, 0); }
+    50%       { box-shadow: 0 0 0 5px transparent; }
   }
 
   .scv-header-label {
@@ -1238,7 +1259,7 @@
     align-items: center;
     justify-content: center;
     color: var(--scv-accent);
-    box-shadow: 0 0 32px rgba(20, 184, 166, 0.12);
+    box-shadow: 0 0 32px var(--scv-accent-dim);
   }
 
   .scv-empty-title {
@@ -1286,7 +1307,7 @@
     white-space: nowrap;
     letter-spacing: 0.05em;
     padding: 3px var(--space-2, 8px);
-    background: rgba(6, 6, 16, 0.92);
+    background: color-mix(in oklch, var(--scv-bg) 92%, transparent);
     border: 1px solid rgba(255, 255, 255, 0.07);
     border-radius: var(--radius-full, 9999px);
     backdrop-filter: blur(8px);
@@ -1331,8 +1352,12 @@
     display: flex;
     align-items: center;
     gap: var(--space-2, 8px);
-    background: linear-gradient(135deg, rgba(20, 184, 166, 0.14) 0%, rgba(20, 184, 166, 0.08) 100%);
-    border: 1px solid rgba(20, 184, 166, 0.22);
+    background: linear-gradient(
+      135deg,
+      color-mix(in oklch, var(--primary-500) 14%, transparent) 0%,
+      color-mix(in oklch, var(--primary-500)  8%, transparent) 100%
+    );
+    border: 1px solid var(--scv-border-accent);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 2px 8px rgba(0, 0, 0, 0.25);
     max-width: 100%;
     overflow: hidden;
@@ -1344,7 +1369,7 @@
     font-family: var(--font-mono, 'JetBrains Mono', monospace);
     font-size: var(--text-2xs, 0.6875rem);
     letter-spacing: 0.04em;
-    color: rgba(20, 184, 166, 0.55);
+    color: color-mix(in oklch, var(--primary-500) 55%, transparent);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1354,7 +1379,7 @@
   }
 
   .scv-lock-icon {
-    color: rgba(20, 184, 166, 0.45);
+    color: color-mix(in oklch, var(--primary-500) 45%, transparent);
     flex-shrink: 0;
     display: flex;
     align-items: center;
@@ -1390,7 +1415,7 @@
     gap: var(--space-1-5, 6px);
     font-size: var(--text-xs, 0.75rem);
     font-family: var(--font-sans, 'Nunito', sans-serif);
-    color: var(--success-400, #34d399);
+    color: var(--success-400);
     align-self: center;
     margin-top: var(--space-1, 4px);
   }
@@ -1403,7 +1428,7 @@
     height: 44px;
     border-radius: var(--radius-full, 9999px);
     border: 1px solid var(--scv-border-accent);
-    background: rgba(6, 6, 16, 0.92);
+    background: color-mix(in oklch, var(--scv-bg) 92%, transparent);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     color: var(--scv-accent);

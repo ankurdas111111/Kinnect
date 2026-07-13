@@ -10,8 +10,13 @@
   import { otherUsers } from '../lib/stores/map.js';
   import { socket } from '../lib/socket.js';
   import { clearHubBadge } from '../lib/stores/hubBadge.js';
+  import { connectivityStore } from '../lib/stores/connectivity.js';
+  import { deriveConnState, formatAge } from '../lib/presence.js';
+  import { allowMotion } from '../lib/stores/effects.js';
   import Card from '../components/primitives/Card.svelte';
   import EmptyState from '../components/primitives/EmptyState.svelte';
+  import StatusBadge from '../components/primitives/StatusBadge.svelte';
+  import AvatarRing from '../components/primitives/AvatarRing.svelte';
   import { getUserColor, getUserColorLight } from '../lib/getUserColor.js';
 
   run(() => {
@@ -49,20 +54,36 @@
     ].slice(0, 120);
   }
 
-  // ── Relative time ───────────────────────────────────────────────────────────
+  // ── Relative time — delegates to presence.js formatAge ──────────────────────
   function relTime(ts) {
-    const diff = now - ts;
-    if (diff < 10000) return 'just now';
-    if (diff < 60000) return `${Math.floor(diff / 1000)}s ago`;
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-    const d = new Date(ts);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return formatAge(now - ts);
   }
 
   // ── Avatar ──────────────────────────────────────────────────────────────────
   // Colors come from getUserColor() (deterministic per-user hue) — never a
   // hardcoded palette.
   function initials(name) { return (name || '?')[0].toUpperCase(); }
+
+  // ── AvatarRing ring type per event type ────────────────────────────────────
+  function ringForType(type) {
+    if (type === 'sos_start') return 'sos';
+    if (type === 'position') return 'live';
+    if (type === 'offline') return 'offline';
+    return 'none';
+  }
+
+  // ── Connection state (badge-driven, never hardcoded) ─────────────────────
+  // Derived from connectivityStore so the badge reflects real socket health.
+  // Badge state changes are NOT announced (announce=false, default) — they must
+  // not pollute the aria-live="polite" feed region.
+  let connState = $derived(
+    deriveConnState({
+      initialized: $connectivityStore.socketConnected,
+      online: $connectivityStore.socketConnected,
+      issue: false,
+      connecting: !$connectivityStore.socketConnected,
+    })
+  );
 
   // ── Socket listeners ────────────────────────────────────────────────────────
   // Track which userIds currently have an active SOS so we only log start/end once
@@ -75,7 +96,7 @@
       // userDisconnect sends a raw socketId string — look up name from otherUsers
       userDisconnect: (socketId) => {
         const uid = typeof socketId === 'string' ? socketId : socketId?.socketId;
-        const user = get(otherUsers).get(uid);
+        const user = get(otherUsers).map ? get(otherUsers).get(uid) : undefined;
         const name = user?.displayName || 'Someone';
         addEvent('offline', user?.userId || null, name, `${name} left`);
       },
@@ -126,10 +147,9 @@
 
     <div class="act-title-group">
       <h1 class="act-title">Activity</h1>
-      <span class="live-badge">
-        <span class="live-dot" aria-hidden="true"></span>
-        Live
-      </span>
+      <!-- StatusBadge driven by real socket connection state.
+           announce=false: badge transitions must NOT pollute the feed's aria-live region. -->
+      <StatusBadge state={connState} announce={false} />
     </div>
 
     <button class="icon-btn" onclick={clearFeed} aria-label="Clear feed" disabled={events.length === 0}>
@@ -149,6 +169,7 @@
         class:active={activeFilter === f.key}
         onclick={() => activeFilter = f.key}
         aria-pressed={activeFilter === f.key}
+        style="touch-action: manipulation;"
       >{f.label}</button>
     {/each}
   </div>
@@ -159,12 +180,17 @@
       <div class="empty-wrap" transition:fade={{ duration: 200 }}>
         <EmptyState
           title="Nothing here yet"
-          body="Activity appears in real time as events happen on your network"
+          body={connState === 'offline'
+            ? 'Events resume when you reconnect'
+            : 'Activity appears in real time as events happen on your network'}
         >
           {#snippet icon()}
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
             </svg>
+          {/snippet}
+          {#snippet action()}
+            <button class="cta-btn" onclick={() => push('/')}>Open the map</button>
           {/snippet}
         </EmptyState>
       </div>
@@ -172,7 +198,10 @@
       {#each filtered as ev (ev.id)}
         {@const isDanger = ev.type === 'sos_start'}
         {@const isMuted = ev.type === 'offline'}
-        <div class="feed-item" in:fly={{ y: -18, duration: 240, easing: cubicOut }}>
+        <div
+          class="feed-item"
+          in:fly={$allowMotion ? { y: -18, duration: 240, easing: cubicOut } : { duration: 0 }}
+        >
           <Card
             variant="glass"
             padding="none"
@@ -189,10 +218,14 @@
               <!-- Avatar / icon -->
               <div class="feed-left">
                 {#if ev.userId}
-                  <div
-                    class="feed-avatar"
-                    style="background:{getUserColorLight(ev.userId)}; color:{getUserColor(ev.userId)}; box-shadow:0 0 10px {getUserColorLight(ev.userId)};"
-                  >{initials(ev.userName)}</div>
+                  <AvatarRing ring={ringForType(ev.type)} size={44}>
+                    {#snippet children()}
+                      <div
+                        class="feed-avatar"
+                        style="background:{getUserColorLight(ev.userId)}; color:{getUserColor(ev.userId)};"
+                      >{initials(ev.userName)}</div>
+                    {/snippet}
+                  </AvatarRing>
                 {:else}
                   <div class="feed-icon feed-icon-{ev.type}">
                     {#if ev.type === 'self'}
@@ -248,10 +281,10 @@
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    padding: calc(env(safe-area-inset-top, 0px) + var(--space-3)) var(--space-4) var(--space-3);
+    padding: calc(var(--safe-top) + var(--space-3)) var(--space-4) var(--space-3);
     background: var(--glass-bg, rgba(5, 5, 18, 0.92));
-    backdrop-filter: blur(24px) saturate(1.6);
-    -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    backdrop-filter: var(--glass-3d-blur);
+    -webkit-backdrop-filter: var(--glass-3d-blur);
     border-bottom: 1px solid var(--border-default);
     flex-shrink: 0;
   }
@@ -284,28 +317,6 @@
     font-weight: 700;
     letter-spacing: -0.02em;
   }
-
-  .live-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--success-500);
-    background: var(--success-500-12);
-    border: 1px solid var(--success-500-20);
-    border-radius: 999px;
-    padding: 2px 8px 2px 6px;
-  }
-  .live-dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: var(--success-500);
-    animation: live-pulse 2s ease-in-out infinite;
-  }
-  @keyframes live-pulse { 0%,100% { opacity:1; } 50% { opacity:0.45; } }
 
   /* Filter chips */
   .filter-row {
@@ -348,7 +359,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
-    padding: var(--space-1) var(--space-4) calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
+    padding: var(--space-1) var(--space-4) calc(var(--space-6) + var(--safe-bottom));
     overflow-y: auto;
   }
 
@@ -380,6 +391,7 @@
 
   .feed-left { flex-shrink: 0; }
 
+  /* feed-avatar fills the AvatarRing's content slot — AvatarRing owns the ring. */
   .feed-avatar {
     width: 44px; height: 44px;
     border-radius: 50%;
@@ -387,9 +399,13 @@
     font-family: var(--font-display);
     font-weight: 700;
     font-size: 16px;
+    /* Inline box-shadow removed — AvatarRing supplies the ring via --ring-color-* tokens */
     transition: transform 180ms var(--ease-out, cubic-bezier(0.16,1,0.3,1));
   }
-  .feed-inner:hover .feed-avatar { transform: scale(1.08); }
+  /* Avatar hover scale: desktop only (coarse pointer = touch device, skip) */
+  @media (hover: hover) and (pointer: fine) {
+    .feed-inner:hover .feed-avatar { transform: scale(1.08); }
+  }
 
   .feed-icon {
     width: 44px; height: 44px;
@@ -399,7 +415,9 @@
     color: var(--primary-400);
     transition: transform 180ms var(--ease-out, cubic-bezier(0.16,1,0.3,1));
   }
-  .feed-inner:hover .feed-icon { transform: scale(1.08); }
+  @media (hover: hover) and (pointer: fine) {
+    .feed-inner:hover .feed-icon { transform: scale(1.08); }
+  }
   .feed-icon-self    { background: var(--surface-inset, rgba(255,255,255,0.06)); color: var(--text-tertiary); }
   .feed-icon-contact { background: var(--primary-500-12); color: var(--primary-400); }
 
@@ -460,8 +478,25 @@
     padding: var(--space-10) var(--space-6);
   }
 
+  /* CTA inside EmptyState action slot */
+  .cta-btn {
+    min-height: 44px;
+    padding: 0 var(--space-5);
+    border-radius: var(--radius-full, 9999px);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    font-family: var(--font-display);
+    background: var(--primary-500-20);
+    border: 1px solid var(--primary-500-20);
+    color: var(--primary-300, var(--primary-400));
+    cursor: pointer;
+    transition: background 150ms, box-shadow 150ms;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  .cta-btn:hover { background: var(--primary-500-30, var(--primary-500-20)); box-shadow: var(--glow-primary-sm); }
+
   @media (prefers-reduced-motion: reduce) {
-    .live-dot { animation: none; }
     .feed-avatar, .feed-icon { transition: none; }
     .feed-inner:hover .feed-avatar,
     .feed-inner:hover .feed-icon { transform: none; }

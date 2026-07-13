@@ -21,7 +21,7 @@
    *   - SOS beat resolves to "safe" within the beat — the page never rests
    *     on an alarming frame.
    */
-  import { onDestroy } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { fade, fly, scale } from 'svelte/transition';
   import { cubicOut, elasticOut } from 'svelte/easing';
   import Button from '../components/primitives/Button.svelte';
@@ -33,8 +33,9 @@
   import {
     STAGE_W, STAGE_H, PLACES, PINS, ROUTES, BEATS, SCENES, SOS_CHIPS,
   } from '../components/landing/landingStory.js';
-  import { allowMotion } from '../lib/stores/effects.js';
+  import { allowMotion, allowWebGL } from '../lib/stores/effects.js';
   import { prefersReducedMotion } from '../lib/deviceCapability.js';
+  import { Capacitor } from '@capacitor/core';
 
   // ── Routing ──────────────────────────────────────────────────────────────
   import { navigate } from '../lib/viewTransition.js';
@@ -87,6 +88,112 @@
     htx = 0; hty = 0;
     if (!heroRaf) heroRaf = requestAnimationFrame(heroTick);
   }
+
+  // ── 3D hero constellation (desktop-web-full only; idle-loaded post-LCP) ────
+  // The static SVG hero above is the LCP element and the PERMANENT poster; the
+  // WebGL field fades in over it and disposes on any gate flip / route leave.
+  // Every gate is re-checked live (a stored 'full' pref must still honor the OS
+  // reduce-motion switch and a resize below 1024px).
+  let heroSectionEl = $state();
+  let constellationCanvasEl = $state();
+  let constellationOn = $state(false);   // drives the 400ms opacity crossfade
+  let sceneHandle = null;                 // { dispose } from the GL module
+  let sceneLoading = false;               // in-flight import guard
+  let idleHandle = null;                  // rIC / setTimeout token
+  let idleIsTimeout = false;
+  let armReady = false;                    // true once the post-LCP idle window
+                                           // has fired — only then may a live
+                                           // gate flip RE-mount (never pre-LCP)
+
+  function gatesPass() {
+    return (
+      $allowWebGL &&                                    // fx==='full' && supportsWebGL
+      !Capacitor.isNativePlatform() &&                  // never on native shells
+      typeof matchMedia === 'function' &&
+      matchMedia('(pointer: fine)').matches &&          // desktop pointer
+      window.innerWidth >= 1024 &&                      // wide viewport
+      !prefersReducedMotion()                           // OS reduce-motion off
+    );
+  }
+
+  /** Passive scroll progress (0..1) through the hero section — read per-frame
+   *  by the GL loop; no scroll listener, no thrash. */
+  function heroScroll() {
+    if (!heroSectionEl) return 0;
+    const vh = window.innerHeight || 1;
+    // 0 at hero top, ~1 once the first story beat is fully in view.
+    return Math.min(Math.max(-heroSectionEl.getBoundingClientRect().top / vh, 0), 1);
+  }
+
+  async function tryMountConstellation() {
+    if (sceneHandle || sceneLoading || !constellationCanvasEl) return;
+    if (!gatesPass()) return;
+    sceneLoading = true;
+    try {
+      // Never in a static import graph — vite pins this into the async 'three'
+      // chunk (and aliases it to capacitor-stub on native builds → mount undefined).
+      const mod = await import('../lib/three/heroConstellation.js');
+      if (typeof mod?.mount !== 'function') return; // native stub or failed shape
+      // Re-check gates AFTER the async gap — user may have flipped a switch.
+      if (!gatesPass() || !constellationCanvasEl) return;
+      sceneHandle = mod.mount(constellationCanvasEl, {
+        getScroll: heroScroll,
+        onMounted: () => { constellationOn = true; }, // crossfade in on first frame
+      });
+    } catch {
+      // Failed import / context creation — poster remains, nothing surfaced.
+    } finally {
+      sceneLoading = false;
+    }
+  }
+
+  function teardownConstellation() {
+    constellationOn = false;
+    if (sceneHandle) { sceneHandle.dispose(); sceneHandle = null; }
+  }
+
+  /** Schedule the mount attempt after LCP: rIC when available, else a 2500ms
+   *  setTimeout shim (Safari — our core audience — has no requestIdleCallback). */
+  function scheduleConstellation() {
+    if (typeof window === 'undefined' || !gatesPass()) return;
+    const fire = () => { armReady = true; tryMountConstellation(); };
+    if ('requestIdleCallback' in window) {
+      idleIsTimeout = false;
+      idleHandle = window.requestIdleCallback(fire, { timeout: 2500 });
+    } else {
+      idleIsTimeout = true;
+      idleHandle = setTimeout(fire, 2500);
+    }
+  }
+
+  function cancelIdle() {
+    if (idleHandle == null) return;
+    if (idleIsTimeout) clearTimeout(idleHandle);
+    else if ('cancelIdleCallback' in window) window.cancelIdleCallback(idleHandle);
+    idleHandle = null;
+  }
+
+  onMount(() => {
+    scheduleConstellation();
+    // Live gate flips: a resize below 1024px or an fx-level change must dispose.
+    const onResize = () => { if (sceneHandle && !gatesPass()) teardownConstellation(); };
+    window.addEventListener('resize', onResize, { passive: true });
+    return () => window.removeEventListener('resize', onResize);
+  });
+
+  // Reactively honor fx-level flips (Settings → calm/minimal kills the scene;
+  // → full while on the hero re-arms it).
+  $effect(() => {
+    // reference $allowWebGL so this re-runs when the fx store changes
+    const armed = $allowWebGL;
+    if (!armed && sceneHandle) {
+      teardownConstellation();            // calm/minimal flip → dispose immediately
+    } else if (armed && armReady && !sceneHandle && !sceneLoading && constellationCanvasEl) {
+      // Re-arm on a live flip back to 'full' — but only AFTER the post-LCP idle
+      // window fired, so this never front-runs the LCP-first load sequence.
+      tryMountConstellation();
+    }
+  });
 
   // ── Story scene state (IO-driven — primary path everywhere) ──────────────
   let activeBeat = $state(0);          // 0 = hero resting frame, 1..4 = beats
@@ -208,6 +315,8 @@
     statsObservers.forEach(o => o.disconnect());
     if (heroRaf) cancelAnimationFrame(heroRaf);
     clearTimeout(sosTimer);
+    cancelIdle();
+    teardownConstellation();   // releases the GL context on route leave
   });
 
   // ── CTA email ─────────────────────────────────────────────────────────────
@@ -231,6 +340,7 @@
   <section
     class="hero-story"
     aria-labelledby="hero-headline"
+    bind:this={heroSectionEl}
     onmousemove={onHeroMouseMove}
     onmouseleave={onHeroMouseLeave}
   >
@@ -253,6 +363,16 @@
           opacity:{0.2 + (i % 3) * 0.15};
         " aria-hidden="true"></div>
       {/each}
+
+      <!-- WebGL depth field: fades in OVER the static SVG poster above (desktop
+           web, fx='full' only). Poster stays beneath permanently → no layout
+           shift on failed import / lost context / gate flip. -->
+      <canvas
+        class="hero-constellation-canvas"
+        class:is-on={constellationOn}
+        bind:this={constellationCanvasEl}
+        aria-hidden="true"
+      ></canvas>
     </div>
 
     <div class="landing-container hs-grid">
@@ -625,6 +745,28 @@
 
   @media (max-width: 900px) {
     .hero-field { width: 80vw; right: -10%; opacity: 0.3; }
+  }
+
+  /* WebGL constellation — absolute over the SVG poster, opacity crossfade in.
+     Opacity-only transition (GPU-safe); starts hidden so a mount that never
+     fires leaves the poster untouched. */
+  .hero-constellation-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 400ms var(--ease-out);
+    will-change: opacity;
+  }
+  .hero-constellation-canvas.is-on { opacity: 1; }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* Belt-and-suspenders: the JS gate already blocks the mount, but never
+       animate the crossfade if the canvas somehow exists. */
+    .hero-constellation-canvas { transition: none; }
   }
 
   .hero-particle {
