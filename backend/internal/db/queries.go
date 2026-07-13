@@ -461,13 +461,17 @@ func GetUserSettings(ctx context.Context, database *sql.DB, userID string) (*Use
 	var qhStart, qhEnd, hbDeadline, ePhone1, ePhone2 *string
 	var hbLastSignal *int64
 	var speedAlertMs sql.NullFloat64
+	var ciEnabled *bool
+	var ciIntervalMin, ciOverdueMin *int
 
 	err := database.QueryRowContext(ctx,
 		`SELECT quiet_hours_enabled, quiet_hours_start::text, quiet_hours_end::text,
 		        heartbeat_enabled, heartbeat_deadline::text, heartbeat_last_signal,
-		        emergency_phone_1, emergency_phone_2, speed_alert_threshold_ms
+		        emergency_phone_1, emergency_phone_2, speed_alert_threshold_ms,
+		        checkin_enabled, checkin_interval_min, checkin_overdue_min
 		   FROM users WHERE id = $1`, userID).
-		Scan(&qhEnabled, &qhStart, &qhEnd, &hbEnabled, &hbDeadline, &hbLastSignal, &ePhone1, &ePhone2, &speedAlertMs)
+		Scan(&qhEnabled, &qhStart, &qhEnd, &hbEnabled, &hbDeadline, &hbLastSignal, &ePhone1, &ePhone2, &speedAlertMs,
+			&ciEnabled, &ciIntervalMin, &ciOverdueMin)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -502,6 +506,15 @@ func GetUserSettings(ctx context.Context, database *sql.DB, userID string) (*Use
 	}
 	if speedAlertMs.Valid {
 		s.SpeedAlertThresholdMs = speedAlertMs.Float64
+	}
+	if ciEnabled != nil {
+		s.CheckInEnabled = *ciEnabled
+	}
+	if ciIntervalMin != nil {
+		s.CheckInIntervalMin = *ciIntervalMin
+	}
+	if ciOverdueMin != nil {
+		s.CheckInOverdueMin = *ciOverdueMin
 	}
 	return s, nil
 }

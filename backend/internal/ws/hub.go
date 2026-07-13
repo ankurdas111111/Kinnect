@@ -167,9 +167,10 @@ func (h *Hub) buildEventHandlers() map[string]func(*Client, json.RawMessage) {
 		"shareRide":            h.handleShareRide,
 		"endRide":              h.handleEndRide,
 		"toggleCrowdMode":      h.handleToggleCrowdMode,
-		"setHeartbeat":         h.handleSetHeartbeat,
-		"setEmergencyPhones":   h.handleSetEmergencyPhones,
-		"startWalkWithMe":      h.handleStartWalkWithMe,
+		"setHeartbeat":          h.handleSetHeartbeat,
+		"setEmergencyPhones":    h.handleSetEmergencyPhones,
+		"getEmergencySettings":  h.handleGetEmergencySettings,
+		"startWalkWithMe":       h.handleStartWalkWithMe,
 		"endWalkWithMe":        h.handleEndWalkWithMe,
 		"sendSecretMsg":        h.handleSendSecretMsg,
 		"getSecretMsgs":        h.handleGetSecretMsgs,
@@ -734,5 +735,13 @@ func (h *Hub) loadUserSettings(user *cache.ActiveUser) {
 		user.EmergencyPhone2 = s.EmergencyPhone2
 		// F5: load speed alert threshold
 		user.SpeedAlertThresholdMs = s.SpeedAlertThresholdMs
+		// Check-in rules — persisted so they survive restart
+		user.CheckIn.Enabled = s.CheckInEnabled
+		if s.CheckInIntervalMin > 0 {
+			user.CheckIn.IntervalMin = s.CheckInIntervalMin
+		}
+		if s.CheckInOverdueMin > 0 {
+			user.CheckIn.OverdueMin = s.CheckInOverdueMin
+		}
 	})
 }

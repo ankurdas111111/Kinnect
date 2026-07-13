@@ -130,6 +130,11 @@ func InitDB(ctx context.Context, db *sql.DB) error {
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS emergency_phone_1 VARCHAR(20)`,
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS emergency_phone_2 VARCHAR(20)`,
 
+		// Check-in Rules — scheduled wellness check-ins
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS checkin_enabled BOOLEAN DEFAULT false`,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS checkin_interval_min INT DEFAULT 60`,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS checkin_overdue_min INT DEFAULT 15`,
+
 		// Ambient Status Messages — user-set short status visible to family
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS status_message VARCHAR(80)`,
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS status_expires_at BIGINT`,

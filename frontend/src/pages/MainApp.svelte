@@ -307,12 +307,16 @@
     sheetOpen = $uiShellStore.sheetOpen;
   });
 
-  // Fix #2: Reactive FAB bottom offset — lift SOS FAB above the BottomSheet
-  // when the sheet is open on mobile so the button is never obscured.
-  // The peek state reveals ~35vh of the sheet from the bottom; add that as clearance.
-  let fabBottomOffset = $derived((isMobile && sheetOpen)
-    ? `calc(var(--bottom-tab-height, 56px) + var(--safe-bottom, 0px) + var(--space-4) + min(35vh, 280px))`
-    : `calc(var(--bottom-tab-height, 56px) + var(--safe-bottom, 0px) + var(--space-4))`);
+  // Fix #2: Reactive FAB dock offset — lifts the SOS FAB above the BottomSheet when the
+  // sheet is open on mobile. The FAB's `bottom` is kept static; we animate
+  // `translateY(calc(-1 * var(--fab-dock-offset)))` instead of `bottom` to keep the
+  // movement on the GPU compositor and avoid layout thrash.
+  // When the sheet is open: offset = tab-bar + safe-area + spacing + sheet peek (~35vh).
+  // When closed:            offset = 0 (no upward shift needed; static `bottom` already
+  //                         accounts for tab-bar + safe-area + spacing via CSS).
+  let fabDockOffset = $derived((isMobile && sheetOpen)
+    ? `min(35vh, 280px)`
+    : `0px`);
 
   // Wire SOS state to global CSS app-state for full-app red tint
   run(() => {
@@ -1004,7 +1008,7 @@
       <button
         class="sos-fab"
         class:active={$mySosActive}
-        style={isMobile ? `bottom: ${fabBottomOffset}` : undefined}
+        style={isMobile ? `--fab-dock-offset: ${fabDockOffset}` : undefined}
         onclick={onSosFabClick}
         aria-label={$mySosActive ? 'Cancel SOS' : 'Send SOS'}
       >
@@ -1201,17 +1205,18 @@
       inset 0 -3px 6px rgba(0, 0, 0, 0.20);
     z-index: calc(var(--z-panel, 100) + 2);
     transform-style: preserve-3d;
-    /* Fix #2: bottom added to transition list so FAB slides smoothly when
-       sheet opens/closes. Before: only transform, box-shadow, background. */
+    /* GPU-only dock lift: --fab-dock-offset drives translateY; `bottom` is static.
+       Animating `bottom` would trigger layout; transform runs on the compositor. */
+    transform: translateY(calc(-1 * var(--fab-dock-offset, 0px)));
     transition:
-      bottom 300ms ease,
-      transform var(--duration-3d) var(--ease-3d-spring),
+      transform var(--duration-normal, 200ms) var(--ease-out),
       box-shadow var(--duration-3d) var(--ease-3d-out),
       background 0.2s ease;
     isolation: isolate;
   }
   .sos-fab:hover {
-    transform: perspective(600px) translateY(-3px) translateZ(6px) scale(1.08);
+    /* Preserve dock lift while applying 3D press-up: dock offset first, then 3D layer */
+    transform: translateY(calc(-1 * var(--fab-dock-offset, 0px))) perspective(600px) translateY(-3px) translateZ(6px) scale(1.08);
     box-shadow:
       0 10px 32px rgba(220, 38, 38, 0.60),
       0 4px 10px rgba(220, 38, 38, 0.40),
@@ -1220,7 +1225,8 @@
       inset 0 -3px 6px rgba(0, 0, 0, 0.18);
   }
   .sos-fab:active {
-    transform: perspective(600px) translateZ(-6px) scale(0.92);
+    /* Preserve dock lift while applying 3D press-down */
+    transform: translateY(calc(-1 * var(--fab-dock-offset, 0px))) perspective(600px) translateZ(-6px) scale(0.92);
     box-shadow:
       0 1px 6px rgba(220, 38, 38, 0.40),
       inset 0 3px 8px rgba(0, 0, 0, 0.25);
@@ -1381,9 +1387,8 @@
       animation: none;
     }
     .sos-fab {
-      transition:
-        bottom 300ms ease,
-        background 0.2s ease;
+      /* No dock-lift animation under reduce-motion; FAB snaps to docked position. */
+      transition: background 0.2s ease;
     }
     .banner-host :global(.banner:not(.banner-sos)) {
       animation: none;

@@ -345,6 +345,31 @@ func (h *Hub) StartPanicRelayTimer(user *cache.ActiveUser) {
 	})
 }
 
+// handleGetEmergencySettings returns the caller's persisted heartbeat config and
+// emergency phone numbers. This is the hydration endpoint for EmergencyProfile.svelte
+// and any other page that must display these fields without re-connecting.
+// Request:  { event: "getEmergencySettings" }  — no payload needed.
+// Response: { event: "emergencySettings", data: { heartbeatEnabled, heartbeatDeadline,
+//             phone1, phone2 } }  — sent only to the requesting client.
+func (h *Hub) handleGetEmergencySettings(c *Client, _ json.RawMessage) {
+	if !c.CheckRateLimit("getEmergencySettings", 20) {
+		return
+	}
+	user := h.Cache.GetActiveUser(c.ID())
+	if user == nil {
+		return
+	}
+	// Values are already in the in-memory cache (loaded at connect via
+	// loadUserSettings → DB). We read them here on the hub loop so there is no
+	// race, then send directly to the caller.
+	c.Send("emergencySettings", map[string]interface{}{
+		"heartbeatEnabled":  user.HeartbeatEnabled,
+		"heartbeatDeadline": user.HeartbeatDeadline,
+		"phone1":            user.EmergencyPhone1,
+		"phone2":            user.EmergencyPhone2,
+	})
+}
+
 func nilIfEmpty(s string) interface{} {
 	if s == "" {
 		return nil

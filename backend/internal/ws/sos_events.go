@@ -330,7 +330,10 @@ func (h *Hub) handleCheckInAck(c *Client, data json.RawMessage) {
 	h.emitLiveCheckIn(user)
 }
 
-// handleSetCheckInRules updates check-in config on user, broadcasts userUpdate.
+// handleSetCheckInRules updates check-in config on user, persists to DB, and
+// broadcasts userUpdate to all visible users. Sends a checkInRulesSaved ack
+// to the requesting client only after the DB write has been confirmed, so the
+// frontend can distinguish receipt from actual persistence success.
 func (h *Hub) handleSetCheckInRules(c *Client, data json.RawMessage) {
 	if !c.CheckRateLimit("setCheckInRules", 10) {
 		return
@@ -349,9 +352,39 @@ func (h *Hub) handleSetCheckInRules(c *Client, data json.RawMessage) {
 	if v, ok := toInt(m["overdueMin"]); ok && v >= 0 {
 		user.CheckIn.OverdueMin = v
 	}
+
+	// Snapshot for the DB goroutine and the ack payload (read cache values now,
+	// on the hub loop, before handing off to the worker).
+	uid := user.UserID
+	enabled := user.CheckIn.Enabled
+	intervalMin := user.CheckIn.IntervalMin
+	overdueMin := user.CheckIn.OverdueMin
+
+	// Broadcast the updated state to visible users immediately (cache is already
+	// updated above; the DB write is fire-and-confirmed below).
 	sanitized := h.Cache.SanitizeUser(user)
 	sanitized["online"] = true
 	h.emitToVisibleAndSelf(user, "userUpdate", sanitized)
+
+	// Persist to DB; ack the caller only on success or failure of the write.
+	h.offloadDB(func(ctx context.Context) {
+		_, err := h.pool.DB.ExecContext(ctx,
+			`UPDATE users SET checkin_enabled=$1, checkin_interval_min=$2, checkin_overdue_min=$3 WHERE id=$4`,
+			enabled, intervalMin, overdueMin, uid)
+		if err != nil {
+			c.Send("checkInRulesSaved", map[string]interface{}{
+				"ok":    false,
+				"error": "failed to save check-in rules",
+			})
+			return
+		}
+		c.Send("checkInRulesSaved", map[string]interface{}{
+			"ok":          true,
+			"enabled":     enabled,
+			"intervalMin": intervalMin,
+			"overdueMin":  overdueMin,
+		})
+	})
 }
 
 // handleSetGeofence updates geofence config, broadcasts userUpdate.

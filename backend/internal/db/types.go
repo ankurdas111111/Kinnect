@@ -75,6 +75,10 @@ type UserSettings struct {
 	EmergencyPhone1    string
 	EmergencyPhone2    string
 	SpeedAlertThresholdMs float64 // F5: 0 = disabled
+	// Check-in Rules — persisted so they survive server restarts
+	CheckInEnabled    bool
+	CheckInIntervalMin int
+	CheckInOverdueMin  int
 }
 
 // SavedPlaceEntry holds a saved place for a user (F4).

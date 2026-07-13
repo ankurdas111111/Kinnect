@@ -47,6 +47,50 @@
   /* ── FX flags (read by JS / keyframes) ───────────────────────────────────
      Overridden per data-fx level below. 1 = allowed, 0 = suppressed. */
   --fx-ambient-opacity: 1;
+
+  /* ── Ring color tokens (avatar/status ring stroke colors, not shadows) ────
+     Consumed by AvatarRing box-shadow composition, map marker rings, and the
+     "calm green moment" arrival pulse. Source tokens are theme-aware, so both
+     light and dark themes inherit automatically without per-theme overrides.
+     IMPORTANT: --ring-live/--ring-sos/--ring-ghost (global.css:229–231) are
+     box-shadow VALUES and must NOT be touched; these are pure <color> tokens. */
+  --ring-color-live:    var(--status-live);     /* "sharing live" presence ring  */
+  --ring-color-sos:     var(--status-sos);      /* SOS emergency ring            */
+  --ring-color-offline: var(--status-offline);  /* offline/stale presence ring   */
+
+  /* ── Opacity dim (unlit-glyph opacity) ──────────────────────────────────
+     SignalBars unlit bars, dimmed status dots. One canonical opacity step
+     for "present but inactive" glyphs (LiveViewer unlit bars: 0.28 today). */
+  --opacity-dim: 0.28;
+
+  /* ── Glass tier tokens ───────────────────────────────────────────────────
+     Three material tiers derived from existing --glass-3d* values. All
+     values are var() aliases so [data-theme] and [data-fx] overrides on the
+     source tokens propagate here automatically — no tier-specific overrides
+     needed. Setting data-fx="minimal" resolves all three -blur tokens to
+     none because their source (--glass-3d-blur) is set to none in that mode.
+
+     tier: panel — full-height sidebars, bottom sheets, modal surfaces (heaviest)
+     tier: card  — raised in-panel cards (PersonCard reference surface)
+     tier: chip  — floating map chips / pills (FreshnessChip tier, lightest)    */
+
+  /* panel tier — heaviest blur, strongest border, deepest shadow */
+  --glass-panel-bg:     var(--glass-3d);
+  --glass-panel-blur:   var(--glass-3d-blur);
+  --glass-panel-border: var(--glass-3d-border);
+  --glass-panel-shadow: var(--shadow-lg), var(--glass-3d-inner);
+
+  /* card tier — medium blur, standard border, moderate shadow */
+  --glass-card-bg:      color-mix(in oklch, var(--glass-3d) 85%, transparent);
+  --glass-card-blur:    var(--glass-blur);
+  --glass-card-border:  var(--glass-border);
+  --glass-card-shadow:  var(--shadow-md), var(--glass-3d-inner);
+
+  /* chip tier — lightest blur, subtlest border, minimal shadow */
+  --glass-chip-bg:      var(--map-chip-bg);
+  --glass-chip-blur:    var(--glass-blur-sm);
+  --glass-chip-border:  var(--map-chip-border);
+  --glass-chip-shadow:  var(--map-chip-shadow);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

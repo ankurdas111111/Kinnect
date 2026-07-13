@@ -19,7 +19,9 @@
     "aab:release": "cd frontend/android && ./gradlew clean bundleRelease",
     "build:ios": "cd frontend && VITE_TARGET=capacitor VITE_REALTIME_PROTOCOL=ws npx vite build && npx cap sync ios",
     "build:ios:prod": "node scripts/build-mobile-with-api.cjs ios",
-    "run:ios": "cd frontend && npx cap run ios"
+    "run:ios": "cd frontend && npx cap run ios",
+    "lint:colors": "node scripts/check-raw-colors.mjs",
+    "check:contrast": "node scripts/contrast-check.mjs"
   },
   "keywords": [
     "realtime",
