@@ -12,7 +12,7 @@
    */
   import { onMount, onDestroy } from 'svelte';
   import { myLocation, otherUsers } from '../../lib/stores/map.js';
-  import { getUserColor } from '../../lib/getUserColor.js';
+  import { resolveMemberColor } from '../../lib/getUserColor.js';
 
   /**
    * @typedef {Object} Props
@@ -355,7 +355,7 @@
       for (const user of $otherUsers.values()) {
         if (!user.lat || !user.lng) continue;
         drawArc(ctx, $myLocation.latitude, $myLocation.longitude,
-                user.lat, user.lng, getUserColor(user.userId), cRY, sRY, cRX, sRX);
+                user.lat, user.lng, resolveMemberColor(user.userId), cRY, sRY, cRX, sRX);
       }
     }
 
@@ -364,7 +364,7 @@
       if (!user.lat || !user.lng) continue;
       const p = project(user.lat, user.lng);
       if (p.depth <= 0.02) continue;
-      const col  = getUserColor(user.userId);
+      const col  = resolveMemberColor(user.userId);
       const ph   = (elapsed*1.4 + user.userId.charCodeAt(0)*0.3) % (Math.PI*2);
       const pulse = 7 + Math.sin(ph)*2;
       const pGr  = ctx.createRadialGradient(p.sx, p.sy, 0, p.sx, p.sy, pulse);

@@ -13,7 +13,7 @@
   import { push } from 'svelte-spa-router';
   import { otherUsers, focusUser } from '../../lib/stores/map.js';
   import { authUser } from '../../lib/stores/auth.js';
-  import { getUserColor } from '../../lib/getUserColor.js';
+  import { resolveMemberColor, CANVAS_DANGER } from '../../lib/getUserColor.js';
 
   // ── Scene ──────────────────────────────────────────────────────────────
   let sceneEl = $state();
@@ -50,7 +50,7 @@
     const isSos    = !!user.sos?.active;
     const isOnline = user.online !== false;
     const isMoving = isOnline && (user.speed || 0) > 1;
-    const color    = isSos ? '#ef4444' : getUserColor(user.userId);
+    const color    = isSos ? CANVAS_DANGER : resolveMemberColor(user.userId);
     const r        = BASE + i * STEP;
     const period   = isSos ? 4.5 : isMoving ? 9 : isOnline ? 22 : 58;
     const angSpd   = (2 * Math.PI) / period;

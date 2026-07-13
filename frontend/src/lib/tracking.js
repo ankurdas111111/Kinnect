@@ -163,7 +163,7 @@ function _attachMarkerKeyboard(el) {
 export function createPersonMarker(options = {}) {
   const {
     displayName = '?',
-    color = '#6366f1',
+    color = 'var(--primary-500)',
     isSelf = false,
     isSos = false,
     presenceState = 'gone',
@@ -205,12 +205,12 @@ export function createPersonMarker(options = {}) {
     tailColor  = 'var(--danger-500, #ef4444)';
   } else if (presenceState === 'now') {
     ringBorder = `2.5px solid ${color}`;
-    ringGlow   = `0 0 0 3px ${color}28,0 0 14px ${color}40`;
+    ringGlow   = `0 0 0 3px color-mix(in oklch, ${color} 16%, transparent),0 0 14px color-mix(in oklch, ${color} 25%, transparent)`;
     textColor  = 'white';
     tailColor  = color;
   } else if (presenceState === 'recent') {
     ringBorder = `2px solid ${color}`;
-    ringGlow   = `0 0 8px ${color}30`;
+    ringGlow   = `0 0 8px color-mix(in oklch, ${color} 19%, transparent)`;
     textColor  = 'white';
     tailColor  = color;
   } else if (presenceState === 'away') {
@@ -220,10 +220,10 @@ export function createPersonMarker(options = {}) {
     tailColor  = color;
   } else {
     // gone / offline
-    ringBorder = '2px solid #6b7280';
+    ringBorder = '2px solid var(--member-offline, #6b7280)';
     ringGlow   = 'none';
-    textColor  = '#9ca3af';
-    tailColor  = '#6b7280';
+    textColor  = 'var(--text-tertiary, #9ca3af)';
+    tailColor  = 'var(--member-offline, #6b7280)';
   }
 
   const opacity = presenceState === 'away' ? '0.78' : presenceState === 'gone' ? '0.50' : '1';
