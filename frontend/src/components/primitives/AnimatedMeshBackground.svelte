@@ -70,9 +70,9 @@ start. Now uses left:calc(50% - 150px) for centering instead.
     border-radius: 50%;
     background: radial-gradient(
       circle at center,
-      rgba(20, 184, 166, 0.20) 0%,
-      rgba(13, 148, 136, 0.14) 35%,
-      rgba(16, 185, 129, 0.07) 60%,
+      color-mix(in oklch, var(--primary-500) 20%, transparent) 0%,
+      color-mix(in oklch, var(--primary-600) 14%, transparent) 35%,
+      color-mix(in oklch, var(--member-1) 7%, transparent) 60%,
       transparent 75%
     );
     top: -200px;
@@ -90,8 +90,8 @@ start. Now uses left:calc(50% - 150px) for centering instead.
     border-radius: 50%;
     background: radial-gradient(
       circle at center,
-      rgba(20, 184, 166, 0.08) 0%,
-      rgba(13, 148, 136, 0.06) 40%,
+      color-mix(in oklch, var(--primary-500) 8%, transparent) 0%,
+      color-mix(in oklch, var(--primary-600) 6%, transparent) 40%,
       transparent 70%
     );
     bottom: -100px;
@@ -113,14 +113,14 @@ start. Now uses left:calc(50% - 150px) for centering instead.
 
   .amb-orb-1 {
     width: min(500px, 45vw); height: min(500px, 45vw);
-    background: radial-gradient(circle, rgba(20, 184, 166, 0.22) 0%, transparent 65%);
+    background: radial-gradient(circle, color-mix(in oklch, var(--primary-500) 22%, transparent) 0%, transparent 65%);
     top: -120px; right: -100px;
     animation: amb-drift-3 20s ease-in-out infinite;
   }
 
   .amb-orb-2 {
     width: min(400px, 38vw); height: min(400px, 38vw);
-    background: radial-gradient(circle, rgba(16, 185, 129, 0.16) 0%, transparent 65%);
+    background: radial-gradient(circle, color-mix(in oklch, var(--member-1) 16%, transparent) 0%, transparent 65%);
     bottom: 10%; left: -80px;
     animation: amb-drift-2 26s ease-in-out infinite reverse;
   }
@@ -130,7 +130,7 @@ start. Now uses left:calc(50% - 150px) for centering instead.
      Fixed: center using left:calc(50% - 150px) (half of 300px width) instead. */
   .amb-orb-3 {
     width: min(300px, 30vw); height: min(300px, 30vw);
-    background: radial-gradient(circle, rgba(6, 182, 212, 0.12) 0%, transparent 65%);
+    background: radial-gradient(circle, color-mix(in oklch, var(--member-2) 12%, transparent) 0%, transparent 65%);
     top: 40%;
     left: calc(50% - 150px);
     animation: amb-drift-1 32s ease-in-out infinite;
@@ -143,8 +143,8 @@ start. Now uses left:calc(50% - 150px) for centering instead.
     z-index: 0;
     pointer-events: none;
     background-image:
-      linear-gradient(0deg, rgba(20, 184, 166, 0.025) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(20, 184, 166, 0.025) 1px, transparent 1px);
+      linear-gradient(0deg, color-mix(in oklch, var(--primary-500) 2%, transparent) 1px, transparent 1px),
+      linear-gradient(90deg, color-mix(in oklch, var(--primary-500) 2%, transparent) 1px, transparent 1px);
     background-size: 60px 60px;
     opacity: 0.6;
     mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
@@ -164,8 +164,8 @@ start. Now uses left:calc(50% - 150px) for centering instead.
     position: absolute;
     width: 2px; height: 2px;
     border-radius: 50%;
-    background: rgba(20, 184, 166, 0.5);
-    box-shadow: 0 0 6px rgba(20, 184, 166, 0.4);
+    background: color-mix(in oklch, var(--primary-500) 50%, transparent);
+    box-shadow: 0 0 6px color-mix(in oklch, var(--primary-500) 40%, transparent);
     animation: amb-particle-float linear infinite;
     will-change: transform, opacity;
   }
@@ -185,8 +185,8 @@ start. Now uses left:calc(50% - 150px) for centering instead.
 
   .amb-p.large {
     width: 4px; height: 4px;
-    background: rgba(45, 212, 191, 0.4);
-    box-shadow: 0 0 10px rgba(45, 212, 191, 0.5), 0 0 20px rgba(20, 184, 166, 0.25);
+    background: color-mix(in oklch, var(--primary-400) 40%, transparent);
+    box-shadow: 0 0 10px color-mix(in oklch, var(--primary-400) 50%, transparent), 0 0 20px color-mix(in oklch, var(--primary-500) 25%, transparent);
   }
 
   /* ── Keyframes ──────────────────────────────────────────────────────── */
