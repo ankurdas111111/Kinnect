@@ -1,6 +1,7 @@
 <script>
   import { myRooms } from '../../lib/stores/rooms.js';
   import { emitSetMeetingPoint, emitClearMeetingPoint } from '../../lib/socket.js';
+  import SectionHeader from '../primitives/SectionHeader.svelte';
 
   // ── F3: Meeting point ──────────────────────────────────────────────────────
   let meetingRoomCode = $state(null);
@@ -32,7 +33,7 @@
 <!-- ── F3: MEETING POINT PER ROOM ────────────────────────────────── -->
 {#if $myRooms.length > 0}
   <div class="feature-section">
-    <span class="card-eyebrow">Meeting Points</span>
+    <SectionHeader title="Meeting Points" level={4} />
     {#each $myRooms as room}
       <div class="room-meeting-row">
         <div class="room-meeting-header">

@@ -66,6 +66,17 @@ export function detectEffectsLevel() {
   return 'full';
 }
 
+/**
+ * True when the primary pointer is coarse (finger/stylus).
+ * Use to gate hover-only decorations (cursor glow) — absent, not just paused.
+ * Same matchMedia pattern as detectEffectsLevel above.
+ * @returns {boolean}
+ */
+export function prefersCoarsePointer() {
+  return typeof matchMedia === 'function'
+    && matchMedia('(pointer: coarse)').matches;
+}
+
 /** WebGL is only worth attempting above 'minimal' and if the context exists. */
 export function supportsWebGL() {
   if (typeof document === 'undefined') return false;

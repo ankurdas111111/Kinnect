@@ -2,9 +2,20 @@
   /**
    * PlaceAlertsSection — arrival/departure alerts and speed alerts.
    * Receives stores and callbacks from SavedPlacesPanel (the orchestrator).
+   *
+   * Props:
+   *   places            — Place[]
+   *   visibleUsers      — {id, name}[]
+   *   getUserName       — fn(userId) → string
+   *   iconEmoji         — Record<string, string>
+   *   onAddPlaceAlert   — fn(targetId, placeId, onArrive, onDepart)
+   *   onRemovePlaceAlert — fn(alertId)
+   *   onAddSpeedAlert   — fn(targetId, thresholdKmh)
+   *   onRemoveSpeedAlert — fn(alertId)
    */
+  import SectionHeader from './primitives/SectionHeader.svelte';
   import { placeAlerts, speedAlerts } from '../lib/stores/places.js';
-
+  import { DEFAULT_SPEED_KMH } from '../lib/alertConfig.js';
 
   let {
     places = [],
@@ -23,7 +34,7 @@
   let alertOnDepart = $state(true);
 
   let speedTargetId = $state('');
-  let speedThreshold = $state(80);
+  let speedThreshold = $state(DEFAULT_SPEED_KMH);
 
   function handleAddPlaceAlert() {
     if (!alertTargetId || !alertPlaceId) return;
@@ -40,22 +51,27 @@
 </script>
 
 <!-- ── Arrival Alerts ──────────────────────────────────────────────── -->
-<div class="section-header">
-  <span class="section-label">Arrival Alerts</span>
-  {#if $placeAlerts.length > 0}
-    <span class="section-badge">{$placeAlerts.length}</span>
-  {/if}
+<div class="section-wrap">
+  <SectionHeader
+    title="Arrival Alerts"
+    subtitle="Get notified when someone arrives at or leaves a saved place."
+    level={3}
+  >
+    {#snippet action()}
+      {#if $placeAlerts.length > 0}
+        <span class="section-badge" aria-label="{$placeAlerts.length} arrival alerts">{$placeAlerts.length}</span>
+      {/if}
+    {/snippet}
+  </SectionHeader>
 </div>
-<div class="section-content">
-  <p class="hint">Get notified when someone arrives at or leaves a saved place.</p>
 
+<div class="section-content">
   {#if $placeAlerts.length === 0}
     <div class="inline-empty">
-      <p class="inline-empty-text">No alerts yet.</p>
       {#if places.length === 0}
-        <p class="inline-empty-cta-hint">Save a place above first to set up alerts.</p>
+        <p class="inline-empty-text">Save a place above first, then set up alerts here.</p>
       {:else}
-        <p class="inline-empty-cta-hint">Add an alert below — know when your family arrives home.</p>
+        <p class="inline-empty-text">No alerts yet. Know the moment your family arrives home.</p>
       {/if}
     </div>
   {:else}
@@ -123,19 +139,24 @@
 <div class="section-divider" role="separator"></div>
 
 <!-- ── Speed Alerts ─────────────────────────────────────────────────── -->
-<div class="section-header">
-  <span class="section-label">Speed Alerts</span>
-  {#if $speedAlerts.length > 0}
-    <span class="section-badge">{$speedAlerts.length}</span>
-  {/if}
+<div class="section-wrap">
+  <SectionHeader
+    title="Speed Alerts"
+    subtitle="Get notified when someone drives faster than a set limit."
+    level={3}
+  >
+    {#snippet action()}
+      {#if $speedAlerts.length > 0}
+        <span class="section-badge" aria-label="{$speedAlerts.length} speed alerts">{$speedAlerts.length}</span>
+      {/if}
+    {/snippet}
+  </SectionHeader>
 </div>
-<div class="section-content">
-  <p class="hint">Get notified when someone drives faster than a set limit.</p>
 
+<div class="section-content">
   {#if $speedAlerts.length === 0}
     <div class="inline-empty">
-      <p class="inline-empty-text">No speed alerts yet.</p>
-      <p class="inline-empty-cta-hint">Set a limit below to protect family members driving.</p>
+      <p class="inline-empty-text">Set a limit below — protect family members on the road.</p>
     </div>
   {:else}
     {#each $speedAlerts as sa (sa.id)}
@@ -167,24 +188,29 @@
           <option value={u.id}>{u.name}</option>
         {/each}
       </select>
-      <label class="field-label-inline">
-        Limit
-        <input
-          type="number"
-          bind:value={speedThreshold}
-          class="field-input field-num"
-          min="10"
-          max="300"
-          step="5"
-          aria-label="Speed limit in km/h"
-        />
-        <span aria-hidden="true">km/h</span>
-      </label>
+      <!-- Speed limit input with visible min/max context -->
+      <div class="speed-limit-group">
+        <label class="field-label-inline" for="speed-threshold">
+          <span class="speed-limit-label">Limit</span>
+          <input
+            id="speed-threshold"
+            type="number"
+            bind:value={speedThreshold}
+            class="field-input field-num"
+            min="10"
+            max="300"
+            step="5"
+            aria-label="Speed limit in km/h, 10 to 300"
+            style="font-size: 16px;"
+          />
+          <span class="field-unit" aria-hidden="true">km/h</span>
+        </label>
+        <span class="speed-range-hint" aria-hidden="true">10–300</span>
+      </div>
       <button
-        class="btn btn-primary btn-sm"
+        class="btn btn-primary btn-sm speed-add-btn"
         onclick={handleAddSpeedAlert}
         disabled={!speedTargetId}
-        style="min-height: 44px;"
       >
         Add
       </button>
@@ -193,21 +219,9 @@
 </div>
 
 <style>
-  .section-header {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
+  /* ── Section header wraps ────────────────────────────────────────────────── */
+  .section-wrap {
     padding: var(--space-4) var(--space-4) var(--space-1);
-  }
-
-  .section-label {
-    font-family: var(--font-display);
-    font-size: var(--text-xs);
-    font-weight: 700;
-    color: var(--text-tertiary);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    flex: 1;
   }
 
   .section-badge {
@@ -231,13 +245,7 @@
     margin: var(--space-2) 0;
   }
 
-  .hint {
-    font-size: var(--text-xs);
-    color: var(--text-tertiary);
-    line-height: var(--leading-normal);
-    margin: 0 0 var(--space-2);
-  }
-
+  /* ── Alert list items ────────────────────────────────────────────────────── */
   .list-item {
     display: flex;
     align-items: center;
@@ -297,25 +305,26 @@
   }
 
   .icon-action:hover { background: var(--surface-hover); color: var(--text-primary); }
-  .icon-action:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 2px; }
-  .icon-action--danger:hover { background: rgba(239, 68, 68, 0.10); color: var(--danger-500); }
+  .icon-action:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
+  /* Danger hover: token-based tint, no raw rgba */
+  .icon-action--danger:hover {
+    background: color-mix(in srgb, var(--danger-500) 10%, transparent);
+    color: var(--danger-500);
+  }
 
-  .inline-empty { padding: var(--space-2) 0 var(--space-3); }
+  /* ── Inline empty states ─────────────────────────────────────────────────── */
+  .inline-empty {
+    padding: var(--space-2) 0 var(--space-3);
+  }
 
   .inline-empty-text {
     font-size: var(--text-xs);
     color: var(--text-tertiary);
-    margin: 0 0 var(--space-1);
-  }
-
-  .inline-empty-cta-hint {
-    font-size: var(--text-xs);
-    color: var(--text-tertiary);
-    font-style: italic;
     margin: 0;
-    opacity: 0.75;
+    line-height: var(--leading-normal);
   }
 
+  /* ── Add forms ───────────────────────────────────────────────────────────── */
   .add-form {
     display: flex;
     flex-direction: column;
@@ -356,11 +365,19 @@
   .field-input:focus {
     outline: none;
     border-color: var(--primary-500);
-    box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.18);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-500) 18%, transparent);
   }
 
   .field-sm  { flex: 1; min-width: 80px; }
   .field-num { width: 64px; flex: none; }
+
+  /* Speed limit group: input + range hint stacked */
+  .speed-limit-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    align-items: flex-start;
+  }
 
   .field-label-inline {
     display: flex;
@@ -369,6 +386,30 @@
     font-size: var(--text-xs);
     color: var(--text-secondary);
     white-space: nowrap;
+  }
+
+  .speed-limit-label {
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+  }
+
+  .field-unit {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+  }
+
+  /* Visible min/max hint */
+  .speed-range-hint {
+    font-size: var(--text-2xs);
+    color: var(--text-tertiary);
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    padding-left: var(--space-1);
+  }
+
+  .speed-add-btn {
+    min-height: 44px;
+    align-self: flex-start;
   }
 
   .check-label {
@@ -382,6 +423,7 @@
     min-height: 44px;
   }
 
+  /* ── Utilities ───────────────────────────────────────────────────────────── */
   .sr-only {
     position: absolute;
     width: 1px; height: 1px;

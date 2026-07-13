@@ -5,6 +5,7 @@
   import { walkDestination } from '../lib/stores/map.js';
   import ShareMyRide from './ShareMyRide.svelte';
   import WalkWithMe from './WalkWithMe.svelte';
+  import Modal from './primitives/Modal.svelte';
   import GpsStatusCard from './infoPanel/GpsStatusCard.svelte';
   import IdentityCard from './infoPanel/IdentityCard.svelte';
   import SafetyActions from './infoPanel/SafetyActions.svelte';
@@ -90,16 +91,18 @@
 {/if}
 
 <ShareMyRide bind:open={rideShareOpen} />
-{#if walkWithMeOpen}
-  <div class="wwm-overlay">
-    <div class="wwm-modal">
-      <button class="wwm-close" onclick={() => walkWithMeOpen = false} aria-label="Close">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-      <WalkWithMe on:close={() => walkWithMeOpen = false} />
-    </div>
-  </div>
-{/if}
+
+<!-- Walk With Me — Modal primitive gives focus-trap + ESC for free -->
+<Modal
+  open={walkWithMeOpen}
+  title="Walk With Me"
+  size="sm"
+  on:close={() => walkWithMeOpen = false}
+>
+  {#snippet children()}
+    <WalkWithMe on:close={() => walkWithMeOpen = false} />
+  {/snippet}
+</Modal>
 
 <style>
   /* ── Root container ─────────────────────────────────────────────── */
@@ -108,35 +111,4 @@
     flex-direction: column;
     gap: var(--space-3);
   }
-
-  /* Walk With Me modal */
-  .wwm-overlay {
-    /* Was z:60 — dangerously low, buried under panels/sheets.
-       Modal overlays must be at --z-modal tier. */
-    position: fixed; inset: 0; z-index: var(--z-modal, 5000);
-    background: rgba(0,0,0,0.55);
-    display: flex; align-items: center; justify-content: center;
-    animation: wwm-fade-in 0.2s ease;
-  }
-  @keyframes wwm-fade-in { from { opacity: 0; } }
-  @media (prefers-reduced-motion: reduce) { .wwm-overlay { animation: none; } }
-  .wwm-modal {
-    position: relative;
-    width: min(380px, 92vw);
-    max-height: 85vh;
-    overflow-y: auto;
-    background: var(--surface-0, #0a0e1a);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 20px;
-    box-shadow: 0 16px 48px rgba(0,0,0,0.5);
-  }
-  .wwm-close {
-    position: absolute; top: 12px; right: 12px; z-index: 2;
-    width: 44px; height: 44px; border-radius: 50%;
-    background: rgba(255,255,255,0.06); border: none;
-    display: flex; align-items: center; justify-content: center;
-    color: rgba(255,255,255,0.4); cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .wwm-close:hover { background: rgba(255,255,255,0.12); }
 </style>

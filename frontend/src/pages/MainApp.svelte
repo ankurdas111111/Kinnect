@@ -53,6 +53,7 @@
   import { rideShare } from '../lib/stores/rideShare.js';
   import * as trackingNotif from '../lib/trackingNotification.js';
   import { startGyroscope, stopGyroscope } from '../lib/gyroscope.js';
+  import { detectAndroidManufacturer, BATTERY_INSTRUCTIONS } from '../lib/manufacturerConfig.js';
 
   let activePanel = $state(null);
   let sidebarTab = $state('info');
@@ -165,61 +166,10 @@
     _prevSocketConnected = connected;
   });
 
-  /**
-   * Detect Android device manufacturer from the WebView UA string.
-   * Returns one of: 'miui' | 'coloros' | 'funtouch' | 'samsung' | 'generic'
-   */
-  function detectAndroidManufacturer() {
-    const ua = (typeof navigator !== 'undefined' ? navigator.userAgent : '').toLowerCase();
-    if (ua.includes('xiaomi') || ua.includes('redmi') || ua.includes('miui')) return 'miui';
-    if (ua.includes('oppo') || ua.includes('realme')) return 'coloros';
-    if (ua.includes('vivo')) return 'funtouch';
-    if (ua.includes('samsung')) return 'samsung';
-    return 'generic';
-  }
-
+  // Manufacturer battery-optimization guidance lives in lib/manufacturerConfig.js;
+  // detect once at module init for the background-access prompt.
   const batteryManufacturer = detectAndroidManufacturer();
 
-  const BATTERY_INSTRUCTIONS = {
-    miui: {
-      brand: 'Xiaomi / Redmi',
-      steps: [
-        'Open Settings → Apps',
-        'Find and tap Kinnect',
-        'Tap Battery Saver',
-        'Select "No restrictions"',
-      ],
-    },
-    coloros: {
-      brand: 'Oppo / Realme',
-      steps: [
-        'Open Settings → App Management',
-        'Find and tap Kinnect',
-        'Tap Battery',
-        'Enable "Allow background activity"',
-      ],
-    },
-    funtouch: {
-      brand: 'Vivo',
-      steps: [
-        'Open Settings → Battery',
-        'Tap "Background power consumption"',
-        'Find Kinnect → set to "Unrestricted"',
-      ],
-    },
-    samsung: {
-      brand: 'Samsung',
-      steps: [
-        'Open Settings → Apps → Kinnect',
-        'Tap Battery → select "Unrestricted"',
-        'Then tap "Allow background activity"',
-      ],
-    },
-    generic: {
-      brand: null,
-      steps: null,
-    },
-  };
   let isMobile = $state(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
   let mobileTab = $state('track');
   let sheetOpen = $state(false);
@@ -1158,7 +1108,7 @@
     white-space: nowrap;
     cursor: pointer;
     flex-shrink: 0;
-    transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out), transform 120ms var(--ease-spring);
+    transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-spring);
     -webkit-tap-highlight-color: transparent;
   }
   .page-nav-btn:hover {
@@ -1168,7 +1118,7 @@
   }
   .page-nav-btn:active {
     transform: scale(0.93);
-    transition-duration: 70ms;
+    transition-duration: var(--duration-fast);
   }
 
   .safety-quick-actions {
@@ -1209,9 +1159,9 @@
        Animating `bottom` would trigger layout; transform runs on the compositor. */
     transform: translateY(calc(-1 * var(--fab-dock-offset, 0px)));
     transition:
-      transform var(--duration-normal, 200ms) var(--ease-out),
+      transform var(--duration-slow) var(--ease-out),
       box-shadow var(--duration-3d) var(--ease-3d-out),
-      background 0.2s ease;
+      background var(--duration-normal) var(--ease-out);
     isolation: isolate;
   }
   .sos-fab:hover {
@@ -1304,7 +1254,7 @@
     justify-content: center;
     padding: var(--space-4);
     overscroll-behavior: none;
-    animation: fade-in 0.15s ease;
+    animation: fade-in var(--duration-fast) var(--ease-out);
   }
   /* sos-confirm-card-spatial, .sos-icon-ring styles are in global.css */
   .sos-confirm-title {
@@ -1388,7 +1338,7 @@
     }
     .sos-fab {
       /* No dock-lift animation under reduce-motion; FAB snaps to docked position. */
-      transition: background 0.2s ease;
+      transition: background var(--duration-normal) var(--ease-out);
     }
     .banner-host :global(.banner:not(.banner-sos)) {
       animation: none;
@@ -1414,7 +1364,7 @@
     justify-content: center;
     padding: var(--space-4);
     overscroll-behavior: none;
-    animation: fade-in 0.2s ease;
+    animation: fade-in var(--duration-normal) var(--ease-out);
   }
   .battery-prompt-card {
     background: var(--surface-2, #1a1a2e);

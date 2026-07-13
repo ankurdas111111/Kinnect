@@ -2,32 +2,52 @@
   import { preventDefault } from 'svelte/legacy';
 
   /**
-   * Landing — Premium scroll-based storytelling page for Kinnect
+   * Landing — "A day with your family, told by scroll."
    *
-   * 2026 Ultra-Polish upgrades:
-   *   - Scroll progress bar via animation-timeline: scroll(root)
-   *   - CSS scroll-driven reveal (animation-timeline: view()) replaces IntersectionObserver
-   *   - @property aurora hero background cycling
-   *   - Depth grid perspective on hero
-   *   - Multi-ring status pulse (ping-dot + ping-ring + ping-ring-2)
-   *   - Noise texture on mockup card
-   *   - Card hover depth system
-   *   - Premium typography: tabular-nums, optimizeLegibility
+   * One scrollytelling spine replaces the old Features → How-it-works →
+   * tabbed-Demo middle: the hero's 3D-tilt phone mockup IS the story device.
+   * On desktop it docks into a sticky right column while four story beats
+   * (morning dispersal → geofence arrival → SOS-that-resolves-safe →
+   * evening all-home) scroll past on the left. On mobile the hero mockup
+   * collapses into a compact sticky card — the only phone chrome on the page.
    *
-   * Scroll reveal fallback: IntersectionObserver kept for stats counter only.
-   * All section/card reveal now uses CSS scroll-driven classes.
+   * Mechanics:
+   *   - IntersectionObserver drives beat/scene classes (PRIMARY path — works
+   *     on every WebView; see StoryBeat.svelte).
+   *   - CSS scroll-driven animation (animation-timeline) is progressive
+   *     enhancement only, behind @supports (reveal-scroll from global.css).
+   *   - position: sticky pins the mockup; all scene changes animate
+   *     transform/opacity only.
+   *   - SOS beat resolves to "safe" within the beat — the page never rests
+   *     on an alarming frame.
    */
-  import { onMount, onDestroy } from 'svelte';
+  import { onDestroy } from 'svelte';
   import { fade, fly, scale } from 'svelte/transition';
   import { cubicOut, elasticOut } from 'svelte/easing';
   import Button from '../components/primitives/Button.svelte';
   import Card   from '../components/primitives/Card.svelte';
   import Input  from '../components/primitives/Input.svelte';
+  import Constellation from '../components/primitives/Constellation.svelte';
+  import { DEFAULT_NODES, DEFAULT_LINKS } from '../components/primitives/constellationGeometry.js';
+  import StoryBeat from '../components/landing/StoryBeat.svelte';
+  import {
+    STAGE_W, STAGE_H, PLACES, PINS, ROUTES, BEATS, SCENES, SOS_CHIPS,
+  } from '../components/landing/landingStory.js';
+  import { allowMotion } from '../lib/stores/effects.js';
+  import { prefersReducedMotion } from '../lib/deviceCapability.js';
 
   // ── Routing ──────────────────────────────────────────────────────────────
-  import { push } from 'svelte-spa-router';
+  import { navigate } from '../lib/viewTransition.js';
 
-  // ── Hero tilt ─────────────────────────────────────────────────────────────
+  // ── Hero night-sky constellation field (VIGIL) ───────────────────────────
+  // Member wheel tokens on the shared primitive — kills the old teal-era
+  // hardcoded member hexes. Center beacon stays brand (self ≠ member hue).
+  const FIELD_NODES = DEFAULT_NODES.map((n, i) => ({
+    ...n,
+    hue: i === 0 ? 'var(--primary-400)' : `var(--member-${i})`,
+  }));
+
+  // ── Hero tilt (rAF-lerped; JS motion gated on allowMotion + OS switch) ────
   let heroCardEl = $state();
   let heroRaf = null;
   let hcx = 0, hcy = 0, htx = 0, hty = 0;
@@ -52,7 +72,9 @@
   }
 
   function onHeroMouseMove(e) {
-    if (!heroCardEl) return;
+    // JS-driven flourish: must honor the OS reduce-motion switch even when a
+    // stored 'full' fx preference exists ($allowMotion alone is not enough).
+    if (!heroCardEl || !$allowMotion || prefersReducedMotion()) return;
     const r  = heroCardEl.getBoundingClientRect();
     const dx = (e.clientX - r.left - r.width  / 2) / (r.width  / 2);
     const dy = (e.clientY - r.top  - r.height / 2) / (r.height / 2);
@@ -66,6 +88,45 @@
     if (!heroRaf) heroRaf = requestAnimationFrame(heroTick);
   }
 
+  // ── Story scene state (IO-driven — primary path everywhere) ──────────────
+  let activeBeat = $state(0);          // 0 = hero resting frame, 1..4 = beats
+  let sosPhase = $state('idle');       // 'idle' | 'alert' | 'safe'
+  let sosTimer = null;
+
+  function setBeat(i) {
+    if (i === activeBeat) return;
+    activeBeat = i;
+    clearTimeout(sosTimer);
+    if (i === 3) {
+      if ($allowMotion && !prefersReducedMotion()) {
+        sosPhase = 'alert';
+        // SOS must resolve to safe WITHIN the beat — never rest on alarm.
+        sosTimer = setTimeout(() => { sosPhase = 'safe'; }, 2400);
+      } else {
+        sosPhase = 'safe'; // reduced motion: render the resolved frame directly
+      }
+    } else {
+      sosPhase = 'idle';
+    }
+  }
+
+  let scene = $derived(SCENES[activeBeat]);
+  let sosActive = $derived(activeBeat === 3 && sosPhase === 'alert');
+  let chip = $derived(
+    activeBeat === 3
+      ? SOS_CHIPS[sosPhase === 'alert' ? 'alert' : 'safe']
+      : scene.chip
+  );
+
+  /** Reset to the hero resting frame when the hero copy re-enters view. */
+  function heroObserve(node) {
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) if (e.isIntersecting) setBeat(0);
+    }, { threshold: 0.4 });
+    io.observe(node);
+    return { destroy() { io.disconnect(); } };
+  }
+
   // ── Animated counters ─────────────────────────────────────────────────────
   const stats = [
     { value: 50000, label: 'Families protected', suffix: '+' },
@@ -75,7 +136,6 @@
   ];
   let statDisplays = $state(stats.map(() => 0));
   let statsVisible = false;
-  let statsEl;
 
   function animateStat(target, decimals = 0, onUpdate) {
     const duration = 1600;
@@ -89,11 +149,10 @@
     requestAnimationFrame(frame);
   }
 
-  // ── Stats IntersectionObserver (still needed for counter trigger) ─────────
+  // ── Stats IntersectionObserver (counter trigger) ──────────────────────────
   let statsObservers = [];
 
-  function observeStats(el) {
-    if (!el) return;
+  function statsObserve(node) {
     const obs = new IntersectionObserver(entries => {
       for (const e of entries) {
         if (e.isIntersecting && !statsVisible) {
@@ -105,79 +164,50 @@
         }
       }
     }, { threshold: 0.3 });
-    obs.observe(el);
-    statsObservers.push(obs);
+    obs.observe(node);
+    statsObservers.navigate(obs);
+    return { destroy() { obs.disconnect(); } };
   }
 
-  function statsObserve(node) {
-    observeStats(node);
-    return { destroy() {} };
-  }
-
-  // ── Features list ─────────────────────────────────────────────────────────
+  // ── Features list (quick-scan bento below the story) ─────────────────────
   const features = [
     {
       icon: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
       title: 'Real-time GPS',
       desc: 'Sub-2-second position updates with Kalman-filtered accuracy. Never a stale pin.',
-      glow: 'primary',
     },
     {
       icon: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>`,
       title: 'Smart Geofences',
       desc: 'Draw zones around school, home, work. Instant alerts when anyone arrives or leaves.',
-      glow: null,
     },
     {
       icon: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
       title: 'SOS Alerts',
       desc: 'One-tap emergency signal. Notifies your entire family and opens live tracking instantly.',
-      glow: 'danger',
     },
     {
       icon: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
       title: 'Secret Chat',
       desc: 'End-to-end encrypted family messaging. Messages vanish after read. Zero metadata.',
-      glow: null,
     },
     {
       icon: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>`,
       title: 'Route History',
       desc: 'Replay anyone\'s route for the last 30 days. Timeline scrubbing, speed heatmaps.',
-      glow: null,
     },
     {
       icon: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
       title: 'Guardian Roles',
       desc: 'Granular permissions. Parents see everything. Kids see what you allow. No surprises.',
-      glow: null,
     },
   ];
-
-  // ── How it works steps ────────────────────────────────────────────────────
-  const steps = [
-    { num: '01', title: 'Create your family', desc: 'Sign up in 30 seconds. Invite family by phone number or QR code.' },
-    { num: '02', title: 'Set your zones',     desc: 'Draw geofences around places that matter — home, school, grandma\'s.' },
-    { num: '03', title: 'Stay calm',          desc: 'Everyone shows up on the map. Alerts fire automatically. You just live.' },
-  ];
-
-  // ── Interactive demo state ────────────────────────────────────────────────
-  let demoTab = $state('map');
-  const demoTabs = ['map', 'alerts', 'chat'];
-
-  // ── Live ping animation ────────────────────────────────────────────────────
-  let pingCount = 0;
-  let pingInterval;
-
-  onMount(() => {
-    pingInterval = setInterval(() => { pingCount = (pingCount + 1) % 3; }, 1800);
-  });
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   onDestroy(() => {
     statsObservers.forEach(o => o.disconnect());
     if (heroRaf) cancelAnimationFrame(heroRaf);
-    if (pingInterval) clearInterval(pingInterval);
+    clearTimeout(sosTimer);
   });
 
   // ── CTA email ─────────────────────────────────────────────────────────────
@@ -190,24 +220,30 @@
   }
 </script>
 
-<!-- ── TECHNIQUE 3: Scroll Progress Bar ──────────────────────────────────── -->
-<!-- Pure CSS via animation-timeline: scroll(root) — defined in global.css    -->
+<!-- Scroll progress bar — pure CSS via animation-timeline: scroll(root) in global.css -->
 <div class="scroll-progress-bar" aria-hidden="true"></div>
 
 <div class="landing" aria-label="Kinnect landing page">
 
-  <!-- ═══════ HERO ════════════════════════════════════════════════════════ -->
-  <section class="hero" onmousemove={onHeroMouseMove} onmouseleave={onHeroMouseLeave}>
-    <!-- Background atmosphere -->
+  <!-- ═══════ HERO + STORY SPINE ═══════════════════════════════════════════
+       One phone mockup: it opens as the hero visual, then stays pinned
+       (position: sticky) while the four story beats scroll past. -->
+  <section
+    class="hero-story"
+    aria-labelledby="hero-headline"
+    onmousemove={onHeroMouseMove}
+    onmouseleave={onHeroMouseLeave}
+  >
+    <!-- Background atmosphere: VIGIL night-sky field (first viewport only) -->
     <div class="hero-bg fx-ambient" aria-hidden="true">
-      <!-- TECHNIQUE 1: @property Aurora background layer -->
       <div class="hero-aurora aurora-hero-bg" aria-hidden="true"></div>
       <div class="hero-orb hero-orb-1"></div>
       <div class="hero-orb hero-orb-2"></div>
       <div class="hero-orb hero-orb-3"></div>
-      <!-- TECHNIQUE 13: Depth grid with perspective -->
       <div class="hero-grid depth-grid-perspective" aria-hidden="true"></div>
-      <!-- Floating particles -->
+      <div class="hero-field">
+        <Constellation mode="dormant" nodes={FIELD_NODES} links={DEFAULT_LINKS} />
+      </div>
       {#each Array(14) as _, i}
         <div class="hero-particle" style="
           left:{8 + i * 6.5}%;
@@ -219,79 +255,76 @@
       {/each}
     </div>
 
-    <div class="landing-container">
-      <div class="hero-layout">
+    <div class="landing-container hs-grid">
 
-        <!-- Left: Copy -->
-        <div class="hero-copy">
-          <div
-            class="hero-badge"
-            in:fly={{ y: -16, duration: 500, delay: 100, easing: cubicOut }}
-          >
-            <span class="hero-badge-dot" aria-hidden="true"></span>
-            Live on 3 platforms
-          </div>
-
-          <h1
-            class="hero-headline"
-            in:fly={{ y: 24, duration: 600, delay: 200, easing: cubicOut }}
-          >
-            Know your family
-            <span class="hero-headline-accent"> is safe.</span>
-            <span class="hero-headline-sub"> Always.</span>
-          </h1>
-
-          <p
-            class="hero-tagline"
-            in:fade={{ duration: 500, delay: 420 }}
-          >
-            Kinnect gives families real-time GPS, smart geofence alerts, and
-            one-tap SOS — wrapped in a design that feels calm, not clinical.
-          </p>
-
-          <div
-            class="hero-actions"
-            in:fly={{ y: 16, duration: 500, delay: 540, easing: cubicOut }}
-          >
-            <Button variant="primary" size="lg" on:click={() => push('/register')}>
-              Start for free
-              {#snippet icon()}
-
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <line x1="3" y1="8" x2="13" y2="8"/>
-                    <polyline points="9 4 13 8 9 12"/>
-                  </svg>
-
-                          {/snippet}
-            </Button>
-
-            <Button variant="ghost" size="lg" on:click={() => push('/login')}>
-              Sign in
-            </Button>
-          </div>
-
-          <p class="hero-social-proof" in:fade={{ duration: 500, delay: 700 }}>
-            <span class="hero-avatars" aria-hidden="true">
-              {#each ['#14b8a6','#a855f7','#f59e0b','#ec4899'] as c}
-                <span class="hero-avatar" style="background:{c};"></span>
-              {/each}
-            </span>
-            <span>Join <strong>50,000+</strong> families worldwide</span>
-          </p>
+      <!-- Hero copy (beat 0) -->
+      <header class="hero-copy" use:heroObserve>
+        <div
+          class="hero-badge"
+          in:fly={{ y: -16, duration: 500, delay: 100, easing: cubicOut }}
+        >
+          <span class="hero-badge-dot" aria-hidden="true"></span>
+          Live on 3 platforms
         </div>
 
-        <!-- Right: 3D device mockup -->
-        <div
-          class="hero-visual"
-          in:fly={{ x: 40, duration: 700, delay: 350, easing: cubicOut }}
+        <h1
+          id="hero-headline"
+          class="hero-headline"
+          in:fly={{ y: 24, duration: 600, delay: 200, easing: cubicOut }}
         >
+          Know your family
+          <span class="hero-headline-accent"> is safe.</span>
+          <span class="hero-headline-sub"> Always.</span>
+        </h1>
+
+        <p
+          class="hero-tagline"
+          in:fade={{ duration: 500, delay: 420 }}
+        >
+          Kinnect gives families real-time GPS, smart geofence alerts, and
+          one-tap SOS — wrapped in a design that feels calm, not clinical.
+        </p>
+
+        <div
+          class="hero-actions"
+          in:fly={{ y: 16, duration: 500, delay: 540, easing: cubicOut }}
+        >
+          <Button variant="primary" size="lg" on:click={() => navigate('/register')}>
+            Start for free
+            {#snippet icon()}
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="3" y1="8" x2="13" y2="8"/>
+                <polyline points="9 4 13 8 9 12"/>
+              </svg>
+            {/snippet}
+          </Button>
+
+          <Button variant="ghost" size="lg" on:click={() => navigate('/login')}>
+            Sign in
+          </Button>
+        </div>
+
+        <p class="hero-social-proof" in:fade={{ duration: 500, delay: 700 }}>
+          <span class="hero-avatars" aria-hidden="true">
+            {#each ['var(--member-1)', 'var(--member-2)', 'var(--member-3)', 'var(--member-4)'] as c}
+              <span class="hero-avatar" style="background:{c};"></span>
+            {/each}
+          </span>
+          <span>Join <strong>50,000+</strong> families worldwide</span>
+        </p>
+      </header>
+
+      <!-- The story device: hero mockup, sticky through all four beats -->
+      <div
+        class="hs-visual"
+        in:fly={{ x: 40, duration: 700, delay: 350, easing: cubicOut }}
+      >
+        <div class="hs-sticky">
           <div class="hero-card-wrap" bind:this={heroCardEl}>
-            <!-- App mockup card — TECHNIQUE 4: noise-surface class -->
             <div class="mockup-card noise-surface">
               <!-- Status bar -->
               <div class="mockup-topbar">
                 <div class="mockup-title">Family</div>
-                <!-- TECHNIQUE 9: Multi-ring pulse — ping-dot + ping-ring + ping-ring-2 -->
                 <div class="mockup-ping" aria-label="Live updates active">
                   <span class="ping-ring-2" aria-hidden="true"></span>
                   <span class="ping-ring" aria-hidden="true"></span>
@@ -299,69 +332,93 @@
                 </div>
               </div>
 
-              <!-- Mini map surface -->
+              <!-- Story stage: the miniature family map, scene-driven.
+                   HARD CAP: ≤6 concurrently animated nodes per scene
+                   (3 pins + geofence + SOS ring + chip). Do not add more. -->
               <div class="mockup-map" aria-hidden="true">
                 <div class="mockup-map-grid"></div>
-                <!-- Animated user pins -->
-                <div class="map-pin pin-1">
-                  <div class="pin-inner">
-                    <div class="pin-dot" style="background:#14b8a6"></div>
-                    <div class="pin-ring" style="border-color:#14b8a6"></div>
-                  </div>
-                  <div class="pin-label">Mom</div>
-                </div>
-                <div class="map-pin pin-2">
-                  <div class="pin-inner">
-                    <div class="pin-dot" style="background:#a855f7"></div>
-                    <div class="pin-ring" style="border-color:#a855f7"></div>
-                  </div>
-                  <div class="pin-label">Dad</div>
-                </div>
-                <div class="map-pin pin-3">
-                  <div class="pin-inner">
-                    <div class="pin-dot" style="background:#f59e0b"></div>
-                    <div class="pin-ring" style="border-color:#f59e0b"></div>
-                  </div>
-                  <div class="pin-label">Zara</div>
-                </div>
-                <!-- Geofence circle -->
-                <div class="map-geofence" aria-hidden="true"></div>
+                <svg
+                  class="story-stage"
+                  viewBox="0 0 {STAGE_W} {STAGE_H}"
+                  preserveAspectRatio="xMidYMid slice"
+                >
+                  {#each ROUTES as r (r.id)}
+                    <polyline
+                      class="route"
+                      class:route-on={scene.routes}
+                      style="--rhue:{r.hue}"
+                      points={r.points}
+                    />
+                  {/each}
+
+                  {#each PLACES as pl (pl.id)}
+                    <g class="place">
+                      <circle class="place-dot" cx={pl.x} cy={pl.y} r="2.5" />
+                      <text class="place-label" x={pl.x} y={pl.y - 8}>{pl.label}</text>
+                    </g>
+                  {/each}
+
+                  {#each PLACES.filter(p => p.ring) as pl (pl.id)}
+                    <circle
+                      class="gf"
+                      class:gf-on={scene.geofence?.id === pl.id}
+                      class:gf-safe={scene.geofence?.id === pl.id && scene.geofence?.tone === 'safe'}
+                      cx={pl.x} cy={pl.y} r="20"
+                    />
+                  {/each}
+
+                  {#each PINS as pin (pin.id)}
+                    <g
+                      class="story-pin"
+                      class:sp-sos={sosActive && pin.id === 'zara'}
+                      style="--hue:{pin.hue}; transform: translate({scene.pos[pin.id][0]}px, {scene.pos[pin.id][1]}px)"
+                    >
+                      <circle class="sp-sos-ring fx-ambient" r="6" />
+                      <circle class="sp-halo" r="8" />
+                      <circle class="sp-dot" r="4" />
+                      <text class="sp-label" y="17">{pin.label}</text>
+                    </g>
+                  {/each}
+                </svg>
               </div>
 
-              <!-- Member rows — TECHNIQUE 7: stagger-messages class for CSS stagger -->
-              <div class="mockup-list stagger-messages">
-                {#each [
-                  { name: 'Mom',   loc: 'Home',        col: '#14b8a6', ago: 'just now' },
-                  { name: 'Dad',   loc: 'Office',      col: '#a855f7', ago: '3 min ago' },
-                  { name: 'Zara',  loc: 'School',      col: '#f59e0b', ago: '2 min ago' },
-                ] as m, i}
+              <!-- Member rows — sublines follow the active scene -->
+              <div class="mockup-list stagger-messages" aria-hidden="true">
+                {#each PINS as pin, i (pin.id)}
                   <div class="mockup-row" style="animation-delay:{i * 80}ms">
-                    <span class="mockup-avatar" style="background:{m.col}" aria-hidden="true"></span>
+                    <span class="mockup-avatar" style="background:{pin.hue}" aria-hidden="true"></span>
                     <span class="mockup-info">
-                      <span class="mockup-name">{m.name}</span>
-                      <span class="mockup-loc">{m.loc}</span>
+                      <span class="mockup-name">{pin.label}</span>
+                      <span class="mockup-loc">{scene.rows[i].loc}</span>
                     </span>
-                    <!-- TECHNIQUE 8: font-variant-numeric on time display -->
-                    <span class="mockup-ago font-tabular">{m.ago}</span>
+                    <span class="mockup-ago font-tabular">{scene.rows[i].ago}</span>
                   </div>
                 {/each}
               </div>
             </div>
 
-            <!-- Floating status chips -->
-            <div class="mockup-chip chip-safe" aria-label="Family safe">
-              <span class="chip-icon" aria-hidden="true">✓</span> All safe
-            </div>
-            <div class="mockup-chip chip-alert" aria-label="Zara arrived at school">
-              <span class="chip-icon" aria-hidden="true">📍</span> Zara arrived
-            </div>
+            <!-- Floating scene chip (decorative twin of the beat copy) -->
+            {#if chip}
+              {#key chip.text}
+                <div class="mockup-chip" data-tone={chip.tone} aria-hidden="true">
+                  <span class="chip-icon">{chip.icon}</span> {chip.text}
+                </div>
+              {/key}
+            {/if}
           </div>
         </div>
-
       </div>
+
+      <!-- The four story beats (IO inside StoryBeat drives the scenes) -->
+      <ol class="story-beats" aria-label="A day with Kinnect">
+        {#each BEATS as beat, i (beat.time)}
+          <StoryBeat {beat} index={i} active={activeBeat === i + 1} onactive={setBeat} />
+        {/each}
+      </ol>
+
     </div>
 
-    <!-- Scroll cue -->
+    <!-- Scroll cue (first viewport only) -->
     <div class="scroll-cue" aria-hidden="true">
       <div class="scroll-cue-line"></div>
     </div>
@@ -374,7 +431,6 @@
       <div class="stats-grid">
         {#each stats as s, i}
           <div class="stat-item">
-            <!-- TECHNIQUE 8: tabular-nums on stat values -->
             <span class="stat-value font-tabular" aria-live="polite">
               {statDisplays[i].toFixed(s.decimals || 0)}{s.suffix}
             </span>
@@ -386,11 +442,10 @@
   </section>
 
 
-  <!-- ═══════ FEATURES ════════════════════════════════════════════════════ -->
+  <!-- ═══════ FEATURES (quick-scan bento, demoted below the story) ════════ -->
   <section class="features" aria-labelledby="features-heading">
     <div class="landing-container">
 
-      <!-- TECHNIQUE 2: scroll-driven reveal replaces IntersectionObserver -->
       <div class="section-header reveal-scroll">
         <p class="section-eyebrow">Everything you need</p>
         <h2 id="features-heading" class="section-title">
@@ -398,13 +453,9 @@
         </h2>
       </div>
 
-      <!-- TECHNIQUE 2: reveal-scroll-grid for staggered card reveal -->
       <div class="features-grid reveal-scroll-grid" role="list">
-        {#each features as f, i}
-          <div
-            class="feature-cell card-hover-depth"
-            role="listitem"
-          >
+        {#each features as f}
+          <div class="feature-cell card-hover-depth" role="listitem">
             <Card variant="glass" hover padding="lg">
               <div class="feature-icon-wrap" aria-hidden="true">
                 {@html f.icon}
@@ -420,163 +471,9 @@
   </section>
 
 
-  <!-- ═══════ HOW IT WORKS ════════════════════════════════════════════════ -->
-  <section class="how-it-works" aria-labelledby="how-heading">
-    <div class="landing-container">
-
-      <div class="section-header reveal-scroll">
-        <p class="section-eyebrow">Simple by design</p>
-        <h2 id="how-heading" class="section-title">Up and running in minutes</h2>
-      </div>
-
-      <div class="steps-track" role="list">
-        {#each steps as s, i}
-          <div
-            class="step reveal-scroll"
-            style="animation-delay: {i * 110}ms"
-            role="listitem"
-          >
-            <div class="step-inner">
-              <div class="step-num" aria-hidden="true">{s.num}</div>
-              {#if i < steps.length - 1}
-                <div class="step-connector" aria-hidden="true"></div>
-              {/if}
-              <div class="step-body">
-                <h3 class="step-title">{s.title}</h3>
-                <p class="step-desc">{s.desc}</p>
-              </div>
-            </div>
-          </div>
-        {/each}
-      </div>
-
-    </div>
-  </section>
-
-
-  <!-- ═══════ INTERACTIVE DEMO ═════════════════════════════════════════════ -->
-  <section class="demo-section" aria-labelledby="demo-heading">
-    <div class="landing-container">
-
-      <div class="section-header reveal-scroll">
-        <p class="section-eyebrow">See it live</p>
-        <h2 id="demo-heading" class="section-title">The app, right here</h2>
-      </div>
-
-      <div
-        class="demo-frame reveal-scroll card-hover-depth"
-        aria-label="Interactive app preview"
-      >
-        <div>
-
-            <!-- Tab row -->
-            <div class="demo-tabs" role="tablist" aria-label="Demo views">
-              {#each demoTabs as tab}
-                <button
-                  class="demo-tab"
-                  class:active={demoTab === tab}
-                  role="tab"
-                  aria-selected={demoTab === tab}
-                  onclick={() => demoTab = tab}
-                >
-                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                </button>
-              {/each}
-            </div>
-
-            <!-- Demo content -->
-            <div class="demo-content" role="tabpanel">
-              {#if demoTab === 'map'}
-                <div class="demo-map" in:fade={{ duration: 280 }} aria-label="Map view showing family locations">
-                  <div class="demo-map-bg depth-grid-fine" aria-hidden="true"></div>
-                  <!-- Animated pins -->
-                  {#each [
-                    { label:'Mom',  x:28, y:42, c:'#14b8a6' },
-                    { label:'Dad',  x:62, y:30, c:'#a855f7' },
-                    { label:'Zara', x:48, y:68, c:'#f59e0b' },
-                  ] as p}
-                    <div
-                      class="demo-pin"
-                      style="left:{p.x}%; top:{p.y}%; --pin-c:{p.c}"
-                      aria-label="{p.label}'s location"
-                    >
-                      <div class="demo-pin-inner">
-                        <div class="demo-pin-dot"></div>
-                        <div class="demo-pin-ripple"></div>
-                      </div>
-                      <div class="demo-pin-label">{p.label}</div>
-                    </div>
-                  {/each}
-                  <!-- Route line -->
-                  <svg class="demo-route" aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none">
-                    <polyline
-                      points="28,42 35,48 42,55 48,68"
-                      fill="none"
-                      stroke="#f59e0b"
-                      stroke-width="0.8"
-                      stroke-dasharray="4 3"
-                      opacity="0.5"
-                    />
-                  </svg>
-                </div>
-
-              {:else if demoTab === 'alerts'}
-                <div class="demo-alerts" in:fade={{ duration: 280 }} role="log" aria-label="Recent alerts">
-                  {#each [
-                    { icon:'📍', text:'Zara arrived at School', time:'9:02 AM', color:'var(--success-500)' },
-                    { icon:'🏠', text:'Dad left Home',          time:'8:14 AM', color:'var(--primary-400)' },
-                    { icon:'⚡', text:'Low battery — Mom (11%)', time:'7:58 AM', color:'var(--warning-500)' },
-                    { icon:'✓',  text:'All family members safe', time:'7:30 AM', color:'var(--success-500)' },
-                  ] as alert, i}
-                    <div
-                      class="demo-alert-row"
-                      style="animation-delay:{i*60}ms"
-                      in:fly={{ x: -16, duration: 300, delay: i * 60, easing: cubicOut }}
-                    >
-                      <span class="alert-icon" aria-hidden="true">{alert.icon}</span>
-                      <span class="alert-text">{alert.text}</span>
-                      <span class="alert-time font-tabular">{alert.time}</span>
-                    </div>
-                  {/each}
-                </div>
-
-              {:else if demoTab === 'chat'}
-                <div class="demo-chat" in:fade={{ duration: 280 }} aria-label="Secret chat preview">
-                  {#each [
-                    { from:'Mom',  msg:'Almost home, 10 mins',    side:'left',  c:'#14b8a6' },
-                    { from:'You',  msg:'Ok! 🙌 Dinner is ready',   side:'right', c:'#a855f7' },
-                    { from:'Zara', msg:'Can I sleep at Emma\'s?',  side:'left',  c:'#f59e0b' },
-                    { from:'Mom',  msg:'Ask Dad 😄',               side:'left',  c:'#14b8a6' },
-                  ] as m, i}
-                    <div
-                      class="demo-msg demo-msg-{m.side}"
-                      in:fly={{
-                        x: m.side === 'left' ? -12 : 12,
-                        duration: 320,
-                        delay: i * 80,
-                        easing: cubicOut
-                      }}
-                    >
-                      {#if m.side === 'left'}
-                        <span class="demo-avatar" style="background:{m.c}" aria-label="{m.from}">{m.from[0]}</span>
-                      {/if}
-                      <span class="demo-bubble demo-bubble-{m.side}">{m.msg}</span>
-                    </div>
-                  {/each}
-                </div>
-              {/if}
-            </div>
-
-        </div>
-      </div>
-
-    </div>
-  </section>
-
-
   <!-- ═══════ CTA ════════════════════════════════════════════════════════ -->
   <section class="cta-section" aria-labelledby="cta-heading">
-    <div class="cta-bg" aria-hidden="true">
+    <div class="cta-bg fx-ambient" aria-hidden="true">
       <div class="cta-orb cta-orb-1"></div>
       <div class="cta-orb cta-orb-2"></div>
     </div>
@@ -635,14 +532,14 @@
   /* ── Layout ─────────────────────────────────────────────────────────────── */
   .landing {
     min-height: 100vh;
-    background: var(--surface-0, #0d0b14);
+    background: var(--surface-0);
     color: var(--text-primary);
     font-family: var(--font-sans);
-    overflow-x: hidden;
+    /* clip (not hidden): an overflow-x:hidden ancestor would silently break
+       the position:sticky story column. */
+    overflow-x: clip;
   }
 
-  /* Viewport-proportional container: fills 92% of the viewport up to 1440px.
-     Mobile (<768px) keeps the original full-width + --space-4 padding. */
   .landing-container {
     width: min(92vw, 90rem);
     margin-inline: auto;
@@ -653,26 +550,24 @@
     .landing-container { width: 100%; padding: 0 var(--space-4); }
   }
 
-  /* ── Hero ────────────────────────────────────────────────────────────────── */
-  .hero {
+  /* ── Hero + story spine ─────────────────────────────────────────────────── */
+  .hero-story {
     position: relative;
-    min-height: 100vh;
-    min-height: 100svh; /* small-viewport units where supported */
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    padding: var(--space-10) 0 var(--space-16);
-    overflow: hidden;
   }
 
-  /* Background atmosphere */
-  .hero-bg { position: absolute; inset: 0; pointer-events: none; }
+  /* Background atmosphere covers the first viewport only */
+  .hero-bg {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 100svh;
+    pointer-events: none;
+    overflow: clip;
+  }
 
-  /* TECHNIQUE 1: Aurora layer — sits behind orbs */
   .hero-aurora {
     position: absolute;
     inset: 0;
-    /* aurora-color-cycle keyframe + CSS from global.css .aurora-hero-bg */
+    /* aurora-color-cycle keyframe + gradients from global.css .aurora-hero-bg */
   }
 
   .hero-orb {
@@ -683,19 +578,19 @@
   }
   .hero-orb-1 {
     width: 600px; height: 600px;
-    background: radial-gradient(circle, var(--primary-500-20, rgba(20,184,166,0.16)) 0%, transparent 65%);
+    background: radial-gradient(circle, color-mix(in oklch, var(--primary-500) 16%, transparent) 0%, transparent 65%);
     top: -10%; left: -10%;
     animation: orb-drift-a 24s ease-in-out infinite;
   }
   .hero-orb-2 {
     width: 500px; height: 500px;
-    background: radial-gradient(circle, var(--violet-400-20, rgba(168,85,247,0.12)) 0%, transparent 65%);
+    background: radial-gradient(circle, color-mix(in oklch, var(--member-3) 12%, transparent) 0%, transparent 65%);
     top: 20%; right: -8%;
     animation: orb-drift-b 30s ease-in-out infinite;
   }
   .hero-orb-3 {
     width: 400px; height: 400px;
-    background: radial-gradient(circle, color-mix(in oklch, var(--secondary-500, #ec4899) 8%, transparent) 0%, transparent 65%);
+    background: radial-gradient(circle, color-mix(in oklch, var(--member-4) 8%, transparent) 0%, transparent 65%);
     bottom: 0; left: 40%;
     animation: orb-drift-a 20s ease-in-out infinite reverse;
   }
@@ -711,22 +606,33 @@
     70%     { transform: translate(20px,-30px) scale(0.97); }
   }
 
-  /* TECHNIQUE 13: hero-grid now uses depth-grid-perspective from global.css */
   .hero-grid {
     position: absolute;
     inset: 0;
-    /* depth-grid-perspective class from global.css handles the grid + perspective transform */
-    /* Override the mask-image from global.css for hero-specific fade */
     mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
     -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
+  }
+
+  /* VIGIL night-sky constellation field behind the mockup */
+  .hero-field {
+    position: absolute;
+    top: 8%;
+    right: 2%;
+    width: min(44vw, 620px);
+    height: 72%;
+    opacity: 0.45;
+  }
+
+  @media (max-width: 900px) {
+    .hero-field { width: 80vw; right: -10%; opacity: 0.3; }
   }
 
   .hero-particle {
     position: absolute;
     width: 2px; height: 2px;
     border-radius: 50%;
-    background: rgba(20,184,166,0.6);
-    box-shadow: 0 0 6px rgba(20,184,166,0.5);
+    background: color-mix(in oklch, var(--primary-400) 60%, transparent);
+    box-shadow: 0 0 6px color-mix(in oklch, var(--primary-400) 50%, transparent);
     animation: particle-float linear infinite;
     will-change: transform, opacity;
   }
@@ -737,29 +643,73 @@
     100%{ transform: translateY(0);  opacity:1; }
   }
 
-  /* Hero layout — gap scales with the viewport above the tablet breakpoint */
-  .hero-layout {
+  /* Grid: hero copy + beats on the left, one sticky mockup column right */
+  .hs-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: clamp(var(--space-16), 6vw, 7rem);
-    align-items: center;
+    grid-template-areas:
+      'hero  visual'
+      'beats visual';
+    column-gap: clamp(var(--space-16), 6vw, 7rem);
+    align-items: start;
+    position: relative;
+    z-index: 1;
   }
 
+  .hero-copy {
+    grid-area: hero;
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: var(--space-10) 0 var(--space-16);
+  }
+
+  .hs-visual { grid-area: visual; }
+
+  .hs-sticky {
+    position: sticky;
+    top: clamp(var(--space-8), 12svh, 8rem);
+    display: flex;
+    justify-content: center;
+    padding: var(--space-10) 0;
+  }
+
+  .story-beats {
+    grid-area: beats;
+    list-style: none;
+    margin: 0;
+    padding: 0 0 var(--space-16);
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Mobile: the hero mockup collapses into the one sticky story card */
   @media (max-width: 900px) {
-    .hero-layout {
-      grid-template-columns: 1fr;
-      gap: var(--space-10);
+    .hs-grid { display: block; }
+    .hero-copy {
+      min-height: auto;
+      padding: clamp(var(--space-16), 18svh, 10rem) 0 var(--space-8);
     }
-    .hero-visual { order: -1; }
+    .hs-visual {
+      position: sticky;
+      top: max(var(--space-3), env(safe-area-inset-top));
+      z-index: 2;
+      display: flex;
+      justify-content: center;
+    }
+    .hs-sticky { position: static; padding: 0; }
+    .story-beats { padding: var(--space-10) 0 var(--space-12); }
   }
 
-  /* Hero copy */
+  /* Hero copy pieces */
   .hero-badge {
     display: inline-flex;
     align-items: center;
     gap: var(--space-2);
-    background: rgba(20,184,166,0.12);
-    border: 1px solid rgba(20,184,166,0.28);
+    align-self: flex-start;
+    background: color-mix(in oklch, var(--primary-500) 12%, transparent);
+    border: 1px solid color-mix(in oklch, var(--primary-500) 28%, transparent);
     border-radius: var(--radius-full, 9999px);
     padding: 5px 14px;
     font-size: var(--text-xs);
@@ -768,7 +718,7 @@
     letter-spacing: 0.04em;
     text-transform: uppercase;
     margin-bottom: var(--space-5);
-    box-shadow: 0 0 16px rgba(20,184,166,0.12);
+    box-shadow: 0 0 16px color-mix(in oklch, var(--primary-500) 12%, transparent);
   }
 
   .hero-badge-dot {
@@ -784,9 +734,6 @@
     50%     { opacity:0.5; transform:scale(0.8); }
   }
 
-  /* TECHNIQUE 8: letter-spacing -0.03em on large heading */
-  /* Same 5vw slope as before, but the cap now lands at 5rem (~1600px) instead
-     of plateauing at 3.5rem (~1120px). Mobile minimum unchanged. */
   .hero-headline {
     font-family: var(--font-display);
     font-size: clamp(2.25rem, 5vw, 5rem);
@@ -841,50 +788,42 @@
 
   .hero-avatars {
     display: flex;
+    margin-right: var(--space-2);
   }
   .hero-avatar {
     width: 28px; height: 28px;
     border-radius: 50%;
-    border: 2px solid var(--surface-0, #0d0b14);
+    border: 2px solid var(--surface-0);
     margin-right: -8px;
     flex-shrink: 0;
   }
-  .hero-avatars { margin-right: var(--space-2); }
 
-  /* Hero visual / mockup */
-  .hero-visual {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  }
-
+  /* The story device (mockup card) */
   .hero-card-wrap {
     position: relative;
     will-change: transform;
     transform-style: preserve-3d;
   }
 
-  /* TECHNIQUE 6: Liquid Glass 2.0 on mockup card */
-  /* Viewport-proportional: 300px floor (old fixed width) up to 520px at 2000px+ */
   .mockup-card {
     width: clamp(300px, 26vw, 520px);
-    background: rgba(13, 11, 20, 0.85);
-    border: 1px solid rgba(168,85,247,0.22);
-    border-top-color: rgba(200,120,255,0.40);
+    background: color-mix(in oklch, var(--surface-0) 88%, transparent);
+    border: 1px solid color-mix(in oklch, var(--primary-400) 22%, transparent);
+    border-top-color: color-mix(in oklch, var(--primary-300) 40%, transparent);
     border-radius: 20px;
     overflow: hidden;
     box-shadow:
-      0 32px 80px rgba(0,0,0,0.60),
-      0 8px 24px rgba(0,0,0,0.40),
-      0 0 0 1px rgba(168,85,247,0.10),
-      inset 0 1px 0 rgba(255,255,255,0.08),
-      inset 0 -1px 0 rgba(0,0,0,0.14);
+      0 32px 80px color-mix(in srgb, black 60%, transparent),
+      0 8px 24px color-mix(in srgb, black 40%, transparent),
+      0 0 0 1px color-mix(in oklch, var(--primary-400) 10%, transparent),
+      inset 0 1px 0 color-mix(in srgb, white 8%, transparent),
+      inset 0 -1px 0 color-mix(in srgb, black 14%, transparent);
     backdrop-filter: blur(32px) saturate(180%) brightness(1.06);
     -webkit-backdrop-filter: blur(32px) saturate(180%) brightness(1.06);
   }
 
-  @media (max-width: 480px) {
-    .mockup-card { width: 260px; }
+  @media (max-width: 900px) {
+    .mockup-card { width: 250px; }
   }
 
   .mockup-topbar {
@@ -892,7 +831,7 @@
     justify-content: space-between;
     align-items: center;
     padding: var(--space-3) var(--space-4);
-    border-bottom: 1px solid rgba(168,85,247,0.12);
+    border-bottom: 1px solid color-mix(in oklch, var(--primary-400) 12%, transparent);
   }
 
   .mockup-title {
@@ -902,94 +841,117 @@
     color: var(--text-primary);
   }
 
-  /* TECHNIQUE 9: Multi-ring ping — container holds 3 layers */
   .mockup-ping {
     position: relative;
     width: 20px; height: 20px;
     flex-shrink: 0;
   }
-  /* ping-dot, ping-ring, ping-ring-2 defined in global.css TECHNIQUE 9 block */
+  /* ping-dot, ping-ring, ping-ring-2 defined in global.css */
 
-  /* Mini map — height scales with the wider desktop card */
+  /* ── Story stage (miniature scene-driven map) ───────────────────────────── */
   .mockup-map {
     position: relative;
-    height: clamp(140px, 12vw, 230px);
+    height: clamp(150px, 13vw, 240px);
     overflow: hidden;
     background:
-      linear-gradient(135deg, rgba(20,184,166,0.06) 0%, rgba(168,85,247,0.06) 100%),
-      rgba(8,8,16,0.60);
+      linear-gradient(135deg,
+        color-mix(in oklch, var(--primary-500) 6%, transparent) 0%,
+        color-mix(in oklch, var(--member-3) 6%, transparent) 100%),
+      color-mix(in oklch, var(--surface-0) 60%, black);
+  }
+
+  @media (max-width: 900px) {
+    .mockup-map { height: 150px; }
   }
 
   .mockup-map-grid {
     position: absolute;
     inset: 0;
     background-image:
-      linear-gradient(0deg, rgba(255,255,255,0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+      linear-gradient(0deg, color-mix(in srgb, white 3%, transparent) 1px, transparent 1px),
+      linear-gradient(90deg, color-mix(in srgb, white 3%, transparent) 1px, transparent 1px);
     background-size: 24px 24px;
   }
 
-  .map-geofence {
-    position: absolute;
-    width: 70px; height: 70px;
-    border-radius: 50%;
-    border: 1.5px dashed rgba(20,184,166,0.35);
-    background: rgba(20,184,166,0.05);
-    top: 35%; left: 32%;
-    transform: translate(-50%,-50%);
-  }
-
-  .map-pin {
-    position: absolute;
-    transform: translate(-50%, -50%);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0;
-  }
-  .pin-1 { top: 35%; left: 32%; animation: pin-float 3.2s ease-in-out infinite; }
-  .pin-2 { top: 20%; left: 62%; animation: pin-float 3.8s ease-in-out 0.5s infinite; }
-  .pin-3 { top: 58%; left: 55%; animation: pin-float 2.9s ease-in-out 1.1s infinite; }
-
-  @keyframes pin-float {
-    0%,100% { transform: translate(-50%,-50%) translateY(0); }
-    50%     { transform: translate(-50%,-50%) translateY(-4px); }
-  }
-
-  .pin-inner {
-    position: relative;
-    width: 10px;
-    height: 10px;
-    flex-shrink: 0;
-  }
-  .pin-dot {
+  .story-stage {
     position: absolute;
     inset: 0;
-    border-radius: 50%;
-    z-index: 2;
-    box-shadow: 0 0 8px currentColor;
+    width: 100%;
+    height: 100%;
   }
-  .pin-ring {
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    border: 1.5px solid;
-    animation: pin-expand 2s ease-out infinite;
-    z-index: 1;
+
+  .place-dot {
+    fill: color-mix(in oklch, var(--text-primary) 30%, transparent);
   }
-  @keyframes pin-expand {
-    0%   { transform: scale(1);   opacity: 0.8; }
-    100% { transform: scale(2.8); opacity: 0; }
-  }
-  .pin-label {
+  .place-label {
+    fill: color-mix(in oklch, var(--text-primary) 55%, transparent);
     font-size: 9px;
+    font-weight: 600;
+    font-family: var(--font-sans);
+    text-anchor: middle;
+  }
+
+  .route {
+    fill: none;
+    stroke: color-mix(in oklch, var(--rhue) 50%, transparent);
+    stroke-width: 1;
+    stroke-dasharray: 4 3;
+    opacity: 0;
+    transition: opacity var(--duration-slower) var(--ease-out);
+  }
+  .route-on { opacity: 0.55; }
+
+  /* Geofence ring — ignite = scale 0.9→1 + opacity 0→1 (transform/opacity only) */
+  .gf {
+    fill: color-mix(in oklch, var(--primary-400) 5%, transparent);
+    stroke: color-mix(in oklch, var(--primary-400) 35%, transparent);
+    stroke-width: 1.5;
+    stroke-dasharray: 4 3;
+    opacity: 0;
+    transform: scale(0.9);
+    transform-box: fill-box;
+    transform-origin: center;
+    transition:
+      opacity var(--duration-slower) var(--ease-out),
+      transform var(--duration-slower) var(--ease-out);
+  }
+  .gf-on { opacity: 1; transform: scale(1); }
+  .gf-safe {
+    stroke: color-mix(in oklch, var(--success-500) 60%, transparent);
+    fill: color-mix(in oklch, var(--success-500) 8%, transparent);
+  }
+
+  /* Member pins travel between scene positions on transform only */
+  .story-pin {
+    transition: transform var(--duration-slower) var(--ease-out);
+    will-change: transform;
+  }
+  .sp-halo { fill: color-mix(in oklch, var(--hue) 18%, transparent); }
+  .sp-dot  { fill: var(--hue); }
+  .sp-label {
+    fill: color-mix(in oklch, var(--text-primary) 75%, transparent);
+    font-size: 8px;
     font-weight: 700;
-    color: rgba(255,255,255,0.75);
-    background: rgba(0,0,0,0.55);
-    padding: 1px 5px;
-    border-radius: 3px;
-    white-space: nowrap;
-    margin-top: 4px;
+    font-family: var(--font-sans);
+    text-anchor: middle;
+  }
+  .sp-sos-ring {
+    fill: none;
+    stroke: var(--danger-500);
+    stroke-width: 1.5;
+    opacity: 0;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
+  /* SOS beat: pin flips to danger + expanding pulse ring (resolves to safe) */
+  .story-pin.sp-sos .sp-dot  { fill: var(--danger-500); }
+  .story-pin.sp-sos .sp-halo { fill: color-mix(in oklch, var(--danger-500) 22%, transparent); }
+  .story-pin.sp-sos .sp-sos-ring { animation: sos-ping 1.8s var(--ease-out) infinite; }
+
+  @keyframes sos-ping {
+    0%   { transform: scale(0.6); opacity: 0.8; }
+    100% { transform: scale(2.8); opacity: 0; }
   }
 
   /* Member rows */
@@ -1000,7 +962,7 @@
     align-items: center;
     gap: var(--space-2);
     padding: var(--space-2) var(--space-4);
-    animation: row-appear 400ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
+    animation: row-appear 400ms var(--ease-out) both;
   }
 
   @keyframes row-appear {
@@ -1018,9 +980,15 @@
   .mockup-loc  { display:block; font-size:10px; color:var(--text-tertiary); }
   .mockup-ago  { font-size:10px; color:var(--text-tertiary); flex-shrink:0; }
 
-  /* Floating chips */
+  @media (max-width: 900px) {
+    /* Compact story card on mobile — the map is the message */
+    .mockup-list { display: none; }
+  }
+
+  /* Floating scene chip */
   .mockup-chip {
     position: absolute;
+    top: -18px; right: -10px;
     display: flex;
     align-items: center;
     gap: var(--space-1);
@@ -1030,41 +998,41 @@
     border-radius: var(--radius-full, 9999px);
     white-space: nowrap;
     pointer-events: none;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+    box-shadow: 0 4px 16px color-mix(in srgb, black 35%, transparent);
+    animation: chip-pop var(--duration-normal) var(--ease-spring) both;
   }
 
-  .chip-safe {
-    background: rgba(16,185,129,0.18);
-    border: 1px solid rgba(16,185,129,0.40);
+  .mockup-chip[data-tone='safe'] {
+    background: color-mix(in oklch, var(--success-500) 18%, transparent);
+    border: 1px solid color-mix(in oklch, var(--success-500) 40%, transparent);
     color: var(--success-400);
-    top: -18px; right: -10px;
-    animation: chip-bob 3.5s ease-in-out infinite;
   }
-
-  .chip-alert {
-    background: rgba(20,184,166,0.15);
-    border: 1px solid rgba(20,184,166,0.38);
+  .mockup-chip[data-tone='info'] {
+    background: color-mix(in oklch, var(--primary-500) 15%, transparent);
+    border: 1px solid color-mix(in oklch, var(--primary-500) 38%, transparent);
     color: var(--primary-400);
-    bottom: -20px; left: -10px;
-    animation: chip-bob 4s ease-in-out 1s infinite;
+  }
+  .mockup-chip[data-tone='alert'] {
+    background: color-mix(in oklch, var(--danger-500) 16%, transparent);
+    border: 1px solid color-mix(in oklch, var(--danger-500) 42%, transparent);
+    color: var(--danger-400, var(--danger-500));
   }
 
-  @media (max-width: 480px) {
-    .chip-safe  { right: -4px; top: -16px; }
-    .chip-alert { left: -4px;  bottom: -18px; }
+  @keyframes chip-pop {
+    from { opacity: 0; transform: translateY(8px) scale(0.95); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  @media (max-width: 900px) {
+    .mockup-chip { right: -4px; top: -14px; }
   }
 
   .chip-icon { font-size: 12px; }
 
-  @keyframes chip-bob {
-    0%,100% { transform: translateY(0); }
-    50%     { transform: translateY(-5px); }
-  }
-
-  /* Scroll cue */
+  /* Scroll cue — pinned to the bottom of the first viewport */
   .scroll-cue {
     position: absolute;
-    bottom: var(--space-8);
+    top: calc(100svh - var(--space-12));
     left: 50%;
     transform: translateX(-50%);
     display: flex;
@@ -1074,7 +1042,7 @@
   }
   .scroll-cue-line {
     width: 1px; height: 40px;
-    background: linear-gradient(180deg, rgba(20,184,166,0.6) 0%, transparent 100%);
+    background: linear-gradient(180deg, color-mix(in oklch, var(--primary-400) 60%, transparent) 0%, transparent 100%);
     animation: scroll-line-drop 2s ease-in-out infinite;
   }
   @keyframes scroll-line-drop {
@@ -1090,7 +1058,9 @@
     padding: clamp(var(--space-10), 4vw, 4rem) 0;
     border-top: 1px solid var(--border-subtle);
     border-bottom: 1px solid var(--border-subtle);
-    background: var(--surface-1, rgba(168,85,247,0.04));
+    background: var(--surface-1);
+    position: relative;
+    z-index: 1;
   }
 
   .stats-grid {
@@ -1120,7 +1090,6 @@
     .stat-item:nth-child(2) { border-bottom: 1px solid var(--border-default); }
   }
 
-  /* TECHNIQUE 8: tabular-nums + letter-spacing */
   .stat-value {
     font-family: var(--font-display);
     font-size: clamp(var(--text-3xl), 2.6vw, 3.25rem);
@@ -1166,8 +1135,6 @@
     margin-bottom: var(--space-3);
   }
 
-  /* TECHNIQUE 8: -0.025em letter-spacing on section titles */
-  /* Same slope, cap raised 2.5rem → 3.25rem for desktop presence */
   .section-title {
     font-family: var(--font-display);
     font-size: clamp(1.75rem, 3.5vw, 3.25rem);
@@ -1182,6 +1149,9 @@
   /* ── Features ─────────────────────────────────────────────────────────────── */
   .features {
     padding: clamp(var(--space-16), 7vw, 7rem) 0 clamp(var(--space-12), 5vw, 5rem);
+    position: relative;
+    z-index: 1;
+    background: var(--surface-0);
   }
 
   .features-grid {
@@ -1205,11 +1175,15 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, rgba(20,184,166,0.18) 0%, rgba(13,148,136,0.10) 100%);
-    border: 1px solid rgba(20,184,166,0.24);
+    background: linear-gradient(135deg,
+      color-mix(in oklch, var(--primary-500) 18%, transparent) 0%,
+      color-mix(in oklch, var(--primary-700) 10%, transparent) 100%);
+    border: 1px solid color-mix(in oklch, var(--primary-500) 24%, transparent);
     color: var(--primary-400);
     margin-bottom: var(--space-4);
-    box-shadow: 0 4px 16px rgba(20,184,166,0.12), inset 0 1px 0 rgba(255,255,255,0.12);
+    box-shadow:
+      0 4px 16px color-mix(in oklch, var(--primary-500) 12%, transparent),
+      inset 0 1px 0 color-mix(in srgb, white 12%, transparent);
   }
 
   .feature-title {
@@ -1229,271 +1203,14 @@
   }
 
 
-  /* ── How it works ─────────────────────────────────────────────────────────── */
-  .how-it-works { padding: clamp(var(--space-12), 5vw, 5rem) 0; }
-
-  /* --steps-gap drives both the flex gap and the connector span so the line
-     always bridges the (viewport-scaled) gap exactly */
-  .steps-track {
-    --steps-gap: clamp(var(--space-6), 2.5vw, var(--space-10));
-    display: flex;
-    gap: var(--steps-gap);
-    align-items: flex-start;
-  }
-
-  @media (max-width: 700px) {
-    .steps-track { flex-direction: column; }
-  }
-
-  .step { flex: 1; }
-
-  .step-inner {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-  }
-
-  /* TECHNIQUE 8: -0.05em letter-spacing on large step numbers */
-  .step-num {
-    font-family: var(--font-display);
-    font-size: var(--text-4xl);
-    font-weight: 900;
-    letter-spacing: -0.05em;
-    text-rendering: optimizeLegibility;
-    background: linear-gradient(135deg, var(--primary-400) 0%, var(--primary-700) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    line-height: 1;
-    padding-bottom: var(--space-2);
-  }
-
-  .step-connector {
-    position: absolute;
-    top: 22px;
-    left: 52px;
-    right: calc(-1 * var(--steps-gap, var(--space-6)));
-    height: 1px;
-    background: linear-gradient(90deg, rgba(168,85,247,0.5) 0%, rgba(168,85,247,0.12) 100%);
-    pointer-events: none;
-  }
-
-  @media (max-width: 700px) {
-    .step-connector { display: none; }
-  }
-
-  .step-title {
-    font-family: var(--font-display);
-    font-size: var(--text-xl);
-    font-weight: 700;
-    color: var(--text-primary);
-    letter-spacing: -0.01em;
-    text-rendering: optimizeLegibility;
-  }
-
-  .step-desc {
-    font-size: var(--text-sm);
-    color: var(--text-secondary);
-    line-height: var(--leading-relaxed);
-  }
-
-
-  /* ── Demo section ─────────────────────────────────────────────────────────── */
-  .demo-section { padding: clamp(var(--space-12), 5vw, 5rem) 0 clamp(var(--space-16), 7vw, 7rem); }
-
-  /* TECHNIQUE 6: Liquid Glass 2.0 on demo frame */
-  /* Frame scales with the viewport: 640px floor (old cap) up to 880px */
-  .demo-frame {
-    max-width: clamp(640px, 46vw, 880px);
-    margin: 0 auto;
-    background: var(--surface-1, rgba(13,11,20,0.70));
-    border: 1px solid var(--border-default);
-    border-top-color: rgba(255,255,255,0.14);
-    border-radius: 20px;
-    overflow: hidden;
-    backdrop-filter: blur(32px) saturate(180%) brightness(1.06);
-    -webkit-backdrop-filter: blur(32px) saturate(180%) brightness(1.06);
-    box-shadow:
-      0 24px 64px rgba(0,0,0,0.40),
-      0 4px 16px rgba(0,0,0,0.24),
-      inset 0 1px 0 rgba(255,255,255,0.10),
-      inset 0 -1px 0 rgba(0,0,0,0.10);
-  }
-
-  /* Demo tabs */
-  .demo-tabs {
-    display: flex;
-    gap: var(--space-1);
-    padding: var(--space-3) var(--space-3) 0;
-    border-bottom: 1px solid var(--border-subtle);
-  }
-
-  .demo-tab {
-    padding: var(--space-2) var(--space-4);
-    border: none;
-    background: transparent;
-    color: var(--text-tertiary);
-    font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 600;
-    cursor: pointer;
-    border-radius: var(--radius-md) var(--radius-md) 0 0;
-    border-bottom: 2px solid transparent;
-    transition:
-      color 180ms var(--ease-out),
-      border-color 180ms var(--ease-out),
-      background 180ms;
-    min-height: 36px;
-  }
-
-  .demo-tab:hover { color: var(--text-primary); background: var(--surface-hover, rgba(255,255,255,0.04)); }
-  .demo-tab.active {
-    color: var(--primary-400);
-    border-bottom-color: var(--primary-400);
-    background: rgba(20,184,166,0.05);
-  }
-
-  .demo-content { min-height: clamp(260px, 18vw, 340px); }
-
-  /* Demo map — height tracks the wider desktop frame */
-  .demo-map {
-    position: relative;
-    height: clamp(260px, 18vw, 340px);
-    overflow: hidden;
-    background: rgba(8,8,20,0.70);
-  }
-  /* depth-grid-fine applied via class on .demo-map-bg */
-  .demo-map-bg {
-    position: absolute;
-    inset: 0;
-    /* depth-grid-fine from global.css */
-  }
-
-  .demo-pin {
-    position: absolute;
-    transform: translate(-50%, -50%);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0;
-  }
-  .demo-pin-inner {
-    position: relative;
-    width: 12px;
-    height: 12px;
-    flex-shrink: 0;
-  }
-  .demo-pin-dot {
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    background: var(--pin-c);
-    box-shadow: 0 0 10px var(--pin-c);
-    z-index: 2;
-  }
-  .demo-pin-ripple {
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    border: 1.5px solid var(--pin-c);
-    animation: demo-pin-expand 2.2s ease-out infinite;
-    z-index: 1;
-  }
-  @keyframes demo-pin-expand {
-    0%   { transform: scale(1);   opacity: 0.75; }
-    100% { transform: scale(3.2); opacity: 0; }
-  }
-  .demo-pin-label {
-    font-size: 10px;
-    font-weight: 700;
-    color: rgba(255,255,255,0.9);
-    background: rgba(0,0,0,0.65);
-    padding: 2px 6px;
-    border-radius: 4px;
-    white-space: nowrap;
-    margin-top: 5px;
-  }
-
-  .demo-route {
-    position: absolute;
-    inset: 0;
-    width: 100%; height: 100%;
-  }
-
-  /* Demo alerts */
-  .demo-alerts { padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-2); }
-
-  .demo-alert-row {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-3) var(--space-4);
-    background: var(--surface-2, rgba(15,15,30,0.60));
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg, 10px);
-    animation: row-appear 380ms var(--ease-out) both;
-  }
-
-  .alert-icon { font-size: 16px; flex-shrink:0; }
-  .alert-text { flex:1; font-size: var(--text-sm); color: var(--text-primary); min-width:0; }
-  /* TECHNIQUE 8: tabular-nums on time */
-  .alert-time { font-size: var(--text-xs); color: var(--text-tertiary); flex-shrink:0; font-variant-numeric: tabular-nums; }
-
-  /* Demo chat */
-  .demo-chat {
-    padding: var(--space-4);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-  }
-
-  .demo-msg {
-    display: flex;
-    align-items: flex-end;
-    gap: var(--space-2);
-  }
-  .demo-msg-right { flex-direction: row-reverse; }
-
-  .demo-avatar {
-    width: 24px; height: 24px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 11px;
-    font-weight: 700;
-    color: #fff;
-  }
-
-  .demo-bubble {
-    max-width: 72%;
-    padding: var(--space-2) var(--space-3);
-    border-radius: 14px;
-    font-size: var(--text-sm);
-    line-height: var(--leading-normal);
-  }
-  .demo-bubble-left {
-    background: var(--surface-2, rgba(255,255,255,0.08));
-    border: 1px solid var(--border-subtle);
-    color: var(--text-primary);
-    border-bottom-left-radius: 4px;
-  }
-  .demo-bubble-right {
-    background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-700) 100%);
-    color: #fff;
-    border-bottom-right-radius: 4px;
-    box-shadow: 0 4px 14px rgba(20,184,166,0.30);
-  }
-
-
   /* ── CTA section ────────────────────────────────────────────────────────── */
   .cta-section {
     position: relative;
     padding: clamp(var(--space-16), 7vw, 7rem) 0 clamp(var(--space-10), 4vw, 4rem);
     overflow: hidden;
     border-top: 1px solid var(--border-subtle);
+    z-index: 1;
+    background: var(--surface-0);
   }
 
   .cta-bg { position: absolute; inset: 0; pointer-events: none; }
@@ -1505,12 +1222,12 @@
   }
   .cta-orb-1 {
     width: 400px; height: 400px;
-    background: radial-gradient(circle, rgba(20,184,166,0.14) 0%, transparent 65%);
+    background: radial-gradient(circle, color-mix(in oklch, var(--primary-500) 14%, transparent) 0%, transparent 65%);
     top: -10%; left: 20%;
   }
   .cta-orb-2 {
     width: 300px; height: 300px;
-    background: radial-gradient(circle, rgba(168,85,247,0.10) 0%, transparent 65%);
+    background: radial-gradient(circle, color-mix(in oklch, var(--member-3) 10%, transparent) 0%, transparent 65%);
     bottom: -5%; right: 15%;
   }
 
@@ -1524,7 +1241,6 @@
     gap: var(--space-5);
   }
 
-  /* TECHNIQUE 8: heading polish — cap raised to match section titles */
   .cta-title {
     font-family: var(--font-display);
     font-size: clamp(1.75rem, 3.5vw, 3.25rem);
@@ -1562,8 +1278,8 @@
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    background: rgba(16,185,129,0.12);
-    border: 1px solid rgba(16,185,129,0.32);
+    background: color-mix(in oklch, var(--success-500) 12%, transparent);
+    border: 1px solid color-mix(in oklch, var(--success-500) 32%, transparent);
     border-radius: var(--radius-xl, 14px);
     padding: var(--space-4) var(--space-6);
     color: var(--success-400);
@@ -1574,8 +1290,8 @@
   .cta-success-icon {
     width: 28px; height: 28px;
     border-radius: 50%;
-    background: rgba(16,185,129,0.20);
-    border: 1px solid rgba(16,185,129,0.40);
+    background: color-mix(in oklch, var(--success-500) 20%, transparent);
+    border: 1px solid color-mix(in oklch, var(--success-500) 40%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1600,29 +1316,28 @@
     font-weight: 500;
   }
 
-  /* ── TECHNIQUE 2: Scroll-driven reveal (CSS-only fallback) ────────────────── */
-  /* reveal-scroll class in global.css handles the animation-timeline: view()    */
-  /* This fallback ensures the element is visible even without scroll-driven support */
-  .reveal-scroll {
-    /* If scroll-driven not supported, elements show immediately */
-    /* The @supports block in global.css applies the animation only when supported */
-  }
+  /* ── FX gating: minimal tier gets instant scene swaps, no loops ──────────── */
+  :global([data-fx='minimal']) .story-pin,
+  :global([data-fx='minimal']) .gf,
+  :global([data-fx='minimal']) .route { transition: none; }
+  :global([data-fx='minimal']) .mockup-chip { animation: none; }
+  :global([data-fx='minimal']) .story-pin.sp-sos .sp-sos-ring { animation: none; opacity: 0; }
 
-  /* ── Reduced motion ─────────────────────────────────────────────────────── */
+  /* ── Reduced motion: final static frames, zero travel, zero loops ────────── */
   @media (prefers-reduced-motion: reduce) {
     .hero-orb, .cta-orb,
     .hero-particle,
     .hero-badge-dot,
-    .chip-safe, .chip-alert,
-    .pin-ring, .pin-1, .pin-2, .pin-3,
-    .demo-pin-ripple,
     .scroll-cue-line,
+    .mockup-row,
+    .mockup-chip,
     .hero-aurora { animation: none; opacity: 1; transform: scale(1); }
 
     .hero-card-wrap { transform: none !important; }
-    .demo-route { display: none; }
 
-    /* Fallback reveal for reduced-motion — all elements instantly visible */
+    .story-pin, .gf, .route { transition: none; }
+    .story-pin.sp-sos .sp-sos-ring { animation: none; opacity: 0; }
+
     .reveal-scroll,
     .reveal-scroll-grid > * {
       opacity: 1 !important;

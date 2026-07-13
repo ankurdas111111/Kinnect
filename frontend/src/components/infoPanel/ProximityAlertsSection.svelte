@@ -4,6 +4,7 @@
   import { onDestroy } from 'svelte';
   import { proximityAlerts } from '../../lib/stores/places.js';
   import { emitSetProximityAlert, emitRemoveProximityAlert, emitListProximityAlerts } from '../../lib/socket.js';
+  import SectionHeader from '../primitives/SectionHeader.svelte';
 
   // ── F7: Proximity alerts ───────────────────────────────────────────────────
   let proximitySection = $state(false);
@@ -42,8 +43,11 @@
 <!-- ── F7: PROXIMITY ALERTS ───────────────────────────────────────── -->
 <div class="feature-section">
   <button class="collapsible-header" onclick={openProximitySection} aria-expanded={proximitySection}>
-    <span class="card-eyebrow" style="margin:0">Proximity Alerts</span>
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true" style="transform: rotate({proximitySection ? 180 : 0}deg); transition: transform 200ms"><polyline points="6 9 12 15 18 9"/></svg>
+    <SectionHeader title="Proximity Alerts" level={4}>
+      {#snippet action()}
+        <svg class="chevron" class:rotated={proximitySection} xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+      {/snippet}
+    </SectionHeader>
   </button>
   {#if proximitySection}
     <div class="feature-row feature-row--mt">
@@ -109,6 +113,13 @@
     color: var(--text-primary);
   }
   .collapsible-header:hover { opacity: 0.8; }
+
+  .chevron {
+    flex-shrink: 0;
+    transition: transform 200ms var(--ease-out);
+  }
+  .chevron.rotated { transform: rotate(180deg); }
+  @media (prefers-reduced-motion: reduce) { .chevron { transition: none; } }
 
   .feature-row--mt { margin-top: var(--space-1-5); }
 

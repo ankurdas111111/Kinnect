@@ -9,7 +9,6 @@
   import { toasts } from '../lib/stores/toast.js';
   import { haptics } from '../lib/haptics.js';
   import { getShareOrigin } from '../lib/env.js';
-  import TiltCard from './primitives/TiltCard.svelte';
   import MagneticButton from './primitives/MagneticButton.svelte';
 
   /**
@@ -306,23 +305,24 @@
         </div>
       </div>
 
-      <!-- Smart Import -->
-      <div class="import-row">
-        <button class="import-btn tactile" onclick={handleScreenshot} disabled={importing}>
+      <!-- Smart Import — demoted to secondary; visually quiet -->
+      <div class="import-row-secondary">
+        <span class="import-label">Quick-fill from app</span>
+        <button class="import-ghost" onclick={handleScreenshot} disabled={importing} aria-label="Scan screenshot to fill details">
           {#if importing && importSource === 'ocr'}
-            <span class="import-spinner" aria-hidden="true"></span> Scanning...
+            <span class="import-spinner" aria-hidden="true"></span>
           {:else}
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-            Scan Screenshot
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
           {/if}
+          <span>Scan</span>
         </button>
-        <button class="import-btn tactile" onclick={handlePaste} disabled={importing}>
+        <button class="import-ghost" onclick={handlePaste} disabled={importing} aria-label="Paste clipboard text to fill details">
           {#if importing && importSource === 'clipboard'}
-            <span class="import-spinner" aria-hidden="true"></span> Reading...
+            <span class="import-spinner" aria-hidden="true"></span>
           {:else}
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            Paste from App
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           {/if}
+          <span>Paste</span>
         </button>
       </div>
       <input type="file" accept="image/*" class="sr-only" bind:this={fileInputEl} onchange={onFileSelected} />
@@ -333,21 +333,19 @@
         <p class="field-label">How are you travelling?</p>
         <div class="vehicle-chips" class:autofilled={autoFilled} role="group" aria-label="Vehicle type">
           {#each VEHICLE_TYPES as vt}
-            <TiltCard intensity={9} shine={true}>
-              <button
-                class="vchip"
-                class:vchip-active={vehicleType === vt.id}
-                onclick={() => vehicleType = vehicleType === vt.id ? '' : vt.id}
-                aria-pressed={vehicleType === vt.id}
-              >
-                <span class="vchip-icon" aria-hidden="true">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d={vt.svgD}/>
-                  </svg>
-                </span>
-                <span class="vchip-label">{vt.label}</span>
-              </button>
-            </TiltCard>
+            <button
+              class="vchip"
+              class:vchip-active={vehicleType === vt.id}
+              onclick={() => vehicleType = vehicleType === vt.id ? '' : vt.id}
+              aria-pressed={vehicleType === vt.id}
+            >
+              <span class="vchip-icon" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d={vt.svgD}/>
+                </svg>
+              </span>
+              <span class="vchip-label">{vt.label}</span>
+            </button>
           {/each}
         </div>
 
@@ -407,8 +405,8 @@
       </div>
 
     {:else if safelyDone}
-      <!-- ── Reached safely celebration ──────────────────────────── -->
-      <div class="safely-done">
+      <!-- ── Reached safely — calm green moment, mirrors WalkWithMe arrived state -->
+      <div class="safely-done" role="status" aria-live="polite">
         <div class="safely-icon">
           <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <polyline points="20 6 9 17 4 12"/>
@@ -421,20 +419,26 @@
     {:else}
       <!-- ── Active ride screen ──────────────────────────────────── -->
       <div class="ride-active-header">
-        <div class="ride-active-dot" aria-hidden="true"></div>
+        <div class="ride-active-dot fx-ambient" aria-hidden="true"></div>
         <div class="ride-active-meta">
           <h3 class="ride-title">
-            Ride Active
-            {#if activeVehicleLabel} · {activeVehicleLabel}{/if}
+            {#if activeVehicleLabel}{activeVehicleLabel}{:else}Ride{/if} Active
           </h3>
           <p class="ride-subtitle">
             {#if $rideShare.dest}to {$rideShare.dest}{/if}
-            {#if $rideShare.vehicle} · {$rideShare.vehicle}{/if}
             {#if etaMinsLeft >= 0}&nbsp;· ETA {etaMinsLeft > 0 ? etaMinsLeft + 'm' : 'now'}{/if}
           </p>
         </div>
-        <span class="ride-timer" aria-label="Elapsed time">{formatElapsed(elapsedSec)}</span>
+        <span class="ride-timer tabular-nums" aria-label="Elapsed time">{formatElapsed(elapsedSec)}</span>
       </div>
+
+      <!-- Plate number — flagship glanceable: JetBrains Mono, 7:1 contrast target -->
+      {#if $rideShare.vehicle}
+        <div class="plate-display" aria-label="Vehicle identifier: {$rideShare.vehicle}">
+          <span class="plate-label">Vehicle</span>
+          <span class="plate-num tabular-nums">{$rideShare.vehicle}</span>
+        </div>
+      {/if}
 
       <!-- ETA progress bar -->
       {#if $rideShare.eta && $rideShare.startedAt}
@@ -490,7 +494,7 @@
   .ride-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.5); /* raw-color-ok: overlay scrim */
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
     z-index: var(--z-modal, 5000);
@@ -503,19 +507,19 @@
     right: 0;
     bottom: 0;
     z-index: calc(var(--z-modal, 5000) + 1);
-    background: var(--surface-2, rgba(18, 18, 36, 0.98));
-    backdrop-filter: blur(32px) saturate(1.8);
-    -webkit-backdrop-filter: blur(32px) saturate(1.8);
-    border-top: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
+    background: var(--glass-panel-bg, var(--surface-2));
+    backdrop-filter: blur(var(--glass-panel-blur, 32px)) saturate(1.8);
+    -webkit-backdrop-filter: blur(var(--glass-panel-blur, 32px)) saturate(1.8);
+    border-top: 1px solid var(--glass-panel-border, var(--border-subtle));
     border-radius: 20px 20px 0 0;
-    box-shadow: 0 -8px 48px rgba(0,0,0,0.40);
+    box-shadow: var(--glass-panel-shadow, 0 -8px 48px rgba(0,0,0,0.40)); /* raw-color-ok in fallback */
     padding: 8px 20px calc(24px + env(safe-area-inset-bottom, 0px));
   }
 
   .ride-handle {
     width: 40px;
     height: 5px;
-    background: var(--gray-400, rgba(255,255,255,0.22));
+    background: var(--border-default);
     border-radius: 999px;
     margin: 4px auto 20px;
   }
@@ -542,51 +546,63 @@
   }
 
   .step-bead {
-    width: 8px;
-    height: 8px;
+    width: 20px;
+    height: 20px;
     border-radius: 50%;
-    background: var(--border-default, rgba(255,255,255,0.16));
-    transition: transform 220ms var(--ease-spring, cubic-bezier(0.34,1.56,0.64,1)),
-                background-color 220ms var(--ease-out, ease);
+    background: var(--surface-inset);
+    border: 1.5px solid var(--border-default);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: transparent;
+    transition:
+      transform var(--duration-fast, 100ms) var(--ease-spring, cubic-bezier(0.34,1.56,0.64,1)),
+      background-color var(--duration-normal, 200ms) var(--ease-out),
+      border-color var(--duration-normal, 200ms) var(--ease-out);
   }
 
   .step-label {
     font-family: var(--font-display);
     font-size: var(--text-xs, 11px);
     font-weight: 700;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.04em;
     color: var(--text-tertiary);
-    transition: color 220ms var(--ease-out, ease);
+    transition: color var(--duration-normal, 200ms) var(--ease-out);
   }
 
   .step-item.step-active .step-bead {
-    background: var(--primary-500, #6366f1);
-    transform: scale(1.5);
-    box-shadow: 0 0 0 4px var(--primary-500-20, rgba(99,102,241,0.2));
+    background: var(--primary-500);
+    border-color: var(--primary-500);
+    transform: scale(1.12);
+    box-shadow: 0 0 0 3px var(--primary-500-20, rgba(99,102,241,0.2));
   }
-  .step-item.step-active .step-label { color: var(--primary-300, #a5b4fc); }
+  .step-item.step-active .step-label { color: var(--primary-300); }
 
-  .step-item.step-complete .step-bead { background: var(--success-500, #10b981); }
+  .step-item.step-complete .step-bead {
+    background: var(--success-500, #10b981);
+    border-color: var(--success-500, #10b981);
+    color: white;
+  }
   .step-item.step-complete .step-label { color: var(--text-secondary); }
 
   /* ── Header ──────────────────────────────────────────────────── */
   .ride-header {
     display: flex;
     align-items: flex-start;
-    gap: 14px;
-    margin-bottom: 18px;
+    gap: var(--space-3, 12px);
+    margin-bottom: var(--space-4, 16px);
   }
 
   .ride-icon {
     width: 48px;
     height: 48px;
-    border-radius: 14px;
-    background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.15));
-    border: 1px solid rgba(99,102,241,0.25);
+    border-radius: var(--radius-lg, 14px);
+    background: var(--primary-500-20, rgba(99,102,241,0.2));
+    border: 1px solid var(--primary-500-30, rgba(99,102,241,0.25));
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--primary-400, #818cf8);
+    color: var(--primary-400);
     flex-shrink: 0;
   }
 
@@ -634,11 +650,8 @@
     margin-bottom: 16px;
   }
 
-  /* TiltCard wrapper is the grid cell — make it a proper card cell */
-  .vehicle-chips :global(.tilt-root) {
-    border-radius: 14px;
-  }
-
+  /* ── Vehicle type picker — quiet segmented card grid ─────────── */
+  /* No tilt/shine; selected state = primary tint + 1px border only */
   .vchip {
     width: 100%;
     min-height: 72px;
@@ -646,16 +659,21 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    padding: 12px 8px;
-    background: var(--surface-inset, rgba(255,255,255,0.05));
-    border: 1px solid var(--border-subtle, rgba(255,255,255,0.10));
-    border-radius: 14px;
+    gap: var(--space-1, 4px);
+    padding: var(--space-3, 12px) var(--space-2, 8px);
+    background: var(--surface-inset);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg, 14px);
     font-family: var(--font-display);
     font-weight: 600;
     color: var(--text-secondary);
     cursor: pointer;
-    transition: background-color 150ms, border-color 150ms, color 150ms, box-shadow 200ms, transform 120ms;
+    outline: none;
+    transition:
+      background-color var(--duration-fast, 100ms) var(--ease-out),
+      border-color var(--duration-fast, 100ms) var(--ease-out),
+      color var(--duration-fast, 100ms) var(--ease-out),
+      transform var(--duration-fast, 100ms) var(--ease-spring, cubic-bezier(0.34,1.56,0.64,1));
   }
 
   .vchip-icon {
@@ -672,21 +690,21 @@
   .vchip:hover {
     background: var(--surface-hover);
     color: var(--text-primary);
-    border-color: var(--primary-500-30, rgba(99,102,241,0.3));
-    box-shadow: 0 0 0 1px var(--primary-500-20, rgba(99,102,241,0.2)),
-                0 6px 20px var(--primary-500-12, rgba(99,102,241,0.12));
+    border-color: var(--border-default);
+  }
+  .vchip:focus-visible {
+    outline: 2px solid var(--primary-400);
+    outline-offset: 2px;
   }
 
+  /* Selected: primary tint bg + 1px primary border. Pressable squish on click. */
   .vchip.vchip-active {
-    background: var(--primary-500-20, rgba(99,102,241,0.18));
-    border-color: var(--primary-500, #6366f1);
-    color: var(--primary-300, #a5b4fc);
-    box-shadow: 0 0 0 1px var(--primary-500-30, rgba(99,102,241,0.3)),
-                0 8px 24px var(--primary-500-20, rgba(99,102,241,0.2));
-    transform: scale(1.02);
+    background: var(--primary-500-20, rgba(99,102,241,0.15));
+    border-color: var(--primary-500);
+    color: var(--primary-300);
   }
-
-  .vchip.vchip-active .vchip-icon { color: var(--primary-300, #a5b4fc); }
+  .vchip.vchip-active .vchip-icon { color: var(--primary-300); }
+  .vchip:active { transform: scale(0.96); }
 
   /* ── Form inputs ─────────────────────────────────────────────── */
   .ride-form {
@@ -735,34 +753,40 @@
   }
 
   .pill-btn {
-    padding: 6px 14px;
-    min-height: 36px;
+    padding: var(--space-2, 8px) var(--space-3, 12px);
+    min-height: 44px; /* touch target */
     font-family: var(--font-display);
-    font-size: var(--text-xs);
+    font-size: var(--text-xs, 11px);
     font-weight: 700;
     border: 1px solid var(--border-default);
     border-radius: var(--radius-full);
-    background: var(--surface-1);
+    background: var(--surface-inset);
     color: var(--text-secondary);
     cursor: pointer;
-    transition: background 120ms, color 120ms, border-color 120ms, transform 100ms;
+    outline: none;
+    transition:
+      background-color var(--duration-fast, 100ms) var(--ease-out),
+      color var(--duration-fast, 100ms) var(--ease-out),
+      border-color var(--duration-fast, 100ms) var(--ease-out),
+      transform var(--duration-fast, 100ms) var(--ease-spring, cubic-bezier(0.34,1.56,0.64,1));
   }
-  .pill-btn:hover { background: var(--surface-2); color: var(--text-primary); }
+  .pill-btn:hover { background: var(--surface-hover); color: var(--text-primary); }
+  .pill-btn:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
   .pill-btn.pill-active {
-    background: var(--primary-600);
-    color: white;
+    background: var(--primary-500-20, rgba(99,102,241,0.2));
+    color: var(--primary-200, #c7d2fe);
     border-color: var(--primary-500);
-    transform: scale(1.06);
   }
+  .pill-btn:active { transform: scale(0.96); }
 
   .eta-arrival {
     font-family: var(--font-display);
-    font-size: var(--text-xs);
+    font-size: var(--text-xs, 11px);
     font-weight: 700;
     color: var(--primary-400);
-    padding: 5px 10px;
-    background: rgba(99,102,241,0.10);
-    border: 1px solid rgba(99,102,241,0.20);
+    padding: var(--space-1, 4px) var(--space-2, 8px);
+    background: var(--primary-500-20, rgba(99,102,241,0.10));
+    border: 1px solid var(--primary-500-30, rgba(99,102,241,0.20));
     border-radius: var(--radius-full);
   }
 
@@ -805,13 +829,50 @@
     border-radius: 50%;
     background: var(--success-500, #10b981);
     flex-shrink: 0;
-    box-shadow: 0 0 0 4px rgba(16,185,129,0.20);
-    animation: ride-pulse 2s ease-in-out infinite;
+    /* Static ring; fx-ambient class enables animation (suppressed at data-fx=minimal) */
+    box-shadow: 0 0 0 4px rgba(16,185,129,0.20); /* raw-color-ok: no --success-* alpha token */
+  }
+  .ride-active-dot.fx-ambient {
+    animation: ride-pulse 2s var(--ease-in-out, ease-in-out) infinite;
   }
 
   @keyframes ride-pulse {
-    0%, 100% { box-shadow: 0 0 0 4px rgba(16,185,129,0.20); }
-    50%       { box-shadow: 0 0 0 8px rgba(16,185,129,0.06); }
+    0%, 100% { box-shadow: 0 0 0 4px rgba(16,185,129,0.20); } /* raw-color-ok */
+    50%       { box-shadow: 0 0 0 8px transparent; }
+  }
+
+  /* ── Plate display — flagship glanceable: JetBrains Mono, 7:1 contrast ── */
+  .plate-display {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3, 12px);
+    padding: var(--space-3, 12px) var(--space-4, 16px);
+    margin-bottom: var(--space-4, 16px);
+    background: var(--text-primary, #f8fafc); /* near-white plate background */
+    border-radius: var(--radius-md, 10px);
+    border: 1px solid var(--border-default);
+  }
+
+  .plate-label {
+    font-family: var(--font-display);
+    font-size: var(--text-xs, 10px);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-tertiary);
+    /* On a light plate background: needs a dark layer override */
+    color: rgba(0,0,0,0.45); /* raw-color-ok: on explicitly white bg */
+    flex-shrink: 0;
+  }
+
+  /* Plate number: JetBrains Mono, --text-2xl, near-black on white = 7:1+ */
+  .plate-num {
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: var(--text-2xl, 24px);
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: rgba(0,0,0,0.87); /* raw-color-ok: on white plate bg — 7:1 contrast target */
+    line-height: 1;
   }
 
   .ride-active-meta {
@@ -876,19 +937,25 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 10px;
-    padding: 14px;
+    gap: var(--space-2, 10px);
+    padding: var(--space-3, 12px) var(--space-4, 16px);
     font-family: var(--font-display);
     font-size: var(--text-base, 15px);
     font-weight: 700;
-    background: #25d366;
+    background: var(--whatsapp-green, #25d366);
     color: white;
     border: none;
     border-radius: var(--radius-lg, 12px);
     cursor: pointer;
-    transition: background 150ms, transform 120ms, box-shadow 150ms;
+    min-height: 44px;
+    outline: none;
+    transition:
+      background-color var(--duration-fast, 100ms) var(--ease-out),
+      transform var(--duration-fast, 100ms) var(--ease-spring, cubic-bezier(0.34,1.56,0.64,1)),
+      box-shadow var(--duration-fast, 100ms) var(--ease-out);
   }
-  .btn-wa:hover  { background: #1ebe5d; box-shadow: 0 4px 16px rgba(37,211,102,0.30); }
+  .btn-wa:hover { background: var(--whatsapp-dark, #1ebe5d); }
+  .btn-wa:focus-visible { outline: 2px solid var(--whatsapp-green, #25d366); outline-offset: 2px; }
   .btn-wa:active { transform: scale(0.98); }
 
   .ride-secondary-actions {
@@ -942,38 +1009,43 @@
   .btn-safe:active { transform: scale(0.98); }
   .btn-safe:disabled { opacity: 0.7; cursor: default; }
 
-  /* ── "Reached Safely" success screen ────────────────────────── */
+  /* ── "Reached Safely" success screen — calm green moment ───── */
+  /* Calm-core: single 300ms entry, single border pulse, then static. No infinite glow. */
   .safely-done {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 32px 20px 16px;
-    gap: 10px;
-    animation: safely-pop 0.35s var(--ease-spring, cubic-bezier(0.34,1.56,0.64,1)) forwards;
+    padding: var(--space-8, 32px) var(--space-5, 20px) var(--space-4, 16px);
+    gap: var(--space-2, 10px);
+    /* border pulse: fades from ring-color to transparent in 300ms, then stays at final */
+    border: 1.5px solid var(--ring-color-live, var(--status-live, #10b981));
+    border-radius: var(--radius-lg, 16px);
+    animation: safely-enter 300ms var(--ease-out) forwards;
   }
 
-  @keyframes safely-pop {
-    from { opacity: 0; transform: scale(0.88); }
-    to   { opacity: 1; transform: scale(1); }
+  @keyframes safely-enter {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
 
   .safely-icon {
     width: 72px;
     height: 72px;
     border-radius: 50%;
-    background: rgba(16,185,129,0.15);
-    border: 2px solid rgba(16,185,129,0.30);
+    background: rgba(16,185,129,0.12); /* raw-color-ok */
+    border: 2px solid var(--ring-color-live, var(--status-live, #10b981));
     display: flex;
     align-items: center;
     justify-content: center;
     color: var(--success-500, #10b981);
-    box-shadow: 0 0 32px rgba(16,185,129,0.20);
-    animation: safely-glow 1.2s ease-in-out infinite;
+    /* Single pop — not infinite; calm-core */
+    animation: safely-icon-pop 300ms var(--ease-spring, cubic-bezier(0.34,1.56,0.64,1)) forwards;
   }
 
-  @keyframes safely-glow {
-    0%, 100% { box-shadow: 0 0 24px rgba(16,185,129,0.18); }
-    50%       { box-shadow: 0 0 44px rgba(16,185,129,0.38); }
+  @keyframes safely-icon-pop {
+    0%   { transform: scale(0.7); }
+    60%  { transform: scale(1.1); }
+    100% { transform: scale(1); }
   }
 
   .safely-text {
@@ -991,57 +1063,64 @@
     margin: 0;
   }
 
-  /* ── Smart Import ──────────────────────────────────────────── */
-  .import-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    margin-bottom: 14px;
-  }
-
-  .import-btn {
+  /* ── Smart Import — demoted to secondary row ─────────────────── */
+  /* Visually quiet: small label + ghost icon-buttons, not full-width CTAs */
+  .import-row-secondary {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 10px 8px;
-    min-height: 44px;
+    gap: var(--space-2, 8px);
+    margin-bottom: var(--space-3, 12px);
+  }
+
+  .import-label {
+    font-size: var(--text-xs, 10px);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-tertiary);
+    flex: 1;
+    white-space: nowrap;
+  }
+
+  .import-ghost {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1, 4px);
+    padding: var(--space-1, 4px) var(--space-2, 8px);
+    min-height: 32px;
     font-family: var(--font-display);
     font-size: var(--text-xs, 11px);
-    font-weight: 700;
-    color: var(--text-secondary);
-    background: var(--surface-inset, rgba(255,255,255,0.05));
-    border: 1px dashed var(--border-subtle, rgba(255,255,255,0.12));
-    border-radius: 12px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    background: transparent;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-full);
     cursor: pointer;
-    transition: background 150ms, border-color 150ms, color 150ms;
+    outline: none;
+    transition:
+      color var(--duration-fast, 100ms) var(--ease-out),
+      border-color var(--duration-fast, 100ms) var(--ease-out);
   }
-  .import-btn:hover {
-    background: var(--surface-hover);
-    border-color: var(--primary-500);
-    color: var(--text-primary);
-  }
-  .import-btn:disabled {
-    opacity: 0.6;
-    cursor: wait;
-  }
+  .import-ghost:hover { color: var(--text-secondary); border-color: var(--border-default); }
+  .import-ghost:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
+  .import-ghost:disabled { opacity: 0.5; cursor: wait; }
 
   .import-spinner {
     display: inline-block;
-    width: 12px;
-    height: 12px;
-    border: 2px solid var(--text-tertiary);
+    width: 10px;
+    height: 10px;
+    border: 1.5px solid var(--text-tertiary);
     border-top-color: var(--primary-400);
     border-radius: 50%;
     animation: spin 0.6s linear infinite;
   }
 
   .autofilled {
-    animation: autofill-glow 1.2s ease-out;
+    animation: autofill-glow 1.2s var(--ease-out) forwards;
   }
   @keyframes autofill-glow {
-    0%   { box-shadow: 0 0 0 3px rgba(99,102,241,0.4); }
-    100% { box-shadow: 0 0 0 0 rgba(99,102,241,0); }
+    0%   { box-shadow: 0 0 0 3px var(--primary-500-20, rgba(99,102,241,0.4)); }
+    100% { box-shadow: none; }
   }
 
   .sr-only {
@@ -1054,11 +1133,27 @@
     border: 0;
   }
 
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .step-bead,
     .step-label,
-    .vchip { transition: none; }
-    .step-item.step-active .step-bead,
-    .vchip.vchip-active { transform: none; }
+    .vchip,
+    .pill-btn,
+    .import-ghost { transition: none; }
+
+    .step-item.step-active .step-bead { transform: none; }
+    .vchip:active,
+    .pill-btn:active { transform: none; }
+
+    /* Infinite loops → land at final state */
+    .ride-active-dot.fx-ambient { animation: none; }
+    .import-spinner { animation: none; }
+
+    /* Entry animations → jump to end state */
+    .safely-done { animation: none; opacity: 1; transform: none; }
+    .safely-icon { animation: none; transform: scale(1); }
   }
 </style>

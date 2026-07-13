@@ -9,14 +9,11 @@
   import { isIgnoringBatteryOptimizations, requestIgnoreBatteryOptimizations } from '../lib/batteryOptimization.js';
   import { isNativePlatform } from '../lib/geoProvider.js';
   import { effects, FX_LEVELS } from '../lib/stores/effects.js';
-  import Card from './primitives/Card.svelte';
+  import SettingsSection from './settings/SettingsSection.svelte';
+  import RetentionPillGroup from './settings/RetentionPillGroup.svelte';
+  import ToggleControl from './primitives/ToggleControl.svelte';
 
-  /**
-   * @typedef {Object} Props
-   * @property {boolean} [embedded]
-   */
-
-  /** @type {Props} */
+  /** @type {{ embedded?: boolean }} */
   let { embedded = false } = $props();
 
   const dispatch = createEventDispatcher();
@@ -25,51 +22,58 @@
   const FX_META = {
     full:    { name: 'Full',    desc: 'All animations & effects' },
     calm:    { name: 'Calm',    desc: 'Reduced motion & blur' },
-    minimal: { name: 'Minimal', desc: 'Max battery & performance' },
+    minimal: { name: 'Minimal', desc: 'No ambient motion, solid panels' },
   };
 
+  // ── Profile ────────────────────────────────────────────────────────────────
   let firstName = $state('');
-  let lastName = $state('');
-  let email = $state('');
-  let mobile = $state('');
-  let currentPassword = $state('');
-  let newPassword = $state('');
-  let confirmPassword = $state('');
-  let deletePassword = $state('');
-  let saving = $state(false);
-  let changingPw = $state(false);
-  let showDelete = $state(false);
-  let deleting = $state(false);
-  let deleteCountdown = $state(0);
-  let deleteTimer = $state(null);
+  let lastName  = $state('');
+  let email     = $state('');
+  let mobile    = $state('');
 
-  // Plain local state — driven only by clicks and acks, never by stores.
-  // This prevents any external store write from overriding what the user just clicked.
-  let retentionMode = $state('default');  // 'default' (24h) | '48h'
-  let privacyUntil = null;        // ms timestamp or null
+  // ── Password ───────────────────────────────────────────────────────────────
+  let currentPassword  = $state('');
+  let newPassword      = $state('');
+  let confirmPassword  = $state('');
+  let saving           = $state(false);
+  let changingPw       = $state(false);
+
+  // ── Delete ─────────────────────────────────────────────────────────────────
+  let deletePassword = $state('');
+  let showDelete     = $state(false);
+  let deleting       = $state(false);
+  let deleteCountdown = $state(0);
+  let deleteTimer    = $state(null);
+
+  // ── Retention (offline visibility) ─────────────────────────────────────────
+  let retentionMode = $state('default');
+
+  // ── Privacy pause ──────────────────────────────────────────────────────────
+  let privacyUntil  = null;
   let privacyActive = $state(false);
   let privacyTimeLeft = $state('');
   let _privacyTimer = null;
 
-  // Quiet Hours state
+  // ── Quiet Hours ────────────────────────────────────────────────────────────
   let quietHoursEnabled = $state(false);
+  let quietHoursStart   = $state('22:00');
+  let quietHoursEnd     = $state('07:00');
 
-  // Panic Mode state (opt-in: double-tap SOS FAB fires SOS without confirm modal)
+  // ── Panic Mode ─────────────────────────────────────────────────────────────
   let panicMode = $state(localStorage.getItem('kinnect_panic_mode') === 'true');
-  let quietHoursStart = $state('22:00');
-  let quietHoursEnd = $state('07:00');
 
-  // Push notifications
-  let pushSupported = $state(false);
-  let pushEnabled = $state(false);
-  let togglingPush = $state(false);
+  // ── Notifications (push) ───────────────────────────────────────────────────
+  let pushSupported       = $state(false);
+  let pushEnabled         = $state(false);
+  let togglingPush        = $state(false);
   let _pendingVapidResolve = null;
 
-  // Background tracking / battery optimization (Android native only)
-  const isNative = isNativePlatform();
-  let batteryOptIgnoring = $state(true);  // true = already unrestricted (no action needed)
-  let checkingBattery = $state(false);
+  // ── Background location (Android native) ───────────────────────────────────
+  const isNative       = isNativePlatform();
+  let batteryOptIgnoring = $state(true);
+  let checkingBattery    = $state(false);
 
+  // ── Helpers ────────────────────────────────────────────────────────────────
   function formatTimeLeft(ms) {
     if (ms <= 0) return '';
     const h = Math.floor(ms / 3600000);
@@ -79,12 +83,16 @@
 
   function _updatePrivacy() {
     const now = Date.now();
-    privacyActive = !!privacyUntil && privacyUntil > now;
+    privacyActive   = !!privacyUntil && privacyUntil > now;
     privacyTimeLeft = privacyActive ? formatTimeLeft(privacyUntil - now) : '';
   }
 
-  // --- Socket event handlers (registered synchronously in onMount before any await) ---
+  function flashBanner(type, text, ms = 2500) {
+    banner.set({ type, text, actions: [] });
+    setTimeout(() => banner.set({ type: null, text: null, actions: [] }), ms);
+  }
 
+  // ── Socket listeners ───────────────────────────────────────────────────────
   function onVapidKey(payload) {
     if (_pendingVapidResolve) {
       _pendingVapidResolve(payload);
@@ -95,24 +103,21 @@
   function onPushSubscribeAck(payload) {
     togglingPush = false;
     if (payload && !payload.ok) {
-      pushEnabled = false; // server rejected — roll back optimistic update
-      banner.set({ type: 'sos', text: payload.error || 'Server rejected push subscription', actions: [] });
-      setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 3000);
+      pushEnabled = false;
+      flashBanner('sos', payload.error || 'Server rejected push subscription', 3000);
     }
   }
 
   function onPushUnsubscribeAck(payload) {
     togglingPush = false;
     if (payload && !payload.ok) {
-      pushEnabled = true; // server rejected — roll back
-      banner.set({ type: 'sos', text: 'Server could not remove subscription', actions: [] });
-      setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 3000);
+      pushEnabled = true;
+      flashBanner('sos', 'Server could not remove subscription', 3000);
     }
   }
 
   function onPrivacyAck(payload) {
     if (payload && payload.ok) {
-      // Server confirmed — update local state and sync shared store.
       privacyUntil = payload.pausedUntil ?? null;
       privacyPause.set(privacyUntil);
       _updatePrivacy();
@@ -121,29 +126,23 @@
 
   onMount(async () => {
     // Register ALL socket listeners FIRST — before any awaits — so no ack is ever missed.
-    socket.on('vapidKey', onVapidKey);
-    socket.on('pushSubscribeAck', onPushSubscribeAck);
-    socket.on('pushUnsubscribeAck', onPushUnsubscribeAck);
-    socket.on('privacyPauseAck', onPrivacyAck);
+    socket.on('vapidKey',            onVapidKey);
+    socket.on('pushSubscribeAck',    onPushSubscribeAck);
+    socket.on('pushUnsubscribeAck',  onPushUnsubscribeAck);
+    socket.on('privacyPauseAck',     onPrivacyAck);
 
-    // Seed privacy from the shared store (populated if another component set it earlier).
+    // Seed privacy from the shared store.
     const stored = get(privacyPause);
-    if (stored && stored > Date.now()) {
-      privacyUntil = stored;
-    }
+    if (stored && stored > Date.now()) privacyUntil = stored;
     _updatePrivacy();
     _privacyTimer = setInterval(_updatePrivacy, 10000);
 
-    // Load profile fields — /api/me is the available endpoint.
     const res = await apiGet('/api/me');
     if (res.ok) {
-      email = res.email || '';
+      email  = res.email  || '';
       mobile = res.mobile || '';
-      // firstName/lastName not in /api/me — leave blank (can be typed in)
     }
 
-    // Push support detection — use getRegistration() to avoid hanging on .ready
-    // if no SW is registered yet.
     pushSupported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
     if (pushSupported) {
       try {
@@ -152,53 +151,36 @@
           const sub = await reg.pushManager.getSubscription();
           pushEnabled = !!sub;
         }
-      } catch (_) {
-        pushEnabled = false;
-      }
+      } catch (_) { pushEnabled = false; }
     }
 
-    // Check battery optimization status (Android native only)
-    if (isNative) {
-      batteryOptIgnoring = await isIgnoringBatteryOptimizations();
-    }
+    if (isNative) batteryOptIgnoring = await isIgnoringBatteryOptimizations();
   });
-
-  async function handleBatteryOptimization() {
-    checkingBattery = true;
-    await requestIgnoreBatteryOptimizations();
-    // Re-check after user returns from settings
-    await new Promise(r => setTimeout(r, 800));
-    batteryOptIgnoring = await isIgnoringBatteryOptimizations();
-    checkingBattery = false;
-  }
 
   onDestroy(() => {
     clearInterval(_privacyTimer);
     if (deleteTimer) clearInterval(deleteTimer);
-    socket.off('vapidKey', onVapidKey);
-    socket.off('pushSubscribeAck', onPushSubscribeAck);
+    socket.off('vapidKey',           onVapidKey);
+    socket.off('pushSubscribeAck',   onPushSubscribeAck);
     socket.off('pushUnsubscribeAck', onPushUnsubscribeAck);
-    socket.off('privacyPauseAck', onPrivacyAck);
+    socket.off('privacyPauseAck',    onPrivacyAck);
     _pendingVapidResolve = null;
   });
 
-  // Fetch VAPID key via WS event — resolves via socket.on('vapidKey'), with 5 s timeout.
+  // ── VAPID ──────────────────────────────────────────────────────────────────
   function fetchVapidKey() {
     return new Promise((resolve) => {
       _pendingVapidResolve = resolve;
       socket.emit('getVapidKey', {});
       setTimeout(() => {
-        if (_pendingVapidResolve === resolve) {
-          _pendingVapidResolve = null;
-          resolve({ ok: false });
-        }
+        if (_pendingVapidResolve === resolve) { _pendingVapidResolve = null; resolve({ ok: false }); }
       }, 5000);
     });
   }
 
   function urlBase64ToUint8Array(base64String) {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
     const raw = window.atob(base64);
     const arr = new Uint8Array(raw.length);
     for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
@@ -212,40 +194,32 @@
       const perm = await Notification.requestPermission();
       if (perm !== 'granted') {
         togglingPush = false;
-        banner.set({ type: 'sos', text: 'Notification permission denied', actions: [] });
-        setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 3000);
+        flashBanner('sos', 'Notification permission denied', 3000);
         return;
       }
       const keyPayload = await fetchVapidKey();
       if (!keyPayload.ok || !keyPayload.key) {
         togglingPush = false;
-        banner.set({ type: 'sos', text: 'Push notifications not configured on server', actions: [] });
-        setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 3000);
+        flashBanner('sos', 'Push notifications not configured on server', 3000);
         return;
       }
       const reg = await Promise.race([
         navigator.serviceWorker.ready,
         new Promise((_, rej) => setTimeout(() => rej(new Error('sw-timeout')), 6000)),
       ]);
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(keyPayload.key),
-      });
+      const sub  = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(keyPayload.key) });
       const json = sub.toJSON();
-      // Optimistic — flip UI immediately, notify server in background.
-      pushEnabled = true;
+      pushEnabled  = true;
       togglingPush = false;
       socket.emit('pushSubscribe', { endpoint: json.endpoint, keys: json.keys });
-      banner.set({ type: 'info', text: "Notifications on. We'll only bother you when it matters.", actions: [] });
-      setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 2500);
+      flashBanner('info', "Notifications on. We'll only bother you when it matters.", 2500);
     } catch (err) {
       togglingPush = false;
       const msg = err.message === 'sw-timeout' ? 'Service worker not ready'
         : (err.message?.includes('denied') || err.message?.includes('permission'))
           ? 'Notification permission denied — enable in browser settings'
           : (err.message || String(err));
-      banner.set({ type: 'sos', text: 'Could not enable notifications: ' + msg, actions: [] });
-      setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 3500);
+      flashBanner('sos', 'Could not enable notifications: ' + msg, 3500);
     }
   }
 
@@ -261,19 +235,17 @@
       if (sub) {
         const endpoint = sub.endpoint;
         await sub.unsubscribe();
-        pushEnabled = false;
+        pushEnabled  = false;
         togglingPush = false;
         socket.emit('pushUnsubscribe', { endpoint });
-        banner.set({ type: 'info', text: 'Notifications off. Radio silence.', actions: [] });
-        setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 2500);
+        flashBanner('info', 'Notifications off. Radio silence.', 2500);
       } else {
-        pushEnabled = false;
+        pushEnabled  = false;
         togglingPush = false;
       }
     } catch (err) {
       togglingPush = false;
-      banner.set({ type: 'sos', text: 'Could not disable notifications: ' + (err.message || err), actions: [] });
-      setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 3000);
+      flashBanner('sos', 'Could not disable notifications: ' + (err.message || err), 3000);
     }
   }
 
@@ -281,33 +253,23 @@
     saving = true;
     const res = await apiPost('/api/profile/update', { firstName, lastName, email, mobile });
     saving = false;
-    if (res.ok) {
-      banner.set({ type: 'info', text: 'Looking good. Profile saved.', actions: [] });
-      setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 2000);
-    } else {
-      banner.set({ type: 'sos', text: res.error || 'Failed to update', actions: [] });
-      setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 3000);
-    }
+    if (res.ok) flashBanner('info', 'Looking good. Profile saved.', 2000);
+    else         flashBanner('sos', res.error || 'Failed to update', 3000);
   }
 
   async function changePassword() {
     if (newPassword !== confirmPassword) {
-      banner.set({ type: 'sos', text: 'Passwords do not match', actions: [] });
-      setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 2000);
+      flashBanner('sos', 'Passwords do not match', 2000);
       return;
     }
     changingPw = true;
     const res = await apiPost('/api/profile/password', { currentPassword, newPassword });
     changingPw = false;
     if (res.ok) {
-      currentPassword = '';
-      newPassword = '';
-      confirmPassword = '';
-      banner.set({ type: 'info', text: "New password locked in. Don't lose this one.", actions: [] });
-      setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 2000);
+      currentPassword = ''; newPassword = ''; confirmPassword = '';
+      flashBanner('info', "New password locked in. Don't lose this one.", 2000);
     } else {
-      banner.set({ type: 'sos', text: res.error || 'Failed', actions: [] });
-      setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 3000);
+      flashBanner('sos', res.error || 'Failed', 3000);
     }
   }
 
@@ -315,13 +277,8 @@
     deleting = true;
     const res = await apiPost('/api/profile/delete', { password: deletePassword });
     deleting = false;
-    if (res.ok) {
-      authUser.set(null);
-      window.location.hash = '#/login';
-    } else {
-      banner.set({ type: 'sos', text: res.error || 'Failed', actions: [] });
-      setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 3000);
-    }
+    if (res.ok) { authUser.set(null); window.location.hash = '#/login'; }
+    else         flashBanner('sos', res.error || 'Failed', 3000);
   }
 
   async function logout() {
@@ -332,54 +289,59 @@
 
   const _retentionLabels = { default: '24 hours', '48h': '2 days', '5d': '5 days', '10d': '10 days', '30d': '30 days' };
   function setRetentionMode(mode) {
-    retentionMode = mode; // immediate optimistic update — no callback, no deadlock
+    retentionMode = mode;
     socket.emit('setRetention', { mode });
-    const label = _retentionLabels[mode] || mode;
-    banner.set({ type: 'info', text: `Location kept for ${label} after going offline`, actions: [] });
-    setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 2500);
+    flashBanner('info', `Location kept for ${_retentionLabels[mode] || mode} after going offline`, 2500);
   }
 
   function startDeleteFlow() {
     showDelete = true;
     deleteCountdown = 3;
     if (deleteTimer) clearInterval(deleteTimer);
-    deleteTimer = setInterval(() => {
-      deleteCountdown--;
-      if (deleteCountdown <= 0) clearInterval(deleteTimer);
-    }, 1000);
+    deleteTimer = setInterval(() => { deleteCountdown--; if (deleteCountdown <= 0) clearInterval(deleteTimer); }, 1000);
   }
 
   function setPrivacyMode(duration) {
-    // Optimistic — update local state immediately, backend confirms via privacyPauseAck.
     if (duration === 'resume') {
       privacyUntil = null;
     } else {
       const hours = parseInt(duration, 10) || 1;
       privacyUntil = Date.now() + hours * 3600000;
     }
-    privacyPause.set(privacyUntil); // keep shared store in sync for other components
+    privacyPause.set(privacyUntil);
     _updatePrivacy();
     socket.emit('setPrivacyPause', { duration });
   }
 
   function saveQuietHours() {
-    socket.emit('updateQuietHours', {
-      enabled: quietHoursEnabled,
-      startTime: quietHoursStart,
-      endTime: quietHoursEnd,
-    });
-    banner.set({ type: 'info', text: quietHoursEnabled
+    socket.emit('updateQuietHours', { enabled: quietHoursEnabled, startTime: quietHoursStart, endTime: quietHoursEnd });
+    flashBanner('info', quietHoursEnabled
       ? `Quiet hours set — contacts see a blurred location ${quietHoursStart}–${quietHoursEnd}`
-      : 'Quiet hours disabled', actions: [] });
-    setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 3000);
+      : 'Quiet hours disabled', 3000);
+  }
+
+  async function handleBatteryOptimization() {
+    checkingBattery = true;
+    await requestIgnoreBatteryOptimizations();
+    await new Promise(r => setTimeout(r, 800));
+    batteryOptIgnoring = await isIgnoringBatteryOptimizations();
+    checkingBattery = false;
+  }
+
+  function cancelDelete() {
+    showDelete = false;
+    deletePassword = '';
+    deleteCountdown = 0;
+    if (deleteTimer) clearInterval(deleteTimer);
   }
 </script>
 
 {#if embedded}
-  <div class="panel-body settings-panel">
-    <Card variant="glass" hover={false} padding="md">
-      <h4 class="section-title-bold">Profile</h4>
-      <div class="form-section">
+  <div class="settings-panel">
+
+    <!-- Profile -->
+    <SettingsSection title="Profile">
+      {#snippet children()}
         <label class="field-label">
           First Name
           <input type="text" bind:value={firstName} class="field-input" maxlength="50" />
@@ -397,15 +359,14 @@
           <input type="tel" bind:value={mobile} class="field-input" />
         </label>
         <button class="btn btn-primary btn-sm tactile" onclick={saveProfile} disabled={saving}>
-          {saving ? 'Saving...' : 'Save Profile'}
+          {saving ? 'Saving…' : 'Save Profile'}
         </button>
-      </div>
-    </Card>
+      {/snippet}
+    </SettingsSection>
 
-    <Card variant="glass" hover={false} padding="md">
-      <h4 class="section-title-bold">Visual effects</h4>
-      <div class="form-section">
-        <p class="hint">Dial down animation and blur for a calmer screen and better battery life.</p>
+    <!-- Visual effects — flagship FX control -->
+    <SettingsSection title="Visual effects" description="Dial down animation and blur for a calmer screen and better battery life.">
+      {#snippet children()}
         <div class="fx-segmented" role="radiogroup" aria-label="Visual effects level">
           {#each FX_LEVELS as level}
             <button
@@ -421,16 +382,15 @@
             </button>
           {/each}
         </div>
-      </div>
-    </Card>
+      {/snippet}
+    </SettingsSection>
 
-    <Card variant="glass" hover={false} padding="md">
-      <h4 class="section-title-bold">Privacy Mode</h4>
-      <div class="form-section">
-        <p class="hint">Temporarily hide your location from everyone. Guardians can still see you.</p>
+    <!-- Privacy Mode -->
+    <SettingsSection title="Privacy Mode" description="Temporarily hide your location from everyone. Guardians can still see you.">
+      {#snippet children()}
         {#if privacyActive}
-          <div class="privacy-active animate-slide-up">
-            <span class="ghost-emoji animate-ghost-float" aria-hidden="true">👻</span>
+          <div class="privacy-active">
+            <span class="ghost-emoji" aria-hidden="true">👻</span>
             <div class="ghost-info">
               <p class="ghost-status">You're hidden</p>
               <p class="ghost-time">{privacyTimeLeft} left</p>
@@ -444,24 +404,17 @@
             <button class="btn btn-secondary btn-sm tactile" onclick={() => setPrivacyMode('8h')}>Hide for 8 hours</button>
           </div>
         {/if}
-      </div>
-    </Card>
+      {/snippet}
+    </SettingsSection>
 
-    <Card variant="glass" hover={false} padding="md">
-      <h4 class="section-title-bold">Quiet Hours</h4>
-      <div class="form-section">
-        <p class="hint">During Quiet Hours your location is approximate for everyone except your guardians.</p>
-        <label class="toggle-row">
-          <span>Enable Quiet Hours</span>
-          <button
-            class="toggle-btn"
-            class:on={quietHoursEnabled}
-            onclick={() => { quietHoursEnabled = !quietHoursEnabled; }}
-            aria-label={quietHoursEnabled ? 'Disable quiet hours' : 'Enable quiet hours'}
-          >
-            <span class="toggle-knob"></span>
-          </button>
-        </label>
+    <!-- Quiet Hours — safety toggle via ToggleControl -->
+    <SettingsSection title="Quiet Hours" description="During Quiet Hours your location is approximate for everyone except your guardians.">
+      {#snippet children()}
+        <ToggleControl
+          bind:checked={quietHoursEnabled}
+          label="Enable Quiet Hours"
+          description="Blurs your position for contacts during the set window"
+        />
         {#if quietHoursEnabled}
           <div class="quiet-time-row">
             <label class="field-label-inline">
@@ -475,95 +428,71 @@
           </div>
         {/if}
         <button class="btn btn-primary btn-sm tactile" onclick={saveQuietHours}>Save Quiet Hours</button>
-      </div>
-    </Card>
+      {/snippet}
+    </SettingsSection>
 
-    <Card variant="glass" hover={false} padding="md">
-      <h4 class="section-title-bold">Panic Mode</h4>
-      <div class="form-section">
-        <p class="hint">Double-tap the SOS button to send an alert instantly, skipping the confirmation step. Only enable if you might need to trigger SOS one-handed in an emergency.</p>
-        <label class="toggle-row">
-          <span>Enable Panic Mode</span>
-          <button
-            class="toggle-btn"
-            class:on={panicMode}
-            onclick={() => { panicMode = !panicMode; localStorage.setItem('kinnect_panic_mode', String(panicMode)); }}
-            aria-label={panicMode ? 'Disable panic mode' : 'Enable panic mode'}
-          >
-            <span class="toggle-knob"></span>
-          </button>
-        </label>
-      </div>
-    </Card>
+    <!-- Panic Mode — safety toggle via ToggleControl -->
+    <SettingsSection title="Panic Mode" description="Double-tap the SOS button to send an alert instantly, skipping the confirmation step. Only enable if you might need to trigger SOS one-handed in an emergency.">
+      {#snippet children()}
+        <ToggleControl
+          bind:checked={panicMode}
+          label="Enable Panic Mode"
+          description="Skips confirmation — SOS fires on double-tap"
+          onchange={(v) => localStorage.setItem('kinnect_panic_mode', String(v))}
+        />
+      {/snippet}
+    </SettingsSection>
 
-    <Card variant="glass" hover={false} padding="md">
-      <h4 class="section-title-bold">Offline Visibility</h4>
-      <div class="form-section">
-        <p class="hint">How long your last location stays visible after you close the app.</p>
-        <div class="retention-pills">
-          {#each [['default','1 Day'],['48h','2 Days'],['5d','5 Days'],['10d','10 Days'],['30d','30 Days']] as [mode, label]}
-            <button
-              class="retention-pill"
-              class:active={retentionMode === mode}
-              onclick={() => setRetentionMode(mode)}
-              aria-pressed={retentionMode === mode}
-            >{label}</button>
-          {/each}
-        </div>
-      </div>
-    </Card>
+    <!-- Offline Visibility — RetentionPillGroup -->
+    <SettingsSection title="Offline Visibility" description="How long your last location stays visible after you close the app.">
+      {#snippet children()}
+        <RetentionPillGroup
+          bind:value={retentionMode}
+          onchange={setRetentionMode}
+        />
+      {/snippet}
+    </SettingsSection>
 
-    <Card variant="glass" hover={false} padding="md">
-      <h4 class="section-title-bold">Notifications</h4>
-      <div class="form-section">
+    <!-- Notifications — safety toggle via ToggleControl -->
+    <SettingsSection title="Notifications" description={pushSupported ? "SOS alerts, check-in reminders, and family updates. We only notify you when it matters." : "Notifications aren't available in this browser."}>
+      {#snippet children()}
         {#if pushSupported}
-          <p class="hint">SOS alerts, check-in reminders, and family updates. We only notify you when it matters.</p>
-          <label class="toggle-row">
-            <span>{pushEnabled ? 'Notifications are on' : 'Turn on notifications'}</span>
-            <button
-              class="toggle-btn"
-              class:on={pushEnabled}
-              disabled={togglingPush}
-              onclick={() => pushEnabled ? disablePush() : enablePush()}
-              aria-label={pushEnabled ? 'Disable push notifications' : 'Enable push notifications'}
-            >
-              <span class="toggle-knob"></span>
-            </button>
-          </label>
-          {#if togglingPush}<p class="hint">Updating...</p>{/if}
-        {:else}
-          <p class="hint">Notifications aren't available in this browser.</p>
+          <ToggleControl
+            checked={pushEnabled}
+            label={pushEnabled ? 'Notifications are on' : 'Turn on notifications'}
+            disabled={togglingPush}
+            onchange={(v) => v ? enablePush() : disablePush()}
+          />
+          {#if togglingPush}<p class="hint">Updating…</p>{/if}
         {/if}
-      </div>
-    </Card>
+      {/snippet}
+    </SettingsSection>
 
+    <!-- Background Location (Android native only) -->
     {#if isNative}
-      <Card variant="glass" hover={false} padding="md">
-        <h4 class="section-title-bold">Background Location</h4>
-        <div class="form-section">
+      <SettingsSection title="Background Location" description={batteryOptIgnoring ? "Kinnect can share your location even when the app is in the background." : "Your phone might stop Kinnect from working in the background. Tap below to fix this."}>
+        {#snippet children()}
           {#if batteryOptIgnoring}
             <div class="battery-status battery-status--ok">
-              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
               Background location is allowed
             </div>
-            <p class="hint">Kinnect can share your location even when the app is in the background.</p>
           {:else}
             <div class="battery-status battery-status--warn">
-              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
               Background location may be restricted
             </div>
-            <p class="hint">Your phone might stop Kinnect from working in the background. Tap below to fix this.</p>
             <button class="btn btn-primary btn-sm tactile" onclick={handleBatteryOptimization} disabled={checkingBattery}>
-              {checkingBattery ? 'Checking...' : 'Fix Background Access'}
+              {checkingBattery ? 'Checking…' : 'Fix Background Access'}
             </button>
           {/if}
-        </div>
-      </Card>
+        {/snippet}
+      </SettingsSection>
     {/if}
 
-    <Card variant="glass" hover={false} padding="md">
-      <h4 class="section-title-bold">Change Password</h4>
-      <div class="form-section">
+    <!-- Change Password -->
+    <SettingsSection title="Change Password">
+      {#snippet children()}
         <label class="field-label">
           Current Password
           <input type="password" bind:value={currentPassword} class="field-input" />
@@ -577,28 +506,28 @@
           <input type="password" bind:value={confirmPassword} class="field-input" />
         </label>
         <button class="btn btn-primary btn-sm tactile" onclick={changePassword} disabled={changingPw || !currentPassword || !newPassword}>
-          {changingPw ? 'Changing...' : 'Change Password'}
+          {changingPw ? 'Changing…' : 'Change Password'}
         </button>
-      </div>
-    </Card>
+      {/snippet}
+    </SettingsSection>
 
-    <Card variant="glass" hover={false} padding="md">
-      <h4 class="section-title-bold">Help</h4>
-      <div class="form-section">
+    <!-- Help -->
+    <SettingsSection title="Help">
+      {#snippet children()}
         <button class="btn btn-secondary btn-sm tactile" onclick={() => dispatch('openGuide')}>How Kinnect Works</button>
-      </div>
-    </Card>
+      {/snippet}
+    </SettingsSection>
 
-    <Card variant="glass" hover={false} padding="md">
-      <h4 class="section-title-bold">Account</h4>
-      <div class="form-section">
+    <!-- Account -->
+    <SettingsSection title="Account">
+      {#snippet children()}
         <button class="btn btn-secondary btn-sm tactile logout-btn" onclick={logout}>Sign Out</button>
-      </div>
-    </Card>
+      {/snippet}
+    </SettingsSection>
 
-    <Card variant="glass" hover={false} glow="danger" padding="md">
-      <h4 class="section-title-bold danger-title">Delete Account</h4>
-      <div class="form-section">
+    <!-- Delete Account -->
+    <SettingsSection title="Delete Account" danger>
+      {#snippet children()}
         {#if showDelete}
           <p class="hint danger-text">This will permanently delete your account, all your data, and remove you from every group. This cannot be undone.</p>
           <label class="field-label">
@@ -608,22 +537,20 @@
           <div class="delete-actions">
             <button
               class="btn btn-sm tactile delete-countdown-btn"
-              class:counting={deleteCountdown > 0}
               class:counting3={deleteCountdown === 3}
               class:counting2={deleteCountdown === 2}
               class:counting1={deleteCountdown === 1}
               onclick={deleteAccount}
               disabled={deleting || !deletePassword || deleteCountdown > 0}
-            >
-              {deleting ? 'Deleting...' : deleteCountdown > 0 ? `Wait ${deleteCountdown}…` : 'Permanently Delete'}
-            </button>
-            <button class="btn btn-secondary btn-sm tactile" onclick={() => { showDelete = false; deletePassword = ''; deleteCountdown = 0; if (deleteTimer) clearInterval(deleteTimer); }}>Cancel</button>
+            >{deleting ? 'Deleting…' : deleteCountdown > 0 ? `Wait ${deleteCountdown}…` : 'Permanently Delete'}</button>
+            <button class="btn btn-secondary btn-sm tactile" onclick={cancelDelete}>Cancel</button>
           </div>
         {:else}
           <button class="btn btn-danger-outline btn-sm tactile" onclick={startDeleteFlow}>Permanently Delete</button>
         {/if}
-      </div>
-    </Card>
+      {/snippet}
+    </SettingsSection>
+
   </div>
 {:else}
   <div class="panel-shell panel-left panel-base">
@@ -638,7 +565,6 @@
 {/if}
 
 <style>
-  /* Stack of glass Cards, one per settings group */
   .settings-panel {
     display: flex;
     flex-direction: column;
@@ -646,19 +572,7 @@
     padding: var(--space-3);
   }
 
-  /* Section title lives inside a Card now — no extra horizontal padding */
-  h4.section-title-bold {
-    margin: 0 0 var(--space-3);
-    padding: 0;
-  }
-
-  .form-section {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2-5);
-    padding: 0;
-  }
-
+  /* ── Form fields ──────────────────────────────────────────────────────────── */
   .field-label {
     display: flex;
     flex-direction: column;
@@ -684,6 +598,25 @@
     box-shadow: 0 0 0 3px var(--primary-500-12);
   }
 
+  .field-label-inline {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+
+  .field-time { width: 110px; }
+
+  .quiet-time-row {
+    display: flex;
+    gap: var(--space-3);
+    align-items: center;
+    margin: var(--space-2) 0;
+  }
+
+  /* ── Misc text ────────────────────────────────────────────────────────────── */
   .hint {
     font-size: var(--text-xs);
     color: var(--text-tertiary);
@@ -693,6 +626,7 @@
 
   .danger-text { color: var(--danger-500); }
 
+  /* ── Buttons ──────────────────────────────────────────────────────────────── */
   .btn-sm {
     padding: var(--space-1-5) var(--space-3-5, 14px);
     font-size: var(--text-xs);
@@ -706,14 +640,29 @@
     cursor: pointer;
     border-radius: var(--radius-md);
   }
-  .btn-danger-outline:hover { background: var(--danger-500-10, rgba(220, 38, 38, 0.08)); }
+  .btn-danger-outline:hover { background: var(--danger-500-10, color-mix(in srgb, var(--danger-500) 10%, transparent)); }
 
+  .logout-btn { width: 100%; }
+
+  /* ── Delete countdown ─────────────────────────────────────────────────────── */
   .delete-actions {
     display: flex;
     gap: var(--space-2);
   }
 
-  /* ── Visual effects — 3-option segmented control ──────────────────── */
+  /* --countdown-color swapped gray→amber→red; transition is functional feedback, survives reduced-motion */
+  .delete-countdown-btn {
+    --countdown-color: var(--danger-500);
+    background: var(--countdown-color);
+    color: white; /* raw-color-ok */
+    border: none;
+    transition: background var(--duration-countdown, 800ms), box-shadow var(--duration-countdown, 800ms);
+  }
+  .delete-countdown-btn.counting3 { --countdown-color: var(--gray-500, #6b7280); box-shadow: none; }
+  .delete-countdown-btn.counting2 { --countdown-color: var(--warning-500); box-shadow: none; }
+  .delete-countdown-btn.counting1 { --countdown-color: var(--danger-500); box-shadow: var(--glow-sos, none); }
+
+  /* ── Visual effects segmented control ────────────────────────────────────── */
   .fx-segmented {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -741,22 +690,16 @@
     -webkit-tap-highlight-color: transparent;
     transition:
       background var(--duration-fast) var(--ease-out),
-      color var(--duration-fast) var(--ease-out),
+      color      var(--duration-fast) var(--ease-out),
       border-color var(--duration-fast) var(--ease-out);
   }
-  .fx-seg-btn:hover {
-    background: var(--surface-2);
-    color: var(--text-primary);
-  }
+  .fx-seg-btn:hover { background: var(--surface-2); color: var(--text-primary); }
   .fx-seg-btn.active {
     background: var(--primary-500-12);
     border-color: var(--primary-500-20);
     color: var(--text-primary);
   }
-  .fx-seg-btn:focus-visible {
-    outline: 2px solid var(--primary-400);
-    outline-offset: 2px;
-  }
+  .fx-seg-btn:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
 
   .fx-seg-name {
     font-family: var(--font-display);
@@ -772,121 +715,14 @@
     line-height: 1.2;
   }
 
-  /* MERIDIAN: Retention pills with glow on selection */
-  .retention-pills {
-    display: flex;
-    gap: var(--space-1-5);
-    flex-wrap: wrap;
-  }
-
-  .retention-pill {
-    padding: var(--space-2) var(--space-3);
-    font-size: var(--text-xs);
-    font-weight: 600;
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-full);
-    background: var(--surface-1);
-    color: var(--text-secondary);
-    cursor: pointer;
-    white-space: nowrap;
-    min-height: 44px;
-    transition:
-      background var(--duration-fast) var(--ease-out),
-      color var(--duration-fast) var(--ease-out),
-      transform 200ms var(--ease-spring);
-  }
-
-  .retention-pill:hover {
-    background: var(--surface-2);
-    color: var(--text-primary);
-  }
-
-  .retention-pill.active {
-    background: var(--primary-600);
-    color: white;
-    border-color: var(--primary-500);
-    box-shadow: var(--glow-primary), var(--shadow-xs);
-    transform: scale(1.04);
-  }
-
-  .danger-title {
-    color: var(--danger-600) !important;
-  }
-
-  .delete-countdown-btn {
-    background: var(--danger-500);
-    color: white;
-    border: none;
-    transition: background 800ms, box-shadow 800ms;
-  }
-
-  /* 3-color progression: gray → amber → red as countdown ticks 3 → 2 → 1 */
-  .delete-countdown-btn.counting3 {
-    background: var(--gray-500);
-    box-shadow: none;
-  }
-  .delete-countdown-btn.counting2 {
-    background: var(--warning-500);
-    box-shadow: none;
-  }
-  .delete-countdown-btn.counting1 {
-    background: var(--danger-500);
-    box-shadow: var(--glow-sos, 0 0 16px rgba(239, 68, 68, 0.40));
-  }
-
-  .privacy-btns {
-    display: flex;
-    gap: var(--space-2);
-    flex-wrap: wrap;
-  }
-
-  .toggle-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    min-height: 44px;
-    font-size: var(--text-sm);
-    color: var(--text-primary);
-    cursor: pointer;
-  }
-
-  .toggle-btn {
-    position: relative;
-    width: 44px;
-    height: 26px;
-    border-radius: var(--radius-full);
-    background: var(--border-strong);
-    border: none;
-    cursor: pointer;
-    transition: background var(--duration-normal) var(--ease-out);
-    padding: 0;
-    flex-shrink: 0;
-  }
-  .toggle-btn.on { background: var(--primary-500); }
-
-  .toggle-knob {
-    position: absolute;
-    top: 3px;
-    left: 3px;
-    width: 20px;
-    height: 20px;
-    border-radius: var(--radius-full);
-    background: white;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-    /* transform-only, spring easing */
-    transition: transform 220ms var(--ease-spring);
-    will-change: transform;
-  }
-  .toggle-btn.on .toggle-knob { transform: translateX(18px); }
-
-  /* ── Ghost mode card ─────────────────────────────────────────────── */
+  /* ── Privacy active card ──────────────────────────────────────────────────── */
   .privacy-active {
     display: flex;
     align-items: center;
     gap: var(--space-3);
     padding: var(--space-3);
-    background: var(--warning-500-08, rgba(245, 158, 11, 0.08));
-    border: 1px solid var(--warning-500-20, rgba(245, 158, 11, 0.20));
+    background: var(--warning-500-08, color-mix(in srgb, var(--warning-500, #f59e0b) 8%, transparent));
+    border: 1px solid var(--warning-500-20, color-mix(in srgb, var(--warning-500, #f59e0b) 20%, transparent));
     border-radius: var(--radius-md);
     flex-wrap: wrap;
   }
@@ -911,29 +747,15 @@
     font-size: var(--text-xs);
     color: var(--text-tertiary);
   }
+  :global([data-theme='dark']) .ghost-status { color: var(--warning-400, #fbbf24); }
 
-  .quiet-time-row {
+  .privacy-btns {
     display: flex;
-    gap: var(--space-3);
-    align-items: center;
-    margin: var(--space-2) 0;
-  }
-  .field-label-inline {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-    font-size: var(--text-xs);
-    font-weight: 600;
-    color: var(--text-secondary);
-  }
-  .field-time {
-    width: 110px;
+    gap: var(--space-2);
+    flex-wrap: wrap;
   }
 
-  .logout-btn {
-    width: 100%;
-  }
-
+  /* ── Battery status indicators ───────────────────────────────────────────── */
   .battery-status {
     display: flex;
     align-items: center;
@@ -945,22 +767,19 @@
     margin-bottom: var(--space-2);
   }
   .battery-status--ok {
-    background: var(--success-500-12, rgba(16, 185, 129, 0.12));
-    border: 1px solid var(--success-500-28, rgba(16, 185, 129, 0.28));
+    background: var(--success-500-12, color-mix(in srgb, var(--success-500, #10b981) 12%, transparent));
+    border: 1px solid var(--success-500-28, color-mix(in srgb, var(--success-500, #10b981) 28%, transparent));
     color: var(--success-700, #047857);
   }
   .battery-status--warn {
-    background: var(--warning-500-12, rgba(245, 158, 11, 0.12));
-    border: 1px solid var(--warning-500-30, rgba(245, 158, 11, 0.30));
+    background: var(--warning-500-12, color-mix(in srgb, var(--warning-500, #f59e0b) 12%, transparent));
+    border: 1px solid var(--warning-500-30, color-mix(in srgb, var(--warning-500, #f59e0b) 30%, transparent));
     color: var(--warning-700, #b45309);
   }
-  :global([data-theme="dark"]) .battery-status--ok {
-    color: var(--success-400, #34d399);
-  }
-  :global([data-theme="dark"]) .battery-status--warn {
-    color: var(--warning-400, #fbbf24);
-  }
+  :global([data-theme='dark']) .battery-status--ok  { color: var(--success-400, #34d399); }
+  :global([data-theme='dark']) .battery-status--warn { color: var(--warning-400, #fbbf24); }
 
+  /* ── Mobile layout ───────────────────────────────────────────────────────── */
   @media (max-width: 767px) {
     .settings-panel {
       width: 100%;
@@ -970,13 +789,10 @@
     }
   }
 
-  /* ── Reduced motion ─────────────────────────────────────────────── */
+  /* ── Reduced motion ──────────────────────────────────────────────────────── */
   @media (prefers-reduced-motion: reduce) {
-    .toggle-knob,
-    .retention-pill,
-    .fx-seg-btn {
-      transition: none;
-    }
-    .retention-pill.active { transform: none; }
+    .fx-seg-btn { transition: none; }
+    /* countdown color is functional feedback — kept even under reduced-motion (no movement) */
+    .delete-countdown-btn { transition: background var(--duration-countdown, 800ms); }
   }
 </style>

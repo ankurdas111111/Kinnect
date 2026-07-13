@@ -1,6 +1,7 @@
 <script>
   import { socket } from '../../lib/socket.js';
   import { pendingIncomingRequests } from '../../lib/stores/guardians.js';
+  import SectionHeader from '../primitives/SectionHeader.svelte';
 
   
   /**
@@ -65,7 +66,11 @@
 <!-- ── PENDING REQUESTS ──────────────────────────────────────────── -->
 {#if $pendingIncomingRequests.length > 0}
   <div class="requests-section">
-    <span class="card-eyebrow">Requests <span class="req-count">{$pendingIncomingRequests.length}</span></span>
+    <SectionHeader title="Requests" level={4}>
+      {#snippet action()}
+        <span class="req-count" aria-label="{$pendingIncomingRequests.length} pending requests">{$pendingIncomingRequests.length}</span>
+      {/snippet}
+    </SectionHeader>
     {#each $pendingIncomingRequests as req, idx}
       <div class="request-card" class:animate-slide-up={animated} class:stagger-item={animated}>
         <p class="req-label">{getRequestLabel(req)}</p>

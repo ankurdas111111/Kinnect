@@ -11,9 +11,11 @@
   import { calculateDistance, formatDistance } from '../lib/tracking.js';
   import FamilyOrbit from '../components/primitives/FamilyOrbit.svelte';
   import GlobeCanvas from '../components/primitives/GlobeCanvas.svelte';
-  import EmptyState from '../components/primitives/EmptyState.svelte';
-  import { allowWebGL } from '../lib/stores/effects.js';
+  import GhostConstellation from '../components/primitives/GhostConstellation.svelte';
+  import { allowWebGL, allowMotion } from '../lib/stores/effects.js';
   import { clearHubBadge } from '../lib/stores/hubBadge.js';
+  import { prefersCoarsePointer } from '../lib/deviceCapability.js';
+  import AvatarRing from '../components/primitives/AvatarRing.svelte';
 
   run(() => {
     if (!$authUser) push('/login');
@@ -69,7 +71,7 @@
   const SR = 21; const SC = 2 * Math.PI * SR;
   let safetyScore = $derived(allSafe ? (onlineCount > 0 ? Math.min(100, 55 + onlineCount * 8) : 55) : Math.max(10, 30 - sosMembers.length * 20));
   let ringOffset = $derived(SC * (1 - safetyScore / 100));
-  let ringColor = $derived(allSafe ? '#10b981' : '#ef4444');
+  let ringColor = $derived(allSafe ? 'var(--success-500)' : 'var(--danger-500)');
   let alertCount = $derived(sosMembers.length + ($mySosActive ? 1 : 0));
 
   // Curated quotes — family-safety context, not generic motivational platitudes
@@ -83,6 +85,10 @@
     { text: "The strength of a family lies in its loyalty to each other.", author: "Mario Puzo" },
     { text: "Being safe is the foundation upon which everything else is built.", author: "Kinnect" },
   ];
+  // ── Quote cycle timing (named constant — no magic numbers) ───────────────
+  const QUOTE_CYCLE_MS = 10_000;
+  const QUOTE_FADE_MS  = 400; // must match .d-quote transition duration
+
   let quoteIdx = $state(Math.floor(Math.random() * QUOTES.length));
   let quoteVisible = $state(true);
   let quoteInterval;
@@ -90,15 +96,23 @@
   let mounted = $state(false);
   function cycleQuote() {
     quoteVisible = false;
-    setTimeout(() => { quoteIdx = (quoteIdx + 1) % QUOTES.length; quoteVisible = true; }, 400);
+    setTimeout(() => { quoteIdx = (quoteIdx + 1) % QUOTES.length; quoteVisible = true; }, QUOTE_FADE_MS);
   }
 
-  // Mouse glow tracking
+  // Mouse glow tracking — only wired on non-coarse-pointer devices
+  const isCoarsePointer = typeof window !== 'undefined' ? prefersCoarsePointer() : true;
   let mouseX = $state(0), mouseY = $state(0);
   function handleMouseMove(e) { mouseX = e.clientX; mouseY = e.clientY; mouseOnDash = true; }
   let mouseOnDash = $state(false);
 
-  // Responsive globe size — fills available left area
+  // ── Globe sizing — named scale constants next to the resize logic ────────
+  //   MOBILE_SCALE  : globe width as fraction of viewport width (mobile)
+  //   VH_SCALE      : globe height cap as fraction of viewport height (desktop)
+  //   LEFT_W_SCALE  : globe width cap as fraction of available left column (desktop)
+  const GLOBE_MOBILE_SCALE  = 0.62;
+  const GLOBE_VH_SCALE      = 0.54;
+  const GLOBE_LEFT_W_SCALE  = 0.52;
+
   let globeSize = $state(400);
   function updateGlobeSize() {
     if (typeof window === 'undefined') return;
@@ -106,17 +120,17 @@
     const vh = window.innerHeight;
     if (vw < 768) {
       // Mobile: globe inline in content, fits without dominating the viewport
-      globeSize = Math.round(Math.min(260, Math.max(200, vw * 0.62)));
+      globeSize = Math.round(Math.min(260, Math.max(200, vw * GLOBE_MOBILE_SCALE)));
     } else {
       const sidebarW = vw >= 1200 ? Math.min(460, vw * 0.35) : Math.min(420, vw * 0.38);
       const leftW = Math.max(400, vw - sidebarW);
-      globeSize = Math.round(Math.min(520, Math.max(320, Math.min(vh * 0.54, leftW * 0.52))));
+      globeSize = Math.round(Math.min(520, Math.max(320, Math.min(vh * GLOBE_VH_SCALE, leftW * GLOBE_LEFT_W_SCALE))));
     }
   }
 
   onMount(() => {
     requestAnimationFrame(() => { mounted = true; });
-    quoteInterval = setInterval(cycleQuote, 10000);
+    quoteInterval = setInterval(cycleQuote, QUOTE_CYCLE_MS);
     updateGlobeSize();
     window.addEventListener('resize', updateGlobeSize);
   });
@@ -128,14 +142,16 @@
 </script>
 
 <div class="d" class:d-ready={mounted}
-  onmousemove={handleMouseMove}
-  onmouseleave={() => mouseOnDash = false}>
+  onmousemove={!isCoarsePointer ? handleMouseMove : undefined}
+  onmouseleave={!isCoarsePointer ? () => mouseOnDash = false : undefined}>
   <div class="d-aurora fx-ambient" aria-hidden="true"></div>
   <div class="d-noise" aria-hidden="true"></div>
 
-  <!-- Mouse cursor glow — follows pointer, desktop only -->
-  <div class="d-cursor-glow" class:d-cursor-visible={mouseOnDash}
-    style="left:{mouseX}px;top:{mouseY}px" aria-hidden="true"></div>
+  <!-- Mouse cursor glow — fine pointer (mouse/trackpad) only, absent on touch -->
+  {#if !isCoarsePointer}
+    <div class="d-cursor-glow" class:d-cursor-visible={mouseOnDash && $allowMotion}
+      style="left:{mouseX}px;top:{mouseY}px" aria-hidden="true"></div>
+  {/if}
 
   <!-- FULL-SCREEN ORBIT BACKGROUND -->
   <div class="d-orbit-bg" aria-hidden="true">
@@ -235,17 +251,16 @@
             {#each members.slice(0, 7) as user (user.userId)}
               {@const color = getUserColor(user.userId)}
               {@const pres = presence(user)}
+              {@const ringState = pres === 'sos' ? 'sos' : (pres === 'offline' ? 'offline' : 'live')}
               <button
                 class="d-mr-bubble tactile"
                 style="--mc:{color}"
                 onclick={() => { focusUser.set(user.userId); push('/'); }}
                 aria-label="{user.displayName} — {presenceLabel(user)}, view on map"
               >
-                <span class="d-mr-init">{getInitials(user.displayName)}</span>
-                <span class="d-mr-dot"
-                  class:dot-on={pres==='online'} class:dot-mv={pres==='moving'}
-                  class:dot-sos={pres==='sos'} class:dot-off={pres==='offline'}
-                  aria-hidden="true"></span>
+                <AvatarRing ring={ringState} size={44}>
+                  <span class="d-mr-init">{getInitials(user.displayName)}</span>
+                </AvatarRing>
               </button>
             {/each}
             {#if members.length > 7}
@@ -385,30 +400,25 @@
         <span class="d-badge">{members.length}</span>
       </header>
       {#if members.length === 0}
-        <EmptyState
+        <GhostConstellation
           title="Add your first family member"
           body="Invite someone to share locations, or open the map to start watching over your people."
-          tone="primary"
-        >
-          {#snippet icon()}
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          {/snippet}
-          {#snippet action()}
-            <button class="d-cta tactile" onclick={() => push('/')}>Open Map</button>
-          {/snippet}
-        </EmptyState>
+          ctaLabel="Open Map"
+          memberCount={members.length}
+          oninvite={() => push('/')}
+        />
       {:else}
         <div class="d-members">
           {#each members as user (user.userId)}
             {@const color = getUserColor(user.userId)}
             {@const pres = presence(user)}
             {@const dist = distText(user)}
+            {@const ringState = pres === 'sos' ? 'sos' : (pres === 'offline' ? 'offline' : 'live')}
             <button class="d-member" class:m-sos={pres==='sos'} class:m-off={pres==='offline'} class:m-on={pres==='online'} class:m-mv={pres==='moving'}
               style="--mc:{color}" onclick={() => { focusUser.set(user.userId); push('/'); }}>
-              <div class="m-av">
+              <AvatarRing ring={ringState} size={32} label="{user.displayName} — {presenceLabel(user)}">
                 <span class="m-init">{getInitials(user.displayName)}</span>
-                <span class="m-dot" class:dot-sos={pres==='sos'} class:dot-off={pres==='offline'} class:dot-mv={pres==='moving'} class:dot-on={pres==='online'} aria-hidden="true"></span>
-              </div>
+              </AvatarRing>
               <div class="m-info">
                 <span class="m-name">{user.displayName || 'Unknown'}</span>
                 <span class="m-status" class:m-sos-text={pres==='sos'}>
@@ -596,7 +606,8 @@
       scrollbar-width: thin;
       scrollbar-color: rgba(255,255,255,0.06) transparent;
     }
-    .d-panel-network :global(.empty) {
+    .d-panel-network :global(.empty),
+    .d-panel-network :global(.gc) {
       flex: 1; min-height: 0;
       justify-content: center;
     }
@@ -615,17 +626,21 @@
     .d-content { width: min(460px, 35vw); }
   }
 
-  /* ═══ Stagger ══════════════════════════════════════════════════════ */
+  /* ═══ Stagger — driven by shared tokens, no inline magic durations ════ */
   .d-hero, .d-stats, .d-panel {
     opacity: 0; transform: translateY(10px);
-    transition: opacity 0.5s var(--ease-expo), transform 0.5s var(--ease-expo);
+    transition: opacity var(--duration-slow, 500ms) var(--ease-expo),
+                transform var(--duration-slow, 500ms) var(--ease-expo);
   }
-  .d-ready .d-hero   { opacity: 1; transform: none; transition-delay: 0.05s; }
-  .d-ready .d-stats   { opacity: 1; transform: none; transition-delay: 0.15s; }
-  .d-ready .d-panel   { opacity: 1; transform: none; transition-delay: 0.22s; }
-  .d-ready .d-panel + .d-panel { transition-delay: 0.30s; }
-  /* .d-quote controlled purely by .quote-on — no stagger override */
-  .d-quote { opacity: 0; transition: opacity 0.6s ease; }
+  .d-ready .d-hero  { opacity: 1; transform: none; transition-delay: var(--stagger-base, 50ms); }
+  .d-ready .d-stats { opacity: 1; transform: none;
+    transition-delay: calc(var(--stagger-base, 50ms) + var(--stagger-step, 40ms) * 2); }
+  .d-ready .d-panel { opacity: 1; transform: none;
+    transition-delay: calc(var(--stagger-base, 50ms) + var(--stagger-step, 40ms) * 4); }
+  .d-ready .d-panel + .d-panel {
+    transition-delay: calc(var(--stagger-base, 50ms) + var(--stagger-step, 40ms) * 6); }
+  /* .d-quote fade: uses --duration-slow for the crossfade (matches QUOTE_FADE_MS=400ms) */
+  .d-quote { opacity: 0; transition: opacity var(--duration-slow, 400ms) var(--ease-out, ease); }
   .d-quote.quote-on { opacity: 1; }
 
 
@@ -765,39 +780,13 @@
   .d-member.m-sos { background: var(--danger-500-12); border-color: rgba(239,68,68,0.25); }
   .d-member.m-off { opacity: 0.45; }
 
-  .m-av { position: relative; width: 32px; height: 32px; border-radius: 50%; background: color-mix(in srgb, var(--mc,#6366f1) 15%, transparent); border: 2px solid var(--mc,#6366f1); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  /* .m-av and .m-dot replaced by AvatarRing — ring grammar now shared */
   .m-init { font-size: 11px; font-weight: 800; color: var(--mc,#6366f1); line-height: 1; user-select: none; }
-  .m-dot { position: absolute; bottom: -1px; right: -1px; width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--surface-0, #050812); }
-  .dot-on { background: var(--success-500); } .dot-mv { background: var(--info-500, #3b82f6); } .dot-off { background: var(--text-tertiary); } .dot-sos { background: var(--danger-500); }
-  /* Live pulse — ripple halo behind the presence dot for online / moving members */
-  .m-dot.dot-on::after, .m-dot.dot-mv::after {
-    content: ''; position: absolute; inset: 0;
-    border-radius: 50%; z-index: -1;
-    animation: dot-pulse 2.4s ease-out infinite;
-  }
-  .m-dot.dot-on::after { background: var(--success-500); }
-  .m-dot.dot-mv::after { background: var(--info-500, #3b82f6); }
-  @keyframes dot-pulse {
-    0%   { transform: scale(1);   opacity: 0.55; }
-    100% { transform: scale(2.6); opacity: 0; }
-  }
   .m-info { flex: 1; min-width: 0; }
   .m-name { display: block; font-size: var(--text-xs); font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .m-status { font-size: 10px; color: rgba(255,255,255,0.35); }
   .m-sos-text { color: var(--danger-400); font-weight: 700; }
   .m-dist { font-size: 9px; color: rgba(255,255,255,0.22); font-variant-numeric: tabular-nums; flex-shrink: 0; }
-
-  /* ═══ Empty-state CTA (rendered inside EmptyState primitive) ═══════ */
-  .d-cta {
-    min-height: 44px; /* WCAG 2.5.8 touch target */
-    background: linear-gradient(135deg, var(--primary-500, #4f46e5), var(--primary-600, #7c3aed));
-    color: var(--text-on-primary, #fff); border: none; border-radius: var(--radius-md, 10px); padding: var(--space-2, 7px) var(--space-5, 18px);
-    font-size: 12px; font-weight: 700; cursor: pointer;
-    transition: transform 0.12s, box-shadow 0.2s;
-    box-shadow: 0 2px 10px rgba(99,102,241,0.3);
-  }
-  .d-cta:hover { transform: translateY(-1px); }
-  .d-cta:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
 
   /* ═══ Actions — bento (Live Map + Network are wide focal tiles) ═════ */
   .d-actions { align-items: stretch; }
@@ -860,15 +849,15 @@
     /* Disable all decorative animations */
     .d-aurora, .d-badge-dot, .d-stat-dot, .d-globe-blip,
     .d-member.m-sos, .d-act.act-sos-on,
-    .m-dot.dot-on::after, .m-dot.dot-mv::after,
     .gsr-on .d-gsr-dot, .gsr-alert .d-gsr-dot {
       animation: none !important;
     }
-    /* Show content immediately — skip stagger entrance */
+    /* Show content immediately — simultaneous fade, no stagger */
     .d-hero, .d-stats, .d-panel, .d-quote, .d-quote-globe {
       opacity: 1 !important;
       transform: none !important;
       transition: none !important;
+      transition-delay: 0ms !important;
     }
     /* Disable globe tilt hover transforms — can cause motion sickness */
     .d-globe-side-l .d-side-card:hover,
@@ -881,22 +870,22 @@
     }
   }
 
-  /* ═══ Mouse cursor glow ════════════════════════════════════════════ */
+  /* ═══ Mouse cursor glow — rendered only on non-coarse-pointer via {#if} ═ */
+  /* CSS just controls visibility transitions; existence is JS-gated.          */
   .d-cursor-glow {
     position: fixed;
     width: 360px; height: 360px;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(99,102,241,0.055) 0%, rgba(139,92,246,0.025) 45%, transparent 70%);
+    background: radial-gradient(circle, var(--primary-500-08, rgba(99,102,241,0.055)) 0%, transparent 70%);
     transform: translate(-50%, -50%);
     pointer-events: none;
     z-index: 2;
     opacity: 0;
-    transition: opacity 0.4s ease;
-    display: none;
+    transition: opacity var(--duration-slow, 400ms) var(--ease-out, ease);
   }
-  @media (min-width: 768px) {
-    .d-cursor-glow { display: block; }
-    .d-cursor-glow.d-cursor-visible { opacity: 1; }
+  .d-cursor-glow.d-cursor-visible { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) {
+    .d-cursor-glow { display: none !important; }
   }
 
   /* ═══ Left HUD overlay — globe fills the left area ════════════════ */
@@ -1074,7 +1063,10 @@
     cursor: pointer;
     text-align: center;
     opacity: 0; transform: translateY(8px);
-    transition: opacity 0.55s ease, transform 0.55s ease, border-color 0.2s, background 0.2s;
+    transition: opacity var(--duration-slow, 500ms) var(--ease-out, ease),
+                transform var(--duration-slow, 500ms) var(--ease-out, ease),
+                border-color var(--duration-fast, 150ms),
+                background var(--duration-fast, 150ms);
     color: inherit;
     font: inherit;
   }
@@ -1204,7 +1196,9 @@
     border: 2px solid color-mix(in srgb, var(--mc,#6366f1) 60%, transparent);
     display: flex; align-items: center; justify-content: center;
     cursor: pointer;
-    transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.25s, border-color 0.2s;
+    transition: transform var(--duration-standard, 250ms) var(--ease-spring, cubic-bezier(0.34,1.56,0.64,1)),
+                box-shadow var(--duration-standard, 250ms),
+                border-color var(--duration-fast, 150ms);
     -webkit-tap-highlight-color: transparent;
     user-select: none;
     padding: 0;
@@ -1219,21 +1213,12 @@
     outline: 2px solid var(--mc, #6366f1);
     outline-offset: 2px;
   }
+  /* .d-mr-dot replaced by AvatarRing — ring grammar now shared */
   .d-mr-init {
     font-size: 12px; font-weight: 800;
     color: color-mix(in srgb, var(--mc,#6366f1) 90%, white);
     line-height: 1; user-select: none; pointer-events: none;
   }
-  .d-mr-dot {
-    position: absolute; bottom: -1px; right: -1px;
-    width: 11px; height: 11px;
-    border-radius: 50%; border: 2px solid rgba(5,8,18,0.9);
-    background: rgba(255,255,255,0.15);
-  }
-  .d-mr-dot.dot-on  { background: var(--success-500); }
-  .d-mr-dot.dot-mv  { background: var(--info-500, #3b82f6); }
-  .d-mr-dot.dot-sos { background: var(--danger-500); box-shadow: 0 0 5px rgba(239,68,68,0.7); }
-  .d-mr-dot.dot-off { background: var(--text-tertiary); }
   .d-mr-more {
     width: 44px; height: 44px; border-radius: 50%;
     background: rgba(255,255,255,0.04);

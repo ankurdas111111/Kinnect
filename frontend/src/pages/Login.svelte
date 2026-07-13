@@ -1,14 +1,17 @@
 <script>
   import { preventDefault } from 'svelte/legacy';
 
-  import { push } from 'svelte-spa-router';
+  import { navigate } from '../lib/viewTransition.js';
   import { authUser, loadSession } from '../lib/stores/auth.js';
   import { apiPost, fetchCsrf, clearCsrf } from '../lib/api.js';
   import { COUNTRY_CODES, COUNTRY_MAP, validateMobileLength } from '../lib/countryCodes.js';
   import { toasts } from '../lib/stores/toast.js';
-  import { onMount } from 'svelte';
+  import { allowMotion } from '../lib/stores/effects.js';
+  import { prefersReducedMotion } from '../lib/deviceCapability.js';
+  import { onMount, onDestroy } from 'svelte';
   import { slide } from 'svelte/transition';
   import AnimatedMeshBackground from '../components/primitives/AnimatedMeshBackground.svelte';
+  import Constellation from '../components/primitives/Constellation.svelte';
 
   // Headline animates per-WORD (not per-character) so line breaks can only
   // happen at word boundaries — never mid-word ("f / amily").
@@ -30,7 +33,7 @@
   let mobileTouched = $state(false);
 
   onMount(() => {
-    if ($authUser) push('/');
+    if ($authUser) navigate('/');
     fetchCsrf();
   });
 
@@ -53,6 +56,61 @@
   let emailError = $derived(emailTouched && loginId.trim() && !emailValid);
   let mobileValid = $derived(mobileDigits ? validateMobileLength(countryIso, mobileDigits).valid : false);
   let passwordError = $derived(passwordTouched && password.length > 0 && password.length < 6);
+
+  /* ── The handshake — reactive constellation wired to EXISTING form state.
+     Sync format checks only (no async validation on login fields — user
+     enumeration risk). Node 0 = self beacon (always live). Member pins ignite
+     as the identifier and password become valid; the remaining two pulse in
+     on submit (the "knock"); success converges the whole constellation as a
+     fire-and-forget flourish (CSS-capped ≤500ms) — navigation is NEVER
+     delayed for it. Purely decorative: the SVG stays aria-hidden. */
+  let idValid = $derived(mode === 'email' ? emailValid : mobileValid);
+  let pwReady = $derived(password.length >= 6);
+  let converging = $state(false);
+  // Ignition state for member pins 1–4 (identity, password, knock ×2).
+  let memberStates = $state(['unlit', 'unlit', 'unlit', 'unlit']);
+  const igniteTimers = [null, null, null, null];
+
+  function setMember(i, lit) {
+    if (igniteTimers[i]) { clearTimeout(igniteTimers[i]); igniteTimers[i] = null; }
+    if (!lit) { memberStates[i] = 'unlit'; return; }
+    if (memberStates[i] === 'live' || memberStates[i] === 'igniting') return;
+    // JS-driven sequence: gated on BOTH the effects store and the live OS
+    // reduce-motion switch (a stored 'full' pref must not defeat the OS).
+    if ($allowMotion && !prefersReducedMotion()) {
+      memberStates[i] = 'igniting';
+      igniteTimers[i] = setTimeout(() => { memberStates[i] = 'live'; igniteTimers[i] = null; }, 340);
+    } else {
+      memberStates[i] = 'live';
+    }
+  }
+
+  $effect(() => { setMember(0, idValid); });
+  $effect(() => { setMember(1, pwReady); });
+  $effect(() => { setMember(2, loading); setMember(3, loading); });
+
+  onDestroy(() => {
+    for (let i = 0; i < igniteTimers.length; i++) {
+      if (igniteTimers[i]) clearTimeout(igniteTimers[i]);
+    }
+  });
+
+  // Deco-map geometry (unchanged coordinates) + VIGIL member hue tokens.
+  let cstNodes = $derived([
+    { x: 180, y: 130, state: converging ? 'converging' : 'live' },
+    { x: 90,  y: 80,  hue: 'var(--member-1)', state: converging ? 'converging' : memberStates[0] },
+    { x: 260, y: 90,  hue: 'var(--member-2)', state: converging ? 'converging' : memberStates[1] },
+    { x: 140, y: 200, hue: 'var(--member-3)', state: converging ? 'converging' : memberStates[2] },
+    { x: 290, y: 170, hue: 'var(--member-4)', state: converging ? 'converging' : memberStates[3] },
+  ]);
+
+  // 24px micro-constellation for the mobile brand header (3 nodes, dormant).
+  const MICRO_NODES = [
+    { x: 170, y: 140, state: 'live' },
+    { x: 70,  y: 70,  hue: 'var(--member-1)', state: 'live' },
+    { x: 270, y: 210, hue: 'var(--member-2)', state: 'live' },
+  ];
+  const MICRO_LINKS = [[1, 0], [0, 2]];
 
   function onModeToggleKeydown(e, current) {
     var order = ['email', 'mobile'];
@@ -104,6 +162,9 @@
       }
       if (res.ok) {
         redirecting = true;
+        // Fire-and-forget convergence flourish, parallel to loadSession().
+        // CSS caps it at ≤500ms and it is never awaited — navigation wins.
+        converging = true;
         toasts.success('Welcome back!');
         // Login creates a new server session with a new CSRF token.
         // Refresh it now so subsequent POSTs from the main app use the correct token.
@@ -114,9 +175,9 @@
         const pendingContact = sessionStorage.getItem('kinnect_pending_contact');
         if (pendingContact) {
           sessionStorage.removeItem('kinnect_pending_contact');
-          push('/add-contact/' + encodeURIComponent(pendingContact));
+          navigate('/add-contact/' + encodeURIComponent(pendingContact));
         } else {
-          push('/');
+          navigate('/');
         }
       } else {
         error = res.error || 'Sign in failed — please check your credentials and try again';
@@ -137,40 +198,11 @@
 
   <div class="auth-brand">
     <div class="auth-brand-inner">
-      <!-- Decorative floating location pins (visual background element) -->
+      <!-- The handshake — reactive constellation replaces the static deco-map.
+           Pure decoration (aria-hidden inside the primitive): never announces
+           on form-state churn, never steals focus. -->
       <div class="auth-brand-deco fx-ambient" aria-hidden="true">
-        <svg class="deco-map" viewBox="0 0 340 280" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <!-- Connection lines between pins -->
-          <line x1="90" y1="80" x2="180" y2="130" stroke="rgba(99,102,241,0.22)" stroke-width="1.5" stroke-dasharray="5 4"/>
-          <line x1="180" y1="130" x2="260" y2="90" stroke="rgba(16,185,129,0.20)" stroke-width="1.5" stroke-dasharray="5 4"/>
-          <line x1="180" y1="130" x2="140" y2="200" stroke="rgba(139,92,246,0.18)" stroke-width="1.5" stroke-dasharray="5 4"/>
-          <line x1="260" y1="90" x2="290" y2="170" stroke="rgba(6,182,212,0.16)" stroke-width="1.5" stroke-dasharray="5 4"/>
-          <!-- Pulse rings on live pins -->
-          <circle cx="180" cy="130" r="22" fill="rgba(99,102,241,0.06)" stroke="rgba(99,102,241,0.18)" stroke-width="1"/>
-          <circle cx="180" cy="130" r="34" fill="none" stroke="rgba(99,102,241,0.08)" stroke-width="1"/>
-          <!-- Pin: self (primary) -->
-          <circle cx="180" cy="130" r="10" fill="rgba(99,102,241,0.90)"/>
-          <circle cx="180" cy="130" r="4" fill="white"/>
-          <!-- Pin: family member 1 (emerald) -->
-          <circle cx="90" cy="80" r="8" fill="rgba(16,185,129,0.85)"/>
-          <circle cx="90" cy="80" r="3" fill="white"/>
-          <circle cx="90" cy="80" r="14" fill="none" stroke="rgba(16,185,129,0.22)" stroke-width="1"/>
-          <!-- Pin: family member 2 (violet) -->
-          <circle cx="260" cy="90" r="7" fill="rgba(139,92,246,0.80)"/>
-          <circle cx="260" cy="90" r="3" fill="white"/>
-          <!-- Pin: family member 3 (cyan) -->
-          <circle cx="140" cy="200" r="7" fill="rgba(6,182,212,0.75)"/>
-          <circle cx="140" cy="200" r="3" fill="white"/>
-          <!-- Pin: family member 4 (amber) -->
-          <circle cx="290" cy="170" r="6" fill="rgba(245,158,11,0.75)"/>
-          <circle cx="290" cy="170" r="2.5" fill="white"/>
-          <!-- Subtle grid dots -->
-          <circle cx="50" cy="160" r="2" fill="rgba(255,255,255,0.06)"/>
-          <circle cx="120" cy="240" r="2" fill="rgba(255,255,255,0.06)"/>
-          <circle cx="220" cy="220" r="2" fill="rgba(255,255,255,0.06)"/>
-          <circle cx="310" cy="50" r="2" fill="rgba(255,255,255,0.06)"/>
-          <circle cx="40" cy="40" r="2" fill="rgba(255,255,255,0.06)"/>
-        </svg>
+        <Constellation mode="reactive" nodes={cstNodes} />
       </div>
 
       <div class="auth-brand-logo">
@@ -208,6 +240,10 @@
       </div>
       <span class="mobile-brand-name">Kinnect</span>
       <span class="mobile-brand-tagline">Keep your family close</span>
+      <!-- 24px micro-constellation — mobile users see the world too -->
+      <div class="mobile-brand-cst fx-ambient">
+        <Constellation mode="dormant" nodes={MICRO_NODES} links={MICRO_LINKS} />
+      </div>
     </div>
 
     <div class="auth-card">
@@ -323,7 +359,7 @@
 <style>
   @import '../styles/auth.css';
 
-  /* Decorative location-pin cluster */
+  /* Decorative constellation cluster (Constellation primitive lives inside) */
   .auth-brand-deco {
     position: absolute;
     top: -40px;
@@ -332,12 +368,6 @@
     height: 280px;
     pointer-events: none;
     opacity: 0.65;
-  }
-
-  .deco-map {
-    width: 100%;
-    height: 100%;
-    filter: drop-shadow(0 4px 12px rgba(20, 184, 166, 0.12));
   }
 
   .input-wrapper {

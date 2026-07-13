@@ -66,9 +66,9 @@
     flex-shrink: 0;
     letter-spacing: 0.04em;
     box-shadow:
-      0 0 8px rgba(239, 68, 68, 0.55),
-      0 0 16px rgba(239, 68, 68, 0.30),
-      inset 0 1px 0 rgba(255,255,255,0.20);
+      0 0 8px color-mix(in srgb, var(--danger-500) 55%, transparent),
+      0 0 16px color-mix(in srgb, var(--danger-500) 30%, transparent),
+      inset 0 1px 0 color-mix(in srgb, white 20%, transparent);
     animation: sos-urgent-pulse 1s ease-in-out infinite;
   }
 
@@ -76,7 +76,7 @@
     width: 5px;
     height: 5px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.9);
+    background: color-mix(in srgb, white 90%, transparent);
     flex-shrink: 0;
   }
 
@@ -93,47 +93,48 @@
     flex-shrink: 1;
   }
 
-  /* Ride share badge */
+  /* Ride share badge — color-mix replaces hardcoded rgba */
   .ride-badge {
     display: inline-flex;
     align-items: center;
     gap: 3px;
     font-size: 0.625rem;
     font-weight: 700;
-    color: var(--primary-400, #818cf8);
-    background: rgba(99, 102, 241, 0.12);
-    border: 1px solid rgba(99, 102, 241, 0.22);
+    color: var(--primary-400);
+    background: color-mix(in srgb, var(--primary-500) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--primary-500) 22%, transparent);
     border-radius: var(--radius-full);
     padding: 1px 6px 1px 4px;
     white-space: nowrap;
     flex-shrink: 0;
   }
 
-  /* Crowd / Festival mode badge */
+  /* Crowd / Festival mode badge — color-mix replaces hardcoded rgba */
   .crowd-badge {
     display: inline-flex;
     align-items: center;
     gap: 3px;
     font-size: 0.625rem;
     font-weight: 700;
-    color: var(--warning-500, #f59e0b);
-    background: rgba(245, 158, 11, 0.12);
-    border: 1px solid rgba(245, 158, 11, 0.22);
+    color: var(--warning-500);
+    background: color-mix(in srgb, var(--warning-500) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--warning-500) 22%, transparent);
     border-radius: var(--radius-full);
     padding: 1px 6px 1px 4px;
     white-space: nowrap;
     flex-shrink: 0;
   }
 
+  /* Quiet hours badge — same grammar as ride badge */
   .quiet-badge {
     display: inline-flex;
     align-items: center;
     gap: 3px;
     font-size: 0.625rem;
     font-weight: 700;
-    color: var(--primary-400, #818cf8);
-    background: rgba(99, 102, 241, 0.12);
-    border: 1px solid rgba(99, 102, 241, 0.22);
+    color: var(--primary-400);
+    background: color-mix(in srgb, var(--primary-500) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--primary-500) 22%, transparent);
     border-radius: var(--radius-full);
     padding: 1px 6px 1px 4px;
     white-space: nowrap;

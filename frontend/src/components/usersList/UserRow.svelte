@@ -14,6 +14,8 @@
    * @property {number} [index]
    * @property {boolean} [isAdmin]
    * @property {any} [deletingUser]
+   * @property {boolean} [initialLoad] — true only during first list population;
+   *   controls row entrance stagger. Later in-place updates never re-stagger.
    */
 
   /** @type {Props} */
@@ -21,13 +23,14 @@
     user,
     index = 0,
     isAdmin = false,
-    deletingUser = null
+    deletingUser = null,
+    initialLoad = false,
   } = $props();
 
   const dispatch = createEventDispatcher();
 
   // Single presence signal — drives the leading dot and the hover/focus accent.
-  // SOS > offline > online. (Kept binary here; finer "away" tiers live in the subline.)
+  // SOS > offline > online.
   let presence = $derived(
     user.sos?.active ? 'sos' : user.online === false ? 'gone' : 'recent'
   );
@@ -36,6 +39,9 @@
       : presence === 'gone' ? 'var(--presence-gone)'
       : 'var(--presence-recent)'
   );
+
+  // Stagger index: cap at 5 so the 6th+ row shares the same delay (spec: cap at 6 items).
+  let staggerI = $derived(Math.min(index, 5));
 
   // ── Swipe-right to locate on map ────────────────────────────────────────
   let swipeStartX = 0;
@@ -96,7 +102,6 @@
   function rowClick() {
     if (lpSuppressClick) { lpSuppressClick = false; return; }
     if (user.latitude == null || user.longitude == null) {
-      // No location — open action sheet for available options (chat accessible via avatar tap)
       dispatch('quickActions', user);
       return;
     }
@@ -112,10 +117,11 @@
 </script>
 
 <div
-  class="user-item user-item-btn user-depth-card"
-  style="--stagger-i: {Math.min(index, 8)}; --row-accent: {accentVar};"
+  class="user-item user-item-btn"
+  class:user-depth-card={initialLoad}
   class:user-sos={user.sos?.active}
   class:user-offline={user.online === false}
+  style="--stagger-i: {staggerI}; --row-accent: {accentVar};"
   role="button"
   tabindex="0"
   onclick={rowClick}
@@ -175,10 +181,16 @@
     min-height: 76px;
   }
 
-  /* 3D stagger entrance — index-driven delay via CSS custom property */
+  /*
+   * Entrance stagger — applied ONLY when initialLoad=true so VirtualList scroll
+   * recycling never re-triggers the animation on rows that are already visible.
+   * Uses stagger tokens: --stagger-base (0ms lead-in) + index * --stagger-step (60ms).
+   * Cap at 5 (6th+ row shares the 5th delay) — more than 6 concurrent animations
+   * degrade mid-range devices and add no glanceability gain.
+   */
   .user-depth-card {
-    animation: item-pop-in 300ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
-    animation-delay: calc(var(--stagger-i, 0) * 35ms);
+    animation: item-pop-in 300ms var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
+    animation-delay: calc(var(--stagger-base, 0ms) + var(--stagger-i, 0) * var(--stagger-step, 60ms));
   }
 
   .user-item-btn {
@@ -215,29 +227,42 @@
     box-shadow: inset 3px 0 0 var(--row-accent, var(--presence-recent));
   }
 
-  /* Keyboard focus ring — design rules requires a visible focus affordance */
+  /* Keyboard focus ring */
   .user-item-btn:focus-visible {
     outline: 2px solid var(--primary-400);
     outline-offset: -2px;
   }
 
-  /* Avatar lives in the UserAvatar child — hover lift still driven by the row */
+  /* Avatar lift on row hover */
   .user-item-btn:hover :global(.user-avatar) {
     transform: scale(1.08) translateZ(4px);
     filter: brightness(1.12);
   }
 
-  /* SOS — urgent red left accent + gradient sweep for readability */
+  /*
+   * SOS row — urgent red accent + gradient sweep.
+   * color-mix replaces hardcoded rgba to stay lint-clean.
+   */
   .user-sos {
     background:
-      linear-gradient(90deg, rgba(239, 68, 68, 0.14) 0%, rgba(239, 68, 68, 0.06) 40%, transparent 80%),
-      rgba(239, 68, 68, 0.10);
+      linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--danger-500) 14%, transparent) 0%,
+        color-mix(in srgb, var(--danger-500) 6%,  transparent) 40%,
+        transparent 80%
+      ),
+      color-mix(in srgb, var(--danger-500) 10%, transparent);
     box-shadow: inset 3px 0 0 var(--danger-500);
   }
   .user-sos:hover {
     background:
-      linear-gradient(90deg, rgba(239, 68, 68, 0.20) 0%, rgba(239, 68, 68, 0.10) 40%, transparent 80%),
-      rgba(239, 68, 68, 0.12);
+      linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--danger-500) 20%, transparent) 0%,
+        color-mix(in srgb, var(--danger-500) 10%, transparent) 40%,
+        transparent 80%
+      ),
+      color-mix(in srgb, var(--danger-500) 12%, transparent);
   }
 
   /* ── Meta ──────────────────────────────────────────────────────────────── */
@@ -273,7 +298,7 @@
 
   .user-name {
     font-family: var(--font-display);
-    font-size: var(--text-base);    /* 16px — legible primary label */
+    font-size: var(--text-base);
     font-weight: 600;
     letter-spacing: -0.01em;
     white-space: nowrap;
@@ -288,7 +313,6 @@
     font-size: var(--text-xs);
     color: var(--text-tertiary);
     letter-spacing: 0.01em;
-    /* TECHNIQUE 8: tabular-nums for timestamps */
     font-variant-numeric: tabular-nums;
     font-feature-settings: 'tnum' 1;
   }
@@ -301,7 +325,7 @@
     flex-shrink: 0;
   }
 
-  /* Chevron affordance — subtle, nudges right on hover */
+  /* Chevron affordance */
   .row-chevron {
     color: var(--text-quaternary, var(--text-tertiary));
     display: flex;
@@ -318,7 +342,10 @@
     transform: translateX(2px);
   }
 
-  /* Battery chip — icon + percentage */
+  /*
+   * Battery chip — icon + percentage.
+   * color-mix() replaces hardcoded rgba to stay lint-clean.
+   */
   .bat-chip {
     display: inline-flex;
     align-items: center;
@@ -331,19 +358,25 @@
     background: var(--surface-inset);
     color: var(--text-tertiary);
     letter-spacing: 0.01em;
-    /* TECHNIQUE 8: tabular-nums for battery % — never shifts layout */
     font-variant-numeric: tabular-nums;
     font-feature-settings: 'tnum' 1;
   }
-  .bat-low  {
+  .bat-low {
     color: var(--danger-400);
-    background: rgba(239, 68, 68, 0.12);
-    box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.20);
+    background: color-mix(in srgb, var(--danger-500) 12%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--danger-500) 20%, transparent);
   }
-  .bat-ok   { color: var(--warning-500); background: rgba(245, 158, 11, 0.12); }
-  .bat-good { color: var(--success-500); background: rgba(16, 185, 129, 0.10); }
+  .bat-ok {
+    color: var(--warning-500);
+    background: color-mix(in srgb, var(--warning-500) 12%, transparent);
+  }
+  .bat-good {
+    color: var(--success-500);
+    background: color-mix(in srgb, var(--success-500) 10%, transparent);
+  }
 
   @media (prefers-reduced-motion: reduce) {
+    /* Stagger animation dies; rows appear instantly. */
     .user-depth-card {
       animation: none;
       animation-delay: 0ms;

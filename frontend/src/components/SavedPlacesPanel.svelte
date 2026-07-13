@@ -13,6 +13,7 @@
   import { apiGet, apiPost, apiDelete } from '../lib/api.js';
   import PlacesListSection from './PlacesListSection.svelte';
   import PlaceAlertsSection from './PlaceAlertsSection.svelte';
+  import { LOCALSTORAGE_KEYS, ICON_MAP, ICON_OPTIONS } from '../lib/alertConfig.js';
 
   /**
    * @typedef {Object} Props
@@ -24,17 +25,14 @@
 
   const dispatch = createEventDispatcher();
 
-  const iconOptions = [
-    { value: 'home',   label: 'Home'   },
-    { value: 'work',   label: 'Work'   },
-    { value: 'school', label: 'School' },
-    { value: 'gym',    label: 'Gym'    },
-    { value: 'pin',    label: 'Other'  },
-  ];
-  const iconEmoji = { home: '🏠', work: '💼', school: '🏫', gym: '🏋️', pin: '📍' };
+  // iconOptions and iconEmoji are derived from the canonical ICON_MAP constant.
+  const iconOptions = ICON_OPTIONS;
+  const iconEmoji = Object.fromEntries(
+    Object.entries(ICON_MAP).map(([k, v]) => [k, v.emoji])
+  );
 
-  const PALERT_KEY = 'kinnect_place_alerts';
-  const SALERT_KEY = 'kinnect_speed_alerts';
+  const PALERT_KEY = LOCALSTORAGE_KEYS.PLACE_ALERTS;
+  const SALERT_KEY = LOCALSTORAGE_KEYS.SPEED_ALERTS;
 
   // Zone story state
   let storyPlaceId = $state(null);

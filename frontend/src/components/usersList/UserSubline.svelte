@@ -3,6 +3,7 @@
   import { arrivalProjections } from '../../lib/stores/arrivals.js';
   import { calculateDistance, formatDistance } from '../../lib/tracking.js';
   import { computeActivityStatus } from '../../lib/activityStatus.js';
+  import { formatAge } from '../../lib/presence.js';
 
   let { user } = $props();
 
@@ -14,19 +15,6 @@
     const h = Math.floor(m / 60);
     const rem = m % 60;
     return rem > 0 ? `~${h}h ${rem}m` : `~${h}h`;
-  }
-
-  function onlineStatus(u) {
-    if (u.online === false) {
-      if (!u.offlineExpiresAt) return 'Offline · kept forever';
-      const ms = u.offlineExpiresAt - Date.now();
-      if (ms <= 0) return 'Offline · expiring soon';
-      const mins = Math.floor(ms / 60000);
-      const h = Math.floor(mins / 60);
-      const m = mins % 60;
-      return h <= 0 ? `Offline · ${m}m left` : `Offline · ${h}h ${m}m left`;
-    }
-    return 'Online';
   }
 
   function getAccuracyLabel(acc) {
@@ -42,6 +30,17 @@
     if (acc <= 50) return 'acc-good';
     return 'acc-low';
   }
+
+  // Freshness age for offline state — uses canonical formatAge from presence.js
+  // (replaces the local onlineStatus helper; same vocabulary as FreshnessChip).
+  let offlineAge = $derived.by(() => {
+    if (user.online !== false) return '';
+    const ts = user.lastSeen ?? user.lastUpdate;
+    if (!ts) return 'Offline';
+    const age = Date.now() - ts;
+    const ageStr = formatAge(age);
+    return ageStr ? `Offline · ${ageStr}` : 'Offline';
+  });
 </script>
 
 <div class="user-sub">
@@ -81,13 +80,13 @@
       {/if}
     {/if}
   {:else}
-    <span class="offline-label">{onlineStatus(user)}</span>
+    <!-- Offline — freshness age via canonical presence.js formatAge -->
+    <span class="offline-label">{offlineAge}</span>
   {/if}
 </div>
 
 <style>
-  /* Sub-row — distance leads; activity / GPS / ETA demoted to a lighter tier.
-     Base tier is tertiary so the distance (below) reads as the dominant value. */
+  /* Sub-row — distance leads; activity / GPS / ETA demoted to a lighter tier. */
   .user-sub {
     display: flex;
     align-items: baseline;
@@ -98,7 +97,7 @@
     overflow: hidden;
   }
 
-  /* Distance — dominant secondary value ("2.4 km" reads before the rest) */
+  /* Distance — dominant secondary value */
   .distance-label {
     font-size: var(--text-sm);
     font-weight: 700;
@@ -157,7 +156,7 @@
   .acc-low   { color: var(--danger-400); }
   .acc-low.acc-dot { background: var(--danger-400); }
 
-  /* ETA chip — token-based colors (no hardcoded hex) */
+  /* ETA chip */
   .eta-chip {
     display: inline-flex;
     align-items: center;

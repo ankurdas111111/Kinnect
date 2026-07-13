@@ -8,10 +8,12 @@
   import { callState, callPeer } from '../lib/stores/webrtc.js';
   import FreshnessChip from './primitives/FreshnessChip.svelte';
   import TiltCard from './primitives/TiltCard.svelte';
+  import AvatarRing from './primitives/AvatarRing.svelte';
   import { focusUser, myLocation } from '../lib/stores/map.js';
   import { sosNarratives } from '../lib/stores/sos.js';
   import { calculateDistance, formatDistance } from '../lib/tracking.js';
   import { computeActivityStatus, formatActivityAge } from '../lib/activityStatus.js';
+  import { allowMotion } from '../lib/stores/effects.js';
 
   /**
    * @typedef {Object} Props
@@ -28,6 +30,14 @@
   let initials = $derived(user
     ? (user.displayName || '').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?'
     : '?');
+
+  // ── Presence ring state (delegated to AvatarRing primitive) ─────────────
+  /** @type {'sos' | 'live' | 'offline' | 'none'} */
+  let ringState = $derived(
+    user?.sos?.active ? 'sos' :
+    user?.online      ? 'live' :
+                        'offline'
+  );
 
   // ── Activity status ──────────────────────────────────────────────────────
   let activityStatus = $derived(computeActivityStatus(user));
@@ -61,7 +71,9 @@
     navigator.clipboard?.writeText(text).catch(() => {});
   }
 
-  // Flash stat cells when coordinates update — timer cleaned up on destroy
+  // Flash stat cells when coordinates update — data-first: text commits before
+  // the flash class toggles (never delay live data for a decorative effect).
+  // Timer cleaned up on destroy.
   let coordFlash = $state(false);
   let _prevLat = $state(null);
   let _prevLng = $state(null);
@@ -69,7 +81,11 @@
 
   run(() => {
     if (user?.lat !== _prevLat || user?.lng !== _prevLng) {
-      if (_prevLat !== null) {
+      // 1. Commit new coordinate references FIRST (data-first ordering).
+      _prevLat = user?.lat ?? null;
+      _prevLng = user?.lng ?? null;
+      // 2. THEN gate the decorative flash behind allowMotion.
+      if (_prevLat !== null && $allowMotion) {
         coordFlash = true;
         if (_coordFlashTimer) clearTimeout(_coordFlashTimer);
         _coordFlashTimer = setTimeout(() => {
@@ -77,8 +93,6 @@
           _coordFlashTimer = null;
         }, 850);
       }
-      _prevLat = user?.lat ?? null;
-      _prevLng = user?.lng ?? null;
     }
   });
 
@@ -100,7 +114,7 @@
   >
     <!-- SOS banner -->
     {#if user.sos?.active}
-      <div class="sos-banner" role="alert">
+      <div class="sos-banner fx-ambient" role="alert">
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
         SOS Active — {user.sos.reason || 'Emergency'}
       </div>
@@ -164,16 +178,22 @@
 
     <!-- Avatar + name row -->
     <div class="card-header">
-      <div
-        class="avatar"
-        class:avatar-sos={user.sos?.active}
-        class:avatar-live={user.online && !user.sos?.active}
-        class:avatar-offline={!user.online}
-        style="background:{colorLight};border-color:{color}"
-        aria-hidden="true"
+      <!-- AvatarRing owns the presence ring (sos/live/offline/none).
+           Inner avatar div owns the surface: background, initials. -->
+      <AvatarRing
+        ring={ringState}
+        size={44}
+        label="{user.displayName || 'User'}: {ringState === 'sos' ? 'SOS active' : ringState === 'live' ? 'online' : 'offline'}"
       >
-        <span class="avatar-initials" style="color:{color}">{initials}</span>
-      </div>
+        {#snippet children()}
+          <div
+            class="avatar-inner"
+            style="background:{colorLight};border-color:{color}"
+          >
+            <span class="avatar-initials" style="color:{color}">{initials}</span>
+          </div>
+        {/snippet}
+      </AvatarRing>
 
       <div class="name-block">
         <span class="display-name">{user.displayName || 'Unknown'}</span>
@@ -222,7 +242,7 @@
           </span>
           <span class="stat-body">
             <span class="stat-label">Latitude</span>
-            <span class="stat-value">{user.lat.toFixed(5)}°</span>
+            <span class="stat-value tabular-nums">{user.lat.toFixed(5)}°</span>
           </span>
         </div>
         <div class="stat stat--coord" class:animate-coord-flash={coordFlash}>
@@ -231,7 +251,7 @@
           </span>
           <span class="stat-body">
             <span class="stat-label">Longitude</span>
-            <span class="stat-value">{user.lng.toFixed(5)}°</span>
+            <span class="stat-value tabular-nums">{user.lng.toFixed(5)}°</span>
           </span>
         </div>
 
@@ -242,7 +262,7 @@
             </span>
             <span class="stat-body">
               <span class="stat-label">Accuracy</span>
-              <span class="stat-value">±{Math.round(user.accuracy)}m</span>
+              <span class="stat-value tabular-nums">±{Math.round(user.accuracy)}m</span>
             </span>
           </div>
         {/if}
@@ -266,7 +286,7 @@
             </span>
             <span class="stat-body">
               <span class="stat-label">Speed</span>
-              <span class="stat-value">{(user.speed * 3.6).toFixed(1)} km/h</span>
+              <span class="stat-value tabular-nums">{(user.speed * 3.6).toFixed(1)} km/h</span>
             </span>
           </div>
         {/if}
@@ -295,19 +315,16 @@
 
 <style>
   .person-card {
-    animation: depth-card-arrive 380ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
-    background: var(--glass-3d, rgba(255,255,255,0.65));
-    backdrop-filter: var(--glass-3d-blur, blur(24px) saturate(2.0));
-    -webkit-backdrop-filter: var(--glass-3d-blur, blur(24px) saturate(2.0));
+    animation: depth-card-arrive 380ms var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
+    background: var(--glass-3d);
+    backdrop-filter: var(--glass-3d-blur);
+    -webkit-backdrop-filter: var(--glass-3d-blur);
     border: 1px solid var(--user-color-light, var(--glass-3d-border));
-    border-top-color: rgba(255, 255, 255, 0.25);
-    /* 3D layered depth with user color glow */
+    border-top-color: var(--glass-3d-border);
     box-shadow:
-      0 8px 32px rgba(0,0,0,0.14),
-      0 2px 8px rgba(0,0,0,0.08),
+      var(--shadow-lg),
       0 12px 40px var(--user-color-light, transparent),
-      inset 0 1px 0 rgba(255,255,255,0.20),
-      inset 0 -1px 0 rgba(0,0,0,0.05);
+      var(--glass-3d-inner);
     border-radius: var(--radius-xl, 20px);
     overflow: hidden;
     isolation: isolate;
@@ -318,29 +335,11 @@
       transform var(--duration-3d, 250ms) var(--ease-spring);
   }
 
-  /* Exit animation scaffolding — reverse of depth-card-arrive.
-     Apply `.person-card--exiting` (or `person-card:not to be removed)` when a
-     dismiss hook becomes available; transform/opacity only, GPU-safe. */
-  .person-card--exiting {
-    animation: person-card-exit 240ms var(--ease-in, cubic-bezier(0.4, 0, 1, 1)) both;
-    pointer-events: none;
-  }
-  @keyframes person-card-exit {
-    0% {
-      transform: perspective(900px) translateZ(0) translateY(0) scale(1);
-      opacity: 1;
-    }
-    100% {
-      transform: perspective(900px) translateZ(-40px) translateY(12px) scale(0.9);
-      opacity: 0;
-    }
-  }
-
   /* ── Inline emergency card — danger-glow region ────────────────────────── */
   .ec-card {
-    background: var(--danger-500-12, rgba(239, 68, 68, 0.06));
-    border-bottom: 1px solid var(--danger-500-20, rgba(239, 68, 68, 0.20));
-    box-shadow: inset 0 0 0 1px var(--danger-500-12, rgba(239,68,68,0.10)), var(--glow-sos);
+    background: var(--danger-500-12);
+    border-bottom: 1px solid var(--danger-500-20);
+    box-shadow: inset 0 0 0 1px var(--danger-500-12), var(--glow-sos);
   }
 
   /* MASSIVE blood type — centered, high contrast, the first thing you see */
@@ -368,7 +367,7 @@
     letter-spacing: -0.04em;
     line-height: 1;
     font-variant-numeric: tabular-nums;
-    text-shadow: 0 1px 2px var(--danger-500-20, rgba(239,68,68,0.20));
+    text-shadow: 0 1px 2px var(--danger-500-20);
   }
 
   /* Risk chips — full text, wrapping, colored by severity */
@@ -390,8 +389,8 @@
     line-height: 1.25;
   }
   .ec-chip--danger {
-    background: var(--danger-500-12, rgba(239, 68, 68, 0.10));
-    border: 1px solid var(--danger-500-20, rgba(239, 68, 68, 0.25));
+    background: var(--danger-500-12);
+    border: 1px solid var(--danger-500-20);
     color: var(--danger-600);
   }
   .ec-chip--warning {
@@ -404,7 +403,7 @@
     display: flex;
     flex-direction: column;
     gap: 1px;
-    border-top: 1px solid var(--danger-500-12, rgba(239, 68, 68, 0.10));
+    border-top: 1px solid var(--danger-500-12);
   }
   .ec-contact {
     display: flex;
@@ -441,8 +440,8 @@
     padding: var(--space-2-5) var(--space-3);
     min-height: 44px;
     border-radius: var(--radius-md);
-    background: var(--success-500-12, rgba(16, 185, 129, 0.12));
-    border: 1px solid var(--success-500-20, rgba(16, 185, 129, 0.28));
+    background: var(--success-500-12);
+    border: 1px solid var(--success-500-20);
     color: var(--success-600);
     font-size: var(--text-2xs);
     font-weight: 700;
@@ -451,16 +450,17 @@
     transition: background var(--duration-fast) var(--ease-out);
     -webkit-tap-highlight-color: transparent;
   }
-  .ec-call:hover { background: var(--success-500-20, rgba(16, 185, 129, 0.22)); }
+  .ec-call:hover { background: var(--success-500-20); }
 
-  /* ── SOS banner ─────────────────────────────────────────────────────────── */
+  /* ── SOS banner — breathe is decorative (fx-ambient gates it) ───────────
+     Static background is the fallback when motion is disabled. */
   .sos-banner {
     display: flex;
     align-items: center;
     gap: var(--space-1-5);
     padding: var(--space-2) var(--space-3-5);
-    background: rgba(var(--danger-500-rgb, 239, 68, 68), 0.12);
-    border-bottom: 1px solid rgba(var(--danger-500-rgb, 239, 68, 68), 0.20);
+    background: var(--danger-500-12);
+    border-bottom: 1px solid var(--danger-500-20);
     color: var(--danger-600);
     font-size: var(--text-xs);
     font-weight: 700;
@@ -469,8 +469,8 @@
     animation: sos-breathe 2s ease-in-out infinite;
   }
   @keyframes sos-breathe {
-    0%, 100% { background: rgba(var(--danger-500-rgb, 239, 68, 68), 0.12); }
-    50%       { background: rgba(var(--danger-500-rgb, 239, 68, 68), 0.22); }
+    0%, 100% { background: var(--danger-500-12); }
+    50%       { background: var(--danger-500-20); }
   }
 
   /* ── Card header ─────────────────────────────────────────────────────────── */
@@ -481,84 +481,21 @@
     padding: var(--space-3-5) var(--space-3-5) var(--space-2-5);
   }
 
-  .avatar {
-    width: 44px;
-    height: 44px;
+  /* Inner avatar surface — AvatarRing owns the ring, this div owns the fill. */
+  .avatar-inner {
+    width: 100%;
+    height: 100%;
     border-radius: 50%;
     border: 2.5px solid var(--user-color);
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0;
-    position: relative;
-    /* 3D sphere avatar */
     box-shadow:
-      0 4px 12px rgba(0, 0, 0, 0.15),
-      inset 0 2px 4px rgba(255, 255, 255, 0.15),
-      inset 0 -2px 4px rgba(0, 0, 0, 0.10);
+      inset 0 2px 4px color-mix(in oklch, white 15%, transparent),
+      inset 0 -2px 4px color-mix(in oklch, black 10%, transparent);
     transition:
       box-shadow var(--duration-normal) var(--ease-out),
       transform var(--duration-normal) var(--ease-spring);
-  }
-  .avatar:hover {
-    transform: perspective(400px) translateZ(4px) scale(1.05);
-  }
-
-  /* SOS: 2026 neon danger ring — double expanding ring */
-  .avatar-sos {
-    animation: sos-neon-ring 1.1s ease-out infinite;
-  }
-  @keyframes sos-neon-ring {
-    0% {
-      box-shadow:
-        0 4px 12px rgba(0,0,0,0.15),
-        inset 0 2px 4px rgba(255,255,255,0.15),
-        0 0 0 0 rgba(239,68,68,0.70),
-        0 0 12px rgba(239,68,68,0.35);
-    }
-    60% {
-      box-shadow:
-        0 4px 12px rgba(0,0,0,0.15),
-        inset 0 2px 4px rgba(255,255,255,0.15),
-        0 0 0 10px rgba(239,68,68,0.05),
-        0 0 24px rgba(239,68,68,0.50),
-        0 0 48px rgba(239,68,68,0.22);
-    }
-    100% {
-      box-shadow:
-        0 4px 12px rgba(0,0,0,0.15),
-        inset 0 2px 4px rgba(255,255,255,0.15),
-        0 0 0 14px rgba(239,68,68,0),
-        0 0 12px rgba(239,68,68,0.30);
-    }
-  }
-
-  /* Online: 2026 neon glow halo — multi-layer ring */
-  .avatar-live {
-    animation: neon-halo-live 2.5s ease-in-out infinite;
-  }
-  @keyframes neon-halo-live {
-    0%, 100% {
-      box-shadow:
-        0 4px 12px rgba(0,0,0,0.15),
-        inset 0 2px 4px rgba(255,255,255,0.15),
-        0 0 0 2px rgba(16,185,129,0.45),
-        0 0 10px rgba(16,185,129,0.22),
-        0 0 24px rgba(16,185,129,0.10);
-    }
-    50% {
-      box-shadow:
-        0 4px 12px rgba(0,0,0,0.15),
-        inset 0 2px 4px rgba(255,255,255,0.15),
-        0 0 0 3px rgba(16,185,129,0.65),
-        0 0 16px rgba(16,185,129,0.40),
-        0 0 36px rgba(16,185,129,0.18);
-    }
-  }
-
-  .avatar-offline {
-    opacity: 0.5;
-    filter: grayscale(0.6);
   }
 
   .avatar-initials {
@@ -603,20 +540,19 @@
     height: 6px;
     border-radius: 50%;
     flex-shrink: 0;
-    /* Neon glow dot for live activity */
     box-shadow: 0 0 4px currentColor;
   }
 
-  /* ── F4: Location label badge ──────────────────────────────────────────── */
+  /* ── F4: Location label badge — primary token tint, no raw hex ──────────── */
   .location-label-badge {
     display: inline-flex;
     align-items: center;
     gap: var(--space-1);
     font-size: 10px;
     font-weight: 600;
-    color: var(--primary-500, #14b8a6);
-    background: rgba(20, 184, 166, 0.10);
-    border: 1px solid rgba(20, 184, 166, 0.22);
+    color: var(--primary-500);
+    background: var(--primary-500-08);
+    border: 1px solid var(--primary-500-12);
     border-radius: var(--radius-full, 9999px);
     padding: 2px 7px;
     line-height: 1.3;
@@ -626,7 +562,7 @@
     white-space: nowrap;
   }
 
-  /* Close button — actual 44x44px touch target (no pseudo-element workaround) */
+  /* Close button — actual 44x44px touch target */
   .close-btn {
     flex-shrink: 0;
     width: 44px;
@@ -652,12 +588,11 @@
     gap: var(--space-2-5);
     padding: var(--space-2-5) var(--space-3);
     background: var(--surface-1);
-    border: 1px solid var(--border-subtle, rgba(0,0,0,0.06));
+    border: 1px solid var(--border-subtle);
     border-radius: var(--radius-lg, 14px);
-    /* subtle 3D inset */
     box-shadow:
-      inset 0 1px 2px rgba(0, 0, 0, 0.03),
-      0 1px 0 rgba(255, 255, 255, 0.06);
+      inset 0 1px 2px color-mix(in oklch, black 3%, transparent),
+      0 1px 0 color-mix(in oklch, white 6%, transparent);
     min-height: 44px;
   }
 
@@ -679,12 +614,12 @@
     min-width: 0;
   }
 
-  /* Per-type tints — token-based, subtle so values stay legible */
+  /* Per-type tints — --primary-500-08/-12 pattern */
   .stat--coord {
-    background: var(--primary-500-08, rgba(20, 184, 166, 0.05));
+    background: var(--primary-500-08);
   }
   .stat--coord .stat-icon {
-    background: var(--primary-500-12, rgba(20, 184, 166, 0.12));
+    background: var(--primary-500-12);
     color: var(--primary-500);
   }
   .stat--accuracy .stat-icon {
@@ -692,17 +627,17 @@
     color: var(--warning-600);
   }
   .stat--distance {
-    background: var(--primary-500-08, rgba(20, 184, 166, 0.05));
+    background: var(--primary-500-08);
   }
   .stat--distance .stat-icon {
-    background: var(--primary-500-12, rgba(20, 184, 166, 0.12));
+    background: var(--primary-500-12);
     color: var(--primary-500);
   }
   .stat--speed {
-    background: var(--success-500-12, rgba(16, 185, 129, 0.08));
+    background: var(--success-500-12);
   }
   .stat--speed .stat-icon {
-    background: var(--success-500-20, rgba(16, 185, 129, 0.18));
+    background: var(--success-500-20);
     color: var(--success-600);
   }
 
@@ -737,11 +672,11 @@
     min-height: 44px;
   }
 
-  /* Reduced-motion: disable the new exit animation (and settle instantly) */
+  /* Coord-flash: gated by $allowMotion in JS — animation only runs when the
+     class is added, which only happens when motion is allowed. */
   @media (prefers-reduced-motion: reduce) {
-    .person-card--exiting {
-      animation: none;
-      opacity: 0;
-    }
+    .person-card { animation: none; }
+    .sos-banner  { animation: none; }
+    .animate-coord-flash { animation: none; }
   }
 </style>

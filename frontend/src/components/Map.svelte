@@ -9,7 +9,8 @@
   import { recentTrailResult } from '../lib/stores/trail.js';
   import { emitGetRecentTrail } from '../lib/socket.js';
   import { haptics } from '../lib/haptics.js';
-  import { createMapIcon, createPersonMarker, getPresenceState, escapeAttr, calculateDistance, formatDistance, circleGeoJSON } from '../lib/tracking.js';
+  import { createMapIcon, createPersonMarker, getPresenceState, circleGeoJSON } from '../lib/tracking.js';
+  import { buildMemberPopup, buildSelfPopup, memberPopupHash, createNavArrowEl, createMeetingPointEl, createDestMarkerEl } from '../lib/mapPopup.js';
   import { animateMarkerTo, cancelAnimation, cancelAllAnimations } from '../lib/markerInterpolator.js';
   import { getUserColor } from '../lib/getUserColor.js';
   import { MAP_STYLE, RASTER_STYLE } from '../lib/mapStyle.js';
@@ -37,21 +38,6 @@
   let hasSetView = $state(false);
   // F3: roomCode → maplibregl.Marker
   let meetingMarkers = new Map();
-
-  /** Creates a Google Maps-style blue navigation arrow marker */
-  function createNavArrow() {
-    const el = document.createElement('div');
-    el.className = 'nav-arrow-marker';
-    el.style.cssText = 'width:48px;height:48px;display:flex;align-items:center;justify-content:center;';
-    el.innerHTML = `
-      <div style="position:relative;width:48px;height:48px;">
-        <div style="position:absolute;inset:0;border-radius:50%;background:rgba(59,130,246,0.15);animation:nav-pulse 2s ease-out infinite;"></div>
-        <div style="position:absolute;inset:8px;border-radius:50%;background:var(--blue-500);border:3px solid #fff;box-shadow:0 2px 8px rgba(59,130,246,0.5);display:flex;align-items:center;justify-content:center;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
-        </div>
-      </div>`;
-    return el;
-  }
 
   // ── Navigation camera state ────────────────────────────────────────
   let prevNavLat = $state(null);
@@ -133,20 +119,6 @@
     } else {
       src.setData({ type: 'FeatureCollection', features: [] });
     }
-  }
-
-  // F3: create a green flag-style meeting point marker element
-  function createMeetingPointEl(label) {
-    const el = document.createElement('div');
-    el.style.cssText = 'display:flex;flex-direction:column;align-items:center;cursor:pointer;';
-    const safeLabel = (label || 'Meet here').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    el.innerHTML = `
-      <div style="background:linear-gradient(135deg,var(--success-500),var(--success-600));width:34px;height:34px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 14px rgba(16,185,129,0.55);display:flex;align-items:center;justify-content:center;">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M4 15V5l5 3 3-4 3 4 5-3v10"/><line x1="4" y1="22" x2="4" y2="15" stroke="#fff" stroke-width="2"/></svg>
-      </div>
-      <div style="background:rgba(16,185,129,0.92);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;margin-top:3px;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 6px rgba(0,0,0,0.18);">${safeLabel}</div>
-      <div style="width:2px;height:7px;background:var(--success-500,#10b981);margin-top:1px;border-radius:0 0 2px 2px;opacity:0.7;" aria-hidden="true"></div>`;
-    return el;
   }
 
   const debouncedCheckMobile = debounce(checkMobile, 80);
@@ -362,78 +334,14 @@
 
 
 
-  function buildPopup(user) {
-    const name = escapeAttr(user.displayName || 'User');
-    const s = (v) => escapeAttr(String(v ?? ''));
-    const isOnline = user.online !== false;
-
-    let html = `<div class="pu-wrap">`;
-    html += `<div class="pu-hdr">`;
-    html += `<strong class="pu-name">${name}</strong>`;
-    html += `<span class="pu-status ${isOnline ? 'pu-online' : 'pu-offline'}"><span class="pu-dot"></span>${isOnline ? 'Online' : 'Offline'}</span>`;
-    html += `</div>`;
-
-    html += `<div class="pu-grid">`;
-    html += `<span class="pu-lbl">Speed</span><span class="pu-val">${parseFloat(user.speed) >= 1 ? user.speed : 0} km/h</span>`;
-
-    const myLoc = $myLocation;
-    if (myLoc && user.latitude != null && user.longitude != null) {
-      const dist = calculateDistance(myLoc.latitude, myLoc.longitude, user.latitude, user.longitude);
-      const formatted = formatDistance(dist);
-      if (formatted) html += `<span class="pu-lbl">Distance</span><span class="pu-val">${formatted}</span>`;
-    }
-    if (user.accuracy != null) {
-      const accCls = user.accuracy <= 15 ? 'pu-good' : user.accuracy <= 50 ? 'pu-warn' : 'pu-danger';
-      html += `<span class="pu-lbl">Accuracy</span><span class="pu-val ${accCls}">~${Math.round(user.accuracy)}m</span>`;
-    }
-    if (user.formattedTime) html += `<span class="pu-lbl">Updated</span><span class="pu-val">${s(user.formattedTime)}</span>`;
-    if (user.batteryPct != null) {
-      const batCls = user.batteryPct > 50 ? 'pu-good' : user.batteryPct > 20 ? 'pu-warn' : 'pu-danger';
-      html += `<span class="pu-lbl">Battery</span><span class="pu-val ${batCls}">${user.batteryPct > 75 ? '🔋' : '🪫'} ${user.batteryPct}%</span>`;
-    }
-    if (user.deviceType) html += `<span class="pu-lbl">Device</span><span class="pu-val">${s(user.deviceType)}</span>`;
-    if (user.connectionQuality && user.connectionQuality !== 'Unknown') {
-      const cqCls = user.connectionQuality === 'Good' ? 'pu-good' : user.connectionQuality === 'OK' ? 'pu-warn' : 'pu-danger';
-      html += `<span class="pu-lbl">Signal</span><span class="pu-val ${cqCls}">${s(user.connectionQuality)}</span>`;
-    }
-    if (user.latitude != null && user.longitude != null) {
-      html += `<span class="pu-lbl">Position</span><span class="pu-val pu-mono">${Number(user.latitude).toFixed(5)}, ${Number(user.longitude).toFixed(5)}</span>`;
-    }
-    html += `</div>`;
-
-    const badges = [];
-    if (user.sos?.active) {
-      const sosReason = user.sos.reason ? ': ' + s(user.sos.reason) : '';
-      const sosTime = user.sos.at ? ' at ' + new Date(user.sos.at).toLocaleTimeString() : '';
-      badges.push(`<div class="pu-badge pu-badge-sos">⚠ SOS Active${sosReason}${sosTime}</div>`);
-    }
-    if (user.geofence?.enabled) {
-      const r = user.geofence.radiusM ? (user.geofence.radiusM >= 1000 ? (user.geofence.radiusM / 1000).toFixed(1) + 'km' : user.geofence.radiusM + 'm') : '';
-      badges.push(`<div class="pu-badge pu-badge-geo">⬡ Geofence${r ? ' · ' + r : ''}</div>`);
-    }
-    if (user.autoSos?.enabled) badges.push(`<div class="pu-badge pu-badge-autoSos">⏱ Auto-SOS · ${user.autoSos.noMoveMinutes || '?'}min</div>`);
-    if (user.checkIn?.enabled) {
-      const lastCI = user.checkIn.lastCheckInAt ? new Date(user.checkIn.lastCheckInAt).toLocaleTimeString() : 'never';
-      badges.push(`<div class="pu-badge pu-badge-checkin">✓ Check-in · every ${user.checkIn.intervalMinutes || '?'}min · last: ${lastCI}</div>`);
-    }
-    if (badges.length) html += `<div class="pu-badges">${badges.join('')}</div>`;
-    if (user.rooms && user.rooms.length > 0) html += `<div class="pu-rooms"><span class="pu-lbl">Rooms:</span> ${user.rooms.map(r => s(r)).join(', ')}</div>`;
-    if (user.userId) {
-      html += `<div class="pu-actions">`;
-      html += `<button class="pu-chat-btn" data-userid="${escapeAttr(user.userId)}" data-name="${name}"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Chat</button>`;
-      html += `<button class="pu-trail-btn" data-userid="${escapeAttr(user.userId)}"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> Trail</button>`;
-      html += `</div>`;
-    }
-    html += `</div>`;
-    return html;
-  }
-
+  // Popup HTML is built by the escaped, token-classed helpers in lib/mapPopup.js.
+  // This wrapper only adds the per-socket memoization used by dirty tracking.
   function buildPopupCached(user) {
     const ml = $myLocation;
-    const hash = `${user.displayName}|${user.online}|${user.speed}|${user.accuracy}|${user.formattedTime}|${user.batteryPct}|${user.latitude?.toFixed(4)}|${user.longitude?.toFixed(4)}|${user.sos?.active}|${user.geofence?.enabled}|${user.checkIn?.lastCheckInAt}|${ml?.latitude?.toFixed(3)}|${ml?.longitude?.toFixed(3)}`;
+    const hash = memberPopupHash(user, ml);
     const cached = popupCache.get(user.socketId);
     if (cached && cached.hash === hash) return cached.html;
-    const html = buildPopup(user);
+    const html = buildMemberPopup(user, ml);
     popupCache.set(user.socketId, { hash, html });
     return html;
   }
@@ -605,11 +513,7 @@
 
         // Add destination marker (red pin with flag)
         if (destMarker) destMarker.remove();
-        const destEl = document.createElement('div');
-        destEl.innerHTML = `<div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--danger-500),var(--danger-600));border:3px solid #fff;box-shadow:0 2px 16px rgba(239,68,68,0.5);display:flex;align-items:center;justify-content:center;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 119.5 9 2.5 2.5 0 0112 11.5z"/></svg>
-        </div><div style="width:2px;height:10px;background:var(--danger-500,#ef4444);margin:0 auto;border-radius:0 0 2px 2px;opacity:0.6;" aria-hidden="true"></div>`;
-        destEl.style.cssText = 'display:flex;flex-direction:column;align-items:center;';
+        const destEl = createDestMarkerEl();
         destMarker = new maplibregl.Marker({ element: destEl, anchor: 'bottom' })
           .setLngLat([nav.destLng, nav.destLat])
           .addTo(map);
@@ -646,27 +550,12 @@
   });
   run(() => {
     if (map && $myLocation) {
-      const { latitude, longitude, speed, formattedTime, accuracy } = $myLocation;
+      const { latitude, longitude } = $myLocation;
       const lngLat = [longitude, latitude];
-      const selfBadges = [];
-      if ($mySafetyStatus?.geofence?.enabled) selfBadges.push('<span class="pu-feat pu-feat-geo">⬡ Geofence</span>');
-      if ($mySafetyStatus?.autoSos?.enabled) selfBadges.push('<span class="pu-feat pu-feat-autoSos">⏱ Auto-SOS</span>');
-      if ($mySafetyStatus?.checkIn?.enabled) selfBadges.push('<span class="pu-feat pu-feat-checkin">✓ Check-in</span>');
-      const accCls0 = accuracy == null ? '' : accuracy <= 15 ? 'pu-good' : accuracy <= 50 ? 'pu-warn' : 'pu-danger';
-      let selfPopupHtml = '<div class="pu-wrap">';
-      selfPopupHtml += '<div class="pu-hdr"><strong class="pu-name">You</strong>';
-      selfPopupHtml += '<span class="pu-status pu-online"><span class="pu-dot"></span>Connected</span></div>';
-      selfPopupHtml += '<div class="pu-grid">';
-      selfPopupHtml += `<span class="pu-lbl">Speed</span><span class="pu-val">${speed >= 1 ? speed : 0} km/h</span>`;
-      if (accuracy != null) selfPopupHtml += `<span class="pu-lbl">Accuracy</span><span class="pu-val ${accCls0}">~${Math.round(accuracy)}m</span>`;
-      if (formattedTime) selfPopupHtml += `<span class="pu-lbl">Updated</span><span class="pu-val">${escapeAttr(String(formattedTime))}</span>`;
-      selfPopupHtml += `<span class="pu-lbl">Position</span><span class="pu-val pu-mono">${Number(latitude).toFixed(5)}, ${Number(longitude).toFixed(5)}</span>`;
-      selfPopupHtml += '</div>';
-      if (selfBadges.length) selfPopupHtml += '<div class="pu-feats">' + selfBadges.join('') + '</div>';
-      selfPopupHtml += '</div>';
+      const selfPopupHtml = buildSelfPopup($myLocation, $mySafetyStatus);
 
       if (!myMarker) {
-        const el = navActive ? createNavArrow() : createMapIcon('var(--primary-500)', '', { markerType: 'self' });
+        const el = navActive ? createNavArrowEl() : createMapIcon('var(--primary-500)', '', { markerType: 'self' });
         myPopup = new maplibregl.Popup({ offset: [0, -44], maxWidth: '280px', closeButton: false })
           .setHTML(selfPopupHtml);
         myMarker = new maplibregl.Marker({ element: el, anchor: 'center', rotationAlignment: 'map' })
@@ -679,7 +568,7 @@
         // Swap marker style when entering/exiting nav mode
         const el = myMarker.getElement();
         if (navActive && !el.classList.contains('nav-arrow-marker')) {
-          const newEl = createNavArrow();
+          const newEl = createNavArrowEl();
           myMarker.remove();
           myMarker = new maplibregl.Marker({ element: newEl, anchor: 'center', rotationAlignment: 'map' })
             .setLngLat(lngLat).setPopup(myPopup).addTo(map);
@@ -964,7 +853,7 @@
 {#if $myLocation}
   {#if $myLocation.accuracy != null}
     {@const acc = $myLocation.accuracy}
-    <div class="map-float-chip accuracy-float-chip"
+    <div class="map-float-chip accuracy-float-chip tabular-nums"
          class:chip-precise={acc <= 20}
          class:chip-ok={acc > 20 && acc <= 80}
          class:chip-rough={acc > 80}
@@ -977,7 +866,7 @@
     </div>
   {/if}
   {#if $myLocation.speed != null && $myLocation.speed >= 4}
-    <div class="map-float-chip chip-speed"
+    <div class="map-float-chip chip-speed tabular-nums"
          aria-live="polite"
          aria-atomic="true"
          aria-label="Speed {Math.round($myLocation.speed)} km/h"
@@ -1285,13 +1174,20 @@
   :global([data-theme="dark"] .pu-badge-autoSos){ background: rgba(252, 211, 77, 0.12); border-color: rgba(252, 211, 77, 0.25); color: var(--warning-300); }
   :global([data-theme="dark"] .pu-badge-checkin){ background: rgba(103, 232, 249, 0.12); border-color: rgba(103, 232, 249, 0.25); color: #67e8f9; }
 
-  /* ── Contextual float chip — calmer glass + glanceable status halo ──────
-     Base chip lives in global.css; these overrides add breathing room and a
-     soft, token-derived status ring so the accuracy/speed dot reads at a glance. */
+  /* ── Contextual float chip — floating-glass chip tier + status halo ──────
+     Base chip lives in global.css; these overrides re-source the material onto
+     the shared --glass-chip-* tier (calm/minimal degradation for free) and add
+     breathing room plus a soft, token-derived status ring so the accuracy/speed
+     dot reads at a glance. */
   :global(.map-float-chip) {
     padding: 5px 12px;
     gap: 6px;
     letter-spacing: 0.02em;
+    background: var(--glass-chip-bg);
+    border: 1px solid var(--glass-chip-border);
+    box-shadow: var(--glass-chip-shadow);
+    backdrop-filter: var(--glass-chip-blur);
+    -webkit-backdrop-filter: var(--glass-chip-blur);
   }
   :global(.map-float-chip .chip-dot) {
     width: 7px;
@@ -1406,11 +1302,111 @@
     100% { transform: scale(1.8); opacity: 0; }
   }
 
-  /* Navigation arrow pulse */
-  :global(.nav-arrow-marker) { z-index: 10 !important; }
+  /* ── Navigation arrow marker (built by lib/mapPopup.js createNavArrowEl) ── */
+  :global(.nav-arrow-marker) {
+    z-index: 10 !important;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  :global(.nav-arrow-inner) { position: relative; width: 48px; height: 48px; }
+  :global(.nav-arrow-pulse) {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: var(--primary-500-12);
+    animation: nav-pulse 2s ease-out infinite;
+    pointer-events: none;
+  }
+  :global(.nav-arrow-core) {
+    position: absolute;
+    inset: 8px;
+    border-radius: 50%;
+    background: var(--primary-500);
+    border: 3px solid var(--surface-0);
+    box-shadow: 0 2px 8px color-mix(in oklch, var(--primary-500) 50%, transparent);
+    color: var(--surface-0);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
   @keyframes nav-pulse {
     0% { transform: scale(1); opacity: 0.6; }
     100% { transform: scale(2.2); opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :global(.nav-arrow-pulse) { animation: none; opacity: 0.35; }
+  }
+
+  /* ── Meeting-point marker (createMeetingPointEl) — green flag ─────────── */
+  :global(.meeting-point-marker) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+  }
+  :global(.meeting-point-marker .mp-flag) {
+    background: linear-gradient(135deg, var(--success-500), var(--success-600));
+    color: var(--surface-0);
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 3px solid var(--surface-0);
+    box-shadow: 0 2px 14px color-mix(in oklch, var(--success-500) 55%, transparent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  :global(.meeting-point-marker .mp-label) {
+    background: color-mix(in oklch, var(--success-500) 92%, transparent);
+    color: var(--surface-0);
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 6px;
+    margin-top: 3px;
+    white-space: nowrap;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-shadow: 0 1px 6px color-mix(in oklch, var(--gray-950) 18%, transparent);
+  }
+  :global(.meeting-point-marker .mp-stem) {
+    width: 2px;
+    height: 7px;
+    background: var(--success-500);
+    margin-top: 1px;
+    border-radius: 0 0 2px 2px;
+    opacity: 0.7;
+  }
+
+  /* ── Destination marker (createDestMarkerEl) — red pin during nav ──────── */
+  :global(.dest-marker) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  :global(.dest-marker .dest-pin) {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--danger-500), var(--danger-600));
+    color: var(--surface-0);
+    border: 3px solid var(--surface-0);
+    box-shadow: 0 2px 16px color-mix(in oklch, var(--danger-500) 50%, transparent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  :global(.dest-marker .dest-stem) {
+    width: 2px;
+    height: 10px;
+    background: var(--danger-500);
+    margin: 0 auto;
+    border-radius: 0 0 2px 2px;
+    opacity: 0.6;
   }
 
   @media (prefers-reduced-motion: reduce) {

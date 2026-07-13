@@ -1,7 +1,7 @@
 <script>
   import { createEventDispatcher } from 'svelte';
-  import KinnectNexus from '../primitives/KinnectNexus.svelte';
   import EmptyState from '../primitives/EmptyState.svelte';
+  import GhostConstellation from '../primitives/GhostConstellation.svelte';
 
   /**
    * @typedef {Object} Props
@@ -31,48 +31,17 @@
     {/snippet}
   </EmptyState>
 {:else}
-  <!-- Full empty state — nobody here yet -->
-  <div class="empty-state-container">
-    <KinnectNexus />
-    <p class="empty-title">Your people will appear here</p>
-    <p class="empty-desc">Share your code with friends or family so you can see each other on the map</p>
-    <button class="empty-cta" onclick={() => dispatch('addPeople')}>
-      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
-      Add people
-    </button>
-  </div>
+  <!-- Full empty state — the ghost constellation previews the filled state -->
+  <GhostConstellation
+    title="Your people will appear here"
+    body="Share your code with friends or family so you can see each other on the map"
+    ctaLabel="Add people"
+    oninvite={() => dispatch('addPeople')}
+  />
 {/if}
 
 <style>
-  /* ── Empty state ─────────────────────────────────────────────────────────── */
-  .empty-state-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: var(--space-6) var(--space-6) var(--space-10);
-    text-align: center;
-    gap: var(--space-2);
-  }
-
-  .empty-title {
-    font-family: var(--font-display);
-    font-size: var(--text-lg);
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: var(--space-2) 0 0;
-    letter-spacing: -0.01em;
-  }
-
-  .empty-desc {
-    font-size: var(--text-sm);
-    color: var(--text-tertiary);
-    max-width: 200px;
-    line-height: var(--leading-relaxed);
-    margin: 0;
-  }
-
-  /* CTA button in empty state */
+  /* CTA button in the solo empty state */
   .empty-cta {
     display: inline-flex;
     align-items: center;

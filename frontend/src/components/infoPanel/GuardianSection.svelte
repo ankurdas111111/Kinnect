@@ -1,6 +1,7 @@
 <script>
   import { socket } from '../../lib/socket.js';
   import { myGuardianData } from '../../lib/stores/guardians.js';
+  import SectionHeader from '../primitives/SectionHeader.svelte';
 
   function revokeGuardian(wardId, guardianId) {
     if (wardId) socket.emit('revokeGuardian', { wardUserId: wardId });
@@ -11,7 +12,7 @@
 <!-- ── GUARDIAN NETWORK ──────────────────────────────────────────── -->
 {#if $myGuardianData.asGuardian.length > 0 || $myGuardianData.asWard.length > 0}
   <div class="network-section">
-    <span class="card-eyebrow">Guardians</span>
+    <SectionHeader title="Guardians" level={4} />
     {#each $myGuardianData.asGuardian as g}
       <div class="network-item">
         <div class="network-avatar">{(g.wardName || '?')[0].toUpperCase()}</div>

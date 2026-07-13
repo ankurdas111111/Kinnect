@@ -1,6 +1,7 @@
 <script>
   import { createEventDispatcher } from 'svelte';
   import { socket, emitIAmSafe } from '../../lib/socket.js';
+  import SectionHeader from '../primitives/SectionHeader.svelte';
   import { banner, mySosActive, myLiveLinks } from '../../lib/stores/sos.js';
   import { rideShare } from '../../lib/stores/rideShare.js';
   import { crowdMode } from '../../lib/stores/crowdMode.js';
@@ -89,7 +90,7 @@
 
 <!-- ── SAFETY ZONE ───────────────────────────────────────────────── -->
 <div class="safety-zone">
-  <span class="card-eyebrow safety-eyebrow">Quick Actions</span>
+  <SectionHeader title="Quick Actions" level={4} />
   <div class="safety-actions">
     <button
       class="sos-action-btn"
@@ -166,8 +167,6 @@
     background: rgba(239, 68, 68, 0.05);
     border-color: rgba(239, 68, 68, 0.14);
   }
-  .safety-eyebrow { color: rgba(239, 68, 68, 0.55); }
-
   .safety-actions {
     display: grid;
     grid-template-columns: 1fr auto auto;

@@ -89,10 +89,11 @@
           {#if node.label}
             <text class="cst-ghost-label" x={node.x} y={node.y + 26}>{node.label}</text>
           {/if}
-          <!-- 44px transparent hit target over the ghost pin -->
+          <!-- Ghost hit target: 64 viewBox units so it stays ≥44 CSS px down to
+               a ~0.7 render scale (≈240px-wide stage on 320px viewports). -->
           <rect
             class="cst-hit"
-            x={node.x - 22} y={node.y - 22} width="44" height="44"
+            x={node.x - 32} y={node.y - 32} width="64" height="64"
             role="button" tabindex="0"
             aria-label={node.label || 'Add a family member'}
             onclick={() => activate(i)}

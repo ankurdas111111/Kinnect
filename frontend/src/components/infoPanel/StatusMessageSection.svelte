@@ -1,6 +1,7 @@
 <script>
   import { socket } from '../../lib/socket.js';
   import { banner } from '../../lib/stores/sos.js';
+  import SectionHeader from '../primitives/SectionHeader.svelte';
 
   // Ambient status message
   let statusDraft = $state('');
@@ -23,7 +24,7 @@
 
 <!-- ── AMBIENT STATUS MESSAGE ─────────────────────────────────── -->
 <div class="status-msg-zone">
-  <span class="card-eyebrow">Status Message</span>
+  <SectionHeader title="Status Message" level={4} />
   <div class="status-msg-row">
     <input
       class="status-msg-input"

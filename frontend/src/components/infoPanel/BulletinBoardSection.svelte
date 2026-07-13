@@ -2,6 +2,7 @@
   import { authUser } from '../../lib/stores/auth.js';
   import { myRooms, roomNotes } from '../../lib/stores/rooms.js';
   import { emitPostRoomNote, emitDeleteRoomNote, emitGetRoomNotes } from '../../lib/socket.js';
+  import SectionHeader from '../primitives/SectionHeader.svelte';
 
   // ── F8: Room bulletin board ────────────────────────────────────────────────
   let openBoardRoom = $state(null);
@@ -38,7 +39,7 @@
 <!-- ── F8: ROOM BULLETIN BOARD ───────────────────────────────────── -->
 {#if $myRooms.length > 0}
   <div class="feature-section">
-    <span class="card-eyebrow">Bulletin Board</span>
+    <SectionHeader title="Bulletin Board" level={4} />
     {#each $myRooms as room}
       <div class="board-room">
         <button class="collapsible-header" onclick={() => toggleBoard(room.code)} aria-expanded={openBoardRoom === room.code}>

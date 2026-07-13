@@ -1,5 +1,6 @@
 <script>
   import { emitSetSpeedAlert } from '../../lib/socket.js';
+  import SectionHeader from '../primitives/SectionHeader.svelte';
 
   // ── F5: Speed alert ────────────────────────────────────────────────────────
   let speedAlertKmh = $state('');
@@ -18,7 +19,7 @@
 
 <!-- ── F5: SPEED ALERT CONFIG ─────────────────────────────────────── -->
 <div class="feature-section">
-  <span class="card-eyebrow">Speed Alert</span>
+  <SectionHeader title="Speed Alert" level={4} />
   <div class="feature-row">
     <input
       class="feature-input"

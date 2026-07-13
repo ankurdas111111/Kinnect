@@ -5,6 +5,7 @@
   import { authUser } from '../../lib/stores/auth.js';
   import { dailyActivity } from '../../lib/stores/activity.js';
   import { emitGetDailyActivity } from '../../lib/socket.js';
+  import SectionHeader from '../primitives/SectionHeader.svelte';
 
   // ── F9: Daily activity ─────────────────────────────────────────────────────
   let activityOpen = $state(false);
@@ -45,8 +46,11 @@
 <!-- ── F9: DAILY ACTIVITY SUMMARY ────────────────────────────────── -->
 <div class="feature-section">
   <button class="collapsible-header" onclick={toggleActivity} aria-expanded={activityOpen}>
-    <span class="card-eyebrow" style="margin:0">Activity</span>
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true" style="transform: rotate({activityOpen ? 180 : 0}deg); transition: transform 200ms"><polyline points="6 9 12 15 18 9"/></svg>
+    <SectionHeader title="Activity" level={4}>
+      {#snippet action()}
+        <svg class="chevron" class:rotated={activityOpen} xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+      {/snippet}
+    </SectionHeader>
   </button>
   {#if activityOpen}
     <div class="activity-list">
@@ -96,6 +100,13 @@
     color: var(--text-primary);
   }
   .collapsible-header:hover { opacity: 0.8; }
+
+  .chevron {
+    flex-shrink: 0;
+    transition: transform 200ms var(--ease-out);
+  }
+  .chevron.rotated { transform: rotate(180deg); }
+  @media (prefers-reduced-motion: reduce) { .chevron { transition: none; } }
 
   /* F9: activity summary */
   .activity-list {

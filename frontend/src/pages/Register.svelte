@@ -1,13 +1,16 @@
 <script>
   import { preventDefault } from 'svelte/legacy';
 
-  import { push } from 'svelte-spa-router';
+  import { navigate } from '../lib/viewTransition.js';
   import { authUser, loadSession } from '../lib/stores/auth.js';
   import { apiPost, fetchCsrf, clearCsrf } from '../lib/api.js';
   import { COUNTRY_CODES, COUNTRY_MAP, validateMobileLength } from '../lib/countryCodes.js';
   import { toasts } from '../lib/stores/toast.js';
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import AnimatedMeshBackground from '../components/primitives/AnimatedMeshBackground.svelte';
+  import Constellation from '../components/primitives/Constellation.svelte';
+  import { allowMotion } from '../lib/stores/effects.js';
+  import { prefersReducedMotion } from '../lib/deviceCapability.js';
 
   // Headline animates per-WORD (not per-character) so line breaks can only
   // happen at word boundaries — never mid-word ("fa / mily").
@@ -16,6 +19,8 @@
 
   let showPassword = $state(false);
   let showConfirm = $state(false);
+  // ALL field state lives at script root (never inside step blocks) so values
+  // survive step switches — panels below are conditionally rendered.
   let firstName = $state('');
   let lastName = $state('');
   let password = $state('');
@@ -36,8 +41,15 @@
   let emailTouched = $state(false);
   let mobileTouched = $state(false);
 
+  // ── 3-step progressive disclosure ("Found your constellation") ─────────
+  // Step order (critique fix): Identity → Contact → Security, so the
+  // identifier and autocomplete="new-password" land adjacent for password
+  // managers (plus a hidden autocomplete="username" mirror on step 3).
+  const STEP_TITLES = ['Who you are', 'How to reach you', 'Secure your account'];
+  let step = $state(1);
+
   onMount(() => {
-    if ($authUser) push('/');
+    if ($authUser) navigate('/');
     fetchCsrf();
   });
 
@@ -105,6 +117,52 @@
     return '';
   }
 
+  // Focus the first field of the current step. preventScroll keeps the step
+  // switch scroll-free (reduced-motion users never get a scroll animation).
+  async function focusFirstField() {
+    await tick();
+    const id = step === 1 ? 'first_name'
+      : step === 2 ? (contactType === 'email' ? 'reg_email' : 'reg_mobile')
+      : 'reg_password';
+    document.getElementById(id)?.focus({ preventScroll: true });
+  }
+
+  function validateStep(n) {
+    if (n === 1) {
+      firstNameTouched = true;
+      if (!firstName.trim()) { error = 'First name is required to create your account'; return false; }
+    } else if (n === 2) {
+      if (contactType === 'email') {
+        emailTouched = true;
+        if (!validateEmail()) { error = emailHint || 'Enter a valid email address'; return false; }
+      } else {
+        mobileTouched = true;
+        if (!validateMobile()) { error = mobileHint || 'Enter a valid mobile number'; return false; }
+      }
+    }
+    return true;
+  }
+
+  function goNext() {
+    if (!validateStep(step)) return;
+    error = '';
+    step += 1;
+    focusFirstField();
+  }
+
+  function goBack() {
+    if (step === 1 || loading) return;
+    error = '';
+    step -= 1;
+    focusFirstField();
+  }
+
+  // Enter advances steps 1–2; the single server submit happens only on step 3.
+  function onFormSubmit() {
+    if (step < 3) { goNext(); return; }
+    handleSubmit();
+  }
+
   async function handleSubmit() {
     error = '';
     firstNameTouched = true;
@@ -113,7 +171,7 @@
     emailTouched = true;
     mobileTouched = true;
 
-    if (!firstName.trim()) { error = 'First name is required to create your account'; return; }
+    if (!firstName.trim()) { error = 'First name is required to create your account'; step = 1; focusFirstField(); return; }
     if (password.length < 6) { error = 'Password must be at least 6 characters'; return; }
     if (password !== confirm) { error = 'Passwords do not match — please re-enter'; return; }
 
@@ -126,10 +184,10 @@
     };
 
     if (contactType === 'email') {
-      if (!validateEmail()) { error = emailHint || 'Enter a valid email address'; return; }
+      if (!validateEmail()) { error = emailHint || 'Enter a valid email address'; step = 2; focusFirstField(); return; }
       body.contact_value = emailValue.trim().toLowerCase();
     } else {
-      if (!validateMobile()) { error = mobileHint || 'Enter a valid mobile number'; return; }
+      if (!validateMobile()) { error = mobileHint || 'Enter a valid mobile number'; step = 2; focusFirstField(); return; }
       const c = getCountry();
       body.contact_value = c.dial + mobileDigits.replace(/\D/g, '');
     }
@@ -149,9 +207,9 @@
         const pendingContact = sessionStorage.getItem('kinnect_pending_contact');
         if (pendingContact) {
           sessionStorage.removeItem('kinnect_pending_contact');
-          push('/add-contact/' + encodeURIComponent(pendingContact));
+          navigate('/add-contact/' + encodeURIComponent(pendingContact));
         } else {
-          push('/');
+          navigate('/');
         }
       } else {
         error = res.error || 'Registration failed — please try again';
@@ -167,6 +225,35 @@
   let mobileValid = $derived(mobileDigits ? validateMobileLength(countryIso, mobileDigits).valid : false);
   let confirmMatch = $derived(confirm && password === confirm);
   let confirmError = $derived(confirmTouched && confirm && !confirmMatch);
+
+  // Step-validity deriveds drive the builder constellation node states.
+  let step1Valid = $derived(firstName.trim().length > 0);
+  let step2Valid = $derived(contactType === 'email' ? !!emailValid : mobileValid);
+  let step3Valid = $derived(password.length >= 6 && !!confirmMatch);
+
+  // Hidden identifier mirrored onto step 3 so password managers pair
+  // username ↔ new-password across the step switch.
+  let identifierValue = $derived(contactType === 'email'
+    ? emailValue.trim().toLowerCase()
+    : ((getCountry()?.dial || '') + mobileDigits.replace(/\D/g, '')));
+
+  // Star N: unlit socket → 'igniting' (pop) the moment its step validates →
+  // locked 'live' once the step is passed. Pure derived, no timers.
+  function starState(idx, valid) {
+    if (redirecting || step > idx) return 'live';
+    if (step === idx && valid) return 'igniting';
+    return 'unlit';
+  }
+  const BUILDER_LINKS = [[1, 0], [2, 0], [3, 0]];
+  let builderNodes = $derived([
+    { x: 170, y: 140, state: 'live' },
+    { x: 170, y: 48, hue: 'var(--member-1)', state: starState(1, step1Valid) },
+    { x: 250, y: 186, hue: 'var(--member-2)', state: starState(2, step2Valid) },
+    { x: 90, y: 186, hue: 'var(--member-3)', state: starState(3, step3Valid) },
+  ]);
+  // Orbit-lock rotation is JS-gated: a stored 'full' FX pref must not defeat
+  // the OS reduce-motion switch.
+  let loops = $derived($allowMotion && !prefersReducedMotion());
 </script>
 
 <div class="auth-page page-enter">
@@ -243,8 +330,23 @@
     </div>
 
     <div class="auth-card">
+      <!-- Builder constellation: center beacon + 3 dormant sockets; each
+           completed step ignites one star. Decorative only — the sr-only
+           heading + aria-live label below carry the real progress semantics. -->
+      <div
+        class="reg-constellation"
+        class:orbit-lock={redirecting}
+        class:orbit-spin={redirecting && loops}
+        aria-hidden="true"
+      >
+        <div class="reg-cst-stage fx-ambient">
+          <Constellation mode="builder" nodes={builderNodes} links={BUILDER_LINKS} />
+        </div>
+      </div>
+
       <h2>Get started</h2>
       <p class="subtitle">Set up in under a minute — free forever for families</p>
+      <p class="reg-step-label" aria-live="polite">Step {step} of 3 · {STEP_TITLES[step - 1]}</p>
 
       {#if error}
         <div class="auth-error" role="alert">
@@ -253,159 +355,179 @@
         </div>
       {/if}
 
-      <form class="reg-form" onsubmit={preventDefault(handleSubmit)} novalidate>
-        <div class="auth-name-row">
-          <div class="auth-field">
-            <label for="first_name">First name</label>
-            <input
-              id="first_name"
-              class="input"
-              class:is-invalid={firstNameTouched && !firstName.trim()}
-              bind:value={firstName}
-              placeholder="John"
-              autocomplete="given-name"
-              enterkeyhint="next"
-              onblur={() => firstNameTouched = true}
-            />
-            {#if firstNameTouched && !firstName.trim()}
-              <span class="auth-hint error">Required</span>
-            {/if}
-          </div>
-          <div class="auth-field">
-            <label for="last_name">Last name</label>
-            <input id="last_name" class="input" bind:value={lastName} placeholder="Doe" autocomplete="family-name" enterkeyhint="next" />
-          </div>
-        </div>
+      <form class="reg-form" onsubmit={preventDefault(onFormSubmit)} novalidate>
+        <h3 class="sr-only">Step {step} of 3: {STEP_TITLES[step - 1]}</h3>
 
-        <div class="auth-field">
-          <label for="reg_password">Password</label>
-          <div class="input-wrapper">
-            <input
-              id="reg_password"
-              type={showPassword ? 'text' : 'password'}
-              class="input"
-              class:is-invalid={passwordTouched && password.length > 0 && password.length < 6}
-              bind:value={password}
-              autocomplete="new-password"
-              enterkeyhint="next"
-              onblur={() => passwordTouched = true}
-            />
-            <button type="button" class="input-icon input-icon--toggle" onclick={() => showPassword = !showPassword} aria-label={showPassword ? 'Hide password' : 'Show password'}>
-              {#if showPassword}
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-              {:else}
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              {/if}
-            </button>
-          </div>
-          {#if password}
-            <div class="password-strength">
-              <div class="strength-bar">
-                <div class="strength-fill" style="width:{passwordStrength.level * 25}%;--strength-color:{passwordStrength.color}"></div>
+        {#key step}
+          <div class="step-panel">
+            {#if step === 1}
+              <div class="auth-name-row">
+                <div class="auth-field">
+                  <label for="first_name">First name</label>
+                  <input
+                    id="first_name"
+                    class="input"
+                    class:is-invalid={firstNameTouched && !firstName.trim()}
+                    bind:value={firstName}
+                    placeholder="John"
+                    autocomplete="given-name"
+                    enterkeyhint="next"
+                    onblur={() => firstNameTouched = true}
+                  />
+                  {#if firstNameTouched && !firstName.trim()}
+                    <span class="auth-hint error">Required</span>
+                  {/if}
+                </div>
+                <div class="auth-field">
+                  <label for="last_name">Last name</label>
+                  <input id="last_name" class="input" bind:value={lastName} placeholder="Doe" autocomplete="family-name" enterkeyhint="next" />
+                </div>
               </div>
-              <span class="strength-label" style="color:{passwordStrength.color}">{passwordStrength.label}</span>
-            </div>
-            {#if passwordHint}
-              <span class="auth-hint password-hint">{passwordHint}</span>
-            {/if}
-          {:else}
-            <span class="auth-hint">Minimum 6 characters</span>
-          {/if}
-        </div>
+            {:else if step === 2}
+              <div class="auth-field contact-type-label"><label class="label">Contact method</label></div>
+              <div class="auth-toggle" role="tablist" aria-label="Contact method">
+                <button type="button" class="auth-toggle-btn" class:active={contactType === 'email'} onclick={() => contactType = 'email'} onkeydown={(e) => onContactToggleKeydown(e, 'email')} role="tab" aria-selected={contactType === 'email'} tabindex={contactType === 'email' ? 0 : -1}>Email</button>
+                <button type="button" class="auth-toggle-btn" class:active={contactType === 'mobile'} onclick={() => contactType = 'mobile'} onkeydown={(e) => onContactToggleKeydown(e, 'mobile')} role="tab" aria-selected={contactType === 'mobile'} tabindex={contactType === 'mobile' ? 0 : -1}>Mobile</button>
+              </div>
 
-        <div class="auth-field">
-          <label for="reg_confirm">Confirm password</label>
-          <div class="input-wrapper">
-            <input
-              id="reg_confirm"
-              type={showConfirm ? 'text' : 'password'}
-              class="input"
-              class:is-invalid={confirmError}
-              class:is-valid={confirmTouched && confirmMatch}
-              bind:value={confirm}
-              autocomplete="new-password"
-              enterkeyhint="next"
-              onblur={() => confirmTouched = true}
-            />
-            {#if confirmTouched && confirmMatch}
-              <span class="input-icon valid check-pop" aria-hidden="true">&#10003;</span>
-            {:else}
-              <button type="button" class="input-icon input-icon--toggle" onclick={() => showConfirm = !showConfirm} aria-label={showConfirm ? 'Hide password' : 'Show password'}>
-                {#if showConfirm}
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                {:else}
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                {/if}
-              </button>
-            {/if}
-          </div>
-          {#if confirmError}
-            <span class="auth-hint error">Passwords do not match</span>
-          {/if}
-        </div>
-
-        <div class="auth-field contact-type-label"><label class="label">Contact method</label></div>
-        <div class="auth-toggle" role="tablist" aria-label="Contact method">
-          <button type="button" class="auth-toggle-btn" class:active={contactType === 'email'} onclick={() => contactType = 'email'} onkeydown={(e) => onContactToggleKeydown(e, 'email')} role="tab" aria-selected={contactType === 'email'} tabindex={contactType === 'email' ? 0 : -1}>Email</button>
-          <button type="button" class="auth-toggle-btn" class:active={contactType === 'mobile'} onclick={() => contactType = 'mobile'} onkeydown={(e) => onContactToggleKeydown(e, 'mobile')} role="tab" aria-selected={contactType === 'mobile'} tabindex={contactType === 'mobile' ? 0 : -1}>Mobile</button>
-        </div>
-
-        {#if contactType === 'email'}
-          <div class="auth-field">
-            <label for="reg_email">Email address</label>
-            <div class="input-wrapper">
-              <input
-                id="reg_email"
-                type="email"
-                class="input"
-                class:is-valid={emailTouched && emailValid}
-                class:is-invalid={emailTouched && emailValue.trim() && !emailValid}
-                bind:value={emailValue}
-                placeholder="you@example.com"
-                onblur={() => { emailTouched = true; validateEmail(); }}
-                autocomplete="email"
-                enterkeyhint="go"
-              />
-              {#if emailTouched && emailValid}
-                <span class="input-icon valid check-pop" aria-hidden="true">&#10003;</span>
+              {#if contactType === 'email'}
+                <div class="auth-field">
+                  <label for="reg_email">Email address</label>
+                  <div class="input-wrapper">
+                    <input
+                      id="reg_email"
+                      type="email"
+                      class="input"
+                      class:is-valid={emailTouched && emailValid}
+                      class:is-invalid={emailTouched && emailValue.trim() && !emailValid}
+                      bind:value={emailValue}
+                      placeholder="you@example.com"
+                      onblur={() => { emailTouched = true; validateEmail(); }}
+                      autocomplete="email"
+                      enterkeyhint="next"
+                    />
+                    {#if emailTouched && emailValid}
+                      <span class="input-icon valid check-pop" aria-hidden="true">&#10003;</span>
+                    {/if}
+                  </div>
+                  {#if emailTouched && emailHint}<span class="auth-hint error">{emailHint}</span>{/if}
+                </div>
+              {:else}
+                <div class="auth-field">
+                  <label for="reg_mobile">Mobile number</label>
+                  <div class="auth-phone-row">
+                    <select class="auth-cc-select" bind:value={countryIso} onchange={validateMobile} aria-label="Country code">
+                      {#each COUNTRY_CODES as c}
+                        <option value={c[1]}>{c[3]} {c[0]}</option>
+                      {/each}
+                    </select>
+                    <input
+                      id="reg_mobile"
+                      type="tel"
+                      class="input"
+                      class:is-valid={mobileTouched && mobileValid}
+                      class:is-invalid={mobileTouched && mobileDigits && !mobileValid}
+                      bind:value={mobileDigits}
+                      placeholder={mobilePlaceholder()}
+                      inputmode="numeric"
+                      autocomplete="tel"
+                      enterkeyhint="next"
+                      onblur={() => { mobileTouched = true; validateMobile(); }}
+                    />
+                  </div>
+                  {#if mobileTouched && mobileHint}<span class="auth-hint error">{mobileHint}</span>{/if}
+                </div>
               {/if}
-            </div>
-            {#if emailTouched && emailHint}<span class="auth-hint error">{emailHint}</span>{/if}
-          </div>
-        {:else}
-          <div class="auth-field">
-            <label for="reg_mobile">Mobile number</label>
-            <div class="auth-phone-row">
-              <select class="auth-cc-select" bind:value={countryIso} onchange={validateMobile} aria-label="Country code">
-                {#each COUNTRY_CODES as c}
-                  <option value={c[1]}>{c[3]} {c[0]}</option>
-                {/each}
-              </select>
-              <input
-                id="reg_mobile"
-                type="tel"
-                class="input"
-                class:is-valid={mobileTouched && mobileValid}
-                class:is-invalid={mobileTouched && mobileDigits && !mobileValid}
-                bind:value={mobileDigits}
-                placeholder={mobilePlaceholder()}
-                inputmode="numeric"
-                enterkeyhint="go"
-                onblur={() => { mobileTouched = true; validateMobile(); }}
-              />
-            </div>
-            {#if mobileTouched && mobileHint}<span class="auth-hint error">{mobileHint}</span>{/if}
-          </div>
-        {/if}
+            {:else}
+              <!-- Hidden identifier from step 2 keeps password managers pairing
+                   username ↔ new-password across the step switch. -->
+              <input class="sr-only" type="text" name="username" autocomplete="username" value={identifierValue} readonly tabindex="-1" aria-hidden="true" />
 
-        <button class="auth-submit tactile" type="submit" disabled={loading}>
-          {#if loading}
-            <span class="submit-spinner" aria-hidden="true"></span>
-            {redirecting ? 'Opening dashboard...' : 'Creating account...'}
-          {:else}
-            Create account
+              <div class="auth-field">
+                <label for="reg_password">Password</label>
+                <div class="input-wrapper">
+                  <input
+                    id="reg_password"
+                    type={showPassword ? 'text' : 'password'}
+                    class="input"
+                    class:is-invalid={passwordTouched && password.length > 0 && password.length < 6}
+                    bind:value={password}
+                    autocomplete="new-password"
+                    enterkeyhint="next"
+                    onblur={() => passwordTouched = true}
+                  />
+                  <button type="button" class="input-icon input-icon--toggle" onclick={() => showPassword = !showPassword} aria-label={showPassword ? 'Hide password' : 'Show password'}>
+                    {#if showPassword}
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                    {:else}
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    {/if}
+                  </button>
+                </div>
+                {#if password}
+                  <div class="password-strength">
+                    <div class="strength-bar">
+                      <div class="strength-fill" style="width:{passwordStrength.level * 25}%;--strength-color:{passwordStrength.color}"></div>
+                    </div>
+                    <span class="strength-label" style="color:{passwordStrength.color}">{passwordStrength.label}</span>
+                  </div>
+                  {#if passwordHint}
+                    <span class="auth-hint password-hint">{passwordHint}</span>
+                  {/if}
+                {:else}
+                  <span class="auth-hint">Minimum 6 characters</span>
+                {/if}
+              </div>
+
+              <div class="auth-field">
+                <label for="reg_confirm">Confirm password</label>
+                <div class="input-wrapper">
+                  <input
+                    id="reg_confirm"
+                    type={showConfirm ? 'text' : 'password'}
+                    class="input"
+                    class:is-invalid={confirmError}
+                    class:is-valid={confirmTouched && confirmMatch}
+                    bind:value={confirm}
+                    autocomplete="new-password"
+                    enterkeyhint="go"
+                    onblur={() => confirmTouched = true}
+                  />
+                  {#if confirmTouched && confirmMatch}
+                    <span class="input-icon valid check-pop" aria-hidden="true">&#10003;</span>
+                  {:else}
+                    <button type="button" class="input-icon input-icon--toggle" onclick={() => showConfirm = !showConfirm} aria-label={showConfirm ? 'Hide password' : 'Show password'}>
+                      {#if showConfirm}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                      {:else}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                      {/if}
+                    </button>
+                  {/if}
+                </div>
+                {#if confirmError}
+                  <span class="auth-hint error">Passwords do not match</span>
+                {/if}
+              </div>
+            {/if}
+          </div>
+        {/key}
+
+        <div class="step-nav">
+          {#if step > 1}
+            <button type="button" class="auth-step-back" onclick={goBack} disabled={loading}>Back</button>
           {/if}
-        </button>
+          <button class="auth-submit tactile" type="submit" disabled={loading}>
+            {#if loading}
+              <span class="submit-spinner" aria-hidden="true"></span>
+              {redirecting ? 'Opening dashboard...' : 'Creating account...'}
+            {:else if step < 3}
+              Continue
+            {:else}
+              Create account
+            {/if}
+          </button>
+        </div>
       </form>
 
       <p class="auth-link">Already have an account? <a href="#/login">Sign in</a></p>
@@ -431,6 +553,59 @@
     width: 100%;
     height: 100%;
     filter: drop-shadow(0 4px 12px rgba(20, 184, 166, 0.12));
+  }
+
+  /* ── Builder constellation header ──────────────────────────────────────
+     Beacon + 3 sockets in the card header. Fixed height, decorative only. */
+  .reg-constellation {
+    height: 132px;
+    margin-bottom: var(--space-2);
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .reg-cst-stage {
+    width: 100%;
+    height: 100%;
+    transform-origin: center;
+  }
+  /* Orbit lock — brand-safe completion signature: transform-only spring pop,
+     then a slow ambient rotation. Rotation is JS-gated ($allowMotion + OS
+     reduce-motion) via the orbit-spin class; the loop wrapper is .fx-ambient. */
+  .orbit-lock .reg-cst-stage {
+    animation: orbit-pop 450ms var(--ease-spring) both;
+  }
+  .orbit-spin .reg-cst-stage {
+    animation:
+      orbit-pop 450ms var(--ease-spring) both,
+      orbit-rotate 24s linear 450ms infinite;
+  }
+  @keyframes orbit-pop {
+    from { transform: scale(0.92); }
+    60%  { transform: scale(1.05); }
+    to   { transform: scale(1); }
+  }
+  @keyframes orbit-rotate {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+
+  /* Visible step progress — color+shape (constellation) never stands alone. */
+  .reg-step-label {
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--auth-page-text-muted);
+    margin: 0 0 var(--space-4) 0;
+  }
+
+  /* Step crossfade — incoming panel opacity/transform, 200ms. */
+  .step-panel {
+    animation: step-in var(--duration-normal) var(--ease-out) both;
+  }
+  @keyframes step-in {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: none; }
   }
 
   .input-wrapper {
@@ -530,22 +705,6 @@
     white-space: nowrap;
   }
 
-  /* Staggered entrance for the form fields — transform/opacity only. */
-  .reg-form > * {
-    animation: field-rise var(--duration-normal) var(--ease-spring) both;
-  }
-  .reg-form > *:nth-child(1) { animation-delay: calc(var(--stagger-step, 40ms) * 1); }
-  .reg-form > *:nth-child(2) { animation-delay: calc(var(--stagger-step, 40ms) * 2); }
-  .reg-form > *:nth-child(3) { animation-delay: calc(var(--stagger-step, 40ms) * 3); }
-  .reg-form > *:nth-child(4) { animation-delay: calc(var(--stagger-step, 40ms) * 4); }
-  .reg-form > *:nth-child(5) { animation-delay: calc(var(--stagger-step, 40ms) * 5); }
-  .reg-form > *:nth-child(6) { animation-delay: calc(var(--stagger-step, 40ms) * 6); }
-  .reg-form > *:nth-child(7) { animation-delay: calc(var(--stagger-step, 40ms) * 7); }
-  @keyframes field-rise {
-    from { opacity: 0; transform: translateY(8px); }
-    to   { opacity: 1; transform: none; }
-  }
-
   /* Calmer error banner: soft color-flash instead of a shake (token-driven). */
   .auth-error {
     background: var(--danger-500-12);
@@ -574,7 +733,9 @@
   @media (prefers-reduced-motion: reduce) {
     .strength-fill { transition: none; }
     .check-pop { animation: none; }
-    .reg-form > * { animation: none; opacity: 1; transform: none; }
+    .step-panel { animation: none; }
+    .orbit-lock .reg-cst-stage,
+    .orbit-spin .reg-cst-stage { animation: none; }
     .auth-error { animation: none; }
   }
 </style>

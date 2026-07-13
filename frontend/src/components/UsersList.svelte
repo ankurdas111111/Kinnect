@@ -76,6 +76,20 @@
     if (userList.length > 0 || $myLocation) initialSyncDone = true;
   });
 
+  // initialLoad flag — true only during the FIRST render of the list.
+  // Passed to UserRow to gate the stagger entrance animation.
+  // VirtualList scroll recycling and later reactive updates see false,
+  // so recycled rows never re-stagger. The $effect commits listEverShown
+  // on the first reactive run where the list is non-empty; subsequent
+  // re-renders (re-sorts, new members, scroll recycling) see false.
+  let listEverShown = $state(false);
+  let rowInitialLoad = $derived(!listEverShown && userList.length > 0);
+  $effect(() => {
+    if (userList.length > 0 && !listEverShown) {
+      listEverShown = true;
+    }
+  });
+
   function locateUser(socketId) {
     haptics.tap();
     focusUser.set(socketId);
@@ -210,6 +224,7 @@
               {index}
               {isAdmin}
               {deletingUser}
+              initialLoad={rowInitialLoad}
               on:locate={(e) => locateUser(e.detail)}
               on:quickActions={(e) => quickUser = e.detail}
               on:secretChat
@@ -252,7 +267,7 @@
   .pull-spinner {
     width: 18px;
     height: 18px;
-    border: 2.5px solid rgba(20, 184, 166, 0.25);
+    border: 2.5px solid color-mix(in srgb, var(--primary-400) 25%, transparent);
     border-top-color: var(--primary-400);
     border-radius: 50%;
     animation: pull-spin 0.7s linear infinite;

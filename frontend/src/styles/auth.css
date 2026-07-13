@@ -1070,3 +1070,60 @@
     transform: none;
   }
 }
+
+/* ── Micro-constellation (mobile brand header) ───────────────────────────
+   ADDITIVE: 24px dormant Constellation shown beside the mobile brand mark
+   so mobile users (where .auth-brand is hidden) still see the shell world.
+   Shared by Login/Register. Sized wrapper only — all pin/link styling and
+   motion gating live inside the Constellation primitive. */
+.mobile-brand-cst {
+  width: 24px;
+  height: 24px;
+  margin-top: var(--space-1);
+  pointer-events: none;
+}
+
+/* ── Register 3-step nav (Back / Continue row) ────────────────────────────
+   ADDITIVE: Register.svelte progressive-disclosure step navigation. Both
+   controls are ≥48px tall (44px touch-target rule) and token-driven. */
+.step-nav {
+  display: flex;
+  gap: var(--space-3);
+  align-items: stretch;
+}
+
+.step-nav .auth-submit {
+  flex: 1;
+}
+
+.auth-step-back {
+  min-height: 48px;
+  min-width: 84px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--auth-input-border);
+  border-radius: var(--radius-md);
+  background: var(--auth-input-bg);
+  color: var(--auth-page-text-muted);
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    color var(--duration-normal) var(--ease-out),
+    border-color var(--duration-normal) var(--ease-out);
+}
+
+.auth-step-back:hover {
+  color: var(--auth-page-text);
+  border-color: var(--primary-400);
+}
+
+.auth-step-back:focus-visible {
+  outline: 2px solid var(--primary-400);
+  outline-offset: 2px;
+}
+
+.auth-step-back:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

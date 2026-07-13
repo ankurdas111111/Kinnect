@@ -1,21 +1,23 @@
 <script>
-  
-
   /**
-   * @typedef {Object} Props
-   * @property {any} [places] - PlacesListSection — saved places list, zone story, and add-place form.
-Receives places and callbacks from SavedPlacesPanel (the orchestrator).
-   * @property {any} [iconOptions]
-   * @property {any} [iconEmoji]
-   * @property {any} onAdd - fn(name, radius, icon) → Promise
-   * @property {any} onRemove - fn(placeId, placeName)
-   * @property {any} onViewStory - fn(placeId)
-   * @property {any} [storyPlaceId]
-   * @property {boolean} [storyLoading]
-   * @property {any} [storyVisits]
+   * PlacesListSection — saved places list, zone story, and add-place form.
+   * Receives places and callbacks from SavedPlacesPanel (the orchestrator).
+   *
+   * Props:
+   *   places        — Place[]  — array of saved places
+   *   iconOptions   — {value, label}[]
+   *   iconEmoji     — Record<string, string>  — emoji lookup from ICON_MAP
+   *   onAdd         — fn(name, radius, icon) → Promise<boolean>
+   *   onRemove      — fn(placeId, placeName)
+   *   onViewStory   — fn(placeId)
+   *   storyPlaceId  — string | null
+   *   storyLoading  — boolean
+   *   storyVisits   — StoryVisit[]
    */
+  import SectionHeader from './primitives/SectionHeader.svelte';
+  import { ICON_MAP } from '../lib/alertConfig.js';
 
-  /** @type {Props} */
+  /** @type {{ places?: any[], iconOptions?: any[], iconEmoji?: Record<string, string>, onAdd: Function, onRemove: Function, onViewStory: Function, storyPlaceId?: string|null, storyLoading?: boolean, storyVisits?: any[] }} */
   let {
     places = [],
     iconOptions = [],
@@ -57,6 +59,11 @@ Receives places and callbacks from SavedPlacesPanel (the orchestrator).
     return d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
   }
 
+  /** aria-label for an emoji icon. Falls back to ICON_MAP label, then the emoji itself. */
+  function iconLabel(iconKey) {
+    return ICON_MAP[iconKey]?.label ?? iconEmoji[iconKey] ?? 'Place';
+  }
+
   async function handleAdd() {
     if (!newPlaceName.trim()) return;
     const ok = await onAdd(newPlaceName.trim(), newPlaceRadius, newPlaceIcon);
@@ -69,31 +76,52 @@ Receives places and callbacks from SavedPlacesPanel (the orchestrator).
   }
 </script>
 
-<div class="section-header">
-  <span class="section-label">Saved Places</span>
-  {#if places.length > 0}
-    <span class="section-badge">{places.length}</span>
-  {/if}
+<!-- ── Section header uses the shared SectionHeader primitive ── -->
+<div class="section-wrap">
+  <SectionHeader
+    title="Saved Places"
+    subtitle="Save home, work, school. Get notified when family arrives or leaves."
+    level={3}
+  >
+    {#snippet action()}
+      {#if places.length > 0}
+        <span class="section-badge" aria-label="{places.length} saved places">{places.length}</span>
+      {/if}
+    {/snippet}
+  </SectionHeader>
 </div>
 
 <div class="section-content">
-  <p class="hint">Save home, work, school. Get notified when family arrives or leaves.</p>
-
   {#if places.length === 0 && !showAddPlace}
+    <!-- Empty state: on-product CTA, brand rule compliance -->
     <div class="empty-state">
       <div class="empty-icon" aria-hidden="true">
         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
       </div>
       <p class="empty-title">No saved places yet</p>
-      <p class="empty-sub">Add home or work to get arrival and departure alerts.</p>
+      <p class="empty-sub">Save Home to get arrival alerts and keep your family safe.</p>
       <button class="btn btn-primary btn-sm" onclick={() => showAddPlace = true}>
-        Add a Place
+        Add Home or Work
       </button>
     </div>
   {:else}
-    {#each places as place (place.id)}
-      <div class="list-item">
-        <div class="item-icon" aria-hidden="true">{iconEmoji[place.icon] ?? '📍'}</div>
+    {#each places as place, i (place.id)}
+      <!-- Place card: @starting-style entrance, stagger capped at 5 -->
+      <div
+        class="list-item"
+        style="--_i: {Math.min(i, 4)}"
+      >
+        <!-- Emoji icon with accessible label + text fallback -->
+        <span
+          class="item-icon"
+          role="img"
+          aria-label={iconLabel(place.icon)}
+          title={iconLabel(place.icon)}
+        >
+          <span aria-hidden="true">{iconEmoji[place.icon] ?? '📍'}</span>
+          <!-- Screen-reader text fallback, hidden visually -->
+          <span class="sr-only">{iconLabel(place.icon)}</span>
+        </span>
         <div class="item-info">
           <span class="item-name">{place.name}</span>
           <span class="item-detail">{place.radiusM}m radius</span>
@@ -157,6 +185,7 @@ Receives places and callbacks from SavedPlacesPanel (the orchestrator).
         maxlength="100"
         autocomplete="off"
         aria-label="Place name"
+        style="font-size: 16px;"
       />
       <div class="form-row">
         <label class="sr-only" for="place-icon">Icon</label>
@@ -166,7 +195,7 @@ Receives places and callbacks from SavedPlacesPanel (the orchestrator).
           {/each}
         </select>
         <label class="field-label-inline">
-          Radius
+          <span>Radius</span>
           <input
             type="number"
             bind:value={newPlaceRadius}
@@ -174,9 +203,11 @@ Receives places and callbacks from SavedPlacesPanel (the orchestrator).
             min="50"
             max="5000"
             step="50"
-            aria-label="Geofence radius in meters"
+            aria-label="Geofence radius in meters (50–5000)"
+            style="font-size: 16px;"
           />
-          <span aria-hidden="true">m</span>
+          <span class="field-unit" aria-hidden="true">m</span>
+          <span class="sr-only">50 to 5000 meters</span>
         </label>
       </div>
       <div class="form-actions">
@@ -203,21 +234,9 @@ Receives places and callbacks from SavedPlacesPanel (the orchestrator).
 </div>
 
 <style>
-  .section-header {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
+  /* ── Section wrap — hosts the SectionHeader primitive ───────────────────── */
+  .section-wrap {
     padding: var(--space-4) var(--space-4) var(--space-1);
-  }
-
-  .section-label {
-    font-family: var(--font-display);
-    font-size: var(--text-xs);
-    font-weight: 700;
-    color: var(--text-tertiary);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    flex: 1;
   }
 
   .section-badge {
@@ -235,22 +254,38 @@ Receives places and callbacks from SavedPlacesPanel (the orchestrator).
 
   .section-content { padding: 0 var(--space-4) var(--space-3); }
 
-  .hint {
-    font-size: var(--text-xs);
-    color: var(--text-tertiary);
-    line-height: var(--leading-normal);
-    margin: 0 0 var(--space-2);
-  }
-
+  /* ── Place list items — @starting-style entrance ────────────────────────── */
   .list-item {
     display: flex;
     align-items: center;
     gap: var(--space-2-5);
     padding: var(--space-2) 0;
     border-bottom: 1px solid var(--border-subtle);
+    /* Stagger: capped at 5 via --_i (set inline) */
+    animation: place-enter var(--duration-normal, 200ms) var(--ease-out, ease-out)
+               calc(var(--stagger-base, 50ms) + var(--_i, 0) * var(--stagger-step, 40ms))
+               both;
   }
   .list-item:last-of-type { border-bottom: none; }
 
+  @keyframes place-enter {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .list-item {
+      animation: none;
+    }
+  }
+
+  /* ── Emoji icon — role=img with text fallback ───────────────────────────── */
   .item-icon {
     font-size: var(--text-lg);
     flex-shrink: 0;
@@ -258,7 +293,7 @@ Receives places and callbacks from SavedPlacesPanel (the orchestrator).
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--text-secondary);
+    /* Don't leak color onto the emoji — presentation only */
   }
 
   .item-info {
@@ -301,9 +336,14 @@ Receives places and callbacks from SavedPlacesPanel (the orchestrator).
   }
 
   .icon-action:hover { background: var(--surface-hover); color: var(--text-primary); }
-  .icon-action:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 2px; }
-  .icon-action--danger:hover { background: rgba(239, 68, 68, 0.10); color: var(--danger-500); }
+  .icon-action:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
+  /* Danger hover: use CSS custom-property tint (no raw rgba) */
+  .icon-action--danger:hover {
+    background: color-mix(in srgb, var(--danger-500) 10%, transparent);
+    color: var(--danger-500);
+  }
 
+  /* ── Empty state ─────────────────────────────────────────────────────────── */
   .empty-state {
     display: flex;
     flex-direction: column;
@@ -321,8 +361,9 @@ Receives places and callbacks from SavedPlacesPanel (the orchestrator).
     width: 48px;
     height: 48px;
     border-radius: var(--radius-full);
-    background: linear-gradient(135deg, rgba(20, 184, 166, 0.12) 0%, rgba(20, 184, 166, 0.06) 100%);
-    border: 1px solid rgba(20, 184, 166, 0.18);
+    /* Tint: primary-500-12 pattern — no raw rgba */
+    background: color-mix(in srgb, var(--primary-500) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--primary-500) 18%, transparent);
     color: var(--primary-500);
     display: flex;
     align-items: center;
@@ -346,6 +387,7 @@ Receives places and callbacks from SavedPlacesPanel (the orchestrator).
     max-width: 220px;
   }
 
+  /* ── Zone story ──────────────────────────────────────────────────────────── */
   .zone-story {
     margin: 0 0 var(--space-2);
     padding: var(--space-2) var(--space-3);
@@ -364,7 +406,7 @@ Receives places and callbacks from SavedPlacesPanel (the orchestrator).
   .skel-row {
     height: var(--space-3);
     border-radius: var(--radius-sm);
-    background: var(--skeleton-base, rgba(255,255,255,0.05));
+    background: var(--skeleton-base, color-mix(in srgb, var(--text-primary) 5%, transparent));
     animation: skel-pulse 1.6s ease-in-out infinite;
   }
   .skel-wide { width: 100%; }
@@ -373,6 +415,10 @@ Receives places and callbacks from SavedPlacesPanel (the orchestrator).
   @keyframes skel-pulse {
     0%, 100% { opacity: 0.5; }
     50%       { opacity: 1; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .skel-row { animation: none; }
   }
 
   .story-empty {
@@ -431,14 +477,15 @@ Receives places and callbacks from SavedPlacesPanel (the orchestrator).
     font-size: var(--text-2xs);
     font-weight: 600;
     color: var(--success-600);
-    background: rgba(16, 185, 129, 0.12);
-    border: 1px solid rgba(16, 185, 129, 0.24);
+    background: color-mix(in srgb, var(--success-500) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--success-500) 24%, transparent);
     padding: 2px var(--space-1-5);
     border-radius: var(--radius-full);
     flex-shrink: 0;
     white-space: nowrap;
   }
 
+  /* ── Add-place form ──────────────────────────────────────────────────────── */
   .add-form {
     display: flex;
     flex-direction: column;
@@ -474,7 +521,7 @@ Receives places and callbacks from SavedPlacesPanel (the orchestrator).
   .field-input:focus {
     outline: none;
     border-color: var(--primary-500);
-    box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.18);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-500) 18%, transparent);
   }
 
   .field-full { width: 100%; box-sizing: border-box; }
@@ -490,6 +537,11 @@ Receives places and callbacks from SavedPlacesPanel (the orchestrator).
     white-space: nowrap;
   }
 
+  .field-unit {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+  }
+
   .form-actions {
     display: flex;
     gap: var(--space-2);
@@ -501,6 +553,7 @@ Receives places and callbacks from SavedPlacesPanel (the orchestrator).
     margin-top: var(--space-2);
   }
 
+  /* ── Utilities ───────────────────────────────────────────────────────────── */
   .sr-only {
     position: absolute;
     width: 1px; height: 1px;
@@ -509,9 +562,5 @@ Receives places and callbacks from SavedPlacesPanel (the orchestrator).
     clip: rect(0,0,0,0);
     white-space: nowrap;
     border: 0;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .skel-row { animation: none; }
   }
 </style>

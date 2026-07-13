@@ -4,6 +4,7 @@
   import { onDestroy } from 'svelte';
   import { geofenceLog } from '../../lib/stores/places.js';
   import { emitGetGeofenceLog } from '../../lib/socket.js';
+  import SectionHeader from '../primitives/SectionHeader.svelte';
 
   // ── F6: Geofence log ───────────────────────────────────────────────────────
   let geofenceLogOpen = $state(false);
@@ -39,8 +40,11 @@
 <!-- ── F6: GEOFENCE LOG ───────────────────────────────────────────── -->
 <div class="feature-section">
   <button class="collapsible-header" onclick={toggleGeofenceLog} aria-expanded={geofenceLogOpen}>
-    <span class="card-eyebrow" style="margin:0">Zone History</span>
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true" style="transform: rotate({geofenceLogOpen ? 180 : 0}deg); transition: transform 200ms"><polyline points="6 9 12 15 18 9"/></svg>
+    <SectionHeader title="Zone History" level={4}>
+      {#snippet action()}
+        <svg class="chevron" class:rotated={geofenceLogOpen} xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+      {/snippet}
+    </SectionHeader>
   </button>
   {#if geofenceLogOpen}
     <div class="log-list">
@@ -90,6 +94,13 @@
     color: var(--text-primary);
   }
   .collapsible-header:hover { opacity: 0.8; }
+
+  .chevron {
+    flex-shrink: 0;
+    transition: transform 200ms var(--ease-out);
+  }
+  .chevron.rotated { transform: rotate(180deg); }
+  @media (prefers-reduced-motion: reduce) { .chevron { transition: none; } }
 
   /* F6: geofence log */
   .log-list {
