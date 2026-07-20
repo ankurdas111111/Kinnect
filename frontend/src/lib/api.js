@@ -2,7 +2,7 @@ import API_BASE from './env.js';
 
 let csrfToken = null;
 
-function buildApiUrl(path) {
+export function buildApiUrl(path) {
   const normalizedPath = String(path || '').startsWith('/') ? String(path || '') : '/' + String(path || '');
   if (!API_BASE) return normalizedPath;
   return API_BASE + normalizedPath;

@@ -32,3 +32,8 @@ backend/*.exe
 # Oracle deploy secrets
 deploy/oracle/.env
 deploy/oracle/edge/.env
+
+.tools/
+.pgdata/
+.pgdata-log.txt
+kinnect-server.exe

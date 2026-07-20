@@ -10,6 +10,10 @@ import (
 	"syscall"
 	"time"
 
+	// Embed the IANA timezone database so time.LoadLocation works in the
+	// scratch/minimal deploy container (the AI copilot resolves the user's zone).
+	_ "time/tzdata"
+
 	"kinnect-v3/internal/api"
 	"kinnect-v3/internal/auth"
 	"kinnect-v3/internal/cache"

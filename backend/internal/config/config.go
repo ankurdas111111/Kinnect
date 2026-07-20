@@ -30,6 +30,12 @@ type Config struct {
 	// Ola Maps — optional; enables Ola place search + routing. Falls back to
 	// Photon / OSRM when empty.
 	OlaMapsAPIKey string
+
+	// OpenRouter — optional; enables the Ask-the-Map AI copilot when set.
+	OpenRouterAPIKey string
+	// AIModels is the preference-ordered model list (primary first). Set via
+	// AI_MODELS as a comma-separated list; sensible free-tier defaults otherwise.
+	AIModels []string
 }
 
 const (
@@ -117,7 +123,29 @@ func Load() (*Config, error) {
 		TwilioAuthToken:    os.Getenv("TWILIO_AUTH_TOKEN"),
 		TwilioFromNumber:   os.Getenv("TWILIO_FROM_NUMBER"),
 		OlaMapsAPIKey:      os.Getenv("OLA_MAPS_API_KEY"),
+		OpenRouterAPIKey:   os.Getenv("OPENROUTER_API_KEY"),
+		AIModels:           ParseAIModels(os.Getenv("AI_MODELS")),
 	}, nil
+}
+
+// DefaultAIModels returns the free tool-calling models used when AI_MODELS is
+// unset (preference order; OpenRouter falls back server-side).
+func DefaultAIModels() []string {
+	return []string{
+		"openai/gpt-oss-20b:free",
+		"nvidia/nemotron-3-super-120b-a12b:free",
+	}
+}
+
+// ParseAIModels parses AI_MODELS (comma-separated, primary first), trimming and
+// deduping, and falling back to DefaultAIModels when empty. Exported so the
+// verification CLIs (cmd/ai-smoke, cmd/ai-eval) parse identically to the server.
+func ParseAIModels(raw string) []string {
+	models := parseCORSOrigins(raw) // same trim/dedupe semantics
+	if len(models) == 0 {
+		return DefaultAIModels()
+	}
+	return models
 }
 
 func parseCORSOrigins(raw string) []string {

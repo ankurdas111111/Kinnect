@@ -35,6 +35,7 @@ func NewRouter(cfg *config.Config, pool *db.Pool, c *cache.Cache, store *auth.Se
 	searchHandler := NewSearchHandler(cfg.OlaMapsAPIKey)
 	routeHandler := NewRouteHandler(cfg.OlaMapsAPIKey)
 	placesHandler := &PlacesHandler{db: pool.DB, cache: c}
+	aiHandler := NewAIHandler(cfg, pool.DB, c)
 
 	// API routes
 	mux.Handle("POST /api/login", CsrfMiddleware(http.HandlerFunc(authHandler.Login)))
@@ -65,6 +66,10 @@ func NewRouter(cfg *config.Config, pool *db.Pool, c *cache.Cache, store *auth.Se
 
 	// Routing proxy (Ola Maps Directions / FOSSGIS OSRM, LRU-cached 5 min)
 	mux.Handle("GET /api/route", RequireAuth(http.HandlerFunc(routeHandler.Route)))
+
+	// AI copilot — Ask the Map (SSE streaming agent)
+	mux.Handle("GET /api/ai/status", RequireAuth(http.HandlerFunc(aiHandler.Status)))
+	mux.Handle("POST /api/ai/ask", RequireAuth(CsrfMiddleware(http.HandlerFunc(aiHandler.Ask))))
 
 	// Saved places CRUD (F4)
 	mux.Handle("GET /api/places", RequireAuth(http.HandlerFunc(placesHandler.List)))

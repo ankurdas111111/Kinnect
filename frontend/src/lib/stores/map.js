@@ -63,3 +63,10 @@ export const mapChatRequest = writable(null);
  * active=false → map resets to pitch 0 / bearing 0
  */
 export const navFollow = writable({ active: false, lat: 0, lng: 0, bearing: 0 });
+
+/**
+ * Ask-the-Map AI copilot output. Set to { directives: [...] } to render AI map
+ * annotations (fly_to / add_pin / draw_trail), or { clear: true } to remove them.
+ * Map.svelte consumes and resets to null.
+ */
+export const aiDirectives = writable(null);

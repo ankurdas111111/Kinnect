@@ -5,7 +5,7 @@
   // maplibregl is loaded dynamically inside onMount so the main bundle
   // does not block on the ~283 kB maplibre chunk at parse time.
   let maplibregl = $state();
-  import { otherUsers, myLocation, mySocketId, mySafetyStatus, focusUser, mapFlyTo, routeGeometry, navigationState, mapTappedUser, mapChatRequest, navFollow } from '../lib/stores/map.js';
+  import { otherUsers, myLocation, mySocketId, mySafetyStatus, focusUser, mapFlyTo, routeGeometry, navigationState, mapTappedUser, mapChatRequest, navFollow, aiDirectives } from '../lib/stores/map.js';
   import { recentTrailResult } from '../lib/stores/trail.js';
   import { emitGetRecentTrail } from '../lib/socket.js';
   import { haptics } from '../lib/haptics.js';
@@ -713,6 +713,67 @@
       }
     }
   });
+  // ── AI copilot annotation helpers ────────────────────────────────────
+  let aiMarkers = [];
+
+  function clearAiAnnotations() {
+    for (const m of aiMarkers) m.remove();
+    aiMarkers = [];
+    if (map.getLayer('ai-trail-line')) map.removeLayer('ai-trail-line');
+    if (map.getLayer('ai-trail-glow')) map.removeLayer('ai-trail-glow');
+    if (map.getSource('ai-trail')) map.removeSource('ai-trail');
+  }
+
+  function executeAiDirectives(directives) {
+    const allCoords = [];
+    const trailFeatures = [];
+    for (const d of directives) {
+      if (d.type === 'add_pin' && d.lat != null && d.lng != null) {
+        const el = document.createElement('div');
+        el.className = 'ai-pin';
+        el.innerHTML = `<span class="ai-pin-dot"></span>${d.label ? `<span class="ai-pin-label">${escapeHtml(d.label)}</span>` : ''}`;
+        const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+          .setLngLat([d.lng, d.lat])
+          .addTo(map);
+        aiMarkers.push(marker);
+        allCoords.push([d.lng, d.lat]);
+      } else if (d.type === 'draw_trail' && Array.isArray(d.points) && d.points.length > 1) {
+        // Accumulate every trail into ONE FeatureCollection — a single 'ai-trail'
+        // source with setData would otherwise let each trail overwrite the last.
+        trailFeatures.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: d.points }, properties: { user: d.user || '' } });
+        allCoords.push(...d.points);
+      }
+    }
+    if (trailFeatures.length) {
+      const fc = { type: 'FeatureCollection', features: trailFeatures };
+      if (map.getSource('ai-trail')) {
+        map.getSource('ai-trail').setData(fc);
+      } else {
+        map.addSource('ai-trail', { type: 'geojson', data: fc });
+        // NOTE: violet hex literals mirror --accent-500 tokens (MapLibre needs literals).
+        map.addLayer({ id: 'ai-trail-glow', type: 'line', source: 'ai-trail',
+          paint: { 'line-color': '#a78bfa', 'line-width': 10, 'line-opacity': 0.22, 'line-blur': 4 } });
+        map.addLayer({ id: 'ai-trail-line', type: 'line', source: 'ai-trail',
+          paint: { 'line-color': '#c4b5fd', 'line-width': 4, 'line-opacity': 0.9 },
+          layout: { 'line-cap': 'round', 'line-join': 'round' } });
+      }
+    }
+    // Camera: explicit fly_to wins; otherwise fit to everything annotated.
+    const fly = directives.find(d => d.type === 'fly_to' && d.lat != null && d.lng != null);
+    if (fly) {
+      map.flyTo({ center: [fly.lng, fly.lat], zoom: fly.zoom || 15, duration: 1100 });
+    } else if (allCoords.length > 1) {
+      const bounds = allCoords.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(allCoords[0], allCoords[0]));
+      map.fitBounds(bounds, { padding: 90, duration: 900, maxZoom: 16.5 });
+    } else if (allCoords.length === 1) {
+      map.flyTo({ center: allCoords[0], zoom: 15.5, duration: 1100 });
+    }
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+  }
+
   // ── Place search fly-to ──────────────────────────────────────────────
   run(() => {
     if (map && $mapFlyTo) {
@@ -747,6 +808,17 @@
         if (map.getLayer('directions-route-line')) map.removeLayer('directions-route-line');
         if (map.getLayer('directions-route-glow')) map.removeLayer('directions-route-glow');
         if (map.getSource('directions-route')) map.removeSource('directions-route');
+      }
+    }
+  });
+  // ── Ask-the-Map AI copilot directives ───────────────────────────────
+  run(() => {
+    if (map && $aiDirectives) {
+      const payload = $aiDirectives;
+      aiDirectives.set(null);
+      clearAiAnnotations();
+      if (!payload.clear && Array.isArray(payload.directives)) {
+        executeAiDirectives(payload.directives);
       }
     }
   });
@@ -915,6 +987,44 @@
     position: absolute;
     inset: 0;
     z-index: 1;
+  }
+
+  /* ── AI copilot pins (Ask the Map) ───────────────────────────── */
+  :global(.ai-pin) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    pointer-events: none;
+  }
+  :global(.ai-pin-label) {
+    order: -1;
+    max-width: 220px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--bg-elevated, #171a2e) 88%, transparent);
+    border: 1px solid color-mix(in oklab, var(--accent-400, #a78bfa) 45%, transparent);
+    color: var(--text-primary, #e7e9f4);
+    font-size: 11.5px;
+    font-weight: 600;
+    line-height: 1.35;
+    text-align: center;
+    backdrop-filter: blur(6px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+    animation: ai-pin-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+  :global(.ai-pin-dot) {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #c4b5fd, #7c3aed);
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 4px rgba(167, 139, 250, 0.25), 0 2px 8px rgba(0, 0, 0, 0.4);
+    animation: ai-pin-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+  @keyframes ai-pin-in {
+    from { opacity: 0; transform: translateY(-8px) scale(0.6); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
   }
 
   /* ── Pending pin preview marker ──────────────────────────────── */

@@ -37,6 +37,8 @@
   import SecretChatPanel from '../components/SecretChatPanel.svelte';
   import HubSpotlight from '../components/HubSpotlight.svelte';
   import FeatureGuide from '../components/FeatureGuide.svelte';
+  import AICopilotPanel from '../components/AICopilotPanel.svelte';
+  import { aiStatus } from '../lib/aiClient.js';
   import { calculateDistance } from '../lib/tracking.js';
   import { GPSKalmanFilter, VelocityKalmanFilter } from '../lib/kalman.js';
   import { startMotionSensor, stopMotionSensor, getMotionState } from '../lib/motionSensor.js';
@@ -93,6 +95,7 @@
     }
   }
   let secretChatPeer = $state(null); // { id: string, name: string }
+  let aiEnabled = $state(false); // Ask-the-Map copilot; probed once on mount
 
   // Dialog element refs for programmatic focus management
   let sosConfirmEl = $state(null);
@@ -605,6 +608,7 @@
   onMount(async () => {
     if (!$authUser) { push('/login'); return; }
     setupSocketHandlers();
+    aiStatus().then(enabled => { aiEnabled = enabled; });
     pushProfile();
     const profileInterval = setInterval(pushProfile, 30000);
     checkMobile();
@@ -801,6 +805,9 @@
           on:setDestination={e => walkDestination.set(e.detail)}
         />
       </div>
+      {#if aiEnabled}
+        <AICopilotPanel />
+      {/if}
 
   {/snippet}
 
