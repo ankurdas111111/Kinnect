@@ -32,3 +32,21 @@ backend/*.exe
 # Oracle deploy secrets
 deploy/oracle/.env
 deploy/oracle/edge/.env
+
+# Local AI/agent tooling — not part of the app
+.agents/
+.claude/
+.codex/
+bencium-claude-code-design-skill/
+claude-agentic-framework/
+web-quality-skills/
+kinnect-coder.skill
+skills-lock.json
+
+# Knowledge-graph output (rebuilt locally by graphify)
+graphify-out/
+
+# Test/scratch artifacts (match at any depth)
+test-results/
+playwright-report/
+scratchpad/
