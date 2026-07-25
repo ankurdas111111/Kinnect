@@ -26,6 +26,12 @@
         } else {
           document.documentElement.setAttribute('data-theme', 'dark');
         }
+        // Daypart tint pre-paint (buckets must match lib/daypart.js daypartFor)
+        if (localStorage.getItem('daypart-enabled') !== '0') {
+          var h = new Date().getHours();
+          document.documentElement.setAttribute('data-daypart',
+            h < 5 ? 'night' : h < 8 ? 'dawn' : h < 17 ? 'day' : h < 20 ? 'dusk' : 'night');
+        }
       } catch (e) {}
     })();
   </script>

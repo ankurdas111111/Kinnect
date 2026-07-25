@@ -252,19 +252,18 @@
     height: 90vh;
     height: 90dvh;
     z-index: var(--z-panel);
-    /* 3D glass sheet with enhanced depth */
-    background: var(--glass-3d);
+    /* nav-tier liquid glass: daypart-warmed material + specular top edge */
+    background:
+      linear-gradient(var(--amb-warmth), var(--amb-warmth)),
+      var(--glass-nav-bg);
     border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
-    border: 1px solid var(--glass-3d-border);
+    border: 1px solid var(--glass-nav-border);
     border-bottom: none;
-    border-top-color: rgba(255, 255, 255, 0.18);
     box-shadow:
       var(--elevation-5),
-      0 -1px 0 rgba(20, 184, 166, 0.20),
-      inset 0 1px 0 rgba(255, 255, 255, 0.15),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.05);
-    backdrop-filter: var(--glass-3d-blur);
-    -webkit-backdrop-filter: var(--glass-3d-blur);
+      var(--glass-nav-highlight);
+    backdrop-filter: var(--glass-nav-blur);
+    -webkit-backdrop-filter: var(--glass-nav-blur);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -275,20 +274,17 @@
     /* NOTE: position:fixed declared above — do not add position:relative here */
   }
 
-  /* Neon top-edge glow line — teal brand accent */
+  /* Tone-aware top-edge light — --glass-edge-light resolves through
+     --nav-tone-accent, so the line reads brand-calm normally and warms to
+     warning/danger with the family verdict. One 500ms opacity-only ease
+     on tone entry comes free from the shared token crossfade pattern. */
   .sheet::before {
     content: '';
     position: absolute;
     top: 0; left: 15%; right: 15%;
     height: 1px;
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      rgba(20, 184, 166, 0.65) 30%,
-      rgba(45, 212, 191, 0.55) 70%,
-      transparent 100%
-    );
-    box-shadow: 0 0 8px rgba(20, 184, 166, 0.40), 0 0 16px rgba(20, 184, 166, 0.18);
+    background: var(--glass-edge-light);
+    box-shadow: 0 0 8px color-mix(in oklch, var(--nav-tone-accent) 40%, transparent);
     border-radius: 0 0 2px 2px;
     pointer-events: none;
     z-index: 2;
@@ -354,8 +350,9 @@
     -webkit-overflow-scrolling: touch;
     touch-action: pan-y;
     padding: 0 var(--space-4) var(--space-4);
-    /* Safe area + bottom tab bar height so content isn't hidden behind the tab bar */
-    padding-bottom: calc(var(--space-4) + var(--safe-bottom, 0px) + var(--bottom-tab-height, 56px));
+    /* Clearance so content isn't hidden behind the floating tab pill
+       (same token as .layout-map — the two must always agree) */
+    padding-bottom: calc(var(--space-4) + var(--tab-bar-clearance));
   }
 
   /* Fix #2: In peek state (~35% visible = ~230px on 667px), clip the body so

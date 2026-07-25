@@ -21,12 +21,15 @@
 
   /* ── Liquid Glass edge-light ─────────────────────────────────────────────
      A single source for the top-edge accent line duplicated across
-     Modal / BottomSheet / Toast / Card. Use via `.fx-edge-line`. */
+     Modal / BottomSheet / Toast / Card. Use via `.fx-edge-line`.
+     Tone-aware: --nav-tone-accent (global.css) resolves to brand primary in
+     the safe state and to warning/danger under <html data-tone> — every
+     edge-lined surface reflects the family verdict in one indirection. */
   --glass-edge-light: linear-gradient(
     90deg,
     transparent 0%,
-    color-mix(in oklch, var(--primary-400) 55%, transparent) 30%,
-    color-mix(in oklch, var(--primary-400) 55%, transparent) 70%,
+    color-mix(in oklch, var(--nav-tone-accent) 55%, transparent) 30%,
+    color-mix(in oklch, var(--nav-tone-accent) 55%, transparent) 70%,
     transparent 100%
   );
 
@@ -91,6 +94,18 @@
   --glass-chip-blur:    var(--glass-blur-sm);
   --glass-chip-border:  var(--map-chip-border);
   --glass-chip-shadow:  var(--map-chip-shadow);
+
+  /* nav tier — chrome floating over the live map (tab bar, sheet, sidebar,
+     top bars). Heaviest legibility treatment: base blur + specular top-edge
+     light-catch (inset shadow — zero paint cost) + one soft lift shadow.
+     var() aliases over data-fx-rewritten sources ⇒ full/calm/minimal behavior
+     is inherited for free. --nav-tint (global.css, the ONLY daypart-bendable
+     color) warms the material at an 8% mix — never text tokens. */
+  --glass-nav-bg:        color-mix(in oklch, var(--glass-bg) 92%, var(--nav-tint));
+  --glass-nav-blur:      var(--glass-blur);
+  --glass-nav-border:    var(--glass-border-strong);
+  --glass-nav-highlight: inset 0 1px 0 var(--nav-specular);
+  --glass-nav-shadow:    var(--shadow-lg), inset 0 1px 0 var(--nav-specular);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -114,6 +129,8 @@
   --glass-bg:       var(--glass-bg-strong);
   --glass-3d:       var(--glass-bg-strong);
   --fx-ambient-opacity: 0;
+  /* Flat near-opaque nav surfaces shouldn't carry deep float shadows */
+  --glass-nav-shadow: var(--shadow-sm), inset 0 1px 0 var(--nav-specular);
 }
 
 /* Minimal = the user opted out of decorative motion. Neutralize ambient

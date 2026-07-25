@@ -30,14 +30,14 @@
   const dispatch = createEventDispatcher();
 
   const tabTitles = {
-    track: 'Track',
-    people: 'People',
+    family: 'Family',
+    map: 'Map',
     share: 'Share',
-    safety: 'Safety',
-    me: 'Profile'
+    help: 'Help',
+    me: 'Me'
   };
 
-  let title = $derived(tabTitles[activeTab] || 'Track');
+  let title = $derived(tabTitles[activeTab] || 'Map');
 </script>
 
 <header class="mobile-top-bar">

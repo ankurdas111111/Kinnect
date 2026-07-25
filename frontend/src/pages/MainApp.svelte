@@ -16,6 +16,10 @@
   import Banner from '../components/Banner.svelte';
   import MapView from '../components/Map.svelte';
   import UsersList from '../components/UsersList.svelte';
+  import FamilyPanel from '../components/hub/FamilyPanel.svelte';
+  import VerdictStrip from '../components/hub/VerdictStrip.svelte';
+  import SidebarLinkRow from '../components/layout/SidebarLinkRow.svelte';
+  import { familyBadge, helpBadge } from '../lib/stores/verdict.js';
   import InfoPanel from '../components/InfoPanel.svelte';
   import AdminPanel from '../components/AdminPanel.svelte';
   import SharingPanel from '../components/SharingPanel.svelte';
@@ -56,7 +60,7 @@
   import { detectAndroidManufacturer, BATTERY_INSTRUCTIONS } from '../lib/manufacturerConfig.js';
 
   let activePanel = $state(null);
-  let sidebarTab = $state('info');
+  let sidebarTab = $state('family');
   let sidebarCollapsed = $state(false);
   let sosConfirmOpen = $state(false);
   let sosParticleBurstActive = $state(false);
@@ -171,7 +175,7 @@
   const batteryManufacturer = detectAndroidManufacturer();
 
   let isMobile = $state(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
-  let mobileTab = $state('track');
+  let mobileTab = $state('map');
   let sheetOpen = $state(false);
   let followMode = $state(false);
   let meSubTab = $state('info');
@@ -284,7 +288,7 @@
     if ($focusUser) {
       if (isMobile) {
         setSheetOpen(false);
-        setMobileTab('track');
+        setMobileTab('map');
       }
       if (activePanel === 'users') {
         activePanel = null;
@@ -298,7 +302,7 @@
 
   function onNavbarToggle(e) {
     const panel = e.detail;
-    if (['info', 'sharing', 'admin', 'places', 'settings'].includes(panel)) {
+    if (['family', 'info', 'sharing', 'admin', 'places', 'settings'].includes(panel)) {
       if (sidebarTab === panel && !sidebarCollapsed) {
         sidebarCollapsed = true;
       } else {
@@ -324,14 +328,14 @@
     const tab = e.detail;
     setMobileTab(tab);
     activePanel = null;
-    if (tab === 'track') {
+    if (tab === 'map') {
       sidebarTab = 'info';
       setSheetOpen(true);
       return;
     }
-    if (tab === 'people') sidebarTab = 'users';
+    if (tab === 'family') sidebarTab = 'family';
     else if (tab === 'share') sidebarTab = 'sharing';
-    else if (tab === 'safety') sidebarTab = 'admin';
+    else if (tab === 'help') sidebarTab = 'admin';
     else if (tab === 'me') sidebarTab = 'info';
     setSheetOpen(true);
   }
@@ -586,8 +590,8 @@
   function checkMobile() {
     isMobile = window.innerWidth < 768;
     if (isMobile) {
-      if (!$uiShellStore.mobileTab) setMobileTab('track');
-      if (!$uiShellStore.sheetOpen && $uiShellStore.mobileTab === 'track') setSheetOpen(true);
+      if (!$uiShellStore.mobileTab) setMobileTab('map');
+      if (!$uiShellStore.sheetOpen && $uiShellStore.mobileTab === 'map') setSheetOpen(true);
     }
   }
 
@@ -772,19 +776,46 @@
         activeTab={sidebarTab}
         {isAdmin}
         collapsed={sidebarCollapsed}
+        badges={{ family: $familyBadge, help: $helpBadge, share: hasNotification }}
         on:tabChange={onSidebarTabChange}
         on:toggle={onSidebarToggle}
       >
-        {#if sidebarTab === 'info'}
+        {#snippet header()}
+          <VerdictStrip compact={sidebarCollapsed}
+            onopen={() => { sidebarTab = 'family'; sidebarCollapsed = false; }} />
+        {/snippet}
+        {#if sidebarTab === 'family'}
+          <div class="sidebar-pad">
+            <!-- showVerdict=false: the sidebar header's VerdictStrip already answers -->
+            <FamilyPanel showVerdict={false} onAddPeople={openSharingFromInvite} onSecretChat={(p) => { secretChatPeer = p; }} />
+          </div>
+        {:else if sidebarTab === 'info'}
           <InfoPanel embedded={true} />
         {:else if sidebarTab === 'sharing'}
           <SharingPanel embedded={true} />
         {:else if sidebarTab === 'admin'}
+          <div class="sidebar-pad">
+            <SidebarLinkRow links={[
+              { label: 'Emergency Profile', route: '/emergency', icon: 'emergency' },
+              { label: 'Check-in Schedule', route: '/checkins', icon: 'checkins' },
+            ]} />
+          </div>
           <AdminPanel embedded={true} />
         {:else if sidebarTab === 'places'}
+          <div class="sidebar-pad">
+            <SidebarLinkRow links={[{ label: 'Route History', route: '/replay', icon: 'routes' }]} />
+          </div>
           <SavedPlacesPanel embedded={true} />
         {:else if sidebarTab === 'settings'}
-          <SettingsPanel embedded={true} on:openGuide={() => showFeatureGuide = true} />
+          <div class="spatial-subtabs sidebar-pad">
+            <button class="spatial-subtab" class:active={meSubTab !== 'settings'} onclick={() => meSubTab = 'info'}>Status</button>
+            <button class="spatial-subtab" class:active={meSubTab === 'settings'} onclick={() => meSubTab = 'settings'}>Settings</button>
+          </div>
+          {#if meSubTab === 'settings'}
+            <SettingsPanel embedded={true} on:openGuide={() => showFeatureGuide = true} />
+          {:else}
+            <InfoPanel embedded={true} />
+          {/if}
         {/if}
       </Sidebar>
 
@@ -826,12 +857,12 @@
 
       <BottomSheet
         open={sheetOpen}
-        title={mobileTab === 'track' ? 'Map' : mobileTab === 'people' ? 'People' : mobileTab === 'share' ? 'Connect' : mobileTab === 'safety' ? 'Safety' : 'Me'}
+        title={mobileTab === 'family' ? 'Family' : mobileTab === 'map' ? 'Map' : mobileTab === 'share' ? 'Share' : mobileTab === 'help' ? 'Help' : 'Me'}
         on:close={() => {
           setSheetOpen(false);
         }}
       >
-        {#if mobileTab === 'track'}
+        {#if mobileTab === 'map'}
           <TrackingNowCard
             location={$myLocation}
             trackingActive={$tracking}
@@ -841,29 +872,9 @@
             on:centerOnMe={() => focusUser.set('__self__')}
             on:toggleFollow={() => (followMode = !followMode)}
           />
+          <SidebarLinkRow links={[{ label: 'Route History', route: '/replay', icon: 'routes' }]} />
         {:else if mobileTab === 'me'}
-          <div class="page-nav-row">
-            <button class="page-nav-btn tactile" title="Dashboard" aria-label="Open Dashboard" onclick={() => push('/dashboard')}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-              Dashboard
-            </button>
-            <button class="page-nav-btn tactile" title="Activity" aria-label="Open Activity" onclick={() => push('/activity')}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-              Activity
-            </button>
-            <button class="page-nav-btn tactile" title="Emergency" aria-label="Open Emergency" onclick={() => push('/emergency')}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-              Emergency
-            </button>
-            <button class="page-nav-btn tactile" title="Check-ins" aria-label="Open Check-ins" onclick={() => push('/checkins')}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              Check-ins
-            </button>
-            <button class="page-nav-btn tactile" title="Route History" aria-label="Open Route History" onclick={() => push('/replay')}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
-              Route History
-            </button>
-          </div>
+          
           <div class="spatial-subtabs">
             <button class="spatial-subtab" class:active={meSubTab === 'info'} onclick={() => meSubTab = 'info'}>Status</button>
             <button class="spatial-subtab" class:active={meSubTab === 'places'} onclick={() => meSubTab = 'places'}>Places</button>
@@ -878,7 +889,7 @@
           {/if}
         {:else if mobileTab === 'share'}
           <SharingPanel embedded={true} />
-        {:else if mobileTab === 'safety'}
+        {:else if mobileTab === 'help'}
           <div class="safety-quick-actions">
             <button
               class="btn"
@@ -901,8 +912,8 @@
             </button>
           </div>
           <AdminPanel embedded={true} />
-        {:else if mobileTab === 'people'}
-          <UsersList embedded={true} on:addPeople={openSharingFromInvite} on:secretChat={(e) => { setSheetOpen(false); secretChatPeer = e.detail; }} />
+        {:else if mobileTab === 'family'}
+          <FamilyPanel onAddPeople={openSharingFromInvite} onSecretChat={(p) => { setSheetOpen(false); secretChatPeer = p; }} />
         {/if}
       </BottomSheet>
 
@@ -914,7 +925,9 @@
         activeTab={mobileTab}
         {isAdmin}
         isTracking={$tracking}
-        {hasNotification}
+        shareNotification={hasNotification}
+        familyBadge={$familyBadge}
+        helpBadge={$helpBadge}
         on:tabChange={onMobileTabChange}
       />
 
@@ -1053,6 +1066,7 @@
 
 <style>
   /* spatial-subtabs styles are in global.css */
+  .sidebar-pad { padding: var(--space-3) var(--space-3) 0; }
 
   /* ── Glassmorphic banner host ────────────────────────────────────────────
      Banner.svelte renders a position:fixed .banner that self-styles its

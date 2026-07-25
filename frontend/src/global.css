@@ -171,6 +171,9 @@
   --sidebar-tablet: min(320px, 40vw);
   --right-panel-width: min(380px, calc(100vw - 2 * var(--space-4)));
   --bottom-tab-height: 56px;
+  /* Clearance under the floating tab-bar pill (bar + float margin + safe area).
+     Single source consumed by .layout-map and .sheet-body — no hand-rolled calcs. */
+  --tab-bar-clearance: calc(var(--bottom-tab-height) + var(--space-4) + var(--safe-bottom));
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
@@ -206,6 +209,22 @@
   --glass-blur:        blur(20px) saturate(1.8);
   --glass-blur-sm:     blur(12px) saturate(1.4);
   --glass-shadow:      0 4px 24px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(255,255,255,0.6);
+
+  /* ── Nav glass sources (nav tier lives in tokens-fx.css) ────────────
+     --nav-tint: temperature color mixed at 8% into nav glass — the ONLY
+     color daypart may bend (tokens-daypart.css). Never affects text tokens,
+     so WCAG contrast cannot regress by construction.
+     --nav-specular: liquid-glass top-edge light-catch (inset highlight). */
+  --nav-tint:          oklch(0.95 0.01 85);
+  --nav-specular:      rgba(255, 255, 255, 0.60);  /* raw-color-ok — nav glass source token */
+
+  /* ── Verdict tone (nav emotional layer) ─────────────────────────────
+     Flipped by <html data-tone="safe|caution|alert"> (App.svelte ← verdict
+     store). safe = brand primary (NOT green — calm by default), caution =
+     warning ramp, alert = danger ramp. Overridden below after theme blocks. */
+  --nav-tone-accent:   var(--primary-400);   /* borders/edge/indicator — ≥3:1 */
+  --nav-tone-ink:      var(--primary-600);   /* text/icons on nav glass — ≥4.5:1 */
+  --nav-tone-tint:     transparent;          /* ambient wash overlay */
 
   /* ── Map Overlay UI ───────────────────────────────────────────── */
   --map-chip-bg:       rgba(255, 255, 255, 0.88);
@@ -395,6 +414,9 @@
   --glass-blur:        blur(24px) saturate(1.6);
   --glass-blur-sm:     blur(14px) saturate(1.4);
   --glass-shadow:      0 8px 32px rgba(0, 0, 0, 0.50), 0 0 0 1px rgba(255,255,255,0.07);
+  --nav-tint:          oklch(0.35 0.02 275);
+  --nav-specular:      rgba(255, 255, 255, 0.10);  /* raw-color-ok — nav glass source token */
+  --nav-tone-ink:      var(--primary-400);
   --map-chip-bg:       rgba(9, 9, 20, 0.85);
   --map-chip-border:   rgba(255, 255, 255, 0.10);
   --map-chip-shadow:   0 2px 12px rgba(0, 0, 0, 0.40);
@@ -483,6 +505,9 @@
     --glass-blur:        blur(24px) saturate(1.6);
     --glass-blur-sm:     blur(14px) saturate(1.4);
     --glass-shadow:      0 8px 32px rgba(0, 0, 0, 0.50), 0 0 0 1px rgba(255,255,255,0.07);
+    --nav-tint:          oklch(0.35 0.02 275);
+    --nav-specular:      rgba(255, 255, 255, 0.10);  /* raw-color-ok — nav glass source token */
+    --nav-tone-ink:      var(--primary-400);
     --map-chip-bg:       rgba(9, 9, 20, 0.85);
     --map-chip-border:   rgba(255, 255, 255, 0.10);
     --map-chip-shadow:   0 2px 12px rgba(0, 0, 0, 0.40);
@@ -518,6 +543,28 @@
     --popup-text-val:     rgba(255, 255, 255, 0.90);
     --popup-text-label:   rgba(255, 255, 255, 0.50);
   }
+}
+
+/* ═══ Verdict tone — nav emotional layer ═══════════════════════════════════
+   <html data-tone> is set by App.svelte from the shared verdict store.
+   :root[data-tone] = (0,2,0) beats [data-theme] (0,1,0); the per-theme ink
+   compounds below are also (0,2,0) and win by source order. safe = defaults
+   above (brand primary, transparent tint) — no block needed. */
+:root[data-tone="caution"] {
+  --nav-tone-accent: var(--warning-400);
+  --nav-tone-ink:    var(--warning-600);
+  --nav-tone-tint:   color-mix(in oklch, var(--warning-500) 10%, transparent);
+}
+[data-theme="dark"][data-tone="caution"] {
+  --nav-tone-ink:    var(--warning-400);
+}
+:root[data-tone="alert"] {
+  --nav-tone-accent: var(--danger-400);
+  --nav-tone-ink:    var(--danger-500);
+  --nav-tone-tint:   color-mix(in oklch, var(--danger-500) 12%, transparent);
+}
+[data-theme="dark"][data-tone="alert"] {
+  --nav-tone-ink:    var(--danger-400);
 }
 
 
@@ -2513,36 +2560,8 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
 }
 
 /* Neon pulse — multi-ring glow that breathes */
-@keyframes neon-breathe-live {
-  0%, 100% {
-    box-shadow: 0 0 6px rgba(16,185,129,0.6), 0 0 16px rgba(16,185,129,0.25);
-    transform: scale(1);
-  }
-  50% {
-    box-shadow: 0 0 12px rgba(16,185,129,0.9), 0 0 30px rgba(16,185,129,0.45), 0 0 60px rgba(16,185,129,0.18);
-    transform: scale(1.12);
-  }
-}
 
-@keyframes neon-breathe-sos {
-  0%, 100% {
-    box-shadow: 0 0 8px rgba(239,68,68,0.7), 0 0 20px rgba(239,68,68,0.35);
-    transform: scale(1);
-  }
-  50% {
-    box-shadow: 0 0 16px rgba(239,68,68,1.0), 0 0 40px rgba(239,68,68,0.60), 0 0 80px rgba(239,68,68,0.28);
-    transform: scale(1.20);
-  }
-}
 
-@keyframes neon-breathe-brand {
-  0%, 100% {
-    box-shadow: 0 0 6px color-mix(in oklch, var(--primary-500) 50%, transparent), 0 0 16px color-mix(in oklch, var(--primary-500) 20%, transparent);
-  }
-  50% {
-    box-shadow: 0 0 10px color-mix(in oklch, var(--primary-500) 80%, transparent), 0 0 26px color-mix(in oklch, var(--primary-500) 38%, transparent), 0 0 52px color-mix(in oklch, var(--primary-500) 16%, transparent);
-  }
-}
 
 /* Holographic shimmer sweep — travels across surface */
 @keyframes holo-travel {
@@ -2717,9 +2736,6 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
 .neon-warn   { box-shadow: var(--neon-warn-sm); }
 
 /* Animated neon breathing */
-.animate-neon-live    { animation: neon-breathe-live  2.5s ease-in-out infinite; }
-.animate-neon-sos     { animation: neon-breathe-sos   1.4s ease-in-out infinite; }
-.animate-neon-brand   { animation: neon-breathe-brand 3s ease-in-out infinite; }
 .animate-chip-breathe { animation: chip-breathe       2.5s ease-in-out infinite; }
 .animate-chip-sos     { animation: chip-breathe-sos   1.4s ease-in-out infinite; }
 .animate-wiggle       { animation: wiggle-attention   0.6s ease-in-out; }
@@ -2739,19 +2755,6 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
 .gyro-layer-3 { transform: var(--gyro-layer-3); }
 
 /* Holographic shimmer surface */
-.holo-surface {
-  position: relative;
-  overflow: hidden;
-}
-.holo-surface::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: var(--holo-shimmer);
-  pointer-events: none;
-  animation: holo-travel 4s ease-in-out infinite;
-  border-radius: inherit;
-}
 
 /* Aurora ambient background — use on page containers */
 .aurora-mesh {
@@ -2812,9 +2815,6 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
 
 /* ── 2026 reduced-motion additions ─────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-  .animate-neon-live,
-  .animate-neon-sos,
-  .animate-neon-brand,
   .animate-chip-breathe,
   .animate-chip-sos,
   .animate-wiggle,
@@ -2825,7 +2825,6 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
   .animate-depth-arrive,
   .animate-item-pop,
   .animate-toast-spring,
-  .holo-surface::after,
   .aurora-mesh::before,
   .aurora-mesh::after,
   .stagger-3d > * {

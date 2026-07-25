@@ -5,11 +5,9 @@
   import { push } from 'svelte-spa-router';
   import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
-  import { get } from 'svelte/store';
   import { authUser } from '../lib/stores/auth.js';
-  import { otherUsers } from '../lib/stores/map.js';
-  import { socket } from '../lib/socket.js';
   import { clearHubBadge } from '../lib/stores/hubBadge.js';
+  import { activityEvents, clearActivity } from '../lib/activityLog.js';
   import { connectivityStore } from '../lib/stores/connectivity.js';
   import { deriveConnState, formatAge } from '../lib/presence.js';
   import { allowMotion } from '../lib/stores/effects.js';
@@ -23,9 +21,7 @@
     if (!$authUser) push('/login');
   });
 
-  // ── Event log ──────────────────────────────────────────────────────────────
-  let events = $state([]);
-  let nextId = 1;
+  // ── Event log — now device-persistent (survives refresh) via activityLog.js ──
   let activeFilter = $state('all');
   let now = Date.now();
   let clockInterval;
@@ -44,15 +40,8 @@
   };
 
   let filtered = $derived(activeFilter === 'all'
-    ? events
-    : events.filter(e => TYPE_FILTER_MAP[e.type] === activeFilter));
-
-  function addEvent(type, userId, userName, message, severity = 'normal') {
-    events = [
-      { id: nextId++, type, userId, userName, message, severity, ts: Date.now() },
-      ...events,
-    ].slice(0, 120);
-  }
+    ? $activityEvents
+    : $activityEvents.filter(e => TYPE_FILTER_MAP[e.type] === activeFilter));
 
   // ── Relative time — delegates to presence.js formatAge ──────────────────────
   function relTime(ts) {
@@ -85,55 +74,17 @@
     })
   );
 
-  // ── Socket listeners ────────────────────────────────────────────────────────
-  // Track which userIds currently have an active SOS so we only log start/end once
-  const sosActiveSet = new Set();
-
-  function makeHandlers() {
-    return {
-      userConnected: (d) => addEvent('position', d.userId, d.displayName, `${d.displayName || 'Someone'} came online`),
-      userOffline:   (d) => addEvent('offline',  d.userId, d.displayName, `${d.displayName || 'Someone'} went offline`),
-      // userDisconnect sends a raw socketId string — look up name from otherUsers
-      userDisconnect: (socketId) => {
-        const uid = typeof socketId === 'string' ? socketId : socketId?.socketId;
-        const user = get(otherUsers).map ? get(otherUsers).get(uid) : undefined;
-        const name = user?.displayName || 'Someone';
-        addEvent('offline', user?.userId || null, name, `${name} left`);
-      },
-      // Backend emits sosUpdate for both SOS start AND end; diff with sosActiveSet
-      sosUpdate: (d) => {
-        if (!d || !d.userId) return;
-        const sos = d.sos || {};
-        const name = d.displayName || 'Someone';
-        if (sos.active && !sosActiveSet.has(d.userId)) {
-          sosActiveSet.add(d.userId);
-          addEvent('sos_start', d.userId, name, `SOS — ${sos.reason || 'Emergency'}`, 'danger');
-        } else if (!sos.active && sosActiveSet.has(d.userId)) {
-          sosActiveSet.delete(d.userId);
-          addEvent('sos_end', d.userId, name, `${name} cancelled SOS`);
-        }
-      },
-      contactAdded:  ()  => addEvent('contact', null, null, 'New contact added to your network'),
-      roomJoined:    (d) => addEvent('self', null, null, `Joined room: ${d.name || d.roomId || 'Unknown'}`),
-    };
-  }
-
-  let handlers = {};
-
+  // Events are captured globally by socketHandlers/activityRecorder.js and
+  // persisted in activityLog — this page only renders and clears them, so the
+  // feed is populated even when it was never opened.
   onMount(() => {
     clearHubBadge();
     clockInterval = setInterval(() => { now = Date.now(); }, 15000);
-    handlers = makeHandlers();
-    for (const [event, fn] of Object.entries(handlers)) socket.on(event, fn);
-    addEvent('self', null, null, 'Activity feed started');
   });
 
-  onDestroy(() => {
-    clearInterval(clockInterval);
-    for (const [event, fn] of Object.entries(handlers)) socket.off(event, fn);
-  });
+  onDestroy(() => clearInterval(clockInterval));
 
-  function clearFeed() { events = []; }
+  function clearFeed() { clearActivity(); }
 </script>
 
 <div class="activity-page page-enter aurora-ambient">
@@ -152,7 +103,7 @@
       <StatusBadge state={connState} announce={false} />
     </div>
 
-    <button class="icon-btn" onclick={clearFeed} aria-label="Clear feed" disabled={events.length === 0}>
+    <button class="icon-btn" onclick={clearFeed} aria-label="Clear feed" disabled={$activityEvents.length === 0}>
       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
         <polyline points="3 6 5 6 21 6"/>
         <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>

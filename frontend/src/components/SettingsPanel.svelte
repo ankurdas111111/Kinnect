@@ -9,6 +9,9 @@
   import { isIgnoringBatteryOptimizations, requestIgnoreBatteryOptimizations } from '../lib/batteryOptimization.js';
   import { isNativePlatform } from '../lib/geoProvider.js';
   import { effects, FX_LEVELS } from '../lib/stores/effects.js';
+  import { daypartEnabled, setDaypartEnabled } from '../lib/daypart.js';
+  import { voiceEnabled, voiceCheckins, voiceMutedUntil, setVoiceEnabledFromGesture, muteForToday, unmute, isSupported as voiceSupported } from '../lib/voice.js';
+  import { haptics } from '../lib/haptics.js';
   import SettingsSection from './settings/SettingsSection.svelte';
   import RetentionPillGroup from './settings/RetentionPillGroup.svelte';
   import ToggleControl from './primitives/ToggleControl.svelte';
@@ -382,6 +385,12 @@
             </button>
           {/each}
         </div>
+        <ToggleControl
+          checked={$daypartEnabled}
+          label="Time-of-day tint"
+          description="Nav and ambient colors gently warm at dawn and dusk."
+          onchange={(v) => setDaypartEnabled(v)}
+        />
       {/snippet}
     </SettingsSection>
 
@@ -467,6 +476,33 @@
         {/if}
       {/snippet}
     </SettingsSection>
+
+    {#if voiceSupported()}
+      <SettingsSection title="Spoken updates" description="Kinnect can say important family updates out loud — SOS alerts, arrivals, and status changes. Handy while driving.">
+        {#snippet children()}
+          <ToggleControl
+            checked={$voiceEnabled}
+            label={$voiceEnabled ? 'Spoken updates are on' : 'Speak updates aloud'}
+            description="If you use a screen reader, leave this off — these updates are already announced."
+            onchange={(v) => { setVoiceEnabledFromGesture(v); if (v) haptics.confirm?.(); }}
+          />
+          {#if $voiceEnabled}
+            <ToggleControl
+              checked={$voiceCheckins}
+              label="Also speak check-ins"
+              description={'Small updates like “Priya checked in”'}
+              onchange={(v) => voiceCheckins.set(v)}
+            />
+            {#if $voiceMutedUntil > Date.now()}
+              <p class="hint">Muted until midnight — SOS will still be spoken.</p>
+              <button class="btn btn-secondary btn-sm tactile" onclick={unmute}>Unmute</button>
+            {:else}
+              <button class="btn btn-secondary btn-sm tactile" onclick={muteForToday}>Mute for today</button>
+            {/if}
+          {/if}
+        {/snippet}
+      </SettingsSection>
+    {/if}
 
     <!-- Background Location (Android native only) -->
     {#if isNative}

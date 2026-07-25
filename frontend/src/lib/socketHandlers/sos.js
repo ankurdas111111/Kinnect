@@ -1,7 +1,11 @@
 import { get } from 'svelte/store';
 import { mySocketId } from '../stores/map.js';
 import { alertState, mySosActive, sosNarratives, activeSosUsers } from '../stores/sos.js';
+import { authUser } from '../stores/auth.js';
 import { bumpHubBadge } from '../stores/hubBadge.js';
+import { pulseMap } from '../stores/pulses.js';
+import { pushActivity } from '../activityLog.js';
+import { announceCheckin } from '../voiceAnnouncer.js';
 import { notifySOS, notifyProximitySOS } from '../nativeNotifications.js';
 import { getShareOrigin } from '../env.js';
 
@@ -174,5 +178,20 @@ export function register(socket, ctx) {
   socket.on('iAmSafe', (data) => {
     if (!data?.displayName) return;
     setBanner({ type: 'info', text: `${data.displayName} is safe`, actions: [] }, 5000);
+    // Surface as a Hub "all good" chip on that member's row for 5 min (zero DB —
+    // pulseMap is an in-memory TTL store). Skip our own echo.
+    if (data.userId && data.userId !== get(authUser)?.userId) {
+      const expiresAt = Date.now() + 5 * 60_000;
+      pulseMap.update((m) => {
+        const nm = new Map(m);
+        nm.set(data.userId, { userId: data.userId, displayName: data.displayName, type: 'ok', at: data.at || Date.now(), expiresAt });
+        return nm;
+      });
+      setTimeout(() => {
+        pulseMap.update((m) => { const nm = new Map(m); if (nm.get(data.userId)?.expiresAt <= Date.now()) nm.delete(data.userId); return nm; });
+      }, 5 * 60_000);
+      pushActivity({ type: 'contact', userId: data.userId, userName: data.displayName, message: `${data.displayName} checked in — safe` });
+      announceCheckin(data.displayName);
+    }
   });
 }

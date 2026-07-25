@@ -3,38 +3,47 @@
   import { haptics } from '../../lib/haptics.js';
 
   /**
+   * BottomTabBar — floating liquid-glass pill (2026 nav).
+   *
+   * Material: --glass-nav-* tier (tokens-fx.css) — blur + specular top edge +
+   * one lift shadow; near-opaque flat under data-fx="minimal". Emotional layer:
+   * the active indicator + active ink read --nav-tone-* (verdict tone), and the
+   * bar surface carries --amb-warmth (daypart temperature).
+   *
+   * Motion: ONE spring slide on the indicator (transform-only, GPU) + a
+   * one-shot settle on the tapped icon. No infinite loops — decoration that
+   * doesn't explain state was deliberately removed (shimmer/neon/breathe).
+   */
+
+  /**
    * @typedef {Object} Props
    * @property {string} [activeTab]
    * @property {boolean} [isAdmin]
    * @property {boolean} [isTracking]
-   * @property {boolean} [hasNotification]
+   * @property {boolean} [shareNotification]  pending connect/guardian requests
+   * @property {{tone:string, count:string|null, urgent:boolean}} [familyBadge]
+   * @property {{active:boolean, mine:boolean}} [helpBadge]
    */
 
   /** @type {Props} */
   let {
-    activeTab = 'track',
+    activeTab = 'map',
     isAdmin = false,
     isTracking = false,
-    hasNotification = false
+    shareNotification = false,
+    familyBadge = { tone: 'safe', count: null, urgent: false },
+    helpBadge = { active: false, mine: false }
   } = $props();
 
   const dispatch = createEventDispatcher();
-  const tabOrder = ['track', 'people', 'share', 'safety', 'me'];
+  const tabOrder = ['family', 'map', 'share', 'help', 'me'];
 
   function selectTab(tab) {
-    if (tab === 'safety') haptics.warning?.();
-    else if (tab === 'people' || tab === 'share') haptics.confirm?.();
+    if (tab === 'help') haptics.warning?.();
+    else if (tab === 'family' || tab === 'share') haptics.confirm?.();
     else haptics.tap?.();
     dispatch('tabChange', tab);
   }
-
-  const tabMeta = {
-    track:  { label: 'Map',     ariaBase: 'Map' },
-    people: { label: 'People',  ariaBase: 'People' },
-    share:  { label: 'Connect', ariaBase: 'Connect' },
-    safety: { label: 'Safety',  ariaBase: 'Safety' },
-    me:     { label: 'Profile', ariaBase: 'Profile' },
-  };
 
   function onTabKeydown(e, tab) {
     const idx = tabOrder.indexOf(tab);
@@ -49,38 +58,52 @@
     selectTab(tabOrder[nextIdx]);
   }
 
-  let activeIndex = $derived(tabOrder.indexOf(activeTab));
-  let pillOffset = $derived(activeIndex >= 0 ? activeIndex * (100 / tabOrder.length) : 0);
+  let activeIndex = $derived(Math.max(0, tabOrder.indexOf(activeTab)));
 </script>
 
-<div class="bottom-tabs" role="tablist" aria-label="Navigation">
-  <!-- Holographic sliding pill indicator — spring physics -->
-  <div
-    class="tab-pill"
-    aria-hidden="true"
-    style="left: calc(4px + {activeIndex} * 20%)"
-  ></div>
-  <!-- Pill glow layer — separate element so it can have blur without affecting pill content -->
-  <div
-    class="tab-pill-glow"
-    aria-hidden="true"
-    style="left: calc(4px + {activeIndex} * 20%)"
-  ></div>
+<div class="bottom-tabs" role="tablist" aria-label="Navigation" style="--tab-index:{activeIndex}">
+  <!-- Single tone-aware indicator — transform-only spring slide -->
+  <div class="tab-indicator" aria-hidden="true"></div>
 
   <button
     class="tab-item"
-    class:active={activeTab === 'track'}
-    class:tracking-active={isTracking}
-    onclick={() => selectTab('track')}
-    onkeydown={(e) => onTabKeydown(e, 'track')}
+    class:active={activeTab === 'family'}
+    onclick={() => selectTab('family')}
+    onkeydown={(e) => onTabKeydown(e, 'family')}
     role="tab"
-    aria-selected={activeTab === 'track'}
-    tabindex={activeTab === 'track' ? 0 : -1}
+    aria-selected={activeTab === 'family'}
+    tabindex={activeTab === 'family' ? 0 : -1}
+    aria-label={familyBadge.tone === 'alert' ? 'Family — needs attention' : familyBadge.tone === 'caution' ? 'Family — check in' : 'Family'}
+  >
+    <div class="tab-icon-wrap">
+      {#if activeTab === 'family'}
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 3.13a4 4 0 0 1 0 7.75" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      {:else}
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      {/if}
+      {#if familyBadge.count}
+        <span class="tab-count" class:urgent={familyBadge.urgent} aria-hidden="true">{familyBadge.count}</span>
+      {:else if familyBadge.tone !== 'safe'}
+        <span class="tab-dot" class:tone-caution={familyBadge.tone === 'caution'} aria-hidden="true"></span>
+      {/if}
+    </div>
+    <span class="tab-label">Family</span>
+  </button>
+
+  <button
+    class="tab-item"
+    class:active={activeTab === 'map'}
+    class:tracking-active={isTracking}
+    onclick={() => selectTab('map')}
+    onkeydown={(e) => onTabKeydown(e, 'map')}
+    role="tab"
+    aria-selected={activeTab === 'map'}
+    tabindex={activeTab === 'map' ? 0 : -1}
     aria-label={isTracking ? 'Map, tracking active' : 'Map'}
   >
     <div class="tab-icon-wrap">
-      {#if activeTab === 'track'}
-        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><path d="M12 20s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11z"/><circle cx="12" cy="9" r="2.5" fill="white"/></svg>
+      {#if activeTab === 'map'}
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><path d="M12 20s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11z"/><circle cx="12" cy="9" r="2.5" fill="var(--surface-0)"/></svg>
       {:else}
         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11z"/><circle cx="12" cy="9" r="2.5"/></svg>
       {/if}
@@ -93,33 +116,13 @@
 
   <button
     class="tab-item"
-    class:active={activeTab === 'people'}
-    onclick={() => selectTab('people')}
-    onkeydown={(e) => onTabKeydown(e, 'people')}
-    role="tab"
-    aria-selected={activeTab === 'people'}
-    tabindex={activeTab === 'people' ? 0 : -1}
-    aria-label="People"
-  >
-    <div class="tab-icon-wrap">
-      {#if activeTab === 'people'}
-        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 3.13a4 4 0 0 1 0 7.75" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-      {:else}
-        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      {/if}
-    </div>
-    <span class="tab-label">People</span>
-  </button>
-
-  <button
-    class="tab-item"
     class:active={activeTab === 'share'}
     onclick={() => selectTab('share')}
     onkeydown={(e) => onTabKeydown(e, 'share')}
     role="tab"
     aria-selected={activeTab === 'share'}
     tabindex={activeTab === 'share' ? 0 : -1}
-    aria-label="Connect"
+    aria-label={shareNotification ? 'Share — new request' : 'Share'}
   >
     <div class="tab-icon-wrap">
       {#if activeTab === 'share'}
@@ -127,31 +130,34 @@
       {:else}
         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
       {/if}
+      {#if shareNotification}
+        <span class="tab-dot tone-caution" aria-hidden="true"></span>
+      {/if}
     </div>
-    <span class="tab-label">Connect</span>
+    <span class="tab-label">Share</span>
   </button>
 
   <button
     class="tab-item"
-    class:active={activeTab === 'safety'}
-    onclick={() => selectTab('safety')}
-    onkeydown={(e) => onTabKeydown(e, 'safety')}
+    class:active={activeTab === 'help'}
+    onclick={() => selectTab('help')}
+    onkeydown={(e) => onTabKeydown(e, 'help')}
     role="tab"
-    aria-selected={activeTab === 'safety'}
-    tabindex={activeTab === 'safety' ? 0 : -1}
-    aria-label="Safety"
+    aria-selected={activeTab === 'help'}
+    tabindex={activeTab === 'help' ? 0 : -1}
+    aria-label={helpBadge.active ? (helpBadge.mine ? 'Help — your SOS is active' : 'Help — SOS active') : 'Help'}
   >
     <div class="tab-icon-wrap">
-      {#if activeTab === 'safety'}
-        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3l-8.47-14.14a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13" stroke="white" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="white"/></svg>
+      {#if activeTab === 'help'}
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3l-8.47-14.14a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13" stroke="var(--surface-0)" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="var(--surface-0)"/></svg>
       {:else}
         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3l-8.47-14.14a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       {/if}
+      {#if helpBadge.active}
+        <span class="tab-dot" aria-hidden="true"></span>
+      {/if}
     </div>
-    <span class="tab-label">Safety</span>
-    {#if hasNotification}
-      <span class="tab-dot" aria-label="Notification"></span>
-    {/if}
+    <span class="tab-label">Help</span>
   </button>
 
   <button
@@ -162,7 +168,7 @@
     role="tab"
     aria-selected={activeTab === 'me'}
     tabindex={activeTab === 'me' ? 0 : -1}
-    aria-label={isAdmin ? 'Profile and admin options' : 'Profile and settings'}
+    aria-label={isAdmin ? 'Me — profile and admin options' : 'Me — profile and settings'}
   >
     <div class="tab-icon-wrap">
       {#if activeTab === 'me'}
@@ -171,115 +177,68 @@
         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
       {/if}
     </div>
-    <span class="tab-label">Profile</span>
+    <span class="tab-label">Me</span>
   </button>
 </div>
 
 <style>
+  /* ── Floating liquid-glass pill ─────────────────────────────────────────── */
   .bottom-tabs {
+    position: relative;
     display: flex;
     align-items: stretch;
     justify-content: space-around;
-    /* Deep glass surface — stronger than before */
-    background: rgba(7, 8, 18, 0.97);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-bottom: none;
-    /* Multi-layer shadow for genuine 3D depth */
-    box-shadow:
-      0 -1px 0 rgba(255, 255, 255, 0.06),
-      0 -4px 24px rgba(0, 0, 0, 0.45),
-      0 -12px 40px rgba(0, 0, 0, 0.25),
-      inset 0 1px 0 rgba(255, 255, 255, 0.07);
-    margin: 0;
-    padding-left: max(10px, env(safe-area-inset-left, 0px));
-    padding-right: max(10px, env(safe-area-inset-right, 0px));
-    border-radius: 22px 22px 0 0;
-    padding-bottom: var(--safe-bottom);
+    width: min(420px, calc(100vw - 2 * var(--space-4) - var(--safe-left) - var(--safe-right)));
+    min-height: var(--bottom-tab-height);
+    margin-inline: auto;
+    padding: var(--space-1);
+    border-radius: var(--radius-full, 999px);
+    /* nav tier: daypart-warmed glass + specular top edge + one lift shadow.
+       --amb-warmth layers the time-of-day temperature over the material. */
+    background:
+      linear-gradient(var(--amb-warmth), var(--amb-warmth)),
+      var(--glass-nav-bg);
+    border: 1px solid var(--glass-nav-border);
+    box-shadow: var(--glass-nav-shadow), var(--shadow-3d-float);
+    backdrop-filter: var(--glass-nav-blur);
+    -webkit-backdrop-filter: var(--glass-nav-blur);
     z-index: var(--z-navbar);
-    position: relative;
-    flex-shrink: 0;
-    /* Subtle noise texture backdrop */
-    backdrop-filter: blur(2px);
-    -webkit-backdrop-filter: blur(2px);
+    pointer-events: auto;
   }
 
-  :global([data-theme="light"]) .bottom-tabs {
-    background: rgba(252, 252, 255, 0.97);
-    border-color: rgba(0, 0, 0, 0.06);
-    box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.70);
-  }
-
-  /* ── Holographic sliding pill — spring motion + neon glow ─────────────── */
-  .tab-pill {
-    position: absolute;
-    top: 7px;
-    width: calc(20% - 10px);
-    bottom: calc(7px + var(--safe-bottom, 0px));
-    /* Iridescent teal glass */
-    background: linear-gradient(
-      135deg,
-      rgba(20, 184, 166, 0.24) 0%,
-      rgba(16, 185, 129, 0.18) 50%,
-      rgba(6, 182, 212, 0.20) 100%
-    );
-    border: 1px solid rgba(20, 184, 166, 0.45);
-    border-top-color: rgba(45, 212, 191, 0.60);
-    border-radius: var(--radius-lg);
-    pointer-events: none;
-    /* Spring physics slide — snappier so the active tab reads instantly */
-    /* Transition left for accurate tab-aligned positioning.
-       left: calc(4px + N * 20%) positions exactly at tab slot center. */
-    transition: left 250ms cubic-bezier(0.34, 1.56, 0.64, 1);
-    z-index: 0;
-    /* Holographic shimmer — traveling highlight */
-    overflow: hidden;
-  }
-
-  /* Shimmer sweep on pill */
-  .tab-pill::after {
+  /* Verdict tone wash — opacity-only crossfade in/out of the calm state.
+     caution↔alert swaps color instantly (var change) — urgency must not lag. */
+  .bottom-tabs::after {
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(
-      105deg,
-      transparent 20%,
-      rgba(255,255,255,0.12) 45%,
-      rgba(45,212,191,0.10) 55%,
-      transparent 80%
-    );
     border-radius: inherit;
-    transform: translateX(-120%);
-    animation: holo-travel 3.5s ease-in-out infinite;
+    background: var(--nav-tone-tint);
+    opacity: 0;
+    transition: opacity var(--duration-slower) var(--ease-out);
     pointer-events: none;
-  }
-
-  /* Glow layer — separate for blur without clipping */
-  .tab-pill-glow {
-    position: absolute;
-    top: 7px;
-    width: calc(20% - 10px);
-    bottom: calc(7px + var(--safe-bottom, 0px));
-    border-radius: var(--radius-lg);
-    pointer-events: none;
-    transition: left 250ms cubic-bezier(0.34, 1.56, 0.64, 1);
     z-index: 0;
-    box-shadow:
-      0 4px 20px rgba(20, 184, 166, 0.38),
-      0 0 12px rgba(20, 184, 166, 0.22),
-      inset 0 1px 0 rgba(255, 255, 255, 0.14);
-    /* Breathe animation for the glow */
-    animation: neon-breathe-brand 3s ease-in-out infinite;
+  }
+  :global([data-tone="caution"]) .bottom-tabs::after,
+  :global([data-tone="alert"]) .bottom-tabs::after {
+    opacity: 1;
   }
 
-  :global([data-theme="light"]) .tab-pill {
-    background: rgba(20, 184, 166, 0.12);
-    border-color: rgba(20, 184, 166, 0.30);
-    box-shadow: 0 4px 12px rgba(20, 184, 166, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.30);
-  }
-
-  :global([data-theme="light"]) .tab-pill-glow {
-    box-shadow: 0 4px 14px rgba(20, 184, 166, 0.20);
-    animation: none;
+  /* ── Active indicator — ONE element, transform-only spring slide ────────── */
+  .tab-indicator {
+    position: absolute;
+    top: var(--space-1);
+    bottom: var(--space-1);
+    left: var(--space-1);
+    width: calc((100% - 2 * var(--space-1)) / 5);
+    border-radius: var(--radius-full, 999px);
+    background: color-mix(in oklch, var(--nav-tone-accent) 14%, transparent);
+    border: 1px solid color-mix(in oklch, var(--nav-tone-accent) 35%, transparent);
+    box-shadow: inset 0 1px 0 var(--nav-specular);
+    transform: translateX(calc(var(--tab-index, 0) * 100%));
+    transition: transform var(--duration-3d, 250ms) var(--ease-spring);
+    pointer-events: none;
+    z-index: 0;
   }
 
   /* ── Tab items ──────────────────────────────────────────────────────────── */
@@ -300,83 +259,66 @@
       transform 120ms var(--ease-spring);
     position: relative;
     z-index: 1;
-    min-height: var(--bottom-tab-height);
+    min-height: 44px;
     min-width: 44px;
     -webkit-tap-highlight-color: transparent;
     font-family: var(--font-display);
-    /* Ripple feedback overlay */
+    border-radius: var(--radius-full, 999px);
     overflow: hidden;
   }
 
-  /* Touch ripple on press */
+  /* One-shot touch ripple — purposeful press feedback, not decoration */
   .tab-item::before {
     content: '';
     position: absolute;
     width: 36px; height: 36px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.12);
+    background: color-mix(in oklch, var(--nav-tone-accent) 16%, transparent);
     top: 50%; left: 50%;
     transform: translate(-50%, -50%) scale(0);
     opacity: 0;
     pointer-events: none;
     transition: transform 0ms, opacity 0ms;
   }
-
   .tab-item:active::before {
     transform: translate(-50%, -50%) scale(1.6);
     opacity: 0;
-    transition: transform 400ms cubic-bezier(0.4, 0, 0.2, 1), opacity 400ms ease-out;
+    transition: transform 400ms var(--ease-out), opacity 400ms var(--ease-out);
   }
 
-  .tab-item:hover {
-    color: var(--text-secondary, rgba(255, 255, 255, 0.65));
-  }
-
-  :global([data-theme="light"]) .tab-item:hover {
-    color: var(--text-secondary);
-  }
-
+  .tab-item:hover { color: var(--text-secondary); }
   .tab-item:active {
-    transform: scale(0.86) perspective(400px) translateZ(-4px);
+    transform: scale(0.92);
     transition-duration: 70ms;
   }
-
   .tab-item:focus-visible {
-    outline: 2px solid var(--primary-400, #2dd4bf);
+    outline: 2px solid var(--nav-tone-accent);
     outline-offset: -3px;
-    border-radius: var(--radius-md, 8px);
   }
 
-  /* Active tab — neon teal + larger icon */
-  .tab-item.active {
-    color: var(--primary-400);
-    /* Subtle text glow */
-    text-shadow: 0 0 10px rgba(45, 212, 191, 0.45);
-  }
+  /* Active tab — tone ink, no glow theatrics */
+  .tab-item.active { color: var(--nav-tone-ink); }
 
-  :global([data-theme="light"]) .tab-item.active {
-    color: var(--primary-600);
-    text-shadow: none;
-  }
-
-  /* Icon spring bounce on tab activation */
+  /* One-shot settle on activation — replaces the perspective bounce loop */
   .tab-item.active .tab-icon-wrap {
-    animation: tab-bounce-3d 380ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation: tab-settle 300ms var(--ease-spring) both;
+  }
+  @keyframes tab-settle {
+    0%   { transform: scale(1); }
+    45%  { transform: scale(1.08) translateY(-2px); }
+    100% { transform: scale(1) translateY(0); }
   }
 
-  /* Tracking tab: success green tint */
-  .tracking-active { color: var(--success-400) !important; text-shadow: 0 0 10px rgba(52, 211, 153, 0.45) !important; }
+  /* Tracking tab: live tint (kept — it explains state) */
+  .tracking-active { color: var(--success-400) !important; }
 
-  /* ── Label — enlarged for legibility ──────────────────────────────────── */
   .tab-label {
-    font-size: var(--text-xs, 12px);
+    font-size: var(--text-2xs, 10px);
     font-weight: 700;
     letter-spacing: 0.02em;
     line-height: 1;
-    transition: opacity var(--duration-fast) var(--ease-out);
   }
 
-  /* ── Icon wrapper ──────────────────────────────────────────────────────── */
   .tab-icon-wrap {
     position: relative;
     display: inline-flex;
@@ -384,7 +326,7 @@
     justify-content: center;
   }
 
-  /* ── Tracking dot — larger calm LIVE pulse ────────────────────────────── */
+  /* ── Status dots — static glow + one-shot appear (no breathing loops) ───── */
   .tracking-dot {
     position: absolute;
     top: -3px;
@@ -393,55 +335,62 @@
     height: 10px;
     background: var(--success-400);
     border-radius: 50%;
-    border: 2px solid rgba(5, 5, 18, 0.92);
-    /* Calm live glow — softer than neon */
+    border: 2px solid var(--surface-0);
     box-shadow: var(--glow-live-sm);
-    animation: neon-breathe-live 2.2s ease-in-out infinite;
+    animation: dot-appear 200ms var(--ease-spring) both;
   }
 
-  :global([data-theme="light"]) .tracking-dot {
-    border-color: rgba(252, 252, 255, 0.94);
-    animation: aurora-pulse 2.2s ease-in-out infinite;
-  }
-
-  /* ── Notification dot — neon red ───────────────────────────────────────── */
   .tab-dot {
     position: absolute;
-    top: 4px;
-    right: calc(50% - 15px);
+    top: -3px;
+    right: -3px;
     width: 8px;
     height: 8px;
     background: var(--danger-500);
     border-radius: 50%;
-    border: 2px solid rgba(5, 5, 18, 0.92);
-    /* Red neon glow */
-    box-shadow: 0 0 6px rgba(239,68,68,0.70), 0 0 14px rgba(239,68,68,0.35);
-    animation: neon-breathe-sos 1.8s ease-in-out infinite;
+    border: 2px solid var(--surface-0);
+    box-shadow: var(--glow-sos-sm, var(--glow-sos));
+    animation: dot-appear 200ms var(--ease-spring) both;
+  }
+  .tab-dot.tone-caution {
+    background: var(--warning-500);
+    box-shadow: none;
   }
 
-  :global([data-theme="light"]) .tab-dot {
-    border-color: rgba(252, 252, 255, 0.94);
-    animation: pulse-ring 2s ease-in-out infinite;
+  /* Unread-count bubble (Family tab) — count = unread events, urgent = SOS */
+  .tab-count {
+    position: absolute;
+    top: -6px;
+    right: -10px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--primary-500);
+    color: var(--text-on-primary);
+    border: 2px solid var(--surface-0);
+    border-radius: var(--radius-full, 999px);
+    font-size: 9px;
+    font-weight: 800;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    animation: dot-appear 200ms var(--ease-spring) both;
   }
+  .tab-count.urgent { background: var(--danger-500); }
 
-  /* ── 2026 Keyframes ─────────────────────────────────────────────────────── */
-  @keyframes tab-bounce-3d {
-    0%   { transform: scale(1) translateY(0) perspective(400px) translateZ(0); }
-    30%  { transform: scale(1.28) translateY(-5px) perspective(400px) translateZ(8px); }
-    60%  { transform: scale(0.92) translateY(0) perspective(400px) translateZ(-2px); }
-    80%  { transform: scale(1.04) translateY(-1px) perspective(400px) translateZ(2px); }
-    100% { transform: scale(1) translateY(0) perspective(400px) translateZ(0); }
+  @keyframes dot-appear {
+    from { transform: scale(0); }
+    to   { transform: scale(1); }
   }
 
   @media (prefers-reduced-motion: reduce) {
+    .tab-indicator { transition: none; }
     .tab-item.active .tab-icon-wrap { animation: none; }
-    .tracking-dot { animation: none; }
-    .tab-dot      { animation: none; box-shadow: 0 0 0 2px rgba(239,68,68,0.60); }
-    .tab-pill     { transition: none; }
-    .tab-pill-glow { animation: none; }
-    .tab-pill::after { animation: none; }
-    .tab-item.active { text-shadow: none; }
-    .tracking-active { text-shadow: none !important; }
+    .tracking-dot, .tab-dot, .tab-count { animation: none; }
+    .tab-item:active { transform: none; }
+    .bottom-tabs::after { transition: none; }
   }
 
   @media (min-width: 768px) {

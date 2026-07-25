@@ -3,6 +3,7 @@
   import { wrap } from 'svelte-spa-router/wrap';
   import { onMount } from 'svelte';
   import { loadSession } from './lib/stores/auth.js';
+  import { familyVerdict } from './lib/stores/verdict.js';
   import Login from './pages/Login.svelte';
   import Register from './pages/Register.svelte';
   import MainApp from './pages/MainApp.svelte';
@@ -36,6 +37,12 @@
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(() => {});
     }
+    // Verdict tone → <html data-tone> — nav chrome (tab bar, sheet, sidebar,
+    // edge lines) tints via CSS custom-property indirection, zero prop-drilling.
+    const unsubTone = familyVerdict.subscribe((v) => {
+      document.documentElement.setAttribute('data-tone', v?.tone || 'safe');
+    });
+    return () => unsubTone();
   });
 
   function conditionsFailed() {

@@ -4,6 +4,7 @@ import { myRooms } from './stores/rooms.js';
 import { myContacts } from './stores/contacts.js';
 import { banner, myLiveLinks, mySosActive, sosNarratives, activeSosUsers } from './stores/sos.js';
 import { pulseMap } from './stores/pulses.js';
+import { cancelAll as cancelVoiceQueue } from './voice.js';
 import { networkGraph } from './stores/network.js';
 import { recordLatency } from './stores/latency.js';
 import { drainBuffer, hasBuffered } from './offlineBuffer.js';
@@ -17,6 +18,8 @@ import { register as registerPlaceHandlers } from './socketHandlers/places.js';
 import { register as registerSafetyHandlers } from './socketHandlers/safety.js';
 import { register as registerSocialHandlers } from './socketHandlers/social.js';
 import { register as registerMiscHandlers } from './socketHandlers/misc.js';
+import { register as registerActivityRecorder } from './socketHandlers/activityRecorder.js';
+import { initVoiceAnnouncer } from './voiceAnnouncer.js';
 
 const storedClientId = localStorage.getItem('clientId');
 const clientId = storedClientId || (crypto && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + '-' + Math.random().toString(16).slice(2));
@@ -73,6 +76,7 @@ export function cancelReconnectBanner() {
  * contacts before the server sends a fresh existingUsers event.
  */
 export function resetSocketState() {
+  cancelVoiceQueue(); // logout must not keep talking
   _localMap = new Map();
   otherUsers.set(_localMap);
   pulseMap.set(new Map());
@@ -266,6 +270,8 @@ export function setupSocketHandlers() {
   registerSafetyHandlers(socket, ctx);
   registerSocialHandlers(socket, ctx);
   registerMiscHandlers(socket, ctx);
+  registerActivityRecorder(socket, ctx);
+  initVoiceAnnouncer(socket); // spoken updates: arrival + verdict watchers
 
   // Network online/offline detection for immediate UX feedback
   if (typeof window !== 'undefined') {

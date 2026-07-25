@@ -175,13 +175,23 @@
     grid-column: 1;
     /* Base 108px accounts for topbar content height; safe-top adds notch/Dynamic Island offset */
     padding-top: calc(var(--safe-top, 0px) + 108px);
-    /* Bottom padding ensures the tab bar (56px) and safe area never obscure map content */
-    padding-bottom: calc(var(--bottom-tab-height, 56px) + 8px);
+    /* Clearance so the floating tab pill + safe area never obscure map content
+       (single source token — also consumed by BottomSheet's .sheet-body) */
+    padding-bottom: var(--tab-bar-clearance);
     transition: padding-bottom 300ms ease;
   }
 
+  /* Floating tab-bar slot — overlays the full-bleed map; the pill inside
+     re-enables pointer events, the gutter around it stays tappable map. */
   .layout-tabs {
-    flex-shrink: 0;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    padding-bottom: calc(var(--safe-bottom, 0px) + var(--space-2));
+    pointer-events: none;
     z-index: var(--z-navbar);
   }
 </style>

@@ -33,8 +33,15 @@
   let mobileTouched = $state(false);
 
   onMount(() => {
-    if ($authUser) navigate('/');
     fetchCsrf();
+    // Cold-start race fix: MainApp's mount guard pushes here BEFORE the async
+    // loadSession (/api/me) resolves, and a mount-only check would strand a
+    // validly-signed-in user on this page. Subscribe instead: the moment the
+    // session hydrates, bounce back to the app.
+    const unsub = authUser.subscribe((u) => {
+      if (u) navigate('/');
+    });
+    return () => unsub();
   });
 
   function getCountry() { return COUNTRY_MAP[countryIso]; }
