@@ -164,4 +164,8 @@
   :global(.app-layout.sidebar-closed:not(.mobile)) .pulse-fab {
     left: calc(var(--sidebar-collapsed, 56px) + var(--space-4));
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pulse-label { animation: none; }
+  }
 </style>

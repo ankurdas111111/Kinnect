@@ -391,8 +391,8 @@
 {:else}
   <div class="panel-shell panel-left panel-base">
     <div class="panel-header">
-      <h3>Connect</h3>
-      <button class="btn btn-icon btn-ghost" aria-label="Close connect panel" onclick={() => dispatch('close')}>
+      <h3>Sharing</h3>
+      <button class="btn btn-icon btn-ghost" aria-label="Close sharing panel" onclick={() => dispatch('close')}>
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>

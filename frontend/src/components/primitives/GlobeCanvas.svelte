@@ -562,4 +562,9 @@
   @keyframes gc-hint-fade {
     0%{opacity:0} 12%{opacity:1} 78%{opacity:1} 100%{opacity:0}
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* no auto-fade — the drag hint just stays visible */
+    .gc-hint { animation: none; opacity: 1; }
+  }
 </style>

@@ -189,4 +189,8 @@
     from { background-position: 200% 0; }
     to { background-position: -200% 0; }
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton-card, .skeleton-line { animation: none; }
+  }
 </style>

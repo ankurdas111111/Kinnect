@@ -115,4 +115,9 @@
     0%, 100% { opacity: 1; }
     50% { opacity: 0.2; }
   }
+
+  /* Reduced motion: dots rest solid — status stays encoded by color + label */
+  @media (prefers-reduced-motion: reduce) {
+    .live .dot, .sos .dot, .waiting .dot { animation: none; }
+  }
 </style>

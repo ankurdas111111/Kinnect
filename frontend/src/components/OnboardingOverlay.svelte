@@ -464,4 +464,10 @@
     from { opacity: 0; transform: scale(0.90) translateY(24px); }
     to { opacity: 1; transform: scale(1) translateY(0); }
   }
+
+  /* Reduced motion: instant overlay, no flip, no float — spinner stays
+     (essential loading state). */
+  @media (prefers-reduced-motion: reduce) {
+    .onboarding-backdrop, .onboarding-card, .brand-icon { animation: none; }
+  }
 </style>

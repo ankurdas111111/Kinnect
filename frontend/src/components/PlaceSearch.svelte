@@ -454,7 +454,7 @@
   }
   .nav-turn-icon {
     width: 44px; height: 44px; border-radius: 12px;
-    background: #3b82f6; color: #fff;
+    background: var(--blue-500); color: #fff;
     font-size: clamp(1.25rem, 1.6vw, 1.375rem); font-weight: 700;
     display: flex; align-items: center; justify-content: center; flex-shrink: 0;
   }
@@ -471,7 +471,7 @@
   .nav-ctrl:hover { background: rgba(255,255,255,0.10); color: #fff; }
   .nav-ctrl:disabled { opacity: 0.2; cursor: default; }
   .nav-step-count { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.25); min-width: 28px; text-align: center; }
-  .nav-stop { padding: 6px 12px; border-radius: 8px; font-size: 11px; font-weight: 700; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.22); color: #f87171; cursor: pointer; margin-left: 4px; min-height: 44px; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  .nav-stop { padding: 6px 12px; border-radius: 8px; font-size: 11px; font-weight: 700; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.22); color: var(--danger-300); cursor: pointer; margin-left: 4px; min-height: 44px; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   .nav-stop:hover { background: rgba(239,68,68,0.22); }
 
   /* ══════════════════════════════════════════════════════════════════════ */
@@ -520,7 +520,7 @@
   .ps-actions { display: flex; gap: 6px; padding: 8px 10px 4px; border-top: 1px solid rgba(255,255,255,0.05); }
   .ps-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 11px 8px; min-height: 44px; border-radius: 12px; font-size: 13px; font-weight: 700; border: none; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
   .ps-btn:active { transform: scale(0.97); }
-  .ps-btn-start { background: #3b82f6; color: #fff; box-shadow: 0 2px 12px rgba(59,130,246,0.35); }
+  .ps-btn-start { background: var(--blue-500); color: #fff; box-shadow: 0 2px 12px rgba(59,130,246,0.35); }
   .ps-btn-start:hover { background: #2563eb; }
   .ps-btn-walk { background: rgba(99,102,241,0.12); color: var(--primary-300, #a5b4fc); border: 1px solid rgba(99,102,241,0.22); }
   .ps-btn-walk:hover { background: rgba(99,102,241,0.20); }

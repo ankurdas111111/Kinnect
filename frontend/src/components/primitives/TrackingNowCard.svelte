@@ -194,4 +194,8 @@
     from { background-position: 200% 0; }
     to { background-position: -20% 0; }
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    .line { animation: none; }
+  }
 </style>

@@ -161,24 +161,24 @@
     height: 30px;
     padding: 0 10px 0 8px;
     border-radius: 20px;
-    background: rgba(99,102,241,0.13);
-    border: 1px solid rgba(99,102,241,0.32);
-    color: #a5b4fc;
+    /* VIGIL primary tokens (was stale pre-rebrand indigo hexes, which also
+       broke Dawn contrast). Static by design — calm by default; tone
+       variants below carry any urgency. */
+    background: color-mix(in oklch, var(--primary-500) 13%, transparent);
+    border: 1px solid color-mix(in oklch, var(--primary-500) 32%, transparent);
+    color: var(--primary-400);
     display: flex;
     align-items: center;
     gap: 5px;
     cursor: pointer;
     flex-shrink: 0;
     transition: background 0.15s ease, color 0.15s ease, transform 0.12s ease, box-shadow 0.2s ease;
-    box-shadow: 0 0 0 0 rgba(99,102,241,0.4);
-    animation: hub-pulse 3s ease-in-out infinite;
   }
   .nav-dashboard-btn:hover {
-    background: rgba(99,102,241,0.24);
-    color: #c7d2fe;
+    background: color-mix(in oklch, var(--primary-500) 24%, transparent);
+    color: var(--primary-300);
     transform: scale(1.04);
-    box-shadow: 0 0 0 3px rgba(99,102,241,0.18);
-    animation: none;
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary-500) 18%, transparent);
   }
   .nav-dashboard-btn:active { transform: scale(0.94); animation: none; }
   .nav-dashboard-label {
@@ -188,14 +188,6 @@
     letter-spacing: 0.04em;
     text-transform: uppercase;
   }
-  @keyframes hub-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(99,102,241,0); border-color: rgba(99,102,241,0.32); }
-    50%       { box-shadow: 0 0 0 3px rgba(99,102,241,0.12); border-color: rgba(99,102,241,0.55); }
-  }
-
-  /* Stop ambient pulse when there's a live badge — the badge speaks for itself */
-  .nav-dashboard-btn.has-badge { animation: none; }
-
   /* Verdict tone tint — border/ink follow the family state (badge grammar:
      tone = tint, count = bubble, pulse = urgent only). Static by design. */
   .nav-dashboard-btn.tone-caution {

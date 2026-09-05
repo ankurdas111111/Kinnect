@@ -132,24 +132,34 @@
     position: absolute;
     border-radius: 22px;
     pointer-events: none;
+    /* Static vignette + ring; the breathe lives on ::after as an
+       opacity-only pulse (box-shadow keyframes repainted the full
+       9999px vignette every frame — GPU-rule violation). */
+    box-shadow:
+      0 0 0 9999px rgba(4, 3, 14, 0.93),
+      0 0 0 2px  rgba(251, 191, 36, 0.78),
+      0 0 0 5px  rgba(251, 191, 36, 0.12);
+  }
+
+  .hs-hole::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow:
+      0 0 0 3px   rgba(251, 191, 36, 0.30),
+      0 0 44px 6px rgba(251, 191, 36, 0.42);
+    opacity: 0.35;
     animation: spot-breathe 2.6s ease-in-out infinite;
   }
 
   @keyframes spot-breathe {
-    0%, 100% {
-      box-shadow:
-        0 0 0 9999px rgba(4, 3, 14, 0.93),
-        0 0 0 2px  rgba(251, 191, 36, 0.78),
-        0 0 0 5px  rgba(251, 191, 36, 0.12),
-        0 0 32px   rgba(251, 191, 36, 0.30);
-    }
-    50% {
-      box-shadow:
-        0 0 0 9999px rgba(4, 3, 14, 0.93),
-        0 0 0 2px  rgba(251, 191, 36, 1),
-        0 0 0 9px  rgba(251, 191, 36, 0.20),
-        0 0 52px   rgba(251, 191, 36, 0.50);
-    }
+    0%, 100% { opacity: 0.35; }
+    50%      { opacity: 1; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hs-hole::after { animation: none; opacity: 0.5; }
   }
 
   .hs-connector {

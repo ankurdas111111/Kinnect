@@ -19,7 +19,7 @@ export function register(socket, ctx) {
 
   // Room action results
   socket.on('roomError', (data) => {
-    setBanner({ type: 'info', text: data?.message || 'Something went wrong with this room', actions: [] }, 2500);
+    setBanner({ type: 'info', text: data?.message || "Couldn't update this room — try again", actions: [] }, 2500);
   });
   socket.on('roomCreated', (data) => {
     setBanner({ type: 'info', text: `"${data.name}" created — share code ${data.code} with family`, actions: [] }, 4000);

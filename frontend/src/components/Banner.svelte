@@ -86,4 +86,8 @@
     from { transform: translateY(20px); opacity: 0; }
     to { transform: translateY(0); opacity: 1; }
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    .banner, .banner-sos { animation: none; }
+  }
 </style>
