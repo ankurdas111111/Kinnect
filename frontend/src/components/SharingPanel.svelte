@@ -285,7 +285,10 @@
               {room}
               myUserId={$authUser?.userId}
               leaving={busyAction === 'leave-' + room.code}
-              bind:adminDuration={roomAdminDurations[room.code]}
+              bind:adminDuration={
+                () => roomAdminDurations[room.code] ?? null,
+                (v) => (roomAdminDurations[room.code] = v)
+              }
               onlocate={locateContact}
               onleave={() => leaveRoom(room.code)}
               onrequestadmin={() => requestAdmin(room.code)}
@@ -331,7 +334,10 @@
               isWard={isWardOf(c.userId)}
               isPending={isPendingGuardianOf(c.userId) || isPendingWardOf(c.userId)}
               removing={busyAction === 'remove-' + c.userId}
-              bind:guardianDuration={guardianDurations[c.userId]}
+              bind:guardianDuration={
+                () => guardianDurations[c.userId] ?? null,
+                (v) => (guardianDurations[c.userId] = v)
+              }
               onlocate={locateContact}
               onremove={removeContact}
               onwatch={requestGuardian}
