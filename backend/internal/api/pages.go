@@ -60,10 +60,17 @@ func (h *PagesHandler) Me(w http.ResponseWriter, r *http.Request) {
 			role = ud.Role
 		}
 	}
+	var firstName, lastName string
+	if ud != nil {
+		firstName = ud.FirstName
+		lastName = ud.LastName
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":          true,
 		"userId":      userID,
 		"displayName": displayName,
+		"firstName":   firstName,
+		"lastName":    lastName,
 		"role":        role,
 		"shareCode":   shareCode,
 		"email":       email,
@@ -92,6 +99,13 @@ func (h *PagesHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	lastName := shared.SanitizeString(strings.TrimSpace(req.LastName), 64)
 	email := strings.ToLower(strings.TrimSpace(req.Email))
 	mobile := strings.TrimSpace(req.Mobile)
+
+	// Registration requires a first name; an empty one here would silently wipe
+	// the user's display name everywhere (roster, map pins, hub greeting).
+	if firstName == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "First name is required"})
+		return
+	}
 
 	if email != "" && !emailRegex.MatchString(email) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "Invalid email address"})

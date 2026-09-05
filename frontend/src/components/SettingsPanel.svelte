@@ -142,6 +142,8 @@
 
     const res = await apiGet('/api/me');
     if (res.ok) {
+      firstName = res.firstName || '';
+      lastName  = res.lastName  || '';
       email  = res.email  || '';
       mobile = res.mobile || '';
     }

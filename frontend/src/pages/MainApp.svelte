@@ -185,6 +185,7 @@
   let lastEmittedFix = null;
   let lastEmitAt = 0;
   let lastCoarseNoticeAt = 0;
+  let findingBannerShown = false; // "Finding your location..." is up — clear on first fix
   let lastRawLat = null;
   let lastRawLng = null;
   let geoPermission = 'unknown';
@@ -466,6 +467,11 @@
 
     const formattedTime = new Date().toLocaleTimeString();
     lastAcceptedFix = { latitude, longitude, ts: now };
+    // First fix landed — retire the "Finding your location..." banner immediately.
+    if (findingBannerShown) {
+      findingBannerShown = false;
+      if ($banner.text === 'Finding your location...') banner.set({ type: null, text: null, actions: [] });
+    }
     myLocation.set({ latitude, longitude, speed, formattedTime, accuracy });
     recordFix({ accuracy, kalmanCorrectionM, filterWarm: gpsFilter.isWarm });
     if (accuracy > 150 && now - lastCoarseNoticeAt > 7000) {
@@ -543,11 +549,13 @@
       }
     );
 
-    // If no fix arrives within 12s (primary watchPosition timeout is 10s), replace the
-    // "Starting..." banner so the user knows we're still searching, not frozen.
+    // If no fix arrives within 12s (primary watchPosition timeout is 10s), tell the
+    // user we're still searching. KR-003 timed path: auto-expires after 8s instead of
+    // sitting over the UI forever, and never persist-clears SOS/reconnect banners.
     setTimeout(() => {
       if ($tracking && !lastAcceptedFix) {
-        banner.set({ type: 'info', text: "Finding your location...", actions: [] });
+        findingBannerShown = true;
+        socketSetBanner({ type: 'info', text: "Finding your location...", actions: [] }, 8000);
       }
     }, 12000);
 

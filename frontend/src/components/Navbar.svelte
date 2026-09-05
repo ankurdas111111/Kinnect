@@ -8,6 +8,7 @@
   import { privacyPause } from '../lib/stores/places.js';
   import { activeSosUsers } from '../lib/stores/sos.js';
   import { familyBadge } from '../lib/stores/verdict.js';
+  import ThemeToggle from './ThemeToggle.svelte';
 
   let ghostMode = $derived($privacyPause && $privacyPause > Date.now());
   // One badge grammar: count = unread bubble, tone = tint, pulse = urgent only
@@ -101,6 +102,8 @@
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
         </button>
       {/if}
+      <!-- Theme picker entry — was orphaned in the intent-first nav rebuild -->
+      <ThemeToggle />
     </div>
 
     <!-- Premium track pill -->

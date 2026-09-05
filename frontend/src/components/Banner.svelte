@@ -20,8 +20,12 @@
   .banner {
     position: fixed;
     top: calc(var(--safe-top, 0px) + var(--navbar-height, 56px));
-    left: var(--space-4);
-    right: var(--space-4);
+    /* Centered fit-content pill — a full-width strip dead-zoned the sidebar
+       tabs and search underneath it while visible. */
+    left: 50%;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: min(calc(100vw - 2 * var(--space-4)), 560px);
     z-index: calc(var(--z-navbar, 2000) + 500); /* above navbar, below overlay */
     display: flex;
     align-items: center;
@@ -32,7 +36,7 @@
     font-weight: 500;
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-lg);
-    animation: slideDown 0.3s var(--ease-out);
+    animation: banner-in-top 0.3s var(--ease-out);
   }
 
   /* Mobile: position above bottom tab bar */
@@ -40,7 +44,7 @@
     .banner {
       top: auto;
       bottom: calc(var(--bottom-tab-height, 56px) + var(--safe-bottom, 0px) + var(--space-3));
-      animation: slideUp 0.3s var(--ease-out);
+      animation: banner-in-bottom 0.3s var(--ease-out);
     }
   }
 
@@ -57,7 +61,7 @@
     -webkit-backdrop-filter: blur(12px);
     color: white;
     border: 1px solid rgba(255, 255, 255, 0.15);
-    animation: slideDown 0.3s var(--ease-out), sos-urgent-pulse 1.5s ease infinite;
+    animation: banner-in-top 0.3s var(--ease-out), sos-urgent-pulse 1.5s ease infinite;
   }
   .banner-text { flex: 1; text-align: center; }
   .banner-close {
@@ -78,13 +82,14 @@
     min-height: 40px;
     padding: 0 12px;
   }
-  @keyframes slideDown {
-    from { transform: translateY(-20px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+  /* Keyframes carry the centering translateX so the entrance can't undo it */
+  @keyframes banner-in-top {
+    from { transform: translate(-50%, -20px); opacity: 0; }
+    to { transform: translate(-50%, 0); opacity: 1; }
   }
-  @keyframes slideUp {
-    from { transform: translateY(20px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+  @keyframes banner-in-bottom {
+    from { transform: translate(-50%, 20px); opacity: 0; }
+    to { transform: translate(-50%, 0); opacity: 1; }
   }
 
   @media (prefers-reduced-motion: reduce) {
