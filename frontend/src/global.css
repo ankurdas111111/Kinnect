@@ -3011,10 +3011,10 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
     transform-origin: left center;
     background: linear-gradient(
       90deg,
-      var(--primary-400, var(--primary-400)) 0%,
+      var(--primary-400) 0%,
       var(--primary-500, #5863d3) 40%,
-      #9e77dc 80%,
-      #00a7ba 100%
+      var(--member-3, #9e77dc) 80%,
+      var(--member-1, #00a7ba) 100%
     );
     animation: scroll-progress linear;
     animation-timeline: scroll(root);

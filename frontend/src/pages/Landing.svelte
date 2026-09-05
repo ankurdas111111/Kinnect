@@ -22,19 +22,23 @@
    *     on an alarming frame.
    */
   import { onMount, onDestroy } from 'svelte';
-  import { fade, fly, scale } from 'svelte/transition';
-  import { cubicOut, elasticOut } from 'svelte/easing';
+  import { scale } from 'svelte/transition';
+  import { elasticOut } from 'svelte/easing';
+  import { spring } from 'svelte/motion';
   import Button from '../components/primitives/Button.svelte';
-  import Card   from '../components/primitives/Card.svelte';
   import Input  from '../components/primitives/Input.svelte';
+  import MagneticButton from '../components/primitives/MagneticButton.svelte';
   import Constellation from '../components/primitives/Constellation.svelte';
   import { DEFAULT_NODES, DEFAULT_LINKS } from '../components/primitives/constellationGeometry.js';
   import StoryBeat from '../components/landing/StoryBeat.svelte';
+  import LandingNav from '../components/landing/LandingNav.svelte';
+  import LandingFooter from '../components/landing/LandingFooter.svelte';
   import {
     STAGE_W, STAGE_H, PLACES, PINS, ROUTES, BEATS, SCENES, SOS_CHIPS,
   } from '../components/landing/landingStory.js';
   import { allowMotion, allowWebGL } from '../lib/stores/effects.js';
   import { prefersReducedMotion } from '../lib/deviceCapability.js';
+  import { daypartFor } from '../lib/daypart.js';
   import { Capacitor } from '@capacitor/core';
 
   // ── Routing ──────────────────────────────────────────────────────────────
@@ -48,29 +52,14 @@
     hue: i === 0 ? 'var(--primary-400)' : `var(--member-${i})`,
   }));
 
-  // ── Hero tilt (rAF-lerped; JS motion gated on allowMotion + OS switch) ────
+  // ── Hero tilt — true spring physics (svelte/motion Spring; gated on
+  //    allowMotion + OS switch). Low damping gives the card a gentle
+  //    settle-overshoot on pointer leave; the glare highlight rides the
+  //    same spring so light and geometry always agree. ──────────────────────
   let heroCardEl = $state();
-  let heroRaf = null;
-  let hcx = 0, hcy = 0, htx = 0, hty = 0;
-
-  function heroLerp(a, b, t) { return a + (b - a) * t; }
-
-  function heroTick() {
-    hcx = heroLerp(hcx, htx, 0.08);
-    hcy = heroLerp(hcy, hty, 0.08);
-    if (heroCardEl) {
-      heroCardEl.style.transform =
-        `perspective(1000px) rotateX(${hcx}deg) rotateY(${hcy}deg)`;
-    }
-    if (Math.abs(hcx - htx) > 0.04 || Math.abs(hcy - hty) > 0.04) {
-      heroRaf = requestAnimationFrame(heroTick);
-    } else {
-      hcx = htx; hcy = hty;
-      if (heroCardEl) heroCardEl.style.transform =
-        `perspective(1000px) rotateX(${hcx}deg) rotateY(${hcy}deg)`;
-      heroRaf = null;
-    }
-  }
+  // spring() (not the Spring class): Button already ships this exact module in
+  // the index chunk, so the physics costs zero additional bundle bytes.
+  const tilt = spring({ x: 0, y: 0 }, { stiffness: 0.08, damping: 0.34, precision: 0.001 });
 
   function onHeroMouseMove(e) {
     // JS-driven flourish: must honor the OS reduce-motion switch even when a
@@ -79,15 +68,23 @@
     const r  = heroCardEl.getBoundingClientRect();
     const dx = (e.clientX - r.left - r.width  / 2) / (r.width  / 2);
     const dy = (e.clientY - r.top  - r.height / 2) / (r.height / 2);
-    htx = -dy * 6;
-    hty =  dx * 6;
-    if (!heroRaf) heroRaf = requestAnimationFrame(heroTick);
+    tilt.set({ x: -dy * 6, y: dx * 6 });
   }
 
   function onHeroMouseLeave() {
-    htx = 0; hty = 0;
-    if (!heroRaf) heroRaf = requestAnimationFrame(heroTick);
+    tilt.set({ x: 0, y: 0 });
   }
+
+  // ── Daypart badge — the watch is live right now, in the visitor's own
+  //    morning or midnight (VIGIL: "keeping the watch"). Honest and personal
+  //    where a static claim would be neither. ───────────────────────────────
+  const DAYPART_BADGE = {
+    dawn:  'Dawn watch is on',
+    day:   'Day watch is on',
+    dusk:  'Dusk watch is on',
+    night: 'Night watch is on',
+  };
+  const badgeText = DAYPART_BADGE[daypartFor(new Date().getHours())] || DAYPART_BADGE.day;
 
   // ── 3D hero constellation (desktop-web-full only; idle-loaded post-LCP) ────
   // The static SVG hero above is the LCP element and the PERMANENT poster; the
@@ -234,12 +231,14 @@
     return { destroy() { io.disconnect(); } };
   }
 
-  // ── Animated counters ─────────────────────────────────────────────────────
+  // ── Animated counters — product truths only. Invented social proof
+  //    ("50,000+ families") is the fastest way to read as template filler;
+  //    every number below is a real property of the product. ────────────────
   const stats = [
-    { value: 50000, label: 'Families protected', suffix: '+' },
-    { value: 99.9,  label: 'Uptime SLA',          suffix: '%', decimals: 1 },
-    { value: 2,     label: 'Sec avg update speed', suffix: 's' },
-    { value: 180,   label: 'Countries supported',  suffix: '+' },
+    { value: 2,  label: 'Second update cadence',  suffix: 's' },
+    { value: 30, label: 'Days of route replay',   suffix: '' },
+    { value: 6,  label: 'Members free, forever',  suffix: '' },
+    { value: 24, label: 'The watch never sleeps', suffix: '/7' },
   ];
   let statDisplays = $state(stats.map(() => 0));
   let statsVisible = false;
@@ -272,26 +271,29 @@
       }
     }, { threshold: 0.3 });
     obs.observe(node);
-    statsObservers.navigate(obs);
+    statsObservers.push(obs);
     return { destroy() { obs.disconnect(); } };
   }
 
-  // ── Features list (quick-scan bento below the story) ─────────────────────
-  const features = [
-    {
-      icon: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
-      title: 'Real-time GPS',
-      desc: 'Sub-2-second position updates with Kalman-filtered accuracy. Never a stale pin.',
-    },
+  // ── Features bento (asymmetric — two featured cells with live visuals,
+  //    four compact, one quiet trust cell; equal-card grids read generic) ────
+  const FEATURE_GPS = {
+    icon: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
+    title: 'Real-time GPS',
+    desc: 'Sub-2-second position updates with Kalman-filtered accuracy. Never a stale pin.',
+  };
+
+  const FEATURE_SOS = {
+    icon: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
+    title: 'One-tap SOS',
+    desc: 'Hold to send an emergency signal. Every family pin turns toward you, live — and it always resolves with "marked safe".',
+  };
+
+  const FEATURES_COMPACT = [
     {
       icon: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>`,
       title: 'Smart Geofences',
       desc: 'Draw zones around school, home, work. Instant alerts when anyone arrives or leaves.',
-    },
-    {
-      icon: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
-      title: 'SOS Alerts',
-      desc: 'One-tap emergency signal. Notifies your entire family and opens live tracking instantly.',
     },
     {
       icon: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
@@ -313,7 +315,6 @@
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   onDestroy(() => {
     statsObservers.forEach(o => o.disconnect());
-    if (heroRaf) cancelAnimationFrame(heroRaf);
     clearTimeout(sosTimer);
     cancelIdle();
     teardownConstellation();   // releases the GL context on route leave
@@ -331,6 +332,8 @@
 
 <!-- Scroll progress bar — pure CSS via animation-timeline: scroll(root) in global.css -->
 <div class="scroll-progress-bar" aria-hidden="true"></div>
+
+<LandingNav />
 
 <div class="landing" aria-label="Kinnect landing page">
 
@@ -377,70 +380,65 @@
 
     <div class="landing-container hs-grid">
 
-      <!-- Hero copy (beat 0) -->
+      <!-- Hero copy (beat 0) — entrance is CSS-choreographed (.le + --le
+           stagger): starts on first paint and honors prefers-reduced-motion,
+           which svelte transitions do not. -->
       <header class="hero-copy" use:heroObserve>
-        <div
-          class="hero-badge"
-          in:fly={{ y: -16, duration: 500, delay: 100, easing: cubicOut }}
-        >
+        <div class="hero-badge le" style="--le:0">
           <span class="hero-badge-dot" aria-hidden="true"></span>
-          Live on 3 platforms
+          {badgeText}
         </div>
 
-        <h1
-          id="hero-headline"
-          class="hero-headline"
-          in:fly={{ y: 24, duration: 600, delay: 200, easing: cubicOut }}
-        >
-          Know your family
-          <span class="hero-headline-accent"> is safe.</span>
-          <span class="hero-headline-sub"> Always.</span>
+        <h1 id="hero-headline" class="hero-headline">
+          <span class="hl-line"><span class="hl-inner" style="--hl:0">Know your family</span></span>
+          <span class="hl-line"><span class="hl-inner hero-headline-accent" style="--hl:1">is safe.</span></span>
+          <span class="hl-line hero-headline-sub"><span class="hl-inner" style="--hl:2">Always.</span></span>
         </h1>
 
-        <p
-          class="hero-tagline"
-          in:fade={{ duration: 500, delay: 420 }}
-        >
+        <p class="hero-tagline le" style="--le:4">
           Kinnect gives families real-time GPS, smart geofence alerts, and
           one-tap SOS — wrapped in a design that feels calm, not clinical.
         </p>
 
-        <div
-          class="hero-actions"
-          in:fly={{ y: 16, duration: 500, delay: 540, easing: cubicOut }}
-        >
-          <Button variant="primary" size="lg" on:click={() => navigate('/register')}>
-            Start for free
-            {#snippet icon()}
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <line x1="3" y1="8" x2="13" y2="8"/>
-                <polyline points="9 4 13 8 9 12"/>
-              </svg>
-            {/snippet}
-          </Button>
+        <div class="hero-actions le" style="--le:5">
+          <MagneticButton strength={5}>
+            <Button variant="primary" size="lg" on:click={() => navigate('/register')}>
+              Start for free
+              {#snippet icon()}
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <line x1="3" y1="8" x2="13" y2="8"/>
+                  <polyline points="9 4 13 8 9 12"/>
+                </svg>
+              {/snippet}
+            </Button>
+          </MagneticButton>
 
           <Button variant="ghost" size="lg" on:click={() => navigate('/login')}>
             Sign in
           </Button>
         </div>
 
-        <p class="hero-social-proof" in:fade={{ duration: 500, delay: 700 }}>
+        <p class="hero-social-proof le" style="--le:6">
           <span class="hero-avatars" aria-hidden="true">
             {#each ['var(--member-1)', 'var(--member-2)', 'var(--member-3)', 'var(--member-4)'] as c}
               <span class="hero-avatar" style="background:{c};"></span>
             {/each}
           </span>
-          <span>Join <strong>50,000+</strong> families worldwide</span>
+          <span>Made for the people on your map — parents, kids, grandparents.</span>
         </p>
       </header>
 
-      <!-- The story device: hero mockup, sticky through all four beats -->
-      <div
-        class="hs-visual"
-        in:fly={{ x: 40, duration: 700, delay: 350, easing: cubicOut }}
-      >
+      <!-- The story device: hero mockup, sticky through all four beats.
+           Tilt + glare ride the same Spring, so light follows geometry. -->
+      <div class="hs-visual le" style="--le:3">
         <div class="hs-sticky">
-          <div class="hero-card-wrap" bind:this={heroCardEl}>
+          <div
+            class="hero-card-wrap"
+            bind:this={heroCardEl}
+            style:transform={`perspective(1000px) rotateX(${$tilt.x}deg) rotateY(${$tilt.y}deg)`}
+            style:--glare-x={`${($tilt.y * 7).toFixed(2)}px`}
+            style:--glare-y={`${(-$tilt.x * 7).toFixed(2)}px`}
+          >
             <div class="mockup-card noise-surface">
               <!-- Status bar -->
               <div class="mockup-topbar">
@@ -515,6 +513,9 @@
                   </div>
                 {/each}
               </div>
+
+              <!-- Specular glare — translated by the tilt spring (ambient tier) -->
+              <div class="mockup-glare fx-ambient" aria-hidden="true"></div>
             </div>
 
             <!-- Floating scene chip (decorative twin of the beat copy) -->
@@ -573,18 +574,55 @@
         </h2>
       </div>
 
-      <div class="features-grid reveal-scroll-grid" role="list">
-        {#each features as f}
-          <div class="feature-cell card-hover-depth" role="listitem">
-            <Card variant="glass" hover padding="lg">
-              <div class="feature-icon-wrap" aria-hidden="true">
-                {@html f.icon}
-              </div>
-              <h3 class="feature-title">{f.title}</h3>
-              <p class="feature-desc">{f.desc}</p>
-            </Card>
+      <!-- Asymmetric bento: two featured cells carry live visuals, four stay
+           compact, one quiet cell carries the privacy promise. Cells are
+           page-local glass surfaces (same token recipe as .mockup-card). -->
+      <div class="features-bento reveal-scroll-grid" role="list">
+
+        <!-- Featured: Real-time GPS — live mini-map with member dots -->
+        <div class="bento-cell bento-gps card-hover-depth" role="listitem">
+          <div class="bento-gps-copy">
+            <div class="feature-icon-wrap" aria-hidden="true">{@html FEATURE_GPS.icon}</div>
+            <h3 class="feature-title">{FEATURE_GPS.title}</h3>
+            <p class="feature-desc">{FEATURE_GPS.desc}</p>
+          </div>
+          <div class="bento-gps-visual" aria-hidden="true">
+            <div class="bgv-grid"></div>
+            <span class="bgv-dot" style="--hue:var(--member-1); top:32%; left:24%"></span>
+            <span class="bgv-dot" style="--hue:var(--member-2); top:58%; left:66%"></span>
+            <span class="bgv-dot bgv-live" style="--hue:var(--member-3); top:40%; left:48%">
+              <span class="bgv-ring fx-ambient"></span>
+            </span>
+          </div>
+        </div>
+
+        <!-- Featured: SOS — hold-ring motif, resolves to safe -->
+        <div class="bento-cell bento-sos card-hover-depth" role="listitem">
+          <div class="bento-sos-visual" aria-hidden="true">
+            <svg viewBox="0 0 96 96" class="sos-ring-svg">
+              <circle class="sos-ring-track" cx="48" cy="48" r="40" />
+              <circle class="sos-ring-pulse fx-ambient" cx="48" cy="48" r="40" />
+            </svg>
+            <span class="sos-ring-core">SOS</span>
+          </div>
+          <h3 class="feature-title">{FEATURE_SOS.title}</h3>
+          <p class="feature-desc">{FEATURE_SOS.desc}</p>
+        </div>
+
+        {#each FEATURES_COMPACT as f}
+          <div class="bento-cell card-hover-depth" role="listitem">
+            <div class="feature-icon-wrap" aria-hidden="true">{@html f.icon}</div>
+            <h3 class="feature-title">{f.title}</h3>
+            <p class="feature-desc">{f.desc}</p>
           </div>
         {/each}
+
+        <!-- Quiet cell: the privacy promise, stated plainly -->
+        <div class="bento-cell bento-quiet" role="listitem">
+          <p class="bento-quiet-line">No ads. No data sold. Ever.</p>
+          <p class="feature-desc">Your family's location belongs to your family — that's the whole business model.</p>
+        </div>
+
       </div>
 
     </div>
@@ -616,9 +654,11 @@
                 size="lg"
               />
             </div>
-            <Button variant="primary" size="lg" type="submit">
-              Get started free
-            </Button>
+            <MagneticButton strength={4}>
+              <Button variant="primary" size="lg" type="submit">
+                Get started free
+              </Button>
+            </MagneticButton>
           </form>
         {:else}
           <div
@@ -645,6 +685,8 @@
         </div>
       </div>
   </section>
+
+  <LandingFooter />
 
 </div>
 
@@ -747,6 +789,27 @@
     .hero-field { width: 80vw; right: -10%; opacity: 0.3; }
   }
 
+  /* Scroll parallax — the night-sky field and depth grid fall away slower
+     than the page (progressive enhancement; neither element animates
+     transform elsewhere, so the scroll-driven animation owns it). */
+  @supports (animation-timeline: scroll()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .hero-grid  { --plx: 30px; }
+      .hero-field { --plx: 56px; }
+      .hero-grid,
+      .hero-field {
+        animation: hero-parallax linear both;
+        animation-timeline: scroll(root);
+        animation-range: 0svh 120svh;
+      }
+    }
+  }
+  @keyframes hero-parallax {
+    to { transform: translateY(var(--plx, 40px)); }
+  }
+  :global([data-fx='minimal']) .hero-grid,
+  :global([data-fx='minimal']) .hero-field { animation: none; }
+
   /* WebGL constellation — absolute over the SVG poster, opacity crossfade in.
      Opacity-only transition (GPU-safe); starts hidden so a mount that never
      fires leaves the poster untouched. */
@@ -835,13 +898,57 @@
     }
     .hs-visual {
       position: sticky;
-      top: max(var(--space-3), env(safe-area-inset-top));
+      /* clear the fixed nav (56px + safe area) — pre-nav this was space-3 */
+      top: calc(env(safe-area-inset-top, 0px) + 56px + var(--space-2));
       z-index: 2;
       display: flex;
       justify-content: center;
     }
     .hs-sticky { position: static; padding: 0; }
     .story-beats { padding: var(--space-10) 0 var(--space-12); }
+  }
+
+  /* ── Hero entrance choreography ─────────────────────────────────────────
+     CSS-only (.le + --le index): starts at first paint, inherently honors
+     prefers-reduced-motion, and needs zero JS. Headline lines rise out of
+     clipped line boxes (.hl-line/.hl-inner) — the masked-reveal treatment. */
+  .hl-line {
+    display: block;
+    overflow: clip;
+    /* extend the clip box below the baseline so descenders never shear */
+    padding-bottom: 0.16em;
+    margin-bottom: -0.16em;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .le {
+      opacity: 0;
+      transform: translateY(14px);
+      animation: le-rise 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
+      animation-delay: calc(var(--le) * 90ms + 60ms);
+    }
+    .hs-visual.le { transform: translateY(18px) scale(0.985); }
+
+    .hl-inner {
+      display: inline-block;
+      transform: translateY(120%);
+      animation: hl-reveal 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
+      animation-delay: calc(var(--hl) * 90ms + 140ms);
+    }
+  }
+
+  @keyframes le-rise {
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes hl-reveal {
+    to { transform: translateY(0); }
+  }
+
+  :global([data-fx='minimal']) .le,
+  :global([data-fx='minimal']) .hl-inner {
+    animation: none;
+    opacity: 1;
+    transform: none;
   }
 
   /* Hero copy pieces */
@@ -968,6 +1075,24 @@
     .mockup-card { width: 250px; }
   }
 
+  /* Specular glare — a soft light source that rides the tilt spring
+     (translate vars set alongside the card's rotation). Screen-blended
+     white at low alpha reads on both themes; .fx-ambient gates it. */
+  .mockup-glare {
+    position: absolute;
+    inset: -30%;
+    pointer-events: none;
+    z-index: 2;
+    background: radial-gradient(
+      ellipse 40% 32% at 50% 36%,
+      color-mix(in srgb, white 9%, transparent) 0%,
+      transparent 70%
+    );
+    mix-blend-mode: screen;
+    transform: translate(var(--glare-x, 0px), var(--glare-y, 0px));
+    will-change: transform;
+  }
+
   .mockup-topbar {
     display: flex;
     justify-content: space-between;
@@ -995,11 +1120,14 @@
     position: relative;
     height: clamp(150px, 13vw, 240px);
     overflow: hidden;
+    /* The map is a NIGHT map in both themes (mixing surface-0 muddied to
+       grey on Dawn); ink is a fixed light ramp step for the same reason. */
+    --map-ink: var(--gray-100);
     background:
       linear-gradient(135deg,
-        color-mix(in oklch, var(--primary-500) 6%, transparent) 0%,
-        color-mix(in oklch, var(--member-3) 6%, transparent) 100%),
-      color-mix(in oklch, var(--surface-0) 60%, black);
+        color-mix(in oklch, var(--primary-500) 8%, transparent) 0%,
+        color-mix(in oklch, var(--member-3) 8%, transparent) 100%),
+      var(--surface-midnight);
   }
 
   @media (max-width: 900px) {
@@ -1023,10 +1151,10 @@
   }
 
   .place-dot {
-    fill: color-mix(in oklch, var(--text-primary) 30%, transparent);
+    fill: color-mix(in oklch, var(--map-ink) 30%, transparent);
   }
   .place-label {
-    fill: color-mix(in oklch, var(--text-primary) 55%, transparent);
+    fill: color-mix(in oklch, var(--map-ink) 55%, transparent);
     font-size: 9px;
     font-weight: 600;
     font-family: var(--font-sans);
@@ -1071,7 +1199,7 @@
   .sp-halo { fill: color-mix(in oklch, var(--hue) 18%, transparent); }
   .sp-dot  { fill: var(--hue); }
   .sp-label {
-    fill: color-mix(in oklch, var(--text-primary) 75%, transparent);
+    fill: color-mix(in oklch, var(--map-ink) 75%, transparent);
     font-size: 8px;
     font-weight: 700;
     font-family: var(--font-sans);
@@ -1127,10 +1255,11 @@
     .mockup-list { display: none; }
   }
 
-  /* Floating scene chip */
+  /* Floating scene chip — rides the card's BOTTOM edge: the top edge lives
+     in the fixed-nav band at rest, and the two collided. */
   .mockup-chip {
     position: absolute;
-    top: -18px; right: -10px;
+    bottom: -16px; right: -10px;
     display: flex;
     align-items: center;
     gap: var(--space-1);
@@ -1166,7 +1295,7 @@
   }
 
   @media (max-width: 900px) {
-    .mockup-chip { right: -4px; top: -14px; }
+    .mockup-chip { right: -4px; bottom: -12px; }
   }
 
   .chip-icon { font-size: 12px; }
@@ -1296,20 +1425,187 @@
     background: var(--surface-0);
   }
 
-  .features-grid {
+  /* Asymmetric bento — cells are page-local glass surfaces (same token
+     recipe as .mockup-card); lift/shadow on hover comes from the global
+     .card-hover-depth class, so local hover only tints border + nudges icon. */
+  .features-bento {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: clamp(var(--space-4), 1.5vw, var(--space-8));
+    grid-auto-rows: minmax(150px, auto);
+    gap: clamp(var(--space-4), 1.5vw, var(--space-6));
+  }
+
+  .bento-cell {
+    position: relative;
+    padding: var(--space-6);
+    border-radius: var(--radius-lg, 16px);
+    background: var(--glass-bg);
+    border: 1px solid var(--border-default);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    overflow: clip;
+    transition: border-color var(--duration-normal) var(--ease-out);
+  }
+
+  @media (hover: hover) {
+    .bento-cell:hover {
+      border-color: color-mix(in oklch, var(--primary-400) 34%, transparent);
+    }
+    .bento-cell:hover .feature-icon-wrap {
+      transform: translateY(-2px) rotate(-3deg);
+    }
+  }
+  .feature-icon-wrap {
+    transition: transform var(--duration-normal) var(--ease-spring, var(--ease-out));
+  }
+
+  /* Featured: GPS — copy beside a live mini-map */
+  .bento-gps {
+    grid-column: span 2;
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: var(--space-5);
+    align-items: center;
+  }
+
+  .bento-gps-visual {
+    position: relative;
+    height: 100%;
+    min-height: 132px;
+    border-radius: var(--radius-md, 12px);
+    border: 1px solid var(--border-subtle);
+    overflow: clip;
+    background:
+      linear-gradient(135deg,
+        color-mix(in oklch, var(--primary-500) 8%, transparent) 0%,
+        color-mix(in oklch, var(--member-3) 8%, transparent) 100%),
+      var(--surface-midnight);
+  }
+
+  .bgv-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(0deg, color-mix(in srgb, white 3%, transparent) 1px, transparent 1px),
+      linear-gradient(90deg, color-mix(in srgb, white 3%, transparent) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+
+  .bgv-dot {
+    position: absolute;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--hue);
+    box-shadow: 0 0 10px color-mix(in oklch, var(--hue) 55%, transparent);
+  }
+
+  .bgv-ring {
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    border: 1.5px solid var(--hue);
+    opacity: 0;
+    animation: bgv-ping 2.2s var(--ease-out) infinite;
+  }
+
+  @keyframes bgv-ping {
+    0%   { transform: scale(0.5); opacity: 0.8; }
+    100% { transform: scale(2.1); opacity: 0; }
+  }
+
+  /* Featured: SOS — hold-ring motif (transform/opacity pulse only) */
+  .bento-sos {
+    grid-row: span 2;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .bento-sos-visual {
+    position: relative;
+    width: 96px; height: 96px;
+    margin: 0 auto var(--space-5);
+  }
+
+  .sos-ring-svg { width: 100%; height: 100%; }
+
+  .sos-ring-track {
+    fill: none;
+    stroke: color-mix(in oklch, var(--danger-500) 22%, transparent);
+    stroke-width: 5;
+  }
+
+  .sos-ring-pulse {
+    fill: none;
+    stroke: var(--danger-500);
+    stroke-width: 3;
+    opacity: 0;
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: sos-hold-pulse 2.6s var(--ease-out) infinite;
+  }
+
+  @keyframes sos-hold-pulse {
+    0%   { transform: scale(0.86); opacity: 0.7; }
+    100% { transform: scale(1.24); opacity: 0; }
+  }
+
+  .sos-ring-core {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    color: var(--danger-400, var(--danger-500));
+  }
+
+  .bento-sos .feature-icon-wrap { margin-inline: auto; }
+  .bento-sos .feature-title,
+  .bento-sos .feature-desc { text-align: center; }
+
+  /* Quiet cell — the privacy promise */
+  .bento-quiet {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--space-2);
+    background: color-mix(in oklch, var(--success-500) 7%, transparent);
+    border-color: color-mix(in oklch, var(--success-500) 26%, transparent);
+  }
+
+  .bento-quiet-line {
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+    margin: 0;
+  }
+
+  /* 7th cell joins the global reveal-scroll-grid stagger (it only covers 6) */
+  @supports (animation-timeline: view()) {
+    .features-bento > :nth-child(7) {
+      animation: reveal-up linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 60%;
+      animation-delay: 480ms;
+    }
   }
 
   @media (max-width: 900px) {
-    .features-grid { grid-template-columns: repeat(2, 1fr); }
+    .features-bento { grid-template-columns: repeat(2, 1fr); }
+    .bento-gps { grid-column: span 2; grid-template-columns: 1fr; }
+    .bento-gps-visual { min-height: 120px; }
+    .bento-sos { grid-row: auto; }
   }
   @media (max-width: 580px) {
-    .features-grid { grid-template-columns: 1fr; }
+    .features-bento { grid-template-columns: 1fr; }
+    .bento-gps { grid-column: auto; }
   }
-
-  .feature-cell { min-height: 160px; }
 
   .feature-icon-wrap {
     width: 44px; height: 44px;
@@ -1464,6 +1760,10 @@
   :global([data-fx='minimal']) .route { transition: none; }
   :global([data-fx='minimal']) .mockup-chip { animation: none; }
   :global([data-fx='minimal']) .story-pin.sp-sos .sp-sos-ring { animation: none; opacity: 0; }
+  /* keyframe opacity would override the .fx-ambient opacity gate — kill the
+     loops explicitly at minimal (mockup-glare is static; fx-ambient hides it) */
+  :global([data-fx='minimal']) .bgv-ring,
+  :global([data-fx='minimal']) .sos-ring-pulse { animation: none; opacity: 0; }
 
   /* ── Reduced motion: final static frames, zero travel, zero loops ────────── */
   @media (prefers-reduced-motion: reduce) {
@@ -1476,9 +1776,11 @@
     .hero-aurora { animation: none; opacity: 1; transform: scale(1); }
 
     .hero-card-wrap { transform: none !important; }
+    .mockup-glare { transform: none !important; }
 
     .story-pin, .gf, .route { transition: none; }
     .story-pin.sp-sos .sp-sos-ring { animation: none; opacity: 0; }
+    .bgv-ring, .sos-ring-pulse { animation: none; opacity: 0; }
 
     .reveal-scroll,
     .reveal-scroll-grid > * {
