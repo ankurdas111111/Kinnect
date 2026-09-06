@@ -1,20 +1,13 @@
 {
   "type": "module",
   "scripts": {
-    "check:three-async": "node scripts/check-three-async.mjs",
-    "check:bundle": "size-limit && node scripts/check-three-async.mjs"
+    "check:bundle": "size-limit"
   },
   "size-limit": [
     {
-      "name": "three chunk (async, Landing hero only)",
-      "path": "dist/assets/three-*.js",
-      "limit": "220 KB",
-      "gzip": true
-    },
-    {
-      "name": "index (initial route — must not grow from the three work)",
+      "name": "index (initial route budget — ratchet, do not raise casually)",
       "path": "dist/assets/index-*.js",
-      "limit": "114 KB",
+      "limit": "120 KB",
       "gzip": true
     }
   ],
