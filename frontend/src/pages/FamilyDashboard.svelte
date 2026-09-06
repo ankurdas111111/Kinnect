@@ -1,24 +1,23 @@
 <script>
   import { run } from 'svelte/legacy';
 
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import { push } from 'svelte-spa-router';
   import { authUser } from '../lib/stores/auth.js';
   import { myLocation } from '../lib/stores/map.js';
   import { mySosActive } from '../lib/stores/sos.js';
-  import { allowWebGL } from '../lib/stores/effects.js';
   import { clearHubBadge } from '../lib/stores/hubBadge.js';
   import { familyVerdict, familyMembers, verdictNow } from '../lib/stores/verdict.js';
+  import { arrivalProjections } from '../lib/stores/arrivals.js';
   import { formatAge } from '../lib/presence.js';
   import { activityEvents } from '../lib/activityLog.js';
   import { rhythmEnabled, setRhythmEnabled } from '../lib/presenceRhythm.js';
-  import HubVerdict from '../components/hub/HubVerdict.svelte';
+  import { myRooms } from '../lib/stores/rooms.js';
   import HomecomingRail from '../components/hub/HomecomingRail.svelte';
   import FamilyRoster from '../components/hub/FamilyRoster.svelte';
   import PulseButton from '../components/hub/PulseButton.svelte';
   import InviteStrip from '../components/hub/InviteStrip.svelte';
   import WeeklyRhythm from '../components/hub/WeeklyRhythm.svelte';
-  import GlobeCanvas from '../components/primitives/GlobeCanvas.svelte';
 
   run(() => {
     if (!$authUser) push('/login');
@@ -42,141 +41,166 @@
     clearHubBadge();
     visited = Object.fromEntries(Object.entries(VIS_KEYS).map(([k, v]) => [k, !!localStorage.getItem(v)]));
     requestAnimationFrame(() => { mounted = true; });
-    updateGlobeSize();
-    window.addEventListener('resize', updateGlobeSize);
-  });
-  onDestroy(() => {
-    window.removeEventListener('resize', updateGlobeSize);
   });
 
   let mounted = $state(false);
   let nowDate = $derived(new Date(nowMs));
-  let timeStr = $derived(nowDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-  let dateStr = $derived(nowDate.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' }));
-  function greeting() {
-    const h = nowDate.getHours();
-    if (h < 5) return 'Up late'; if (h < 12) return 'Good morning';
-    if (h < 17) return 'Good afternoon'; return 'Good evening';
-  }
-  let firstName = $derived(($authUser?.displayName || '').split(' ')[0] || 'there');
+  let timeStr = $derived(nowDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
+  let dateStr = $derived(nowDate.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' }));
 
   // ── Derived family state — read from the shared verdict store (zero DB) ────
   let members = $derived($familyMembers);
   let verdict = $derived($familyVerdict);
 
-  // ── Globe (demoted): desktop-only ambient flourish, gated by allowWebGL ─────
-  let globeSize = $state(420);
-  function updateGlobeSize() {
-    if (typeof window === 'undefined') return;
-    const vw = window.innerWidth, vh = window.innerHeight;
-    if (vw < 768) { globeSize = 0; return; }
-    const sidebarW = vw >= 1200 ? Math.min(460, vw * 0.35) : Math.min(420, vw * 0.38);
-    const leftW = Math.max(400, vw - sidebarW);
-    globeSize = Math.round(Math.min(560, Math.max(320, Math.min(vh * 0.6, leftW * 0.62))));
-  }
+  // Hearth 06: rooms are this app's families, so the room name titles the page.
+  let familyName = $derived($myRooms?.[0]?.name || 'Your family');
+  let initials = $derived(
+    ($authUser?.displayName || '?')
+      .split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase()
+  );
+
+  /**
+   * Hearth 06b — when nobody has shared in a long time the page must SAY so and
+   * offer one useful thing to do, instead of rendering empty widgets. Derived
+   * from real state only; no invented numbers.
+   */
+  let sharingNow = $derived(members.filter((m) => m.online && m.lastUpdate));
+  let dormant = $derived(members.filter((m) => !m.online || !m.lastUpdate));
+  let nobodySharing = $derived(members.length > 0 && sharingNow.length === 0);
 </script>
 
 <div class="d d-{verdict.tone}" class:d-ready={mounted}>
   <!-- ONE ambient tint, driven by the real verdict tone (replaces aurora+noise+glow pile-up) -->
   <div class="d-ambient" aria-hidden="true"></div>
 
-  <!-- Demoted globe — desktop-only living backdrop, skipped in calm/low-end via allowWebGL -->
-  {#if $allowWebGL && globeSize > 0}
-    <div class="d-globe-flourish" aria-hidden="true">
-      <GlobeCanvas size={globeSize} />
-    </div>
-  {/if}
-
-  <!-- Header -->
+  <!-- Header (Hearth 06): back to map · wordmark · family · date + you -->
   <header class="d-header">
     <button class="d-back tactile" onclick={() => push('/')} aria-label="Back to map">
       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
       Map
     </button>
-    <div class="d-clock">{timeStr}</div>
+    <span class="d-wordmark">Kinnect</span>
+    <span class="d-family-name">{familyName}</span>
+    <div class="d-head-right">
+      <span class="d-when">{dateStr} · {timeStr}</span>
+      <span class="d-avatar" aria-hidden="true">{initials}</span>
+    </div>
   </header>
 
-  <!-- Content -->
+  <!-- Content — two columns on desktop, one on phone (06a / 06c) -->
   <div class="d-content">
-    <section class="d-greet">
-      <h1 class="d-name"><span class="d-greet-word">{greeting()},&nbsp;</span><span class="d-name-word">{firstName}</span></h1>
-      <p class="d-date">{dateStr}</p>
-    </section>
+    <div class="d-main">
+      <section class="d-now" aria-labelledby="d-now-head">
+        <p class="d-eyebrow" id="d-now-head">Right now</p>
+        <h1 class="d-verdict verdict-voice">{verdict.sentence}</h1>
+        {#if nobodySharing}
+          <p class="d-verdict-detail">
+            Nobody in {familyName} is sharing at the moment. One nudge asks everyone to turn
+            sharing back on — or invite someone new.
+          </p>
+        {:else if verdict.detail}
+          <p class="d-verdict-detail">{verdict.detail}</p>
+        {/if}
 
-    <div class="d-verdict-slot">
-      <HubVerdict {verdict} onopen={() => push('/')} />
-    </div>
-
-    <div class="d-pulse-slot">
-      <PulseButton />
-    </div>
-
-    <HomecomingRail />
-
-    <section class="d-family">
-      <FamilyRoster {members} myLocation={$myLocation} now={nowMs} />
-      {#if members.length > 0}
-        <button class="d-rhythm-toggle" role="switch" aria-checked={$rhythmEnabled}
-          onclick={() => setRhythmEnabled(!$rhythmEnabled)}>
-          <span class="d-rhythm-dot" class:on={$rhythmEnabled}></span>
-          {$rhythmEnabled ? 'Rhythm hints on' : 'Show rhythm hints'}
-        </button>
-      {/if}
-    </section>
-
-    <div class="d-invite-slot">
-      <InviteStrip {members} />
-    </div>
-
-    <div class="d-week-slot">
-      <WeeklyRhythm />
-    </div>
-
-    {#if $activityEvents.length > 0}
-      <section class="d-recent" aria-label="Recent activity">
-        <button class="d-recent-head" onclick={() => push('/activity')}>
-          <span>Recent</span>
-          <span class="d-recent-more">All activity ›</span>
-        </button>
-        <div class="d-recent-list">
-          {#each $activityEvents.slice(0, 2) as ev (ev.id)}
-            <button class="d-recent-row" onclick={() => push('/activity')}>
-              <span class="d-recent-dot d-recent-{ev.type}" aria-hidden="true"></span>
-              <span class="d-recent-msg">{ev.message}</span>
-              <span class="d-recent-ts">{formatAge(nowMs - ev.ts)}</span>
-            </button>
-          {/each}
+        <!-- One row of real actions, ember reserved for the primary one -->
+        <div class="d-cta-row">
+          <div class="d-cta-pulse"><PulseButton /></div>
+          <button class="d-cta" onclick={() => push('/')}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+            Share live
+          </button>
+          <button class="d-cta d-cta-accent" onclick={() => push('/')}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Invite
+          </button>
         </div>
       </section>
-    {/if}
 
-    <!-- Quick actions — slim, specific, thumb-reachable -->
-    <section class="d-actions" aria-label="Quick actions">
-      <button class="d-act act-map tactile" onclick={() => visitFeature(null, '/')}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
-        <span>Live Map</span>
-      </button>
-      <button class="d-act act-activity tactile" onclick={() => visitFeature('activity', '/activity')}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-        <span>Activity</span>
-        {#if !visited.activity}<span class="d-dot"></span>{/if}
-      </button>
-      <button class="d-act act-replay tactile" onclick={() => visitFeature('replay', '/replay')}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.61"/></svg>
-        <span>Routes</span>
-        {#if !visited.replay}<span class="d-dot"></span>{/if}
-      </button>
-      <button class="d-act act-sos tactile" class:act-sos-on={$mySosActive} onclick={() => visitFeature('emergency', '/emergency')}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        <span>Emergency</span>
-        {#if !visited.emergency}<span class="d-dot d-dot-red"></span>{/if}
-      </button>
-      <button class="d-act act-checkin tactile" onclick={() => visitFeature('checkins', '/checkins')}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        <span>Check-ins</span>
-        {#if !visited.checkins}<span class="d-dot d-dot-cyan"></span>{/if}
-      </button>
-    </section>
+      <section class="d-family card">
+        <FamilyRoster {members} myLocation={$myLocation} now={nowMs} />
+        {#if members.length > 0}
+          <button class="d-rhythm-toggle" role="switch" aria-checked={$rhythmEnabled}
+            onclick={() => setRhythmEnabled(!$rhythmEnabled)}>
+            <span class="d-rhythm-dot" class:on={$rhythmEnabled}></span>
+            {$rhythmEnabled ? 'Rhythm hints on' : 'Show rhythm hints'}
+          </button>
+        {/if}
+        <div class="d-invite-slot"><InviteStrip {members} /></div>
+      </section>
+
+      <!-- Slim text nav, not a wall of tiles (06a footer) -->
+      <nav class="d-nav" aria-label="More">
+        <button class="d-nav-link" onclick={() => visitFeature('activity', '/activity')}>Activity{#if !visited.activity}<span class="d-dot"></span>{/if}</button>
+        <button class="d-nav-link" onclick={() => visitFeature('replay', '/replay')}>Routes{#if !visited.replay}<span class="d-dot"></span>{/if}</button>
+        <button class="d-nav-link" onclick={() => visitFeature('checkins', '/checkins')}>Check-ins{#if !visited.checkins}<span class="d-dot"></span>{/if}</button>
+        <button class="d-nav-link" onclick={() => push('/')}>Places</button>
+        <button class="d-nav-link" class:d-nav-sos={$mySosActive} onclick={() => visitFeature('emergency', '/emergency')}>Emergency{#if !visited.emergency}<span class="d-dot d-dot-red"></span>{/if}</button>
+      </nav>
+    </div>
+
+    <!-- Right column: where everyone is, coming home, today, your week -->
+    <aside class="d-side" aria-label="Family overview">
+      <section class="card d-card">
+        <header class="d-card-head">
+          <h2 class="d-card-title">Where everyone is</h2>
+          <button class="d-card-more" onclick={() => push('/')}>Open map →</button>
+        </header>
+        {#if members.length === 0}
+          <p class="d-empty">Nobody to show yet. Invite someone and they'll appear here.</p>
+        {:else}
+          <div class="d-pebbles">
+            {#each members.slice(0, 8) as m (m.userId || m.socketId)}
+              <span class="d-pebble" style="--hue: var(--member-{(Math.abs([...(m.displayName || '?')].reduce((a, c) => a + c.charCodeAt(0), 0)) % 4) + 1})">
+                <span class="d-pebble-dot" aria-hidden="true"></span>
+                {(m.displayName || '?').split(' ')[0]}
+              </span>
+            {/each}
+          </div>
+        {/if}
+      </section>
+
+      <section class="card d-card">
+        <h2 class="d-card-title">Coming home</h2>
+        <!-- HomecomingRail self-hides when there is nothing to project, which
+             left an empty card. 06b: say what would fill it. -->
+        {#if $arrivalProjections && $arrivalProjections.size > 0}
+          <HomecomingRail />
+        {:else}
+          <p class="d-empty-strong">Nobody's heading home right now.</p>
+          <p class="d-empty">This fills in once someone sets a Home place and starts sharing.</p>
+        {/if}
+      </section>
+
+      <section class="card d-card">
+        <header class="d-card-head">
+          <h2 class="d-card-title">Today</h2>
+          {#if $activityEvents.length > 0}
+            <button class="d-card-more" onclick={() => push('/activity')}>All activity →</button>
+          {/if}
+        </header>
+        {#if $activityEvents.length === 0}
+          <!-- 06b: an empty day is a sentence, not a blank panel -->
+          <p class="d-empty-strong">Nothing happened today.</p>
+          <p class="d-empty">A quiet day is a good day. Nothing to review.</p>
+        {:else}
+          <div class="d-today">
+            {#each $activityEvents.slice(0, 3) as ev (ev.id)}
+              <button class="d-today-row" onclick={() => push('/activity')}>
+                <span class="d-today-ts">{formatAge(nowMs - ev.ts)}</span>
+                <span class="d-recent-dot d-recent-{ev.type}" aria-hidden="true"></span>
+                <span class="d-today-msg">{ev.message}</span>
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </section>
+
+      <!-- WeeklyRhythm renders its own "Your week / Private to you" header —
+           no wrapper header here, or the card shows the title twice. -->
+      <section class="card d-card">
+        <WeeklyRhythm />
+      </section>
+    </aside>
 
     <div class="d-spacer"></div>
   </div>
@@ -201,29 +225,41 @@
       radial-gradient(ellipse 60% 45% at 85% 80%, var(--amb-b) 0%, transparent 60%);
     transition: background var(--duration-slow, 600ms) var(--ease-out, ease);
   }
-  .d-safe    { --amb-a: var(--success-500-12, rgba(16,185,129,0.10)); --amb-b: var(--primary-500-08, rgba(99,102,241,0.08)); }
-  .d-caution { --amb-a: var(--warning-500-12, rgba(245,158,11,0.12)); --amb-b: var(--primary-500-08, rgba(99,102,241,0.06)); }
-  .d-alert   { --amb-a: var(--danger-500-12, rgba(239,68,68,0.14));   --amb-b: var(--danger-500-08, rgba(239,68,68,0.06)); }
-
-  /* ── Demoted globe flourish (desktop only, behind content) ────────────────── */
-  .d-globe-flourish { display: none; }
-  @media (min-width: 768px) {
-    .d-globe-flourish {
-      display: flex; align-items: center; justify-content: center;
-      position: absolute; top: 0; bottom: 0; left: 0;
-      right: min(420px, 38vw); z-index: 1; pointer-events: none; opacity: 0.85;
-    }
-  }
-  @media (min-width: 1200px) { .d-globe-flourish { right: min(460px, 35vw); } }
+  /* Hearth: the page is warm paper, so the tone wash is a whisper of the tone
+     colour — the old emerald/indigo pair read as a green stain on cream. */
+  .d-safe    { --amb-a: color-mix(in oklch, var(--sage) 5%, transparent);      --amb-b: transparent; }
+  .d-caution { --amb-a: color-mix(in oklch, var(--ochre) 7%, transparent);     --amb-b: transparent; }
+  .d-alert   { --amb-a: color-mix(in oklch, var(--vermilion) 9%, transparent); --amb-b: transparent; }
 
   /* ── Header ───────────────────────────────────────────────────────────────── */
   .d-header {
     position: fixed; top: 0; left: 0; right: 0; z-index: 20;
-    display: flex; align-items: center; justify-content: space-between;
+    display: flex; align-items: center; gap: var(--space-3);
     padding: calc(var(--safe-top, 0px) + var(--space-2)) var(--space-5) var(--space-2);
-    background: rgba(5,8,18,0.55);
+    background: color-mix(in oklch, var(--surface-0) 88%, transparent);
     backdrop-filter: blur(24px) saturate(1.5); -webkit-backdrop-filter: blur(24px) saturate(1.5);
-    border-bottom: 1px solid var(--border-default, rgba(255,255,255,0.04));
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .d-wordmark {
+    font-family: var(--font-serif, var(--font-display));
+    font-style: italic;
+    font-size: var(--text-lg);
+    color: var(--text-primary);
+  }
+  .d-family-name { font-size: var(--text-sm); font-weight: 600; color: var(--text-secondary); }
+  .d-head-right { margin-left: auto; display: flex; align-items: center; gap: var(--space-3); }
+  .d-when {
+    font-size: var(--text-xs); color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .d-avatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--primary-500); color: var(--text-on-primary);
+    font-size: 11px; font-weight: 700; letter-spacing: 0.02em; flex-shrink: 0;
+  }
+  @media (max-width: 640px) {
+    .d-wordmark, .d-when { display: none; }
   }
   .d-back {
     display: flex; align-items: center; gap: 4px; min-height: 44px;
@@ -234,50 +270,161 @@
     transition: background var(--duration-fast, 150ms) var(--ease-out), color var(--duration-fast, 150ms) var(--ease-out);
     -webkit-tap-highlight-color: transparent;
   }
-  .d-back:hover { background: rgba(255,255,255,0.10); color: var(--text-primary); }
+  .d-back:hover { background: var(--surface-hover); color: var(--text-primary); }
   .d-back:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
-  .d-clock { font-size: clamp(1.125rem, 1.4vw, 1.25rem); font-weight: 700; letter-spacing: -0.03em; color: var(--text-primary); font-variant-numeric: tabular-nums; font-family: var(--font-display, system-ui); }
 
-  /* ── Content column ───────────────────────────────────────────────────────── */
+  /* ── Content: two columns on desktop (06a), one on phone (06c) ───────────── */
   .d-content {
     position: relative; z-index: 5;
     height: 100dvh; overflow-y: auto;
     -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain;
-    padding: calc(var(--safe-top, 0px) + 52px) 0 0;
-    display: flex; flex-direction: column; gap: var(--space-4);
+    padding: calc(var(--safe-top, 0px) + 60px) var(--space-5) var(--space-8);
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-5);
+    align-content: start;
   }
-  .d-greet, .d-verdict-slot, .d-pulse-slot, .d-family, .d-invite-slot, .d-week-slot, .d-recent, .d-actions { padding-left: var(--space-5); padding-right: var(--space-5); }
-
-  @media (min-width: 768px) {
+  @media (min-width: 1024px) {
     .d-content {
-      position: absolute; top: 0; right: 0; bottom: 0;
-      width: min(420px, 38vw);
-      padding: calc(var(--safe-top, 0px) + 60px) 0 0;
-      background: linear-gradient(90deg, transparent 0%, rgba(5,8,18,0.6) 30%, rgba(5,8,18,0.9) 100%);
-      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
+      gap: var(--space-6);
+      max-width: 1360px;
+      margin-inline: auto;
+      width: 100%;
     }
   }
-  @media (min-width: 1200px) { .d-content { width: min(460px, 35vw); } }
+  .d-main, .d-side {
+    display: flex; flex-direction: column; gap: var(--space-4);
+    min-width: 0;
+  }
 
   /* Staggered entrance — transform/opacity only */
-  .d-greet, .d-verdict-slot, .d-pulse-slot, .d-family, .d-invite-slot, .d-week-slot, .d-recent, .d-actions {
+  .d-main, .d-side {
     opacity: 0; transform: translateY(10px);
     transition: opacity var(--duration-slow, 500ms) var(--ease-out), transform var(--duration-slow, 500ms) var(--ease-out);
   }
-  .d-ready .d-greet        { opacity: 1; transform: none; transition-delay: 40ms; }
-  .d-ready .d-verdict-slot { opacity: 1; transform: none; transition-delay: 90ms; }
-  .d-ready .d-pulse-slot   { opacity: 1; transform: none; transition-delay: 130ms; }
-  .d-ready .d-family       { opacity: 1; transform: none; transition-delay: 170ms; }
-  .d-ready .d-invite-slot  { opacity: 1; transform: none; transition-delay: 210ms; }
-  .d-ready .d-week-slot    { opacity: 1; transform: none; transition-delay: 240ms; }
-  .d-ready .d-recent       { opacity: 1; transform: none; transition-delay: 270ms; }
-  .d-ready .d-actions      { opacity: 1; transform: none; transition-delay: 300ms; }
+  .d-ready .d-main { opacity: 1; transform: none; transition-delay: 40ms; }
+  .d-ready .d-side { opacity: 1; transform: none; transition-delay: 140ms; }
 
-  .d-greet { margin: 0; }
-  .d-name { margin: 0; font-family: var(--font-display, system-ui); font-size: clamp(1.5rem, 4.5vw, 2rem); font-weight: 400; letter-spacing: -0.03em; line-height: 1.15; color: var(--text-secondary); }
-  .d-greet-word { font-weight: 400; color: var(--text-secondary); }
-  .d-name-word { font-weight: 800; background: linear-gradient(135deg, #fff 30%, var(--primary-300, #c4b5fd) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-  .d-date { margin: var(--space-1) 0 0; font-size: var(--text-xs); color: var(--text-tertiary); }
+  /* ── "Right now" — the page answers before it shows anything ─────────────── */
+  .d-eyebrow {
+    margin: 0 0 var(--space-2);
+    font-size: var(--text-xs); font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--text-tertiary);
+  }
+  .d-verdict {
+    margin: 0;
+    font-size: clamp(2rem, 4.4vw, 3.25rem);
+    line-height: 1.05;
+    color: var(--text-primary);
+  }
+  .d-verdict-detail {
+    margin: var(--space-3) 0 0;
+    font-size: var(--text-base);
+    line-height: 1.55;
+    color: var(--text-secondary);
+    max-width: 54ch;
+  }
+  .d-cta-row {
+    display: flex; align-items: center; gap: var(--space-2);
+    flex-wrap: wrap; margin-top: var(--space-4);
+  }
+  .d-cta {
+    display: inline-flex; align-items: center; gap: var(--space-2);
+    min-height: 44px; padding: 0 var(--space-4);
+    background: var(--surface-1); color: var(--text-primary);
+    border: 1px solid var(--border-default); border-radius: var(--radius-full, 999px);
+    font-size: var(--text-sm); font-weight: 600; font-family: inherit; cursor: pointer;
+    transition: background var(--duration-fast, 150ms) var(--ease-out), border-color var(--duration-fast, 150ms) var(--ease-out);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .d-cta:hover { background: var(--surface-hover); }
+  .d-cta:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
+  /* Ember stays reserved for the one action worth taking */
+  .d-cta-accent {
+    background: color-mix(in oklch, var(--primary-500) 12%, transparent);
+    border-color: color-mix(in oklch, var(--primary-500) 30%, transparent);
+    color: var(--primary-600);
+  }
+  .d-cta-accent:hover { background: color-mix(in oklch, var(--primary-500) 18%, transparent); }
+  .d-cta-pulse :global(button) { min-height: 44px; }
+
+  /* ── Cards ───────────────────────────────────────────────────────────────── */
+  .card {
+    background: var(--surface-1);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg, 16px);
+    padding: var(--space-4);
+    box-shadow: var(--shadow-sm);
+  }
+  .d-card { display: flex; flex-direction: column; gap: var(--space-3); }
+
+  /* The roster's ghost-constellation empty state is sized for a whole panel;
+     inside the dashboard card it swallowed the left column. Scale the stage
+     down here only — the panel version is untouched. */
+  .d-family :global(.gc-stage) { transform: scale(0.68); transform-origin: center; margin: calc(-1 * var(--space-6)) 0; }
+  @media (prefers-reduced-motion: reduce) {
+    .d-family :global(.gc-stage) { transform: scale(0.68); }
+  }
+  .d-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
+  .d-card-title {
+    margin: 0; font-family: var(--font-display);
+    font-size: var(--text-sm); font-weight: 700;
+    letter-spacing: 0.02em; color: var(--text-primary);
+  }
+  .d-card-more {
+    background: none; border: none; padding: 0; cursor: pointer;
+    font-family: inherit; font-size: var(--text-xs); font-weight: 600;
+    color: var(--primary-600);
+  }
+  .d-card-more:hover { text-decoration: underline; }
+  .d-card-more:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
+  .d-card-note { font-size: var(--text-xs); color: var(--text-tertiary); }
+
+  /* Honest empty states (06b) — a sentence, never a blank panel */
+  .d-empty-strong { margin: 0; font-size: var(--text-sm); font-weight: 600; color: var(--text-primary); }
+  .d-empty { margin: 0; font-size: var(--text-sm); line-height: 1.5; color: var(--text-tertiary); }
+
+  /* Pebbles — name tags, not coordinates */
+  .d-pebbles { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+  .d-pebble {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px var(--space-3);
+    background: var(--surface-3); border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-full, 999px);
+    font-size: var(--text-xs); font-weight: 600; color: var(--text-secondary);
+  }
+  .d-pebble-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--hue, var(--primary-500)); }
+
+  /* Today timeline */
+  .d-today { display: flex; flex-direction: column; }
+  .d-today-row {
+    display: grid; grid-template-columns: auto auto 1fr; align-items: center;
+    gap: var(--space-2); padding: var(--space-2) 0;
+    background: none; border: none; text-align: left; cursor: pointer;
+    font-family: inherit; color: inherit;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .d-today-row:last-child { border-bottom: none; }
+  .d-today-row:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
+  .d-today-ts {
+    font-size: var(--text-xs); color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums; min-width: 4.5ch;
+  }
+  .d-today-msg { font-size: var(--text-sm); color: var(--text-secondary); }
+
+  /* Slim text nav (06a footer) */
+  .d-nav { display: flex; flex-wrap: wrap; gap: var(--space-4); padding-top: var(--space-2); }
+  .d-nav-link {
+    position: relative;
+    background: none; border: none; padding: var(--space-2) 0; cursor: pointer;
+    font-family: inherit; font-size: var(--text-sm); font-weight: 600;
+    color: var(--text-secondary); min-height: 44px;
+  }
+  .d-nav-link:hover { color: var(--text-primary); }
+  .d-nav-link:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; border-radius: var(--radius-sm, 6px); }
+  .d-nav-sos { color: var(--danger-500); }
 
   /* ── Quick actions ────────────────────────────────────────────────────────── */
   .d-actions { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--space-2); }
