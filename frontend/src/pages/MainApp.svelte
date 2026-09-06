@@ -87,7 +87,19 @@
   //                     accident"), skipping the dialog for a real emergency
   // The socket emit lives here and nowhere else, so there is exactly one
   // code path that can raise an SOS.
-  const SOS_HOLD_MS = 2000;
+  // Panic mode (Settings → "Panic mode") shortens the hold rather than being
+  // dropped: the setting is still user-facing, so it must still do something.
+  // Previously it enabled a double-tap bypass of the confirm dialog; with
+  // hold-to-send that role becomes "reach SOS faster".
+  const SOS_HOLD_MS_DEFAULT = 2000;
+  const SOS_HOLD_MS_PANIC = 800;
+  function sosHoldDuration() {
+    try {
+      return localStorage.getItem('kinnect_panic_mode') === 'true'
+        ? SOS_HOLD_MS_PANIC
+        : SOS_HOLD_MS_DEFAULT;
+    } catch { return SOS_HOLD_MS_DEFAULT; }   // private mode → safe default
+  }
   let sosHolding = $state(false);
   let sosHoldProgress = $state(0);
   let sosHoldSecondsLeft = $state(2);
@@ -114,17 +126,18 @@
 
   function sosHoldBegin() {
     if ($mySosActive || sosHolding) return;
+    const holdMs = sosHoldDuration();
     sosHoldFired = false;
     sosHolding = true;
     sosHoldProgress = 0;
-    sosHoldSecondsLeft = Math.ceil(SOS_HOLD_MS / 1000);
+    sosHoldSecondsLeft = Math.ceil(holdMs / 1000);
     const start = performance.now();
     const tick = () => {
       if (!sosHolding) return;
       const elapsed = performance.now() - start;
-      sosHoldProgress = Math.min(elapsed / SOS_HOLD_MS, 1);
-      sosHoldSecondsLeft = Math.max(0, Math.ceil((SOS_HOLD_MS - elapsed) / 1000));
-      if (elapsed >= SOS_HOLD_MS) {
+      sosHoldProgress = Math.min(elapsed / holdMs, 1);
+      sosHoldSecondsLeft = Math.max(0, Math.ceil((holdMs - elapsed) / 1000));
+      if (elapsed >= holdMs) {
         sosHoldFired = true;
         sosHoldStop();
         fireSos();
@@ -150,11 +163,18 @@
 
   function onSosPointerDown() {
     sosPointerUsed = true;
-    if ($mySosActive) return;   // cancel happens on click, not on press
+    if ($mySosActive) return;   // cancel happens on release, not on press
     sosHoldBegin();
   }
 
-  /** Keyboard/assistive activation: no pointer, so this is always a tap. */
+  /**
+   * Keyboard/assistive activation: no pointer sequence, so this is a tap.
+   *
+   * `sosPointerUsed` suppresses the click that trails a pointer interaction.
+   * It MUST be cleared on every pointer exit — if the user presses the FAB and
+   * drags off, no click follows, and a stale `true` would swallow the next
+   * keyboard/screen-reader activation, silently doing nothing in an emergency.
+   */
   function onSosFabClick() {
     if (sosPointerUsed) { sosPointerUsed = false; return; }
     if ($mySosActive) { haptics.sosCancelled?.(); socket.emit('cancelSOS'); return; }
@@ -165,6 +185,13 @@
   function onSosPointerUp() {
     if ($mySosActive) { haptics.sosCancelled?.(); socket.emit('cancelSOS'); return; }
     sosHoldRelease();
+  }
+
+  /** Pointer left the button or was cancelled → abort the hold AND clear the
+   *  click-suppression flag, since no click will arrive to clear it. */
+  function onSosPointerAbort() {
+    sosPointerUsed = false;
+    sosHoldStop();
   }
   let secretChatPeer = $state(null); // { id: string, name: string }
 
@@ -1054,8 +1081,8 @@
         style={isMobile ? `--fab-dock-offset: ${fabDockOffset}` : undefined}
         onpointerdown={onSosPointerDown}
         onpointerup={onSosPointerUp}
-        onpointerleave={sosHoldStop}
-        onpointercancel={sosHoldStop}
+        onpointerleave={onSosPointerAbort}
+        onpointercancel={onSosPointerAbort}
         onclick={onSosFabClick}
         aria-label={$mySosActive
           ? 'Cancel SOS'

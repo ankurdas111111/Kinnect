@@ -162,10 +162,14 @@
    speaks in a human sentence. Applied by class so headings elsewhere keep
    the sans face.
    ═══════════════════════════════════════════════════════════════════════════ */
+/* NOTE: this is a PLAIN stylesheet imported by main.js, not a Svelte <style>
+   block, so `:global(...)` is invalid here — and one invalid selector in a
+   list invalidates the whole rule, which silently killed the serif voice
+   entirely. Bare selectors are already global from this file. */
 .verdict-voice,
-:global(.verdict-line),
-:global(.hs-headline),
-:global(.verdict-sentence) {
+.verdict-line,
+.hs-headline,
+.verdict-sentence {
   font-family: var(--font-serif);
   font-style: italic;
   font-weight: 400;
