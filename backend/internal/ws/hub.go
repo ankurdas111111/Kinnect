@@ -139,6 +139,7 @@ func (h *Hub) buildEventHandlers() map[string]func(*Client, json.RawMessage) {
 		"revokeLiveLink":       h.handleRevokeLiveLink,
 		"watchJoin":            h.handleWatchJoin,
 		"liveJoin":             h.handleLiveJoin,
+		"nudgeUser":            h.handleNudgeUser,
 		"requestAdminOverview": h.handleRequestAdminOverview,
 		"requestRoomAdmin":     h.handleRequestRoomAdmin,
 		"voteRoomAdmin":        h.handleVoteRoomAdmin,
@@ -402,6 +403,18 @@ func (h *Hub) handleUnregister(c *Client) {
 	delete(h.clients, clientID)
 	h.leaveAllGroupsLocked(clientID)
 	h.mu.Unlock()
+
+	// Hearth 05a: tell the link owner a watcher left (viewer sockets carry
+	// liveToken; regular app sockets have it empty).
+	if c.liveToken != "" {
+		if entry := h.Cache.GetLiveToken(c.liveToken); entry != nil {
+			if owner := h.GetClientByUserID(entry.UserID); owner != nil {
+				owner.Send("liveViewerLeft", map[string]interface{}{
+					"token": c.liveToken, "viewerName": c.liveViewerName,
+				})
+			}
+		}
+	}
 
 	user := h.Cache.GetActiveUser(clientID)
 	if user == nil {

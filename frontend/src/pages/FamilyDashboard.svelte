@@ -13,6 +13,9 @@
   import { activityEvents } from '../lib/activityLog.js';
   import { rhythmEnabled, setRhythmEnabled } from '../lib/presenceRhythm.js';
   import { myRooms } from '../lib/stores/rooms.js';
+  import { myContacts } from '../lib/stores/contacts.js';
+  import { fmtWhen } from '../lib/hubStatus.js';
+  import { socket } from '../lib/socket.js';
   import HomecomingRail from '../components/hub/HomecomingRail.svelte';
   import FamilyRoster from '../components/hub/FamilyRoster.svelte';
   import PulseButton from '../components/hub/PulseButton.svelte';
@@ -64,9 +67,35 @@
    * offer one useful thing to do, instead of rendering empty widgets. Derived
    * from real state only; no invented numbers.
    */
-  let sharingNow = $derived(members.filter((m) => m.online && m.lastUpdate));
-  let dormant = $derived(members.filter((m) => !m.online || !m.lastUpdate));
-  let nobodySharing = $derived(members.length > 0 && sharingNow.length === 0);
+  // "Sharing" needs real coordinates — the hub stamps lastUpdate at connect
+  // time, so a merely-online member with no position must still read dormant.
+  let liveIds = $derived(
+    new Set(
+      members
+        .filter((m) => m.lat != null && m.lastUpdate && nowMs - m.lastUpdate < 300_000)
+        .map((m) => m.userId)
+    )
+  );
+  // Hearth 06b: the dormant list comes from myContacts (which includes offline
+  // people the live member map never sees), with online/lastUpdate from the hub.
+  let notSharing = $derived(($myContacts || []).filter((c) => !liveIds.has(c.userId)));
+  let nobodySharing = $derived(
+    (members.length > 0 || ($myContacts || []).length > 0) && liveIds.size === 0
+  );
+
+  // Nudge — one per person per dashboard visit; the button says what happened.
+  let nudged = $state(new Set());
+  function nudge(userId) {
+    if (nudged.has(userId)) return;
+    socket.emit('nudgeUser', { userId });
+    nudged = new Set([...nudged, userId]);
+  }
+  function lastSharedLabel(c) {
+    if (!c.lastUpdate) return "hasn't shared yet";
+    const age = nowMs - c.lastUpdate;
+    if (age < 86_400_000) return 'last shared ' + fmtWhen(c.lastUpdate, nowMs).replace('since ', 'at ');
+    return 'last shared ' + new Date(c.lastUpdate).toLocaleDateString([], { day: 'numeric', month: 'long' });
+  }
 </script>
 
 <div class="d d-{verdict.tone}" class:d-ready={mounted}>
@@ -154,6 +183,24 @@
                 <span class="d-pebble-dot" aria-hidden="true"></span>
                 {(m.displayName || '?').split(' ')[0]}
               </span>
+            {/each}
+          </div>
+        {/if}
+        {#if notSharing.length > 0}
+          <!-- Hearth 06b: dormant members are named, dated, and nudgeable -->
+          <div class="d-dormant">
+            <p class="d-dormant-head">Not sharing · {notSharing.length}</p>
+            {#each notSharing as c (c.userId)}
+              <div class="d-dormant-row">
+                <span class="d-dormant-name">{(c.displayName || '?').split(' ')[0]}</span>
+                <span class="d-dormant-when">{lastSharedLabel(c)}</span>
+                <button
+                  class="d-nudge tactile"
+                  disabled={nudged.has(c.userId)}
+                  onclick={() => nudge(c.userId)}
+                  aria-label="Nudge {c.displayName} to share their location"
+                >{nudged.has(c.userId) ? 'Nudged ✓' : 'Nudge'}</button>
+              </div>
             {/each}
           </div>
         {/if}
@@ -396,6 +443,41 @@
     font-size: var(--text-xs); font-weight: 600; color: var(--text-secondary);
   }
   .d-pebble-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--hue, var(--primary-500)); }
+
+  /* Dormant members (06b) — quiet list under the pebbles, one Nudge each */
+  .d-dormant {
+    display: flex; flex-direction: column; gap: var(--space-1);
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--border-subtle);
+  }
+  .d-dormant-head {
+    margin: 0 0 var(--space-1);
+    font-size: var(--text-2xs, 10px); font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--text-tertiary);
+  }
+  .d-dormant-row {
+    display: grid; grid-template-columns: auto 1fr auto; align-items: center;
+    gap: var(--space-2); min-height: 36px;
+  }
+  .d-dormant-name { font-size: var(--text-sm); font-weight: 600; color: var(--text-secondary); }
+  .d-dormant-when {
+    font-size: var(--text-xs); color: var(--text-tertiary);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .d-nudge {
+    min-height: 32px; padding: 0 var(--space-3);
+    background: color-mix(in oklch, var(--primary-500) 10%, transparent);
+    border: 1px solid color-mix(in oklch, var(--primary-500) 24%, transparent);
+    border-radius: var(--radius-full, 999px);
+    font-family: inherit; font-size: var(--text-xs); font-weight: 700;
+    color: var(--primary-600); cursor: pointer;
+    transition: background var(--duration-fast, 150ms) var(--ease-out);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .d-nudge:hover:not(:disabled) { background: color-mix(in oklch, var(--primary-500) 16%, transparent); }
+  .d-nudge:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
+  .d-nudge:disabled { opacity: 0.55; cursor: default; color: var(--text-tertiary); border-color: var(--border-subtle); background: transparent; }
 
   /* Today timeline */
   .d-today { display: flex; flex-direction: column; }

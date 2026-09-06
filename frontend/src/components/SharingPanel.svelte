@@ -1,7 +1,7 @@
 <script>
   import { createEventDispatcher, onMount } from 'svelte';
   import { socket } from '../lib/socket.js';
-  import { banner, myLiveLinks } from '../lib/stores/sos.js';
+  import { banner, myLiveLinks, liveViewers } from '../lib/stores/sos.js';
   import { myRooms, myShareCode } from '../lib/stores/rooms.js';
   import { myContacts } from '../lib/stores/contacts.js';
   import { myGuardianData } from '../lib/stores/guardians.js';
@@ -403,6 +403,7 @@
               {url}
               waHref={'https://wa.me/?text=' + encodeURIComponent('Watch my live location on Kinnect: ' + url)}
               deadline={link.expiresAt ? new Date(link.expiresAt).getTime() : null}
+              viewers={$liveViewers.get(link.token) || []}
               onstop={() => revokeLink(link.token)}
             />
           {/each}

@@ -115,11 +115,25 @@
   }
 
   // ── Scroll state ────────────────────────────────────────────────────────
-  let p = $state(0);
+  // pRaw is where the scrollbar IS; pS is where the CAMERA is. pS chases pRaw
+  // with exponential damping, which is what gives the scrub its weight —
+  // wheel-step scrolling glides instead of stepping. Under reduced motion the
+  // chase is skipped (damping is autonomous movement after input stops).
+  let pRaw = $state(0);
+  let pS = $state(0);
   let vw = $state(1200);
   let vh = $state(800);
   let storyEl = $state(null);
   let raf = 0;
+  let chaseRaf = 0;
+
+  function chase() {
+    chaseRaf = 0;
+    const d = pRaw - pS;
+    if (Math.abs(d) < 0.0004) { pS = pRaw; return; }
+    pS += d * 0.11;
+    chaseRaf = requestAnimationFrame(chase);
+  }
 
   function measure() {
     vw = window.innerWidth;
@@ -127,8 +141,10 @@
     if (storyEl) {
       const r = storyEl.getBoundingClientRect();
       const total = r.height - vh;
-      p = total > 0 ? cl(-r.top / total) : 0;
+      pRaw = total > 0 ? cl(-r.top / total) : 0;
     }
+    if (prefersReducedMotion()) { pS = pRaw; return; }
+    if (!chaseRaf) chaseRaf = requestAnimationFrame(chase);
   }
   function onScroll() {
     if (raf) return;
@@ -139,11 +155,13 @@
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll);
     measure();
+    pS = pRaw;   // land where the page loads, no initial chase
     requestAnimationFrame(measure);
     return () => {
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onScroll);
       if (raf) cancelAnimationFrame(raf);
+      if (chaseRaf) cancelAnimationFrame(chaseRaf);
     };
   });
 
@@ -153,8 +171,9 @@
     window.scrollTo({ top: y, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
   }
 
-  // ── The scene, derived from scroll ──────────────────────────────────────
+  // ── The scene, derived from the DAMPED scroll ───────────────────────────
   let scene = $derived.by(() => {
+    const p = pS;
     const t = keyed(TM, p)[0];
     const [cx, cy, s0] = keyed(CAM, t, true);
     const narrow = vw < 720;
@@ -167,13 +186,16 @@
 
     const people = PEOPLE.map((per) => {
       const [x, y] = keyed(per.keys, t);
+      // A pebble in transit lifts slightly — presence, not decoration.
+      const [x2, y2] = keyed(per.keys, t + 0.02);
+      const moving = Math.hypot(x2 - x, y2 - y) > 0.8;
       let tag = per.tags[0];
       for (const tg of per.tags) if (t >= tg[0]) tag = tg;
       const state = tag[2];
       return {
         initial: per.initial,
         label: per.self ? tag[1] : `${per.name} · ${tag[1]}`,
-        x, y,
+        x, y, moving,
         self: !!per.self,
         color: per.self ? 'var(--ember)' : per.color,
         sos: state === 'sos',
@@ -192,7 +214,9 @@
       const fi = i === 0 ? 1 : cl((t - c.a) / fade);
       const fo = i === CHAPTERS.length - 1 ? 1 : cl((c.b - t) / fade);
       const o = Math.min(fi, fo);
-      return { ...c, o };
+      // Type choreography: the title leads, the body follows a beat behind.
+      const eased = sm(o);
+      return { ...c, o, cardY: (1 - eased) * 26, cardScale: 0.97 + eased * 0.03, titleY: (1 - eased) * 14, bodyO: cl((o - 0.35) / 0.65) };
     });
 
     // ambient tint: ochre while Nani is quiet, vermilion during SOS, sage after
@@ -274,7 +298,7 @@
         {#each scene.people as per (per.initial)}
           <div class="lp-person" class:lp-sos={per.sos} class:lp-self={per.self}
             style:left={`${per.x}px`} style:top={`${per.y}px`} style:transform={`scale(${scene.k})`}>
-            <div class="lp-person-inner">
+            <div class="lp-person-inner" class:lp-moving={per.moving}>
               <div class="lp-pebble-wrap">
                 <div class="lp-sos-ring" class:on={per.sos} aria-hidden="true"></div>
                 <div class="lp-pebble" class:lp-quiet={per.quiet}
@@ -296,12 +320,13 @@
       <div class="lp-hint" class:visible={scene.hint}>Keep scrolling — the day moves with you</div>
 
       {#each scene.chapters as c (c.time)}
-        <div class="lp-chapter" style:opacity={c.o} style:transform={`translateY(${(1 - c.o) * 16}px)`}
+        <div class="lp-chapter" style:opacity={c.o}
+          style:transform={`translateY(${c.cardY}px) scale(${c.cardScale})`}
           style:pointer-events={c.o > 0.5 ? 'auto' : 'none'} aria-hidden={c.o < 0.1}>
           <div class="lp-chapter-card" class:lp-card-sos={c.sos} class:lp-card-sage={c.sage}>
             <span class="lp-chapter-time">{c.time}</span>
-            <p class="lp-chapter-title">{c.title}</p>
-            <p class="lp-chapter-body">{c.body}</p>
+            <p class="lp-chapter-title" style:transform={`translateY(${c.titleY}px)`}>{c.title}</p>
+            <p class="lp-chapter-body" style:opacity={c.bodyO}>{c.body}</p>
           </div>
         </div>
       {/each}
@@ -310,13 +335,13 @@
 
   <!-- ═══ CLOSING ════════════════════════════════════════════════════════ -->
   <section class="lp-closing">
-    <span class="lp-eyebrow">That's the whole app</span>
-    <h2 class="lp-closing-headline">Everyone's settled.</h2>
-    <p class="lp-closing-body">
+    <span class="lp-eyebrow reveal-scroll">That's the whole app</span>
+    <h2 class="lp-closing-headline reveal-scroll">Everyone's settled.</h2>
+    <p class="lp-closing-body reveal-scroll">
       One sentence, a few pebbles, and a hold-to-send SOS for the one evening in
       a thousand. Only people you invite can see anyone — ever.
     </p>
-    <div class="lp-cta-row lp-cta-center">
+    <div class="lp-cta-row lp-cta-center reveal-scroll">
       <button class="lp-cta lp-cta-primary" onclick={() => navigate('/register')}>Create your family — free</button>
       <button class="lp-cta lp-cta-ghost" onclick={() => navigate('/register')}>Get the app</button>
     </div>
@@ -423,7 +448,45 @@
     display: flex; align-items: center; gap: var(--space-2);
     font-size: 13px; color: var(--ink-3);
   }
-  .lp-cue-line { width: 28px; height: 1px; background: var(--ink-3); }
+  .lp-cue-line {
+    width: 28px; height: 1px; background: var(--ink-3);
+    transform-origin: left center;
+  }
+
+  /* ── Hero entrance — the page arrives with intent ─────────────────────── */
+  @media (prefers-reduced-motion: no-preference) {
+    .lp-eyebrow, .lp-sub, .lp-cta-row, .lp-scroll-cue {
+      opacity: 0;
+      transform: translateY(14px);
+      animation: lp-rise 640ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    .lp-hero .lp-eyebrow { animation-delay: 80ms; }
+    .lp-hero .lp-sub { animation-delay: 340ms; }
+    .lp-hero .lp-cta-row { animation-delay: 460ms; }
+    .lp-hero .lp-scroll-cue { animation-delay: 700ms; }
+    /* the headline rises out of a clipped line box */
+    .lp-headline {
+      clip-path: inset(-4% -2% -8% -2%);
+      opacity: 0;
+      transform: translateY(0.35em);
+      animation: lp-headline-rise 780ms cubic-bezier(0.16, 1, 0.3, 1) 160ms both;
+    }
+    .lp-cue-line { animation: lp-cue-sweep 2.6s ease-in-out 1.4s infinite; }
+    /* the closing eyebrow/headline reuse .lp-eyebrow — but their reveal is
+       scroll-driven via .reveal-scroll (global.css), so cancel the load-time
+       rise there to avoid double animation */
+    .lp-closing .lp-eyebrow, .lp-closing .lp-cta-row { animation: none; opacity: 1; transform: none; }
+  }
+  @keyframes lp-rise {
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes lp-headline-rise {
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes lp-cue-sweep {
+    0%, 100% { transform: scaleX(1); opacity: 1; }
+    50% { transform: scaleX(1.8); opacity: 0.45; }
+  }
 
   /* ── Story ────────────────────────────────────────────────────────────── */
   .lp-story { position: relative; height: 700vh; }
@@ -512,6 +575,12 @@
   .lp-pebble.lp-quiet {
     color: var(--ink-2); opacity: 0.85;
     box-shadow: 0 4px 12px rgba(40, 30, 20, 0.22);
+  }
+  /* In transit: the pebble lifts off the map a touch */
+  .lp-person-inner { transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1); }
+  .lp-person-inner.lp-moving { transform: translate(-50%, -22px) scale(1.07); }
+  .lp-person-inner.lp-moving .lp-pebble {
+    box-shadow: 0 0 0 2px var(--sage), 0 10px 22px rgba(40, 30, 20, 0.30);
   }
   .lp-person.lp-sos .lp-pebble {
     box-shadow: 0 0 0 3px var(--card), 0 4px 12px rgba(40, 30, 20, 0.3);
@@ -624,6 +693,34 @@
   .lp-foot-mark { font-family: var(--font-serif); font-style: italic; font-size: 15px; }
 
   @media (prefers-reduced-motion: reduce) {
-    .lp-sos-ring, .lp-pebble, .lp-tag, .lp-hint { transition: none; }
+    .lp-sos-ring, .lp-pebble, .lp-tag, .lp-hint, .lp-person-inner { transition: none; }
+    .lp-person-inner.lp-moving { transform: translate(-50%, -22px); }
+  }
+
+  /* ── Night mode (design "landing night" palette) ─────────────────────────
+     Custom props inherit, so remapping them on .lp re-colours the whole
+     story — type, cards, and the map scene — without touching markup. */
+  :global([data-theme='dark']) .lp {
+    --paper: oklch(0.21 0.01 60);
+    --card: oklch(0.25 0.01 60);
+    --ink: oklch(0.95 0.008 80);
+    --ink-2: oklch(0.78 0.012 80);
+    --ink-3: oklch(0.65 0.012 80);
+    --hairline: oklch(0.95 0.008 80 / 0.12);
+    --ember: oklch(0.76 0.13 38);
+    --map-base: oklch(0.245 0.012 60);
+    --map-street: oklch(0.30 0.012 60);
+    --map-park: oklch(0.27 0.03 140);
+    --map-water: oklch(0.27 0.03 230);
+    --lp-quiet: oklch(0.42 0.012 60);
+    --sh: 0 8px 24px oklch(0 0 0 / 0.45);
+    --surface-hover: oklch(0.95 0.008 80 / 0.07);
+  }
+  /* Night accent is light (L 0.76) — dark ink on it, not white */
+  :global([data-theme='dark']) .lp .lp-cta-primary {
+    color: oklch(0.20 0.04 38);
+  }
+  :global([data-theme='dark']) .lp .lp-cta-primary:hover {
+    background: oklch(0.80 0.13 38);
   }
 </style>

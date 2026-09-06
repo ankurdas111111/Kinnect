@@ -1509,12 +1509,59 @@ func (h *Hub) handleLiveJoin(c *Client, data json.RawMessage) {
 	c.liveToken = token
 	c.liveViewerName = viewerName
 
+	// Hearth 05a "Watching now": the link owner always sees who is watching.
+	if owner := h.GetClientByUserID(entry.UserID); owner != nil {
+		owner.Send("liveViewerJoined", map[string]interface{}{
+			"token": token, "viewerName": viewerName, "at": time.Now().UnixMilli(),
+		})
+	}
+
 	target := h.Cache.GetActiveUser(h.Cache.GetUserIdToSocketId(entry.UserID))
 	if target == nil {
 		c.Send("liveInit", map[string]interface{}{"userId": entry.UserID})
 		return
 	}
 	c.Send("liveInit", map[string]interface{}{"user": h.Cache.SanitizeUser(target)})
+}
+
+// handleNudgeUser — Hearth 06b "Nudge": ask a dormant family member to turn
+// sharing back on. Contact-gated (you can only nudge people already connected
+// to you), rate-limited, delivered as a banner when they're online and a push
+// notification either way.
+func (h *Hub) handleNudgeUser(c *Client, data json.RawMessage) {
+	if !c.CheckRateLimit("nudgeUser", 10) {
+		return
+	}
+	user := h.Cache.GetActiveUser(c.ID())
+	if user == nil {
+		return
+	}
+	m := toMap(data)
+	targetID := ""
+	if m != nil {
+		if s, ok := m["userId"].(string); ok {
+			targetID = strings.TrimSpace(s)
+		}
+	}
+	if targetID == "" || targetID == user.UserID {
+		return
+	}
+	isContact := false
+	for _, uid := range h.Cache.GetContactsForUser(user.UserID) {
+		if uid == targetID {
+			isContact = true
+			break
+		}
+	}
+	if !isContact {
+		return
+	}
+	fromName := h.Cache.GetDisplayName(user.UserID)
+	if other := h.GetClientByUserID(targetID); other != nil {
+		other.Send("nudged", map[string]interface{}{"fromName": fromName})
+	}
+	h.SendPushToUser(targetID, "Kinnect", fromName+" asked you to check in — turn sharing on when you can.")
+	c.Send("nudgeSent", map[string]interface{}{"userId": targetID})
 }
 
 // handleRequestAdminOverview sends full admin overview (admin only).

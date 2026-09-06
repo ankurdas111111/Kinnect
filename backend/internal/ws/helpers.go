@@ -87,14 +87,23 @@ func (h *Hub) emitMyRooms(c *Client, userID string) {
 }
 
 // emitMyContacts builds and sends myContacts payload.
+// Hearth 06b: the dashboard lists dormant members with "last shared 26 April",
+// so each contact carries presence (online) and lastUpdate (unix ms, nil if
+// they have never shared) — data the cache already holds.
 func (h *Hub) emitMyContacts(c *Client, userID string) {
 	rooms := h.Cache.GetUserRooms(userID)
 	contacts := h.Cache.GetContactsForUser(userID)
 	payload := make([]map[string]interface{}, 0, len(contacts))
 	for _, uid := range contacts {
 		name := h.Cache.GetDisplayName(uid)
+		online := h.Cache.GetUserIdToSocketId(uid) != ""
+		var lastUpdate interface{}
+		if ud := h.Cache.GetUser(uid); ud != nil && ud.LastUpdate != nil {
+			lastUpdate = *ud.LastUpdate
+		}
 		payload = append(payload, map[string]interface{}{
 			"userId": uid, "displayName": name, "inRooms": h.userInRooms(uid, rooms),
+			"online": online, "lastUpdate": lastUpdate,
 		})
 	}
 	c.Send("myContacts", payload)

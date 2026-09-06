@@ -3,6 +3,7 @@
 
   import { createEventDispatcher, onMount } from 'svelte';
   import { authUser } from '../lib/stores/auth.js';
+  import { myRooms } from '../lib/stores/rooms.js';
   import { socket } from '../lib/socket.js';
 
   /**
@@ -21,7 +22,25 @@
   let addError = $state('');
   let addSuccess = $state(false);
 
+  // Hearth 03a — "Give your family a name" step
+  let familyName = $state('');
+  let creating = $state(false);
+  let createError = $state('');
+
   let shareCode = $derived($authUser?.shareCode || '');
+
+  // Returning users on a fresh device already belong to a family — don't ask
+  // them to create another one; go straight to connecting.
+  function nextAfterPermission() {
+    step = ($myRooms?.length || 0) > 0 ? 3 : 2;
+  }
+
+  function handleCreateFamily() {
+    if (!familyName.trim() || creating) return;
+    creating = true;
+    createError = '';
+    socket.emit('createRoom', { name: familyName.trim() });
+  }
 
   function handleAddContact() {
     if (!contactCode.trim() || adding || addSuccess) return;
@@ -41,11 +60,25 @@
       adding = false;
       addError = data?.message || 'Could not find user with that code.';
     };
+    const onRoomCreated = () => {
+      if (step !== 2) return;
+      creating = false;
+      step = 3;
+    };
+    const onRoomError = (data) => {
+      if (step !== 2) return;
+      creating = false;
+      createError = data?.message || 'Could not create your family. Try again.';
+    };
     socket.on('contactAdded', onContactAdded);
     socket.on('contactError', onContactError);
+    socket.on('roomCreated', onRoomCreated);
+    socket.on('roomError', onRoomError);
     return () => {
       socket.off('contactAdded', onContactAdded);
       socket.off('contactError', onContactError);
+      socket.off('roomCreated', onRoomCreated);
+      socket.off('roomError', onRoomError);
     };
   });
 
@@ -61,9 +94,10 @@
   <div class="onboarding-backdrop" onclick={self(() => dispatch('dismiss'))} onkeydown={(e) => { if (e.key === 'Escape') dispatch('dismiss'); }} role="dialog" aria-modal="true" aria-label="Get started" tabindex="-1">
     <div class="onboarding-card">
       <!-- Step indicators -->
-      <div class="step-indicators" aria-label="Step {step} of 2">
+      <div class="step-indicators" aria-label="Step {step} of 3">
         <span class="step-dot" class:active={step === 1}></span>
         <span class="step-dot" class:active={step === 2}></span>
+        <span class="step-dot" class:active={step === 3}></span>
       </div>
 
       {#if step === 1}
@@ -88,15 +122,45 @@
             Your location is private. Only your family can see it.
           </div>
           <div class="onboarding-actions">
-            <button class="btn-primary-full" onclick={() => { dispatch('requestPermission'); step = 2; }}>
+            <button class="btn-primary-full" onclick={() => { dispatch('requestPermission'); nextAfterPermission(); }}>
               Turn on location
             </button>
-            <button class="btn-ghost-sm" onclick={() => step = 2}>Maybe later</button>
+            <button class="btn-ghost-sm" onclick={nextAfterPermission}>Maybe later</button>
           </div>
         </div>
+      {:else if step === 2}
+        <!-- Step 2 (Hearth 03a): name the family — the room IS the family -->
+        <div class="onboarding-step" role="tabpanel" aria-label="Step 2: Name your family">
+          <h2 class="onboarding-title">Give your family a name</h2>
+          <p class="onboarding-desc">This is what everyone sees at the top of the map — "The Sharmas", "Home", whatever feels right.</p>
+
+          <div class="input-row">
+            <input
+              class="code-input family-input"
+              placeholder="Your family's name"
+              bind:value={familyName}
+              maxlength="50"
+              onkeydown={(e) => e.key === 'Enter' && handleCreateFamily()}
+            />
+            <button class="add-btn" onclick={handleCreateFamily} disabled={creating || !familyName.trim()}>
+              {#if creating}
+                <span class="mini-spinner"></span>
+              {:else}
+                Create
+              {/if}
+            </button>
+          </div>
+          {#if createError}
+            <span class="add-error">{createError}</span>
+          {/if}
+
+          <button class="btn-ghost-sm" style="margin-top: var(--space-3)" onclick={() => (step = 3)}>
+            Have an invite code? Join a family instead
+          </button>
+        </div>
       {:else}
-        <!-- Step 2: Add first person -->
-        <div class="onboarding-step" role="tabpanel" aria-label="Step 2: Add a contact">
+        <!-- Step 3: Add first person -->
+        <div class="onboarding-step" role="tabpanel" aria-label="Step 3: Add a contact">
           <h2 class="onboarding-title">Connect with family</h2>
           <p class="onboarding-desc">Send your code to a family member, or type in theirs to start sharing locations.</p>
 
@@ -413,6 +477,12 @@
   .code-input:focus {
     border-color: var(--primary-500);
     box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+  }
+
+  /* Family-name input reads as a name, not a code */
+  .family-input {
+    letter-spacing: normal;
+    text-transform: none;
   }
 
   .add-btn {

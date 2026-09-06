@@ -18,10 +18,11 @@
    *   url: string,
    *   waHref: string,
    *   deadline?: number | null,
+   *   viewers?: Array<{viewerName: string, at: number}>,
    *   onstop?: () => void,
    * }}
    */
-  let { url, waHref, deadline = null, onstop } = $props();
+  let { url, waHref, deadline = null, viewers = [], onstop } = $props();
 
   // Capture the full remaining window once so the ring depletes from full.
   const total = deadline ? Math.max(1, deadline - Date.now()) : 0;
@@ -41,6 +42,12 @@
       </span>
     </div>
   </div>
+  {#if viewers.length}
+    <p class="broadcast-viewers">
+      <span class="viewer-dot" aria-hidden="true"></span>
+      Watching now · {viewers.map((v) => v.viewerName).join(', ')}
+    </p>
+  {/if}
   <div class="broadcast-actions">
     <CopyButton text={url} label="Copy Link" />
     <a
@@ -102,6 +109,22 @@
   .broadcast-expiry {
     font-size: var(--text-xs);
     color: var(--text-tertiary);
+  }
+
+  .broadcast-viewers {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1-5);
+    margin: 0;
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+  }
+  .viewer-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-success, var(--sage));
+    flex-shrink: 0;
   }
 
   .broadcast-actions {
