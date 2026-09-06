@@ -1,5 +1,6 @@
 import { writable, get } from 'svelte/store';
 import { apiGet } from '../api.js';
+import { myShareCode, myContactInfo } from './rooms.js';
 
 export const authUser = writable(null);
 export const authLoading = writable(true);
@@ -13,6 +14,10 @@ function applySessionData(data) {
     email: data.email,
     mobile: data.mobile,
   });
+  // Seed the identity stores from the session so the "Your Code" card and QR
+  // never depend on winning the one-shot 'myShareCode' socket-event race.
+  if (data.shareCode) myShareCode.set(data.shareCode);
+  myContactInfo.set({ email: data.email || '', mobile: data.mobile || '' });
 }
 
 export async function loadSession() {

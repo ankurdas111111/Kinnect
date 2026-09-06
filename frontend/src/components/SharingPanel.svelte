@@ -17,6 +17,7 @@
   import InviteSheet from './InviteSheet.svelte';
   import { rideShare } from '../lib/stores/rideShare.js';
   import QuickActionCard from './sharing/QuickActionCard.svelte';
+  import QrModal from './sharing/QrModal.svelte';
   import RoomCard from './sharing/RoomCard.svelte';
   import ContactRow from './sharing/ContactRow.svelte';
   import LiveBroadcastRow from './sharing/LiveBroadcastRow.svelte';
@@ -163,6 +164,7 @@
   // ── Quick Actions ──────────────────────────────────────────────
   let rideShareOpen = $state(false);
   let inviteOpen = $state(false);
+  let qrOpen = $state(false);
 
   // ── My Code share ──────────────────────────────────────────────
   let myCodeCopied = $state(false);
@@ -250,9 +252,15 @@
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.016.5 3.914 1.37 5.582L0 24l6.618-1.342A11.954 11.954 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 0 1-5.013-1.375l-.36-.213-3.727.757.788-3.613-.234-.372A9.818 9.818 0 0 1 2.182 12C2.182 6.566 6.566 2.182 12 2.182c5.433 0 9.818 4.384 9.818 9.818 0 5.433-4.385 9.818-9.818 9.818z"/></svg>
         {/snippet}
       </QuickActionCard>
+      <QuickActionCard label="QR Code" tone="invite" onclick={() => qrOpen = true}>
+        {#snippet icon()}
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="3" height="3"/><rect x="18" y="14" width="3" height="3"/><rect x="14" y="18" width="3" height="3"/><rect x="18" y="18" width="3" height="3"/></svg>
+        {/snippet}
+      </QuickActionCard>
     </div>
     <ShareMyRide bind:open={rideShareOpen} />
     <InviteSheet bind:open={inviteOpen} />
+    <QrModal bind:open={qrOpen} />
 
     <!-- ── ROOMS ────────────────────────────────────────────────── -->
     <section class="sharing-section">

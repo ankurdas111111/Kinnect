@@ -69,6 +69,10 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
+    /* The parent (.info-root) is a scrolling flex column: without this the
+       card is squashed to its eyebrow (~34px) while its body needs ~110px,
+       and overflow:hidden then chops the code + Copy/QR buttons clean off. */
+    flex-shrink: 0;
     position: relative;
     box-shadow:
       0 0 16px rgba(20, 184, 166, 0.08),

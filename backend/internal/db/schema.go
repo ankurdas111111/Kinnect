@@ -283,6 +283,26 @@ func InitDB(ctx context.Context, db *sql.DB) error {
 		)`,
 		// Migration guard: ts column added after initial deployment
 		`ALTER TABLE position_history ADD COLUMN IF NOT EXISTS ts BIGINT NOT NULL DEFAULT 0`,
+		// Migration guard: legacy deployments created this table with
+		// latitude/longitude. CREATE TABLE IF NOT EXISTS silently skips the
+		// newer lat/lng definition above, so every trail INSERT failed with
+		// `column "lat" does not exist` and route replay stayed empty forever.
+		// Rename in place (keeps existing rows) when only the legacy names exist.
+		`DO $$
+		BEGIN
+			IF EXISTS (SELECT 1 FROM information_schema.columns
+			           WHERE table_name = 'position_history' AND column_name = 'latitude')
+			   AND NOT EXISTS (SELECT 1 FROM information_schema.columns
+			                   WHERE table_name = 'position_history' AND column_name = 'lat') THEN
+				ALTER TABLE position_history RENAME COLUMN latitude TO lat;
+			END IF;
+			IF EXISTS (SELECT 1 FROM information_schema.columns
+			           WHERE table_name = 'position_history' AND column_name = 'longitude')
+			   AND NOT EXISTS (SELECT 1 FROM information_schema.columns
+			                   WHERE table_name = 'position_history' AND column_name = 'lng') THEN
+				ALTER TABLE position_history RENAME COLUMN longitude TO lng;
+			END IF;
+		END $$`,
 		`CREATE INDEX IF NOT EXISTS idx_position_history_user_ts ON position_history(user_id, ts DESC)`,
 	}
 

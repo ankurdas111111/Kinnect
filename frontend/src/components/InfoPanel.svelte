@@ -111,4 +111,13 @@
     flex-direction: column;
     gap: var(--space-3);
   }
+
+  /* This column scrolls (.panel-body overflow-y:auto), so every card is a
+     flex item that the browser is free to compress once total content
+     exceeds the panel height — cards with overflow:hidden then clip their
+     own contents (the "Your Code" card lost its code + Copy/QR buttons
+     entirely). Cards size to content and scroll instead of squashing. */
+  .info-root > :global(*) {
+    flex-shrink: 0;
+  }
 </style>
