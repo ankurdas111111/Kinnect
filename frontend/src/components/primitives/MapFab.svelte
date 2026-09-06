@@ -128,7 +128,7 @@
     width: 56px;
     height: 56px;
     background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-700) 100%);
-    color: #ffffff;
+    color: var(--text-on-primary, #fff);
     box-shadow:
       0 4px 20px rgba(37, 99, 235, 0.50),
       0 0 0 1px rgba(59, 130, 246, 0.20);
@@ -183,19 +183,19 @@
   }
 
   :global([data-theme="dark"]) .fab--secondary {
-    background: rgba(30, 41, 59, 0.85);
+    background: var(--map-chip-bg, rgba(30, 41, 59, 0.85));
     box-shadow: 0 2px 12px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.08);
     color: var(--text-secondary);
   }
 
   :global([data-theme="dark"]) .fab--secondary:hover {
-    background: rgba(30, 41, 59, 0.95);
+    background: var(--surface-2, rgba(30, 41, 59, 0.95));
     color: var(--primary-400);
   }
 
   :global([data-theme="dark"]) .fab--secondary.follow-active {
-    background: rgba(37, 99, 235, 0.18);
-    box-shadow: 0 2px 12px rgba(59,130,246,0.30), 0 0 0 1px rgba(96,165,250,0.35);
+    background: color-mix(in oklch, var(--primary-500) 18%, transparent);
+    box-shadow: 0 2px 12px color-mix(in oklch, var(--primary-500) 30%, transparent), 0 0 0 1px color-mix(in oklch, var(--primary-400) 35%, transparent);
     color: var(--primary-400);
   }
 

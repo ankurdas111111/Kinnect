@@ -1405,10 +1405,10 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
 .badge-neutral  { background: var(--gray-100); color: var(--gray-600); }
 
 [data-theme="dark"] .badge-primary  { background: color-mix(in oklch, var(--primary-500) 16%, transparent); color: var(--primary-300); }
-[data-theme="dark"] .badge-success  { background: rgba(52, 211, 153, 0.15); color: var(--success-400); }
-[data-theme="dark"] .badge-warning  { background: rgba(251, 191, 36, 0.15); color: var(--warning-400); }
-[data-theme="dark"] .badge-danger   { background: rgba(248, 113, 113, 0.15); color: var(--danger-400); }
-[data-theme="dark"] .badge-neutral  { background: var(--gray-800); color: var(--gray-300); }
+[data-theme="dark"] .badge-success  { background: color-mix(in oklch, var(--success-500) 16%, transparent); color: var(--success-400); }
+[data-theme="dark"] .badge-warning  { background: color-mix(in oklch, var(--warning-500) 16%, transparent); color: var(--warning-400); }
+[data-theme="dark"] .badge-danger   { background: color-mix(in oklch, var(--danger-500) 16%, transparent); color: var(--danger-400); }
+[data-theme="dark"] .badge-neutral  { background: var(--surface-2); color: var(--text-secondary); }
 
 
 /* ── Status Dot ────────────────────────────────────────────────────────── */
@@ -2314,7 +2314,7 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
 }
 .spatial-subtab.active {
   background: linear-gradient(135deg, var(--primary-500), var(--primary-700));
-  color: white;
+  color: var(--text-on-primary, #fff);
   /* 3D raised active subtab */
   box-shadow:
     0 4px 12px rgba(99,102,241,0.32),

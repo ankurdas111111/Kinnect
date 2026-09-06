@@ -51,7 +51,7 @@
     padding: var(--space-2-5) var(--space-4);
     min-height: 44px;
     background: linear-gradient(135deg, var(--primary-500, #14b8a6), var(--primary-700, #0f766e));
-    color: white;
+    color: var(--text-on-primary, #fff);
     border: none;
     border-radius: var(--radius-lg);
     font-family: var(--font-display);

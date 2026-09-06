@@ -9,6 +9,7 @@
   import { isIgnoringBatteryOptimizations, requestIgnoreBatteryOptimizations } from '../lib/batteryOptimization.js';
   import { isNativePlatform } from '../lib/geoProvider.js';
   import { effects, FX_LEVELS } from '../lib/stores/effects.js';
+  import { themeStore } from '../lib/stores/theme.js';
   import { daypartEnabled, setDaypartEnabled } from '../lib/daypart.js';
   import { voiceEnabled, voiceCheckins, voiceMutedUntil, setVoiceEnabledFromGesture, muteForToday, unmute, isSupported as voiceSupported } from '../lib/voice.js';
   import { haptics } from '../lib/haptics.js';
@@ -369,6 +370,36 @@
       {/snippet}
     </SettingsSection>
 
+    <!-- Appearance — Hearth day / night -->
+    <SettingsSection title="Appearance" description="Warm paper by day, the same room with the lamps on by night.">
+      {#snippet children()}
+        <div class="fx-segmented fx-segmented-2" role="radiogroup" aria-label="Theme">
+          <button
+            type="button"
+            class="fx-seg-btn tactile"
+            class:active={$themeStore === 'light'}
+            role="radio"
+            aria-checked={$themeStore === 'light'}
+            onclick={() => themeStore.set('light')}
+          >
+            <span class="fx-seg-name">Day</span>
+            <span class="fx-seg-desc">Warm paper</span>
+          </button>
+          <button
+            type="button"
+            class="fx-seg-btn tactile"
+            class:active={$themeStore === 'dark'}
+            role="radio"
+            aria-checked={$themeStore === 'dark'}
+            onclick={() => themeStore.set('dark')}
+          >
+            <span class="fx-seg-name">Night</span>
+            <span class="fx-seg-desc">Lamplit charcoal</span>
+          </button>
+        </div>
+      {/snippet}
+    </SettingsSection>
+
     <!-- Visual effects — flagship FX control -->
     <SettingsSection title="Visual effects" description="Dial down animation and blur for a calmer screen and better battery life.">
       {#snippet children()}
@@ -701,6 +732,7 @@
   .delete-countdown-btn.counting1 { --countdown-color: var(--danger-500); box-shadow: var(--glow-sos, none); }
 
   /* ── Visual effects segmented control ────────────────────────────────────── */
+  .fx-segmented-2 { grid-template-columns: repeat(2, 1fr); }
   .fx-segmented {
     display: grid;
     grid-template-columns: repeat(3, 1fr);

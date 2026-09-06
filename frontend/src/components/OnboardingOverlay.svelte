@@ -254,7 +254,7 @@
   }
 
   :global([data-theme="dark"]) .onboarding-card {
-    background: var(--glass-2, rgba(20,27,58,0.96));
+    background: var(--glass-bg-strong, rgba(20,27,58,0.96));
   }
 
   .step-indicators {

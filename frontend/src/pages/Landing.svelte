@@ -70,7 +70,7 @@
   ].map((r) => ({ ...r, L: routeLen(r.pts), points: r.pts.map((q) => q.join(',')).join(' ') }));
 
   const PLACES = [
-    { name: 'Home', x: 1000, y: 900, center: true, dy: -78 },
+    { name: 'Home', x: 1000, y: 900, center: true, dy: -116 },
     { name: 'School', x: 560, y: 1000, dx: 32 },
     { name: 'Office', x: 1360, y: 440, dx: 32 },
     { name: 'Tuition', x: 740, y: 1160, dx: 32 },
@@ -229,7 +229,10 @@
     const hh = Math.floor(t), mm = Math.floor((t - hh) * 60);
     const clock = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 
-    return { t, tx, ty, s, k, ver, people, routes, chapters, tint, clock, hint: p < 0.015 };
+    // Last 7% of the story: the map hands off to the closing on paper, no hard cut.
+    const fade = cl((p - 0.93) / 0.07);
+
+    return { t, tx, ty, s, k, ver, people, routes, chapters, tint, clock, fade, hint: p < 0.015 };
   });
 </script>
 
@@ -259,6 +262,28 @@
       </div>
     </div>
 
+    <!-- The product, in miniature: a settled evening on the quiet map -->
+    <div class="lp-hero-vignette" aria-hidden="true">
+      <div class="lp-hv-head">
+        <span class="lp-hv-dot"></span>
+        <span class="lp-hv-verdict">Everyone&rsquo;s settled.</span>
+        <span class="lp-hv-clock">19:30</span>
+      </div>
+      <div class="lp-hv-map">
+        <div class="lp-hv-park"></div>
+        <svg viewBox="0 0 340 260" class="lp-hv-route">
+          <polyline points="56,224 56,156 150,156 150,118" fill="none" stroke="var(--member-2)"
+            stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="1 7" opacity="0.9" />
+        </svg>
+        <span class="lp-hv-place" style="left:252px; top:88px;">Home</span>
+        <span class="lp-hv-place" style="left:34px; top:238px;">School</span>
+        <div class="lp-hv-pebble" style="left:226px; top:120px; background:var(--ember);">P</div>
+        <div class="lp-hv-pebble" style="left:252px; top:146px; background:var(--member-1);">A</div>
+        <div class="lp-hv-pebble lp-hv-walking" style="left:150px; top:118px; background:var(--member-2);">M</div>
+        <span class="lp-hv-tag">Meera · heading home</span>
+      </div>
+    </div>
+
     <div class="lp-scroll-cue"><span class="lp-cue-line" aria-hidden="true"></span>Scroll — a Tuesday with the Nair family, Bengaluru</div>
   </section>
 
@@ -278,7 +303,7 @@
         <svg viewBox="0 0 2000 1400" width="2000" height="1400" class="lp-routes" aria-hidden="true">
           {#each scene.routes as r, i (i)}
             <polyline
-              points={r.points} fill="none" stroke={r.color} stroke-width="5"
+              points={r.points} fill="none" stroke={r.color} stroke-width="3.5"
               stroke-linecap="round" stroke-linejoin="round"
               style:stroke-dasharray={r.dash}
               style:stroke-dashoffset={r.offset}
@@ -296,7 +321,7 @@
         {/each}
 
         {#each scene.people as per (per.initial)}
-          <div class="lp-person" class:lp-sos={per.sos} class:lp-self={per.self}
+          <div class="lp-person lp-p-{per.initial}" class:lp-sos={per.sos} class:lp-self={per.self}
             style:left={`${per.x}px`} style:top={`${per.y}px`} style:transform={`scale(${scene.k})`}>
             <div class="lp-person-inner" class:lp-moving={per.moving}>
               <div class="lp-pebble-wrap">
@@ -311,6 +336,7 @@
       </div>
 
       <div class="lp-tint" style:background={scene.tint.c} style:opacity={scene.tint.o} aria-hidden="true"></div>
+      <div class="lp-stage-fade" style:opacity={scene.fade} aria-hidden="true"></div>
 
       <div class="lp-story-chrome" aria-hidden="true">
         <span class="lp-wordmark lp-wordmark-sm">Kinnect</span>
@@ -393,12 +419,14 @@
   }
   .lp-nav-pill {
     min-height: 44px; padding: 0 var(--space-4);
-    border-radius: 999px; border: 1px solid var(--hairline);
-    background: transparent; cursor: pointer;
+    border-radius: 999px;
+    border: 1px solid color-mix(in oklch, var(--ink) 22%, transparent);
+    background: var(--card); cursor: pointer;
     color: var(--ink); font-family: inherit; font-size: var(--text-sm); font-weight: 600;
     white-space: nowrap;
+    box-shadow: 0 1px 2px rgba(40, 30, 20, 0.08);
   }
-  .lp-nav-pill:hover { background: var(--surface-hover); }
+  .lp-nav-pill:hover { border-color: color-mix(in oklch, var(--ink) 38%, transparent); }
 
   .lp-hero-body {
     flex: 1;
@@ -409,8 +437,14 @@
   }
   .lp-eyebrow {
     font-size: var(--text-xs); font-weight: 600;
-    letter-spacing: 0.1em; text-transform: uppercase;
+    letter-spacing: 0.12em; text-transform: uppercase;
     color: var(--ink-3);
+  }
+  /* an ember tick anchors the eyebrow — a mark, not a floating whisper */
+  .lp-hero-body .lp-eyebrow { display: flex; align-items: center; gap: 12px; }
+  .lp-hero-body .lp-eyebrow::before {
+    content: ''; width: 26px; height: 2px; flex-shrink: 0;
+    background: var(--ember); border-radius: 1px;
   }
   .lp-headline {
     margin: 0;
@@ -439,7 +473,7 @@
     white-space: nowrap;
     -webkit-tap-highlight-color: transparent;
   }
-  .lp-cta-primary { border: none; background: var(--ember); color: #fff; }
+  .lp-cta-primary { border: none; background: var(--ember); color: var(--text-on-primary, #fff); }
   .lp-cta-primary:hover { background: var(--primary-600); }
   .lp-cta-ghost { border: 1px solid var(--hairline); background: transparent; color: var(--ink); }
   .lp-cta-ghost:hover { background: var(--surface-hover); }
@@ -449,7 +483,7 @@
     font-size: 13px; color: var(--ink-3);
   }
   .lp-cue-line {
-    width: 28px; height: 1px; background: var(--ink-3);
+    width: 28px; height: 1.5px; background: var(--ink-2);
     transform-origin: left center;
   }
 
@@ -472,6 +506,10 @@
       animation: lp-headline-rise 780ms cubic-bezier(0.16, 1, 0.3, 1) 160ms both;
     }
     .lp-cue-line { animation: lp-cue-sweep 2.6s ease-in-out 1.4s infinite; }
+    .lp-hero-vignette {
+      opacity: 0;
+      animation: lp-hv-in 820ms cubic-bezier(0.16, 1, 0.3, 1) 520ms both;
+    }
     /* the closing eyebrow/headline reuse .lp-eyebrow — but their reveal is
        scroll-driven via .reveal-scroll (global.css), so cancel the load-time
        rise there to avoid double animation */
@@ -486,6 +524,86 @@
   @keyframes lp-cue-sweep {
     0%, 100% { transform: scaleX(1); opacity: 1; }
     50% { transform: scaleX(1.8); opacity: 0.45; }
+  }
+  @keyframes lp-hv-in {
+    from { opacity: 0; transform: translateY(calc(-50% + 30px)) rotate(4.5deg); }
+    to { opacity: 1; transform: translateY(-50%) rotate(2deg); }
+  }
+
+  /* ── Hero vignette — the product in miniature, floating right ─────────── */
+  .lp-hero-vignette {
+    display: none;
+    position: absolute;
+    right: clamp(24px, 5vw, 88px);
+    top: 50%;
+    width: min(400px, 30vw);
+    background: var(--card);
+    border: 1px solid var(--hairline);
+    border-radius: 20px;
+    box-shadow: var(--sh), 0 2px 8px rgba(40, 30, 20, 0.10);
+    overflow: hidden;
+    transform: translateY(-50%) rotate(2deg);
+  }
+  @media (min-width: 1080px) {
+    .lp-hero-vignette { display: block; }
+    .lp-hero-body { max-width: min(760px, 56vw); }
+  }
+  .lp-hv-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .lp-hv-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sage); flex-shrink: 0; }
+  .lp-hv-verdict {
+    font-family: var(--font-serif); font-style: italic;
+    font-size: 19px; color: var(--ink);
+    flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .lp-hv-clock {
+    font-size: 12px; font-weight: 600; color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+  }
+  .lp-hv-map {
+    position: relative; height: 260px;
+    background:
+      linear-gradient(90deg, var(--map-street) 0 2px, transparent 2px) 14px 0 / 76px 100%,
+      linear-gradient(0deg, var(--map-street) 0 2px, transparent 2px) 0 10px / 100% 66px,
+      linear-gradient(90deg, var(--map-street) 0 1px, transparent 1px) 4px 0 / 19px 100%,
+      linear-gradient(0deg, var(--map-street) 0 1px, transparent 1px) 0 4px / 100% 17px,
+      var(--map-base);
+  }
+  .lp-hv-park {
+    position: absolute; left: -36px; top: 26px; width: 150px; height: 104px;
+    background: var(--map-park);
+    border-radius: 52% 48% 58% 42% / 55% 46% 54% 45%;
+    box-shadow: inset 0 0 0 1.5px color-mix(in oklch, var(--ink) 7%, transparent);
+  }
+  .lp-hv-route { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .lp-hv-place {
+    position: absolute;
+    font-size: 10px; font-weight: 600; letter-spacing: 0.02em;
+    color: var(--ink-2);
+    padding: 1px 7px; border-radius: 999px;
+    background: color-mix(in oklch, var(--card) 78%, transparent);
+  }
+  .lp-hv-pebble {
+    position: absolute; box-sizing: border-box;
+    width: 30px; height: 30px; margin: -15px 0 0 -15px;
+    border-radius: 50%;
+    border: 2px solid var(--card);
+    box-shadow: 0 0 0 1.5px var(--sage), 0 2px 6px rgba(40, 30, 20, 0.25);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 700; font-size: 11px;
+  }
+  .lp-hv-tag {
+    position: absolute; left: 150px; top: 138px;
+    transform: translateX(-50%);
+    padding: 2px 8px; border-radius: 999px;
+    background: var(--card);
+    border: 1px solid var(--hairline);
+    box-shadow: 0 1px 2px rgba(40, 30, 20, 0.14);
+    font-size: 10.5px; font-weight: 600; color: var(--ink);
+    white-space: nowrap;
   }
 
   /* ── Story ────────────────────────────────────────────────────────────── */
@@ -502,30 +620,36 @@
     transform-origin: 0 0;
     will-change: transform;
   }
+  /* City texture at street scale — thin, dense lines read as a map, not a
+     spreadsheet. Avenues (3px) over lanes (1px). */
   .lp-grid-major {
     position: absolute; inset: 0;
     background-image:
-      linear-gradient(90deg, var(--map-street) 0 7px, transparent 7px),
-      linear-gradient(0deg, var(--map-street) 0 7px, transparent 7px);
-    background-size: 200px 100%, 100% 180px;
+      linear-gradient(90deg, var(--map-street) 0 3px, transparent 3px),
+      linear-gradient(0deg, var(--map-street) 0 3px, transparent 3px);
+    background-size: 150px 100%, 100% 130px;
     background-position: 60px 0, 0 40px;
   }
   .lp-grid-minor {
     position: absolute; inset: 0;
     background-image:
-      linear-gradient(90deg, var(--map-street) 0 2.5px, transparent 2.5px),
-      linear-gradient(0deg, var(--map-street) 0 2.5px, transparent 2.5px);
-    background-size: 50px 100%, 100% 60px;
+      linear-gradient(90deg, var(--map-street) 0 1px, transparent 1px),
+      linear-gradient(0deg, var(--map-street) 0 1px, transparent 1px);
+    background-size: 30px 100%, 100% 32px;
     background-position: 20px 0, 0 20px;
-    opacity: 0.75;
+    opacity: 0.55;
   }
   .lp-water {
     position: absolute; left: 1480px; top: 120px; width: 460px; height: 300px;
-    background: var(--map-water); border-radius: 60% 40% 50% 50%;
+    background: var(--map-water);
+    border-radius: 58% 42% 52% 48% / 52% 55% 45% 48%;
+    box-shadow: inset 0 0 0 1.5px color-mix(in oklch, var(--ink) 7%, transparent);
   }
   .lp-park {
     position: absolute; left: 560px; top: 480px; width: 360px; height: 240px;
-    background: var(--map-park); border-radius: 48% 52% 60% 40%;
+    background: var(--map-park);
+    border-radius: 52% 48% 58% 42% / 55% 46% 54% 45%;
+    box-shadow: inset 0 0 0 1.5px color-mix(in oklch, var(--ink) 7%, transparent);
   }
   .lp-routes { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
 
@@ -551,7 +675,7 @@
     transform: translate(-50%, -22px);
     display: flex; flex-direction: column; align-items: center; gap: 6px;
   }
-  .lp-pebble-wrap { position: relative; width: 44px; height: 44px; }
+  .lp-pebble-wrap { position: relative; width: 40px; height: 40px; }
   .lp-sos-ring {
     position: absolute; left: 50%; top: 50%;
     width: 104px; height: 104px;
@@ -565,38 +689,50 @@
   .lp-sos-ring.on { opacity: 1; }
   .lp-pebble {
     position: relative; box-sizing: border-box;
-    width: 44px; height: 44px; border-radius: 50%;
-    border: 3px solid var(--card);
-    box-shadow: 0 0 0 2px var(--sage), 0 4px 12px rgba(40, 30, 20, 0.25);
+    width: 40px; height: 40px; border-radius: 50%;
+    border: 2.5px solid var(--card);
+    box-shadow: 0 0 0 2px var(--sage), 0 2px 8px rgba(40, 30, 20, 0.28);
     display: flex; align-items: center; justify-content: center;
-    color: #fff; font-weight: 700; font-size: 15px;
+    color: #fff; font-weight: 700; font-size: 14px;
     transition: background 0.4s, box-shadow 0.4s;
   }
   .lp-pebble.lp-quiet {
     color: var(--ink-2); opacity: 0.85;
-    box-shadow: 0 4px 12px rgba(40, 30, 20, 0.22);
+    box-shadow: 0 2px 8px rgba(40, 30, 20, 0.22);
   }
   /* In transit: the pebble lifts off the map a touch */
   .lp-person-inner { transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1); }
   .lp-person-inner.lp-moving { transform: translate(-50%, -22px) scale(1.07); }
   .lp-person-inner.lp-moving .lp-pebble {
-    box-shadow: 0 0 0 2px var(--sage), 0 10px 22px rgba(40, 30, 20, 0.30);
+    box-shadow: 0 0 0 2px var(--sage), 0 8px 18px rgba(40, 30, 20, 0.32);
   }
   .lp-person.lp-sos .lp-pebble {
-    box-shadow: 0 0 0 3px var(--card), 0 4px 12px rgba(40, 30, 20, 0.3);
+    box-shadow: 0 0 0 3px var(--card), 0 2px 8px rgba(40, 30, 20, 0.3);
   }
   .lp-tag {
     padding: 3px 9px; border-radius: 999px;
     background: var(--card);
-    box-shadow: 0 1px 4px rgba(40, 30, 20, 0.18);
+    border: 1px solid var(--hairline);
+    box-shadow: 0 1px 2px rgba(40, 30, 20, 0.14);
     font-size: 12px; font-weight: 600; color: var(--ink);
     white-space: nowrap;
     transition: background 0.4s;
   }
   .lp-tag-quiet { color: var(--ink-2); }
-  .lp-tag-sos { background: var(--vermilion); color: #fff; font-weight: 700; }
+  .lp-tag-sos { background: var(--vermilion); border-color: transparent; color: #fff; font-weight: 700; }
+
+  /* The home cluster: three pebbles a few px apart. Per-person tag placement
+     keeps every name readable — Nani's rides above, the parents' tuck
+     outward — instead of three tags stacking on one spot. */
+  .lp-p-N .lp-person-inner { flex-direction: column-reverse; transform: translate(-50%, calc(-100% + 20px)); }
+  .lp-p-A .lp-tag { transform: translateX(-16px); }
+  .lp-p-M .lp-tag { transform: translateX(16px); }
 
   .lp-tint { position: absolute; inset: 0; pointer-events: none; }
+  .lp-stage-fade {
+    position: absolute; inset: 0; pointer-events: none; z-index: 8;
+    background: linear-gradient(to bottom, transparent 30%, var(--paper) 96%);
+  }
 
   .lp-story-chrome {
     position: absolute; top: 0; left: 0; right: 0;
@@ -633,7 +769,8 @@
   }
   .lp-chapter-card {
     background: var(--card); color: var(--ink);
-    border-radius: 24px;
+    border: 1px solid var(--hairline);
+    border-radius: 20px;
     padding: 22px 24px 24px;
     box-shadow: var(--sh);
     display: flex; flex-direction: column; gap: 10px;
@@ -697,30 +834,7 @@
     .lp-person-inner.lp-moving { transform: translate(-50%, -22px); }
   }
 
-  /* ── Night mode (design "landing night" palette) ─────────────────────────
-     Custom props inherit, so remapping them on .lp re-colours the whole
-     story — type, cards, and the map scene — without touching markup. */
-  :global([data-theme='dark']) .lp {
-    --paper: oklch(0.21 0.01 60);
-    --card: oklch(0.25 0.01 60);
-    --ink: oklch(0.95 0.008 80);
-    --ink-2: oklch(0.78 0.012 80);
-    --ink-3: oklch(0.65 0.012 80);
-    --hairline: oklch(0.95 0.008 80 / 0.12);
-    --ember: oklch(0.76 0.13 38);
-    --map-base: oklch(0.245 0.012 60);
-    --map-street: oklch(0.30 0.012 60);
-    --map-park: oklch(0.27 0.03 140);
-    --map-water: oklch(0.27 0.03 230);
-    --lp-quiet: oklch(0.42 0.012 60);
-    --sh: 0 8px 24px oklch(0 0 0 / 0.45);
-    --surface-hover: oklch(0.95 0.008 80 / 0.07);
-  }
-  /* Night accent is light (L 0.76) — dark ink on it, not white */
-  :global([data-theme='dark']) .lp .lp-cta-primary {
-    color: oklch(0.20 0.04 38);
-  }
-  :global([data-theme='dark']) .lp .lp-cta-primary:hover {
-    background: oklch(0.80 0.13 38);
-  }
+  /* Night mode now comes from the app-wide HEARTH NIGHT token block in
+     tokens-hearth.css (:root[data-theme="dark"]) — --paper/--card/--ink and
+     the map tokens all flip there, so the landing needs no scoped palette. */
 </style>

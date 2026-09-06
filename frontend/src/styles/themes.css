@@ -23,8 +23,11 @@
    animation) so it costs one composite, not one per frame. If profiling
    on mid-range WebViews ever says otherwise, the escape hatch is a real
    dark style fork of public/map-style.json, not a cheaper filter. */
+/* HEARTH NIGHT: invert the light tiles, then pull the result warm — sepia
+   re-tints the inverted (cool) canvas toward the hue-60 charcoal desk so the
+   map sits with the night paper instead of glowing indigo. */
 [data-theme="dark"] .maplibregl-canvas {
-  filter: invert(1) hue-rotate(205deg) saturate(0.55) brightness(0.75) contrast(1.05);
+  filter: invert(1) hue-rotate(180deg) saturate(0.30) sepia(0.28) brightness(0.72) contrast(1.02);
 }
 
 /* Soften the map edges into the indigo canvas (chrome, not tiles) */

@@ -582,7 +582,7 @@
     -webkit-backdrop-filter: blur(28px) saturate(1.8);
   }
   :global([data-theme="dark"] .maplibregl-popup-content) {
-    background: rgba(12, 12, 24, 0.94);
+    background: var(--glass-bg-strong, rgba(12, 12, 24, 0.94));
     color: rgba(255, 255, 255, 0.90);
     box-shadow:
       0 12px 40px rgba(0, 0, 0, 0.55),
@@ -590,7 +590,7 @@
       inset 0 1px 0 rgba(255, 255, 255, 0.06);
   }
   :global(.maplibregl-popup-tip) { border-top-color: rgba(255, 255, 255, 0.96); }
-  :global([data-theme="dark"] .maplibregl-popup-tip) { border-top-color: rgba(20, 25, 40, 0.92); }
+  :global([data-theme="dark"] .maplibregl-popup-tip) { border-top-color: var(--glass-bg-strong, rgba(20, 25, 40, 0.92)); }
   :global(.maplibregl-popup-close-button) {
     color: var(--text-tertiary, rgba(255, 255, 255, 0.5));
     font-size: 18px;

@@ -157,6 +157,143 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   HEARTH NIGHT — the same room with the lamps on.
+   The design's night palette: warm charcoal desk, paper sheets gone dusk,
+   the ember brightened so it still glows. One block re-skins the whole app
+   because every component reads semantic tokens.
+
+   Specificity note: :root[data-theme="dark"] is (0,2,0) — it beats BOTH the
+   legacy VIGIL block at [data-theme="dark"] (global.css) and this file's own
+   bare :root, in any load order. index.html's pre-paint always stamps
+   data-theme, so this is the single source of night truth.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root[data-theme="dark"] {
+  /* ── Raw night palette ───────────────────────────────────────────────── */
+  --paper:   oklch(0.21 0.01 60);
+  --paper-2: oklch(0.245 0.012 60);
+  --card:    oklch(0.25 0.01 60);
+  --ink:     oklch(0.95 0.008 80);
+  --ink-2:   oklch(0.78 0.012 80);
+  --ink-3:   oklch(0.65 0.012 80);
+  --hairline: oklch(0.95 0.008 80 / 0.12);
+  --ember:   oklch(0.76 0.13 38);
+  --sage:    oklch(0.62 0.10 150);
+  --ochre:   oklch(0.68 0.12 75);
+  --vermilion: oklch(0.64 0.20 27);
+  --lp-quiet: oklch(0.42 0.012 60);
+
+  /* Night map canvas tokens */
+  --map-base:   oklch(0.245 0.012 60);
+  --map-street: oklch(0.30 0.012 60);
+  --map-park:   oklch(0.27 0.03 140);
+  --map-water:  oklch(0.27 0.03 230);
+
+  --sh:   0  8px 24px oklch(0 0 0 / 0.45);
+  --sh-up: 0 -8px 32px oklch(0 0 0 / 0.50);
+
+  /* ── Ember ramp, brightened — light accent needs DARK ink on it ─────── */
+  --primary-50:  oklch(0.26 0.03 38);
+  --primary-100: oklch(0.30 0.05 38);
+  --primary-200: oklch(0.38 0.08 38);
+  --primary-300: oklch(0.66 0.12 38);
+  --primary-400: oklch(0.72 0.13 38);
+  --primary-500: oklch(0.76 0.13 38);
+  --primary-600: oklch(0.80 0.13 38);
+  --primary-700: oklch(0.62 0.14 38);
+  --primary-800: oklch(0.54 0.13 38);
+  --primary-900: oklch(0.46 0.11 38);
+
+  --success-400: oklch(0.68 0.10 150);
+  --success-500: oklch(0.62 0.10 150);
+  --success-600: oklch(0.54 0.09 150);
+  --success-700: oklch(0.46 0.08 150);
+
+  --warning-300: oklch(0.78 0.11 75);
+  --warning-400: oklch(0.72 0.12 75);
+  --warning-500: oklch(0.68 0.12 75);
+  --warning-600: oklch(0.58 0.11 75);
+  --warning-700: oklch(0.50 0.10 75);
+
+  --danger-300: oklch(0.74 0.16 27);
+  --danger-400: oklch(0.68 0.19 27);
+  --danger-500: oklch(0.64 0.20 27);
+  --danger-600: oklch(0.55 0.20 27);
+  --danger-700: oklch(0.47 0.18 27);
+
+  /* ── Surfaces ────────────────────────────────────────────────────────── */
+  --surface-0: var(--paper);
+  --surface-1: var(--card);
+  --surface-2: oklch(0.27 0.012 60);
+  --surface-3: oklch(0.235 0.01 60);
+  --surface-inset: oklch(0.185 0.01 60);
+  --surface-hover: oklch(0.95 0.008 80 / 0.07);
+  --surface-active: oklch(0.95 0.008 80 / 0.11);
+  --surface-selected: color-mix(in oklch, var(--primary-500) 14%, transparent);
+  --surface-midnight: oklch(0.185 0.01 60);
+  --primary-ghost-hover: color-mix(in oklch, var(--primary-500) 12%, transparent);
+
+  /* ── Ink ─────────────────────────────────────────────────────────────── */
+  --text-primary:   var(--ink);
+  --text-secondary: var(--ink-2);
+  --text-tertiary:  var(--ink-3);
+  /* Consumers use --text-inverse ON colored/dark surfaces (SOS banner, toggle
+     thumbs) — it stays light at night; flipping it dark would break them. */
+  --text-inverse:   oklch(0.99 0.004 80);
+  --text-on-primary: oklch(0.20 0.04 38);
+
+  /* ── Hairlines ───────────────────────────────────────────────────────── */
+  --border-default: var(--hairline);
+  --border-subtle:  oklch(0.95 0.008 80 / 0.07);
+  --border-strong:  oklch(0.95 0.008 80 / 0.20);
+  --border-highlight: oklch(0.95 0.008 80 / 0.14);
+
+  /* ── Glass → dusk paper (kills the VIGIL indigo glass everywhere) ───── */
+  --glass-bg:            oklch(0.25 0.01 60 / 0.92);
+  --glass-bg-strong:     oklch(0.23 0.01 60 / 0.95);
+  --glass-border:        oklch(0.95 0.008 80 / 0.10);
+  --glass-border-strong: oklch(0.95 0.008 80 / 0.16);
+  --glass-3d:            oklch(0.26 0.012 60 / 0.85);
+  --glass-3d-border:     oklch(0.95 0.008 80 / 0.10);
+  --nav-tint:            oklch(0.30 0.015 60);
+  --nav-specular:        oklch(0.95 0.008 80 / 0.10);
+  --map-chip-bg:         oklch(0.24 0.01 60 / 0.88);
+  --map-chip-border:     oklch(0.95 0.008 80 / 0.10);
+
+  /* ── Warm-black elevation ────────────────────────────────────────────── */
+  --shadow-xs: 0 1px  3px oklch(0 0 0 / 0.35);
+  --shadow-sm: 0 2px  8px oklch(0 0 0 / 0.40);
+  --shadow-md: 0 4px 14px oklch(0 0 0 / 0.45);
+  --shadow-lg: var(--sh);
+  --shadow-xl: 0 16px 48px oklch(0 0 0 / 0.55);
+  --shadow-primary: 0 4px 18px oklch(0.76 0.13 38 / 0.30);
+  --shadow-danger:  0 4px 18px oklch(0.64 0.20 27 / 0.35);
+
+  /* ── Status ladder ───────────────────────────────────────────────────── */
+  --status-live:    var(--sage);
+  --status-stale:   var(--ochre);
+  --status-offline: oklch(0.55 0.01 60);
+  --status-sos:     var(--vermilion);
+
+  /* ── Member wheel, lifted for dark ground ────────────────────────────── */
+  --member-1: oklch(0.68 0.10 240);
+  --member-2: oklch(0.66 0.11 320);
+  --member-3: oklch(0.66 0.10 200);
+  --member-4: oklch(0.64 0.08 280);
+  --member-1-halo: oklch(0.80 0.07 240);
+  --member-2-halo: oklch(0.78 0.08 320);
+  --member-3-halo: oklch(0.78 0.07 200);
+  --member-4-halo: oklch(0.76 0.05 280);
+  --member-offline: oklch(0.45 0.008 60);
+
+  /* Map popups (tokens the VIGIL block used to own) */
+  --popup-text-heading: var(--ink);
+  --popup-text-val:     var(--ink);
+  --popup-text-label:   var(--ink-3);
+
+  --grain-opacity: 0.05;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    THE VERDICT VOICE
    "Everyone's settled." — Instrument Serif italic, the one place the app
    speaks in a human sentence. Applied by class so headings elsewhere keep

@@ -75,14 +75,14 @@
   }
 
   :global([data-theme="dark"]) .network-chip {
-    background: rgba(16, 185, 129, 0.18);
-    border-color: rgba(52, 211, 153, 0.35);
+    background: color-mix(in oklch, var(--success-500) 18%, transparent);
+    border-color: color-mix(in oklch, var(--success-400) 35%, transparent);
     color: var(--success-400, #34d399);
   }
 
   :global([data-theme="dark"]) .network-chip.offline {
-    background: rgba(245, 158, 11, 0.18);
-    border-color: rgba(251, 191, 36, 0.35);
+    background: color-mix(in oklch, var(--warning-500) 18%, transparent);
+    border-color: color-mix(in oklch, var(--warning-400) 35%, transparent);
     color: var(--warning-400, #fbbf24);
   }
 
