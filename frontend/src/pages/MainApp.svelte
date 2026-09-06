@@ -40,6 +40,7 @@
   import SosParticleBurst from '../components/primitives/SosParticleBurst.svelte';
   import SecretChatPanel from '../components/SecretChatPanel.svelte';
   import HubSpotlight from '../components/HubSpotlight.svelte';
+  import SosHoldOverlay from '../components/SosHoldOverlay.svelte';
   import FeatureGuide from '../components/FeatureGuide.svelte';
   import { calculateDistance } from '../lib/tracking.js';
   import { GPSKalmanFilter, VelocityKalmanFilter } from '../lib/kalman.js';
@@ -80,21 +81,90 @@
   });
 
   // Feature 7: Panic Mode — read from localStorage (set in SettingsPanel)
-  // Double-tap the SOS FAB to fire SOS instantly without the confirm modal.
-  let sosFabLastTap = 0;
+  // ── SOS activation: BOTH paths are supported ───────────────────────────
+  //   tap            → confirm dialog (unchanged, and the only keyboard/AT path)
+  //   press & hold 2s → fires directly (Hearth 04a: "impossible to send by
+  //                     accident"), skipping the dialog for a real emergency
+  // The socket emit lives here and nowhere else, so there is exactly one
+  // code path that can raise an SOS.
+  const SOS_HOLD_MS = 2000;
+  let sosHolding = $state(false);
+  let sosHoldProgress = $state(0);
+  let sosHoldSecondsLeft = $state(2);
+  let sosHoldRaf = null;
+  let sosHoldFired = false;   // hold completed → suppress the trailing click
+  let sosPointerUsed = false; // pointer drove this activation → click is a dupe
+
+  /** Human recipient list for the hold overlay copy. */
+  let sosRecipients = $derived.by(() => {
+    const names = [...$otherUsers.values()]
+      .map((u) => (u?.displayName || '').trim().split(/\s+/)[0])
+      .filter(Boolean);
+    const uniq = [...new Set(names)].slice(0, 3);
+    if (!uniq.length) return '';
+    if (uniq.length === 1) return uniq[0];
+    return `${uniq.slice(0, -1).join(', ')} and ${uniq[uniq.length - 1]}`;
+  });
+
+  function fireSos() {
+    haptics.sos?.();
+    socket.emit('triggerSOS', { reason: 'SOS', medicalCard: getMedicalSnapshot() });
+    sosParticleBurstActive = true;
+  }
+
+  function sosHoldBegin() {
+    if ($mySosActive || sosHolding) return;
+    sosHoldFired = false;
+    sosHolding = true;
+    sosHoldProgress = 0;
+    sosHoldSecondsLeft = Math.ceil(SOS_HOLD_MS / 1000);
+    const start = performance.now();
+    const tick = () => {
+      if (!sosHolding) return;
+      const elapsed = performance.now() - start;
+      sosHoldProgress = Math.min(elapsed / SOS_HOLD_MS, 1);
+      sosHoldSecondsLeft = Math.max(0, Math.ceil((SOS_HOLD_MS - elapsed) / 1000));
+      if (elapsed >= SOS_HOLD_MS) {
+        sosHoldFired = true;
+        sosHoldStop();
+        fireSos();
+        return;
+      }
+      sosHoldRaf = requestAnimationFrame(tick);
+    };
+    sosHoldRaf = requestAnimationFrame(tick);
+  }
+
+  function sosHoldStop() {
+    sosHolding = false;
+    sosHoldProgress = 0;
+    if (sosHoldRaf) { cancelAnimationFrame(sosHoldRaf); sosHoldRaf = null; }
+  }
+
+  /** Released early → treat as a tap and fall back to the confirm dialog. */
+  function sosHoldRelease() {
+    const wasHolding = sosHolding;
+    sosHoldStop();
+    if (wasHolding && !sosHoldFired) sosConfirmOpen = true;
+  }
+
+  function onSosPointerDown() {
+    sosPointerUsed = true;
+    if ($mySosActive) return;   // cancel happens on click, not on press
+    sosHoldBegin();
+  }
+
+  /** Keyboard/assistive activation: no pointer, so this is always a tap. */
   function onSosFabClick() {
-    if ($mySosActive) { socket.emit('cancelSOS'); return; }
-    const panicMode = localStorage.getItem('kinnect_panic_mode') === 'true';
-    const now = Date.now();
-    if (panicMode && now - sosFabLastTap < 400) {
-      // Double-tap in panic mode → fire immediately
-      sosFabLastTap = 0;
-      haptics.sos?.();
-      socket.emit('triggerSOS', { reason: 'SOS', medicalCard: getMedicalSnapshot() });
-    } else {
-      sosFabLastTap = now;
-      sosConfirmOpen = true;
-    }
+    if (sosPointerUsed) { sosPointerUsed = false; return; }
+    if ($mySosActive) { haptics.sosCancelled?.(); socket.emit('cancelSOS'); return; }
+    sosConfirmOpen = true;
+  }
+
+  /** Pointer release on an active SOS cancels it (unchanged behaviour). */
+  function onSosPointerUp() {
+    if ($mySosActive) { haptics.sosCancelled?.(); socket.emit('cancelSOS'); return; }
+    sosHoldRelease();
   }
   let secretChatPeer = $state(null); // { id: string, name: string }
 
@@ -735,6 +805,7 @@
 
     return () => {
       mounted = false;
+      sosHoldStop();   // never leave the hold rAF running past unmount
       clearInterval(profileInterval);
       stopTracking();
       stopGyroscope();
@@ -979,9 +1050,16 @@
       <button
         class="sos-fab"
         class:active={$mySosActive}
+        class:holding={sosHolding}
         style={isMobile ? `--fab-dock-offset: ${fabDockOffset}` : undefined}
+        onpointerdown={onSosPointerDown}
+        onpointerup={onSosPointerUp}
+        onpointerleave={sosHoldStop}
+        onpointercancel={sosHoldStop}
         onclick={onSosFabClick}
-        aria-label={$mySosActive ? 'Cancel SOS' : 'Send SOS'}
+        aria-label={$mySosActive
+          ? 'Cancel SOS'
+          : 'Send SOS — press and hold for two seconds to send immediately, or tap to confirm'}
       >
         {#if $mySosActive}
           <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -1004,7 +1082,16 @@
         />
       </div>
 
-      <!-- SOS Confirmation Modal -->
+      <!-- Hold-to-send feedback (Hearth 04a). Presentational; the timer and the
+           emit live in this file so there is one SOS code path. -->
+      <SosHoldOverlay
+        holding={sosHolding}
+        progress={sosHoldProgress}
+        secondsLeft={sosHoldSecondsLeft}
+        recipients={sosRecipients}
+      />
+
+      <!-- SOS Confirmation Modal — the tap path, and the keyboard/AT path -->
       {#if sosConfirmOpen}
         <div class="sos-confirm-backdrop" bind:this={sosConfirmEl} onclick={self(() => sosConfirmOpen = false)} onkeydown={(e) => { if (e.key === 'Escape') sosConfirmOpen = false; }} role="dialog" aria-modal="true" aria-labelledby="sos-confirm-title" tabindex="-1">
           <div class="sos-confirm-card-spatial">
@@ -1203,6 +1290,19 @@
       0 1px 6px rgba(220, 38, 38, 0.40),
       inset 0 3px 8px rgba(0, 0, 0, 0.25);
   }
+  /* Held: swell + sit above the hold overlay so the button stays visible
+     while the ring counts down. Transform/opacity only. */
+  .sos-fab.holding {
+    transform: translateY(calc(-1 * var(--fab-dock-offset, 0px))) scale(1.12);
+    z-index: calc(var(--z-modal, 5000) + 1);
+    box-shadow:
+      0 0 0 10px color-mix(in oklch, var(--danger-500) 18%, transparent),
+      0 8px 28px color-mix(in oklch, var(--danger-500) 45%, transparent);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sos-fab.holding { transform: translateY(calc(-1 * var(--fab-dock-offset, 0px))); }
+  }
+
   .sos-fab .sos-text {
     font-size: 14px;
     font-weight: 900;
