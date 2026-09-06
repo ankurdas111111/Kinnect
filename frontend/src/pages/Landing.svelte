@@ -77,8 +77,10 @@
     { name: 'Koramangala', x: 1230, y: 960, area: true },
     { name: 'Jayanagar', x: 560, y: 1100, area: true },
     { name: 'Indiranagar', x: 1360, y: 340, area: true },
-    { name: 'Ulsoor Lake', x: 1710, y: 270, area: true },
-    { name: 'Cubbon Park', x: 740, y: 600, area: true },
+    // Water/green labels sit at the feature's edge, the way maps caption
+    // terrain — never centred inside it like a sticker.
+    { name: 'Ulsoor Lake', x: 1622, y: 438, area: true },
+    { name: 'Cubbon Park', x: 748, y: 748, area: true },
   ];
 
   const CHAPTERS = [
@@ -316,8 +318,49 @@
       >
         <div class="lp-grid-major" aria-hidden="true"></div>
         <div class="lp-grid-minor" aria-hidden="true"></div>
-        <div class="lp-water" aria-hidden="true"></div>
-        <div class="lp-park" aria-hidden="true"></div>
+
+        <!-- Terrain: the city's fabric. Static SVG inside the camera layer —
+             rasterised once, zero per-frame cost. Organic water/green (drawn
+             paths, not border-radius ellipses), arterial roads cutting across
+             the block grid, and low-contrast block clusters that thicken the
+             neighbourhoods so the wide shots read as a place, not graph
+             paper. -->
+        <svg viewBox="0 0 2000 1400" width="2000" height="1400" class="lp-terrain" aria-hidden="true">
+          <!-- city blocks — a breath of density around each neighbourhood -->
+          <g class="lp-t-blocks">
+            <rect x="1150" y="855" width="112" height="72" rx="3" />
+            <rect x="1292" y="898" width="88" height="118" rx="3" />
+            <rect x="1178" y="1002" width="132" height="78" rx="3" />
+            <rect x="474" y="1058" width="118" height="88" rx="3" />
+            <rect x="636" y="1148" width="98" height="70" rx="3" />
+            <rect x="428" y="1206" width="88" height="108" rx="3" />
+            <rect x="1382" y="298" width="108" height="78" rx="3" />
+            <rect x="1502" y="432" width="88" height="60" rx="3" />
+            <rect x="1298" y="418" width="78" height="98" rx="3" />
+            <rect x="756" y="818" width="88" height="58" rx="3" />
+            <rect x="878" y="702" width="68" height="88" rx="3" />
+            <rect x="1602" y="598" width="118" height="88" rx="3" />
+            <rect x="1698" y="758" width="88" height="68" rx="3" />
+          </g>
+          <!-- arterial roads — casing first, then the road -->
+          <g class="lp-t-casing">
+            <path d="M 140 1210 C 480 1108, 780 992, 1040 952 C 1300 912, 1450 640, 1560 470 C 1652 352, 1742 250, 1880 170" />
+            <path d="M 1080 120 C 1112 400, 1074 700, 1112 1000 C 1128 1180, 1106 1290, 1120 1390" />
+            <path d="M 150 1030 C 500 1006, 900 1062, 1300 1022 C 1600 992, 1800 1012, 1930 992" />
+          </g>
+          <g class="lp-t-roads">
+            <path d="M 140 1210 C 480 1108, 780 992, 1040 952 C 1300 912, 1450 640, 1560 470 C 1652 352, 1742 250, 1880 170" />
+            <path d="M 1080 120 C 1112 400, 1074 700, 1112 1000 C 1128 1180, 1106 1290, 1120 1390" />
+            <path d="M 150 1030 C 500 1006, 900 1062, 1300 1022 C 1600 992, 1800 1012, 1930 992" />
+          </g>
+          <!-- water — a lake with an inlet and a southern point, not an egg -->
+          <path class="lp-t-water" d="M 1594 208 C 1636 158, 1706 140, 1764 152 C 1788 157, 1794 176, 1822 170 C 1866 161, 1916 190, 1930 244 C 1941 288, 1918 316, 1926 348 C 1932 374, 1904 404, 1862 410 C 1820 416, 1792 396, 1758 408 C 1712 424, 1650 420, 1610 390 C 1576 364, 1568 330, 1580 300 C 1588 280, 1560 262, 1568 238 C 1573 224, 1582 218, 1594 208 Z" />
+          <path class="lp-t-ripple" d="M 1648 260 q 58 -18 118 -4" />
+          <path class="lp-t-ripple" d="M 1690 322 q 50 -14 102 -2" />
+          <!-- green — the park with a bitten edge and a south-west lobe -->
+          <path class="lp-t-green" d="M 626 544 C 662 490, 742 464, 806 476 C 848 484, 862 512, 896 520 C 926 528, 942 572, 928 608 C 918 634, 888 640, 884 664 C 879 692, 838 716, 794 716 C 762 716, 744 700, 712 708 C 668 719, 616 700, 598 662 C 584 632, 596 610, 588 588 C 582 570, 606 556, 626 544 Z" />
+          <path class="lp-t-green" d="M 566 1066 C 596 1036, 654 1028, 690 1052 C 716 1069, 722 1096, 706 1118 C 688 1142, 640 1152, 602 1140 C 566 1128, 548 1094, 566 1066 Z" />
+        </svg>
 
         <svg viewBox="0 0 2000 1400" width="2000" height="1400" class="lp-routes" aria-hidden="true">
           {#each scene.routes as r, i (i)}
@@ -333,6 +376,10 @@
 
         {#each PLACES as pl (pl.name)}
           <div class="lp-place" style:left={`${pl.x}px`} style:top={`${pl.y}px`} style:transform={`scale(${scene.k})`}>
+            {#if !pl.area}
+              <!-- anchor dot: the label points AT somewhere, not at nothing -->
+              <span class="lp-place-dot" class:lp-dot-home={pl.center}></span>
+            {/if}
             <span class="lp-place-label" class:lp-area={pl.area}
               style:transform={pl.area || pl.center ? `translate(-50%, calc(-50% + ${pl.dy || 0}px))` : `translate(${pl.dx}px, -50%)`}
             >{pl.name}</span>
@@ -661,21 +708,40 @@
     background-position: 20px 0, 0 20px;
     opacity: 0.55;
   }
-  .lp-water {
-    position: absolute; left: 1480px; top: 120px; width: 460px; height: 300px;
-    background: var(--map-water);
-    border-radius: 58% 42% 52% 48% / 52% 55% 45% 48%;
-    box-shadow: inset 0 0 0 1.5px color-mix(in oklch, var(--ink) 7%, transparent);
+  .lp-terrain { position: absolute; left: 0; top: 0; pointer-events: none; }
+  .lp-t-blocks rect { fill: color-mix(in oklch, var(--ink) 3.5%, transparent); }
+  .lp-t-casing path {
+    fill: none; stroke: color-mix(in oklch, var(--ink) 6%, transparent);
+    stroke-width: 17; stroke-linecap: round;
   }
-  .lp-park {
-    position: absolute; left: 560px; top: 480px; width: 360px; height: 240px;
-    background: var(--map-park);
-    border-radius: 52% 48% 58% 42% / 55% 46% 54% 45%;
-    box-shadow: inset 0 0 0 1.5px color-mix(in oklch, var(--ink) 7%, transparent);
+  .lp-t-roads path {
+    fill: none; stroke: var(--map-street);
+    stroke-width: 13; stroke-linecap: round;
+  }
+  .lp-t-water {
+    fill: var(--map-water);
+    stroke: color-mix(in oklch, var(--ink) 8%, transparent); stroke-width: 1.5;
+  }
+  .lp-t-ripple {
+    fill: none; stroke: color-mix(in oklch, var(--ink) 10%, transparent);
+    stroke-width: 1.5; stroke-linecap: round;
+  }
+  .lp-t-green {
+    fill: var(--map-park);
+    stroke: color-mix(in oklch, var(--ink) 8%, transparent); stroke-width: 1.5;
   }
   .lp-routes { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
 
   .lp-place { position: absolute; width: 0; height: 0; transform-origin: 0 0; z-index: 2; }
+  .lp-place-dot {
+    position: absolute; left: -4px; top: -4px;
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--card);
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--ink) 30%, transparent);
+  }
+  .lp-dot-home {
+    box-shadow: 0 0 0 2px var(--ember);
+  }
   .lp-place-label {
     position: absolute; left: 0; top: 0;
     white-space: nowrap;
