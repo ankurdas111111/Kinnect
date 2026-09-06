@@ -38,8 +38,10 @@
       // Not logged in — save the code and redirect to login
       sessionStorage.setItem('kinnect_pending_contact', code);
       await crossfadeTo('login-required');
-      // Auto-redirect after a brief moment so user + screen reader see the message
-      setTimeout(() => push('/login'), 3000);
+      // Auto-redirect after a brief moment so user + screen reader see the
+      // message. Tracked so onDestroy can cancel it — a live timer after
+      // navigation yanked the router mid-mount on the next page.
+      redirectTimer = setTimeout(() => push('/login'), 3000);
       return;
     }
 
@@ -73,7 +75,7 @@
       haptics.confirm?.();
       cleanup();
       // Redirect to main app after showing success
-      setTimeout(() => push('/'), 2000);
+      redirectTimer = setTimeout(() => push('/'), 2000);
     };
 
     const onError = async (data) => {
@@ -125,7 +127,11 @@
   }
 
   let _cleanup = null;
-  onDestroy(() => { if (_cleanup) _cleanup(); });
+  let redirectTimer = null;
+  onDestroy(() => {
+    if (redirectTimer) clearTimeout(redirectTimer);
+    if (_cleanup) _cleanup();
+  });
 </script>
 
 <div class="add-contact-page">

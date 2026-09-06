@@ -427,7 +427,7 @@
   /* Safety button gets a subtle guardian tint when active */
   .nav-btn-safety.active {
     color: var(--accent-guardian);
-    background: rgba(139, 92, 246, 0.10);
+    background: color-mix(in oklch, var(--accent-guardian) 12%, transparent);
     box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   }
 

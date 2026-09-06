@@ -15,7 +15,7 @@
 
   // Headline animates per-WORD (not per-character) so line breaks can only
   // happen at word boundaries — never mid-word ("f / amily").
-  const headlineText = 'Keep your family close';
+  const headlineText = 'A quiet map for the people you love.';
   const headlineWords = headlineText.split(' ');
 
   let mode = $state('email');
@@ -218,7 +218,6 @@
           <path d="M7 7v6M7 10l3.5-3M7 10l3.5 3" stroke="rgba(255,255,255,0.90)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </div>
-      <div class="auth-brand-badge">Kinnect = Kin + Connect</div>
       <!-- Kinetic headline — word-atomic spans (never breaks mid-word) with a
            staggered spring entrance. Styles live in auth.css (.kinetic-word). -->
       <h1 class="auth-brand-h1" aria-label={headlineText}>
@@ -226,12 +225,11 @@
           <span class="kinetic-word" aria-hidden="true" style="animation-delay: {120 + i * 110}ms">{word}</span>
         {/each}
       </h1>
-      <p>Always know your family is safe. Real-time location sharing, built for families who care.</p>
+      <p>Kinnect shows your family as a few pebbles and tells you, in one honest sentence, whether everyone’s OK.</p>
       <ul class="auth-brand-features">
-        <li><span class="feature-check" aria-hidden="true"></span> See your family on a live map</li>
-        <li><span class="feature-check" aria-hidden="true"></span> One-tap SOS when you need help</li>
-        <li><span class="feature-check" aria-hidden="true"></span> Arrival alerts and safe zones</li>
-        <li><span class="feature-check" aria-hidden="true"></span> Works on every phone and browser</li>
+        <li><span class="feature-check" aria-hidden="true"></span> Only people you invite can see you</li>
+        <li><span class="feature-check" aria-hidden="true"></span> Hold-to-send SOS for real emergencies</li>
+        <li><span class="feature-check" aria-hidden="true"></span> No ads — and you can stop sharing anytime</li>
       </ul>
     </div>
   </div>
@@ -246,7 +244,7 @@
         </svg>
       </div>
       <span class="mobile-brand-name">Kinnect</span>
-      <span class="mobile-brand-tagline">Keep your family close</span>
+      <span class="mobile-brand-tagline">A quiet map for the people you love.</span>
       <!-- 24px micro-constellation — mobile users see the world too -->
       <div class="mobile-brand-cst fx-ambient">
         <Constellation mode="dormant" nodes={MICRO_NODES} links={MICRO_LINKS} />

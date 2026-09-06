@@ -271,7 +271,7 @@
   --accent-signal:   var(--primary-500);
   --accent-live:     #10b981;
   --accent-warm:     #f59e0b;
-  --accent-guardian: oklch(0.70 0.14 310); /* lavender-plum, off-brand-hue */
+  --accent-guardian: var(--member-2, oklch(0.55 0.12 320)); /* guardian role rides the member wheel's plum — in-palette, distinct from status colors */
   --accent-link:     var(--primary-300);
 
   /* ── Border Highlights ─────────────────────────────────────────────── */
@@ -2390,13 +2390,10 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
     radial-gradient(ellipse 60% 50% at 85% 70%,
       color-mix(in srgb, var(--primary-300) 8%, transparent) 0%, transparent 55%),
     var(--surface-0);
-  animation: aurora-drift 16s ease-in-out infinite alternate;
+  /* Static: this layer CARRIES the page background — animating its opacity
+     let the page's fallback color bleed through as a permanent grey veil on
+     light themes (and was an information-free infinite loop besides). */
   pointer-events: none;
-}
-@keyframes aurora-drift {
-  0%   { opacity: 0.7; }
-  50%  { opacity: 1; }
-  100% { opacity: 0.7; }
 }
 
 /* ── Enhanced Button Press ──────────────────────────────────────────────

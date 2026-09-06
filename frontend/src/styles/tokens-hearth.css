@@ -148,6 +148,10 @@
      "8 min · 1.2 km · 64%", sparse and aligned, not in a mono face. */
   --font-mono:    'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
 
+  /* Pages that predate Hearth read --bg-base for their page ground; without
+     a definition they fall back to VIGIL near-black hexes. */
+  --bg-base: var(--surface-0);
+
   /* Legacy accent aliases still referenced by a few components */
   --indigo-400: var(--primary-400);
   --indigo-500: var(--primary-500);
@@ -291,6 +295,7 @@
   --popup-text-label:   var(--ink-3);
 
   --grain-opacity: 0.05;
+  --bg-base: var(--surface-0);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

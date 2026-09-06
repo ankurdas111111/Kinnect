@@ -115,11 +115,8 @@
   background: var(--surface-3);
   border: 1px solid var(--border-subtle);
 }
-.ep-med-card--blood,
-.ep-med-card--allergy {
-  background: var(--danger-500-12);
-  border-color: var(--danger-500-20);
-}
+/* Blood/allergy share the neutral med-card shell — in Hearth, vermilion is
+   reserved for SOS; a red panel here read as an error state. */
 .ep-med-card-title {
   display: flex;
   align-items: center;
@@ -128,14 +125,7 @@
   font-weight: 600;
   color: var(--text-primary);
 }
-.ep-med-card--blood .ep-med-card-title,
-.ep-med-card--allergy .ep-med-card-title {
-  color: var(--danger-600);
-}
-[data-theme='dark'] .ep-med-card--blood .ep-med-card-title,
-[data-theme='dark'] .ep-med-card--allergy .ep-med-card-title {
-  color: var(--danger-400);
-}
+
 
 /* ── Blood type pill grid ─────────────────────────────────────────────────── */
 .ep-blood-grid {

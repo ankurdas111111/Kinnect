@@ -600,9 +600,23 @@
   }
 
   .settings-card-dimmed {
-    opacity: 0.45;
+    /* Disabled reads as muted, not fogged: explicit tokens keep every label
+       legible instead of compositing the whole card to sub-AA contrast. */
     pointer-events: none;
   }
+  .settings-card-dimmed :global(.pill-btn) {
+    background: var(--surface-inset);
+    color: var(--text-tertiary);
+    border-color: var(--border-subtle);
+    box-shadow: none;
+  }
+  .settings-card-dimmed :global(.pill-btn.pill-active) {
+    background: var(--surface-3);
+    color: var(--text-secondary);
+    border-color: var(--border-default);
+  }
+  .settings-card-dimmed .settings-label-block { color: var(--text-tertiary); }
+  .settings-card-dimmed .settings-label-block :global(*) { color: inherit; }
 
   .settings-label-block {
     display: flex;
