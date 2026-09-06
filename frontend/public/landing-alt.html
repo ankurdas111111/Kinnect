@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kinnect — a quiet map for the people you love</title>
+  <meta name="description" content="Kinnect shows your family as a few pebbles on a quiet map and tells you, in one sentence, whether everyone's OK. No feeds. No pings. No dashboard." />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@1&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* ── Token layer: the landing system re-tuned to Kinnect's Hearth brand ──
+       Canvas = warm paper, ink = warm near-black, one ember accent, sage for
+       "live". Cards stay white, pills stay glossy, CTAs stay tactile. */
+    :root {
+      --bg-page: #f7f4ee;
+      --bg-alt: #f1ede5;
+      --surface: #ffffff;
+      --text-strong: #2a231c;
+      --text-body: #4a423a;
+      --text-muted: #837a70;
+      --border-soft: rgba(42, 35, 28, 0.10);
+      --border-medium: rgba(42, 35, 28, 0.18);
+      --ember: #b0532c;
+      --ember-deep: #93441f;
+      --sage: #47795b;
+      --sage-bg: #e9f0e9;
+      --ochre: #a9761c;
+      --ochre-bg: #f7efdd;
+      --plum: #8d5a8f;
+      --plum-bg: #f3eaf3;
+      --ink-btn: #241d17;
+      --map-base: #f2eee6;
+      --map-street: #fdfcf9;
+      --map-park: #e4ecdd;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg-page);
+      color: var(--text-body);
+      font-family: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+    }
+    .font-editorial { font-family: "Instrument Serif", Georgia, serif; font-style: italic; font-weight: 400; }
+
+    /* Glossy pill — premium metadata chip */
+    .pill-gloss {
+      background: linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.45) 48%, rgba(229,223,212,0.20) 52%, rgba(229,223,212,0.55) 100%);
+      border: 1px solid rgba(255,255,255,0.75);
+      box-shadow: inset 0 2px 2px rgba(255,255,255,0.95), inset 0 -1px 2px rgba(42,35,28,0.06), 0 3px 0 #e4ded3, 0 6px 12px rgba(42,35,28,0.06);
+    }
+
+    /* Tactile hardware buttons */
+    .btn-3d-dark {
+      background: linear-gradient(180deg, #3d342b 0%, #2a231c 55%, #1d1712 100%);
+      box-shadow: inset 0 2px 2px rgba(255,255,255,0.22), inset 0 -2px 4px rgba(0,0,0,0.55), 0 5px 0 #14100c, 0 10px 18px rgba(20,16,12,0.22);
+      transition: transform 140ms cubic-bezier(0.2,0.8,0.2,1), box-shadow 140ms cubic-bezier(0.2,0.8,0.2,1);
+    }
+    .btn-3d-dark:hover { transform: translateY(2px); box-shadow: inset 0 2px 2px rgba(255,255,255,0.22), inset 0 -2px 4px rgba(0,0,0,0.55), 0 3px 0 #14100c, 0 6px 12px rgba(20,16,12,0.20); }
+    .btn-3d-ember {
+      background: linear-gradient(180deg, #c56339 0%, #b0532c 55%, #9a4523 100%);
+      box-shadow: inset 0 2px 2px rgba(255,255,255,0.30), inset 0 -2px 4px rgba(0,0,0,0.35), 0 5px 0 #7d3719, 0 10px 18px rgba(154,69,35,0.28);
+      transition: transform 140ms cubic-bezier(0.2,0.8,0.2,1), box-shadow 140ms cubic-bezier(0.2,0.8,0.2,1);
+    }
+    .btn-3d-ember:hover { transform: translateY(2px); box-shadow: inset 0 2px 2px rgba(255,255,255,0.30), inset 0 -2px 4px rgba(0,0,0,0.35), 0 3px 0 #7d3719, 0 6px 12px rgba(154,69,35,0.24); }
+    .btn-3d-light {
+      background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.55) 48%, rgba(226,220,209,0.20) 52%, rgba(226,220,209,0.50) 100%);
+      border: 1px solid rgba(255,255,255,0.8);
+      box-shadow: inset 0 2px 2px rgba(255,255,255,1), inset 0 -2px 4px rgba(42,35,28,0.08), 0 5px 0 #e0dacf, 0 10px 18px rgba(42,35,28,0.08);
+      transition: transform 140ms cubic-bezier(0.2,0.8,0.2,1), box-shadow 140ms cubic-bezier(0.2,0.8,0.2,1);
+    }
+    .btn-3d-light:hover { transform: translateY(2px); box-shadow: inset 0 2px 2px rgba(255,255,255,1), inset 0 -2px 4px rgba(42,35,28,0.08), 0 3px 0 #e0dacf, 0 6px 12px rgba(42,35,28,0.07); }
+
+    /* White card family */
+    .card-shell {
+      background: var(--surface);
+      border: 1px solid var(--border-soft);
+      border-radius: 24px;
+      box-shadow: 0 8px 32px rgba(42, 35, 28, 0.06);
+    }
+
+    /* Mini-map texture inside proof media */
+    .map-grid {
+      background:
+        linear-gradient(90deg, var(--map-street) 0 2px, transparent 2px) 18px 0 / 88px 100%,
+        linear-gradient(0deg, var(--map-street) 0 2px, transparent 2px) 0 12px / 100% 74px,
+        linear-gradient(90deg, var(--map-street) 0 1px, transparent 1px) 6px 0 / 22px 100%,
+        linear-gradient(0deg, var(--map-street) 0 1px, transparent 1px) 0 5px / 100% 19px,
+        var(--map-base);
+    }
+    .pebble {
+      box-shadow: 0 0 0 2px var(--sage), 0 2px 8px rgba(42,35,28,0.28);
+      border: 2.5px solid #fff;
+    }
+    .focus-ring:focus-visible { outline: 2px solid var(--ember); outline-offset: 3px; }
+  </style>
+</head>
+<body class="antialiased">
+
+  <!-- ═══ Sticky header ═══ -->
+  <header class="sticky top-0 z-50 border-b" style="background: rgba(247,244,238,0.85); backdrop-filter: blur(14px); border-color: var(--border-soft);">
+    <div class="max-w-[1200px] mx-auto px-6 md:px-8 h-16 flex items-center justify-between gap-6">
+      <a href="#top" class="font-editorial text-2xl focus-ring rounded" style="color: var(--text-strong);">Kinnect</a>
+      <nav class="hidden md:flex items-center gap-8 text-sm font-medium" aria-label="Page">
+        <a href="#quiet" class="hover:opacity-70 focus-ring rounded" style="color: var(--text-body);">Why quiet</a>
+        <a href="#setup" class="hover:opacity-70 focus-ring rounded" style="color: var(--text-body);">Getting set up</a>
+        <a href="#day" class="hover:opacity-70 focus-ring rounded" style="color: var(--text-body);">One Tuesday</a>
+        <a href="#faq" class="hover:opacity-70 focus-ring rounded" style="color: var(--text-body);">Questions</a>
+      </nav>
+      <div class="flex items-center gap-3">
+        <a href="/#/login" class="hidden sm:inline-flex text-sm font-semibold hover:opacity-70 focus-ring rounded px-2 py-2" style="color: var(--text-strong);">Sign in</a>
+        <a href="/#/register" class="btn-3d-dark focus-ring inline-flex items-center rounded-xl px-5 py-2.5 text-sm font-semibold text-white">Create your family</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="top">
+
+    <!-- ═══ Hero: promise left, proof media right ═══ -->
+    <section id="hero" class="px-6 md:px-8 pt-16 md:pt-24 pb-20 md:pb-28">
+      <div class="max-w-[1200px] mx-auto grid lg:grid-cols-[1.05fr_0.95fr] gap-14 lg:gap-10 items-center">
+        <div>
+          <div class="pill-gloss inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold tracking-wide" style="color: var(--text-strong);">
+            <span class="w-2 h-2 rounded-full" style="background: var(--sage);"></span>
+            Family location sharing, without the noise
+          </div>
+          <h1 class="mt-6 text-5xl md:text-6xl xl:text-7xl font-bold leading-[1.06] tracking-tight" style="color: var(--text-strong);">
+            Know everyone's OK<br />
+            <span class="font-editorial font-normal">in one glance.</span>
+          </h1>
+          <p class="mt-6 text-lg leading-relaxed max-w-xl" style="color: var(--text-body);">
+            Kinnect shows your family as a few pebbles on a quiet map and tells you,
+            in one honest sentence, whether everyone's where they should be.
+            No feeds. No pings. No dashboard to babysit.
+          </p>
+          <div class="mt-9 flex flex-wrap items-center gap-4">
+            <a href="/#/register" class="btn-3d-ember focus-ring inline-flex items-center justify-center rounded-xl px-8 py-4 text-base font-semibold text-white">Create your family — free</a>
+            <a href="#day" class="btn-3d-light focus-ring inline-flex items-center justify-center rounded-xl px-7 py-4 text-base font-semibold" style="color: var(--text-strong);">See one family's Tuesday</a>
+          </div>
+          <ul class="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm" style="color: var(--text-muted);">
+            <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full" style="background: var(--sage);"></span>Invite-only visibility</li>
+            <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full" style="background: var(--sage);"></span>No ads, ever</li>
+            <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full" style="background: var(--sage);"></span>Stop sharing anytime</li>
+          </ul>
+        </div>
+
+        <!-- Proof media: the product, honestly, in miniature -->
+        <figure class="card-shell overflow-hidden rotate-[1.5deg] max-w-[480px] w-full mx-auto lg:mx-0 lg:justify-self-end" aria-label="A settled evening in Kinnect: the family verdict and three pebbles on the quiet map">
+          <figcaption class="flex items-center gap-3 px-5 py-4 border-b" style="border-color: var(--border-soft);">
+            <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background: var(--sage);"></span>
+            <span class="font-editorial text-xl truncate" style="color: var(--text-strong);">Everyone's settled.</span>
+            <span class="ml-auto text-xs font-semibold tabular-nums" style="color: var(--text-muted);">19:30</span>
+          </figcaption>
+          <div class="map-grid relative h-[300px]" role="img" aria-hidden="true">
+            <svg viewBox="0 0 480 300" class="absolute inset-0 w-full h-full">
+              <path d="M -20 96 C 26 66, 96 56, 138 74 C 172 89, 176 122, 152 142 C 124 165, 62 170, 22 152 C -8 138, -14 116, -20 96 Z" fill="var(--map-park)" stroke="rgba(42,35,28,0.08)" stroke-width="1.5"/>
+              <path d="M -10 262 C 120 240, 260 258, 360 224 C 428 202, 462 168, 496 140" fill="none" stroke="var(--map-street)" stroke-width="11" stroke-linecap="round"/>
+              <path d="M 236 -10 C 244 80, 232 170, 246 310" fill="none" stroke="var(--map-street)" stroke-width="9" stroke-linecap="round"/>
+              <polyline points="88,268 88,206 196,206 196,158" fill="none" stroke="var(--plum)" stroke-width="3" stroke-linecap="round" stroke-dasharray="1 8" opacity="0.9"/>
+            </svg>
+            <span class="absolute text-[10px] font-semibold px-2 py-0.5 rounded-full" style="left: 322px; top: 96px; color: var(--text-muted); background: rgba(255,255,255,0.8);">Home</span>
+            <span class="absolute text-[10px] font-semibold px-2 py-0.5 rounded-full" style="left: 58px; top: 272px; color: var(--text-muted); background: rgba(255,255,255,0.8);">School</span>
+            <div class="pebble absolute w-8 h-8 -ml-4 -mt-4 rounded-full grid place-items-center text-[11px] font-bold text-white" style="left: 296px; top: 128px; background: var(--ember);">P</div>
+            <div class="pebble absolute w-8 h-8 -ml-4 -mt-4 rounded-full grid place-items-center text-[11px] font-bold text-white" style="left: 330px; top: 156px; background: #4a7ba6;">A</div>
+            <div class="pebble absolute w-8 h-8 -ml-4 -mt-4 rounded-full grid place-items-center text-[11px] font-bold text-white" style="left: 196px; top: 158px; background: var(--plum);">M</div>
+            <span class="absolute text-[10.5px] font-semibold px-2.5 py-1 rounded-full bg-white border" style="left: 196px; top: 178px; transform: translateX(-50%); color: var(--text-strong); border-color: var(--border-soft); box-shadow: 0 1px 2px rgba(42,35,28,0.14);">Meera · heading home</span>
+          </div>
+        </figure>
+      </div>
+    </section>
+
+    <!-- ═══ Trust band — commitments you can verify, not logos ═══ -->
+    <section id="trust" class="px-6 md:px-8 py-10" style="background: var(--bg-alt);">
+      <div class="max-w-[1200px] mx-auto">
+        <ul class="grid sm:grid-cols-3 gap-4 text-center">
+          <li class="text-sm font-medium" style="color: var(--text-body);"><strong class="block text-base" style="color: var(--text-strong);">Only people you invite</strong> can ever see anyone — there is no public anything.</li>
+          <li class="text-sm font-medium" style="color: var(--text-body);"><strong class="block text-base" style="color: var(--text-strong);">No ads, no data resale</strong> — your family's movements are not a product.</li>
+          <li class="text-sm font-medium" style="color: var(--text-body);"><strong class="block text-base" style="color: var(--text-strong);">Sharing is yours to stop</strong> — pause or leave in two taps, no dark patterns.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ═══ Why quiet: the three things Kinnect gives you ═══ -->
+    <section id="quiet" class="px-6 md:px-8 py-24 md:py-32">
+      <div class="max-w-[1200px] mx-auto">
+        <header class="max-w-2xl mx-auto text-center">
+          <p class="text-xs font-bold uppercase tracking-[0.14em]" style="color: var(--ember);">Why quiet</p>
+          <h2 class="mt-3 text-3xl md:text-5xl font-bold tracking-tight leading-tight" style="color: var(--text-strong);">
+            Trackers shout. <span class="font-editorial font-normal">A family just needs to know.</span>
+          </h2>
+          <p class="mt-4 text-lg" style="color: var(--text-body);">
+            Location apps became surveillance feeds — alerts for every door, speed
+            charts, guilt. Kinnect keeps the one promise that matters and deletes the rest.
+          </p>
+        </header>
+        <div class="mt-14 grid md:grid-cols-3 gap-6">
+          <article class="card-shell p-8">
+            <div class="h-24 flex items-center">
+              <p class="font-editorial text-2xl" style="color: var(--text-strong);">"Everyone's settled."</p>
+            </div>
+            <h3 class="text-lg font-bold" style="color: var(--text-strong);">One honest sentence</h3>
+            <p class="mt-2 text-sm leading-relaxed" style="color: var(--text-body);">
+              The whole family's day, judged for you: settled, moving, or needs a look.
+              When there's nothing to say, Kinnect says nothing — that's the point.
+            </p>
+          </article>
+          <article class="card-shell p-8">
+            <div class="h-24 flex items-center gap-2">
+              <span class="pebble w-9 h-9 rounded-full grid place-items-center text-xs font-bold text-white" style="background: var(--ember);">P</span>
+              <span class="pebble w-9 h-9 rounded-full grid place-items-center text-xs font-bold text-white" style="background: #4a7ba6;">A</span>
+              <span class="pebble w-9 h-9 rounded-full grid place-items-center text-xs font-bold text-white" style="background: var(--plum);">M</span>
+              <span class="pebble w-9 h-9 rounded-full grid place-items-center text-xs font-bold" style="background: #cdc5b8; color: var(--text-strong);">N</span>
+            </div>
+            <h3 class="text-lg font-bold" style="color: var(--text-strong);">Pebbles, not blips</h3>
+            <p class="mt-2 text-sm leading-relaxed" style="color: var(--text-body);">
+              People, not coordinates. A warm map with your places on it — home, school,
+              tuition — and a plain word for what each person is doing: home, driving, quiet.
+            </p>
+          </article>
+          <article class="card-shell p-8">
+            <div class="h-24 flex items-center">
+              <span class="relative inline-grid place-items-center w-14 h-14 rounded-full text-white text-xs font-bold" style="background: #b23a31;">
+                SOS
+                <span class="absolute inset-[-9px] rounded-full" style="background: rgba(178,58,49,0.14);"></span>
+              </span>
+            </div>
+            <h3 class="text-lg font-bold" style="color: var(--text-strong);">Hold-to-send SOS</h3>
+            <p class="mt-2 text-sm leading-relaxed" style="color: var(--text-body);">
+              For the one evening in a thousand: press and hold, or tap and confirm.
+              One sentence lands on every phone with a live trail — until it's resolved.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ Process: three phases, phase-accent colors ═══ -->
+    <section id="setup" class="px-6 md:px-8 py-24 md:py-32" style="background: var(--bg-alt);">
+      <div class="max-w-[1200px] mx-auto">
+        <header class="max-w-2xl mx-auto text-center">
+          <p class="text-xs font-bold uppercase tracking-[0.14em]" style="color: var(--ember);">Getting set up</p>
+          <h2 class="mt-3 text-3xl md:text-5xl font-bold tracking-tight leading-tight" style="color: var(--text-strong);">
+            Three minutes, <span class="font-editorial font-normal">start to settled.</span>
+          </h2>
+        </header>
+        <div class="mt-14 grid md:grid-cols-3 gap-6">
+          <article class="card-shell p-8">
+            <span class="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-bold" style="background: var(--sage-bg); color: var(--sage);">Step 1</span>
+            <h3 class="mt-4 text-lg font-bold" style="color: var(--text-strong);">Name your family</h3>
+            <p class="mt-2 text-sm leading-relaxed" style="color: var(--text-body);">
+              "The Sharmas", "Home" — whatever feels right. That name sits at the top
+              of the map for everyone in it.
+            </p>
+            <div class="mt-6 rounded-xl px-4 py-3 text-sm font-medium" style="background: var(--sage-bg); color: var(--text-strong);">The Nairs&nbsp;<span style="color: var(--text-muted);">— your quiet map</span></div>
+          </article>
+          <article class="card-shell p-8">
+            <span class="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-bold" style="background: var(--ochre-bg); color: var(--ochre);">Step 2</span>
+            <h3 class="mt-4 text-lg font-bold" style="color: var(--text-strong);">Invite your people</h3>
+            <p class="mt-2 text-sm leading-relaxed" style="color: var(--text-body);">
+              A six-letter code or a QR — over WhatsApp, over the dinner table. The moment
+              someone joins, the map says so and glides to their pebble.
+            </p>
+            <div class="mt-6 rounded-xl px-4 py-3 text-sm font-semibold tracking-[0.2em] text-center" style="background: var(--ochre-bg); color: var(--text-strong);">EY4N6S</div>
+          </article>
+          <article class="card-shell p-8">
+            <span class="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-bold" style="background: var(--plum-bg); color: var(--plum);">Step 3</span>
+            <h3 class="mt-4 text-lg font-bold" style="color: var(--text-strong);">Turn on sharing — and forget it</h3>
+            <p class="mt-2 text-sm leading-relaxed" style="color: var(--text-body);">
+              From then on the sentence does the work. Open the app when you wonder;
+              it answers before the map has even finished loading.
+            </p>
+            <div class="mt-6 rounded-xl px-4 py-3 text-sm font-medium flex items-center gap-2" style="background: var(--plum-bg); color: var(--text-strong);"><span class="w-2 h-2 rounded-full" style="background: var(--sage);"></span>Sharing live · updated just now</div>
+          </article>
+        </div>
+        <div class="mt-12 text-center">
+          <a href="/#/register" class="btn-3d-ember focus-ring inline-flex items-center justify-center rounded-xl px-8 py-4 text-base font-semibold text-white">Create your family — free</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ Proof (story-led): one Tuesday, honestly told ═══ -->
+    <section id="day" class="px-6 md:px-8 py-24 md:py-32">
+      <div class="max-w-[1200px] mx-auto">
+        <header class="max-w-2xl mx-auto text-center">
+          <p class="text-xs font-bold uppercase tracking-[0.14em]" style="color: var(--ember);">One Tuesday</p>
+          <h2 class="mt-3 text-3xl md:text-5xl font-bold tracking-tight leading-tight" style="color: var(--text-strong);">
+            A whole day, <span class="font-editorial font-normal">four sentences.</span>
+          </h2>
+          <p class="mt-4 text-lg" style="color: var(--text-body);">
+            This is everything Kinnect said to the Nair family in fourteen hours.
+            Every other minute, it stayed out of the way.
+          </p>
+        </header>
+        <div class="mt-14 grid md:grid-cols-2 xl:grid-cols-4 gap-6">
+          <article class="card-shell p-7">
+            <p class="text-xs font-bold tabular-nums tracking-[0.12em]" style="color: var(--text-muted);">07:40</p>
+            <p class="mt-3 font-editorial text-2xl leading-snug" style="color: var(--text-strong);">Meera leaves for school.</p>
+            <p class="mt-3 text-sm leading-relaxed" style="color: var(--text-body);">A moving pebble and a time — fourteen minutes — not a speed, not a coordinate.</p>
+          </article>
+          <article class="card-shell p-7">
+            <p class="text-xs font-bold tabular-nums tracking-[0.12em]" style="color: var(--text-muted);">12:30</p>
+            <p class="mt-3 font-editorial text-2xl leading-snug" style="color: var(--text-strong);">Nothing to report.</p>
+            <p class="mt-3 text-sm leading-relaxed" style="color: var(--text-body);">Everyone's where they should be, so Kinnect says nothing at all.</p>
+          </article>
+          <article class="card-shell p-7" style="border-color: rgba(169,118,28,0.35);">
+            <p class="text-xs font-bold tabular-nums tracking-[0.12em]" style="color: var(--ochre);">16:40</p>
+            <p class="mt-3 font-editorial text-2xl leading-snug" style="color: var(--text-strong);">Nani's phone goes quiet.</p>
+            <p class="mt-3 text-sm leading-relaxed" style="color: var(--text-body);">Not an alarm — the page just warms. A call settles it: she was napping.</p>
+          </article>
+          <article class="card-shell p-7" style="border-color: rgba(178,58,49,0.35);">
+            <p class="text-xs font-bold tabular-nums tracking-[0.12em]" style="color: #b23a31;">18:52</p>
+            <p class="mt-3 font-editorial text-2xl leading-snug" style="color: var(--text-strong);">Meera holds SOS.</p>
+            <p class="mt-3 text-sm leading-relaxed" style="color: var(--text-body);">One sentence on every phone. Arjun is nine minutes away — and already moving. By 19:04, she's safe.</p>
+          </article>
+        </div>
+        <p class="mt-10 text-center text-sm" style="color: var(--text-muted);">
+          Want it with the map, the pebbles, and the scroll?
+          <a href="/#/landing" class="font-semibold underline underline-offset-4 focus-ring rounded" style="color: var(--ember);">Walk the full story</a>
+        </p>
+      </div>
+    </section>
+
+    <!-- ═══ Comparison: the noisy tracker vs Kinnect ═══ -->
+    <section id="compare" class="px-6 md:px-8 py-24 md:py-32" style="background: var(--bg-alt);">
+      <div class="max-w-[1000px] mx-auto">
+        <header class="max-w-2xl mx-auto text-center">
+          <p class="text-xs font-bold uppercase tracking-[0.14em]" style="color: var(--ember);">The difference</p>
+          <h2 class="mt-3 text-3xl md:text-5xl font-bold tracking-tight leading-tight" style="color: var(--text-strong);">
+            Watching over <span class="font-editorial font-normal">isn't watching.</span>
+          </h2>
+        </header>
+        <div class="mt-14 card-shell overflow-hidden">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b" style="border-color: var(--border-soft);">
+                <th scope="col" class="text-left font-semibold px-6 py-4 w-[38%]" style="color: var(--text-muted);">When you wonder…</th>
+                <th scope="col" class="text-left font-semibold px-6 py-4" style="color: var(--text-muted);">The noisy tracker</th>
+                <th scope="col" class="text-left font-bold px-6 py-4" style="color: var(--ember); background: rgba(176,83,44,0.06);">Kinnect</th>
+              </tr>
+            </thead>
+            <tbody style="color: var(--text-body);">
+              <tr class="border-b" style="border-color: var(--border-soft);">
+                <th scope="row" class="text-left px-6 py-4 font-medium" style="color: var(--text-strong);">"Is everyone OK?"</th>
+                <td class="px-6 py-4">A feed of alerts to scroll and decode</td>
+                <td class="px-6 py-4 font-medium" style="background: rgba(176,83,44,0.06); color: var(--text-strong);">One sentence, answered before you ask</td>
+              </tr>
+              <tr class="border-b" style="border-color: var(--border-soft);">
+                <th scope="row" class="text-left px-6 py-4 font-medium" style="color: var(--text-strong);">"Where's Meera?"</th>
+                <td class="px-6 py-4">Speed, battery %, coordinates, guilt</td>
+                <td class="px-6 py-4 font-medium" style="background: rgba(176,83,44,0.06); color: var(--text-strong);">"Walking home — about 15 minutes"</td>
+              </tr>
+              <tr class="border-b" style="border-color: var(--border-soft);">
+                <th scope="row" class="text-left px-6 py-4 font-medium" style="color: var(--text-strong);">A quiet afternoon</th>
+                <td class="px-6 py-4">"Left home" · "Arrived" · "Left again"</td>
+                <td class="px-6 py-4 font-medium" style="background: rgba(176,83,44,0.06); color: var(--text-strong);">Silence — nothing needed saying</td>
+              </tr>
+              <tr>
+                <th scope="row" class="text-left px-6 py-4 font-medium" style="color: var(--text-strong);">A real emergency</th>
+                <td class="px-6 py-4">Buried in the same alert noise</td>
+                <td class="px-6 py-4 font-medium" style="background: rgba(176,83,44,0.06); color: var(--text-strong);">Hold-to-send SOS on every phone, unmissable</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-10 text-center">
+          <a href="/#/register" class="btn-3d-ember focus-ring inline-flex items-center justify-center rounded-xl px-8 py-4 text-base font-semibold text-white">Create your family — free</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ FAQ ═══ -->
+    <section id="faq" class="px-6 md:px-8 py-24 md:py-32">
+      <div class="max-w-[820px] mx-auto">
+        <header class="text-center">
+          <p class="text-xs font-bold uppercase tracking-[0.14em]" style="color: var(--ember);">Questions</p>
+          <h2 class="mt-3 text-3xl md:text-5xl font-bold tracking-tight leading-tight" style="color: var(--text-strong);">
+            Asked by every family <span class="font-editorial font-normal">we'd want to join.</span>
+          </h2>
+        </header>
+        <div class="mt-12 space-y-4">
+          <article class="card-shell">
+            <button class="faq-q focus-ring w-full flex items-center justify-between gap-4 px-7 py-5 text-left text-base font-semibold" style="color: var(--text-strong);" aria-expanded="true">
+              Who can see where I am?
+              <span class="faq-icon text-xl leading-none select-none" aria-hidden="true">−</span>
+            </button>
+            <div class="faq-a px-7 pb-6 text-sm leading-relaxed" style="color: var(--text-body);">
+              Only the people you've invited into your family, plus anyone you hand a
+              live link — and those expire on the schedule you pick. There are no public
+              profiles, no discovery, no "nearby" anything.
+            </div>
+          </article>
+          <article class="card-shell">
+            <button class="faq-q focus-ring w-full flex items-center justify-between gap-4 px-7 py-5 text-left text-base font-semibold" style="color: var(--text-strong);" aria-expanded="false">
+              Can I stop sharing when I want to?
+              <span class="faq-icon text-xl leading-none select-none" aria-hidden="true">+</span>
+            </button>
+            <div class="faq-a px-7 pb-6 text-sm leading-relaxed hidden" style="color: var(--text-body);">
+              Yes — two taps, no interrogation. Your family sees "not sharing right now"
+              with when you last shared, and nothing else. Privacy pauses are a feature,
+              not a loophole.
+            </div>
+          </article>
+          <article class="card-shell">
+            <button class="faq-q focus-ring w-full flex items-center justify-between gap-4 px-7 py-5 text-left text-base font-semibold" style="color: var(--text-strong);" aria-expanded="false">
+              Is this going to feel like spying on my teenager?
+              <span class="faq-icon text-xl leading-none select-none" aria-hidden="true">+</span>
+            </button>
+            <div class="faq-a px-7 pb-6 text-sm leading-relaxed hidden" style="color: var(--text-body);">
+              That's the app we refused to build. No speed reports, no history replays
+              shoved in your face, no "left school 4 minutes early" alerts. A pebble, a
+              plain word, and an SOS she controls — most days you'll simply see "settled."
+            </div>
+          </article>
+          <article class="card-shell">
+            <button class="faq-q focus-ring w-full flex items-center justify-between gap-4 px-7 py-5 text-left text-base font-semibold" style="color: var(--text-strong);" aria-expanded="false">
+              What happens in an emergency?
+              <span class="faq-icon text-xl leading-none select-none" aria-hidden="true">+</span>
+            </button>
+            <div class="faq-a px-7 pb-6 text-sm leading-relaxed hidden" style="color: var(--text-body);">
+              Press and hold SOS — or tap and confirm, both always work. One sentence
+              lands on every family phone with a live trail and stays until someone marks
+              it resolved. Quiet the rest of the year, unmissable the moment it matters.
+            </div>
+          </article>
+          <article class="card-shell">
+            <button class="faq-q focus-ring w-full flex items-center justify-between gap-4 px-7 py-5 text-left text-base font-semibold" style="color: var(--text-strong);" aria-expanded="false">
+              How much does it cost?
+              <span class="faq-icon text-xl leading-none select-none" aria-hidden="true">+</span>
+            </button>
+            <div class="faq-a px-7 pb-6 text-sm leading-relaxed hidden" style="color: var(--text-body);">
+              Creating your family is free, and there are no ads and no selling of your
+              data — your family's movements are not a product. If that ever changes,
+              it will be said in plain words before it does.
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ Close ═══ -->
+    <section id="close" class="px-6 md:px-8 pb-28 pt-4">
+      <div class="max-w-[1200px] mx-auto card-shell px-8 py-16 md:py-20 text-center" style="border-radius: 32px;">
+        <p class="font-editorial text-3xl md:text-5xl" style="color: var(--text-strong);">Everyone's settled.</p>
+        <p class="mt-4 text-lg max-w-xl mx-auto" style="color: var(--text-body);">
+          That's the sentence you're actually looking for. Set it up tonight —
+          your family can be on the map before dinner's done.
+        </p>
+        <div class="mt-9 flex flex-wrap justify-center gap-4">
+          <a href="/#/register" class="btn-3d-ember focus-ring inline-flex items-center justify-center rounded-xl px-8 py-4 text-base font-semibold text-white">Create your family — free</a>
+          <a href="/#/login" class="btn-3d-light focus-ring inline-flex items-center justify-center rounded-xl px-7 py-4 text-base font-semibold" style="color: var(--text-strong);">Sign in</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ═══ Footer ═══ -->
+  <footer class="px-6 md:px-8 pb-12">
+    <div class="max-w-[1200px] mx-auto pt-8 border-t flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm" style="border-color: var(--border-soft); color: var(--text-muted);">
+      <span class="font-editorial text-base" style="color: var(--text-strong);">Kinnect</span>
+      <span>Privacy-first</span>
+      <span>No ads, ever</span>
+      <span>Bengaluru</span>
+      <a href="/#/landing" class="underline underline-offset-4 hover:opacity-70 focus-ring rounded">The story version</a>
+    </div>
+  </footer>
+
+  <script>
+    // FAQ accordion — one open at a time, ARIA kept in sync.
+    document.querySelectorAll('.faq-q').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const open = btn.getAttribute('aria-expanded') === 'true';
+        document.querySelectorAll('.faq-q').forEach((b) => {
+          b.setAttribute('aria-expanded', 'false');
+          b.querySelector('.faq-icon').textContent = '+';
+          b.parentElement.querySelector('.faq-a').classList.add('hidden');
+        });
+        if (!open) {
+          btn.setAttribute('aria-expanded', 'true');
+          btn.querySelector('.faq-icon').textContent = '−';
+          btn.parentElement.querySelector('.faq-a').classList.remove('hidden');
+        }
+      });
+    });
+  </script>
+</body>
+</html>
