@@ -292,13 +292,22 @@
           </div>
           <div class="live-header">
             <span class="rec-dot animate-rec-blink" aria-hidden="true"></span>
-            <h2>{sharedBy !== 'User' ? `${sharedBy}'s Live Location` : 'Live Location'}</h2>
+            <span class="live-badge-word">Live</span>
           </div>
-          <p class="text-sm text-muted" style="margin-bottom:var(--space-4);">You were invited to watch. Treat this with care.</p>
-          <p class="text-sm text-muted" style="margin-bottom:var(--space-4);">Enter your name to start viewing</p>
-          <input class="input input-lg" placeholder="Your name" bind:value={viewerName} onkeydown={e => e.key === 'Enter' && startViewing()} />
-          <button class="btn btn-primary btn-lg" style="width:100%;margin-top:var(--space-3);" onclick={startViewing}>Start Viewing</button>
-          <p class="text-sm text-muted" style="margin-top:var(--space-3);">Want your own account? <a href="/#/register">Sign up</a> or <a href="/#/login">Log in</a></p>
+          <!-- Hearth 05b: one sentence, one field. Plain words, no jargon. -->
+          <h2 class="gate-headline verdict-voice">
+            {sharedBy !== 'User' ? `${sharedBy} is sharing their live location with you.` : 'Someone is sharing their live location with you.'}
+          </h2>
+          <p class="gate-sub">
+            {sharedBy !== 'User' ? `${sharedBy} will see that you're watching` : "They'll see that you're watching"}, and this link stops on its own.
+          </p>
+          <label class="gate-label" for="lv-viewer-name">
+            Your name — so {sharedBy !== 'User' ? sharedBy : 'they'} know{sharedBy !== 'User' ? 's' : ''} it's you
+          </label>
+          <input id="lv-viewer-name" class="input input-lg" placeholder="Your name" bind:value={viewerName} onkeydown={e => e.key === 'Enter' && startViewing()} />
+          <button class="btn btn-primary btn-lg" style="width:100%;margin-top:var(--space-3);" onclick={startViewing}>Start watching</button>
+          <p class="gate-foot">Nothing is stored. Closing this page stops watching.</p>
+          <p class="text-sm text-muted" style="margin-top:var(--space-2);">Want your own account? <a href="/#/register">Sign up</a> or <a href="/#/login">Log in</a></p>
         </div>
       </div>
     {/if}
@@ -520,6 +529,40 @@
     .sos-dock {
       animation: none;
     }
+  }
+
+  /* ── Hearth 05b: the name gate speaks in one sentence ─────────────────── */
+  .live-badge-word {
+    font-size: var(--text-xs);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--success-500);
+  }
+  .gate-headline {
+    margin: var(--space-3) 0 var(--space-2);
+    font-size: var(--text-xl);
+    line-height: 1.25;
+    color: var(--text-primary);
+  }
+  .gate-sub {
+    margin: 0 0 var(--space-5);
+    font-size: var(--text-sm);
+    line-height: 1.55;
+    color: var(--text-secondary);
+  }
+  .gate-label {
+    display: block;
+    margin-bottom: var(--space-2);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--text-tertiary);
+    text-align: left;
+  }
+  .gate-foot {
+    margin: var(--space-3) 0 0;
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
   }
 
   /* ── Member popup ────────────────────────────────────────────────────────

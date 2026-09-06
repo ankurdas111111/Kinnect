@@ -197,6 +197,11 @@ func (h *Hub) parseExpiresIn(exp string) *int64 {
 		ms = 60 * 60 * 1000
 	case "6h":
 		ms = 6 * 60 * 60 * 1000
+	case "8h":
+		// Hearth 05a offers a plain-words "8 hours" option. Without this case
+		// it fell through to default → nil → a link that never expires, which
+		// contradicts the sheet's promise that sharing "ends on its own".
+		ms = 8 * 60 * 60 * 1000
 	case "24h":
 		ms = 24 * 60 * 60 * 1000
 	case "48h":

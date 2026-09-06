@@ -363,9 +363,17 @@
           {#if $myLiveLinks.length > 0}<span class="section-badge section-badge-live">{$myLiveLinks.length}</span>{/if}
         {/snippet}
       </SectionHeader>
+      <!-- Hearth 05a: duration first, in plain words, then who's watching.
+           "∞" is gone deliberately — a link that never ends contradicts
+           "it ends on its own", which is the promise the sheet makes. -->
+      <p class="live-link-blurb">
+        A private link anyone can open — no account needed. You'll always see
+        who's watching, and it ends on its own.
+      </p>
       <div class="live-link-toolbar">
-        <div class="duration-pills" role="group" aria-label="Broadcast duration">
-          {#each [['1h','1h'],['6h','6h'],['24h','24h'],['48h','48h'],['forever','∞']] as [val, label]}
+        <span class="duration-label" id="live-duration-label">For how long</span>
+        <div class="duration-pills" role="group" aria-labelledby="live-duration-label">
+          {#each [['1h','1 hour'],['6h','Until I arrive'],['8h','8 hours']] as [val, label]}
             <button
               class="pill-btn"
               class:pill-active={selectedLinkDuration === val}
@@ -374,7 +382,7 @@
             >{label}</button>
           {/each}
         </div>
-        <button class="btn btn-primary btn-sm tactile" onclick={generateLiveLink}>Share Live Location</button>
+        <button class="btn btn-primary btn-sm tactile" onclick={generateLiveLink}>Share your live location</button>
       </div>
 
       {#if $myLiveLinks.length === 0}
@@ -555,6 +563,21 @@
     width: 100%;
   }
   .live-link-toolbar .btn { width: 100%; }
+  .live-link-blurb {
+    margin: 0 0 var(--space-3);
+    font-size: var(--text-sm);
+    line-height: 1.5;
+    color: var(--text-secondary);
+  }
+  .duration-label {
+    display: block;
+    margin-bottom: var(--space-2);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+  }
   .duration-pills {
     display: flex;
     gap: var(--space-1);
