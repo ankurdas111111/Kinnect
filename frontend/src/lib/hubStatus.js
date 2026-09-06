@@ -20,6 +20,10 @@ import { formatAge } from './presence.js';
 export const FRESH_MS = 30_000;       // < 30s  → fresh   (live green)
 export const AGING_MS = 5 * 60_000;   // < 5m   → aging   (amber)
 export const STALE_MS = 30 * 60_000;  // < 30m  → stale   (muted)
+/** Above this a member counts as actually moving, not GPS drift. km/h — the
+ *  unit MainApp emits. Was `> 1` against a value documented as m/s, so a
+ *  stationary phone jittering at 2 km/h read as "on the move". */
+export const MOVING_KMH = 3.6;
                                       // ≥ 30m  → silent  (needs attention if online)
 
 /**
@@ -45,7 +49,10 @@ export function normMember(u) {
     socketId: u.socketId,
     displayName: u.displayName || 'Unknown',
     online: u.online !== false, // default online unless explicitly false
-    speed: u.speed || 0,        // m/s
+    // km/h — MainApp emits an already-converted, Kalman-filtered km/h value
+    // (see applyFix: rawKmh = rawSpeed * 3.6). This was documented as m/s,
+    // which made the "moving" threshold below fire ~3.6x too eagerly.
+    speed: u.speed || 0,
     lat, lng, lastUpdate, sosActive,
     batteryPct: u.batteryPct ?? null,
   };
@@ -78,8 +85,65 @@ export function presenceOf(m, now) {
   if (m.sosActive) return 'sos';
   if (!m.online) return 'offline';
   if (freshness(m.lastUpdate, now) === 'silent') return 'silent';
-  if (m.speed > 1) return 'moving'; // > 1 m/s ≈ 3.6 km/h → actually moving
+  if (m.speed > MOVING_KMH) return 'moving';
   return 'settled';
+}
+
+/**
+ * Human "when" phrasing — Hearth principle 4: "just now", "8 min ago",
+ * "quiet since 4:40" replace 6:42:11 PM and ±12 m.
+ * @param {number|null} lastUpdate unix ms
+ * @param {number} now unix ms
+ * @returns {string}
+ */
+export function fmtWhen(lastUpdate, now) {
+  if (!lastUpdate) return '';
+  const sec = Math.max(0, Math.round((now - lastUpdate) / 1000));
+  if (sec < 45) return 'just now';
+  const min = Math.round(sec / 60);
+  if (min < 60) return `${min} min ago`;
+  // Past an hour the clock time reads better than "97 min ago".
+  return `since ${new Date(lastUpdate).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+}
+
+/**
+ * One honest sentence about ONE member — the person card's headline
+ * (Hearth 02b: "Driving home — about 8 minutes away."). Same rules ladder as
+ * computeVerdict, scoped to a single person. Pure compute.
+ *
+ * @param {ReturnType<normMember>} m
+ * @param {number} now unix ms
+ * @param {{ placeName?: string, etaSeconds?: number|null }} [arrival]
+ * @returns {{ tone:'safe'|'caution'|'alert', sentence:string }}
+ */
+export function memberSentence(m, now, arrival = null) {
+  if (!m) return { tone: 'safe', sentence: '' };
+  const first = (m.displayName || 'They').trim().split(/\s+/)[0];
+
+  if (m.sosActive) return { tone: 'alert', sentence: `${first} needs help.` };
+
+  if (!m.online) {
+    const when = fmtWhen(m.lastUpdate, now);
+    return { tone: 'caution', sentence: when ? `Offline — last seen ${when}.` : 'Offline right now.' };
+  }
+
+  if (freshness(m.lastUpdate, now) === 'silent') {
+    const when = fmtWhen(m.lastUpdate, now);
+    return { tone: 'caution', sentence: when ? `Quiet ${when}.` : `${first} has been quiet for a while.` };
+  }
+
+  // Heading somewhere we know about, with an ETA.
+  if (arrival?.placeName && arrival?.etaSeconds != null) {
+    const eta = fmtEta(arrival.etaSeconds);
+    return { tone: 'safe', sentence: `Heading to ${arrival.placeName} — about ${eta} away.` };
+  }
+
+  if (m.speed > MOVING_KMH) {
+    const kmh = Math.round(m.speed);   // already km/h — do not convert
+    return { tone: 'safe', sentence: `On the move${kmh ? ` at ${kmh} km/h` : ''}.` };
+  }
+
+  return { tone: 'safe', sentence: 'Settled where they are.' };
 }
 
 /** Human ETA phrasing. @param {number|null} sec @returns {string} */

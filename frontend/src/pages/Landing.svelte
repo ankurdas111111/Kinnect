@@ -1563,7 +1563,6 @@
     color: var(--danger-400, var(--danger-500));
   }
 
-  .bento-sos .feature-icon-wrap { margin-inline: auto; }
   .bento-sos .feature-title,
   .bento-sos .feature-desc { text-align: center; }
 

@@ -32,10 +32,11 @@
   </EmptyState>
 {:else}
   <!-- Full empty state — the ghost constellation previews the filled state -->
+  <!-- Hearth 03b: the empty state is a sentence and a seat, not a feature blurb. -->
   <GhostConstellation
-    title="Your people will appear here"
-    body="Share your code with friends or family so you can see each other on the map"
-    ctaLabel="Add people"
+    title="It's just you here for now."
+    body="Invite the people you want to keep close. They'll appear on this map the moment they join — and you on theirs."
+    ctaLabel="Invite your family"
     oninvite={() => dispatch('addPeople')}
   />
 {/if}

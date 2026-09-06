@@ -48,19 +48,23 @@
     }
   }
 
+  /* Hearth: informational banners are quiet paper with an ember edge, not a
+     loud blue bar — the palette allows exactly one accent, and blue isn't it. */
   .banner-info {
-    background: rgba(37, 99, 235, 0.92);
+    background: var(--surface-1);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    color: white;
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: var(--text-primary);
+    border: 1px solid var(--border-default);
+    border-left: 3px solid var(--primary-500);
   }
+  /* SOS keeps the full vermilion fill — the one place the app goes red. */
   .banner-sos {
-    background: rgba(220, 38, 38, 0.92);
+    background: var(--danger-600);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    color: white;
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: var(--text-inverse, #fff);
+    border: 1px solid color-mix(in oklch, var(--danger-500) 60%, transparent);
     animation: banner-in-top 0.3s var(--ease-out), sos-urgent-pulse 1.5s ease infinite;
   }
   .banner-text { flex: 1; text-align: center; }

@@ -17,6 +17,7 @@
  */
 
 import { escapeAttr, calculateDistance, formatDistance } from './tracking.js';
+import { normMember, memberSentence, fmtWhen } from './hubStatus.js';
 
 /** Shorthand: escape any value to a safe HTML text fragment. */
 const s = (v) => escapeAttr(String(v ?? ''));
@@ -55,36 +56,36 @@ export function buildMemberPopup(user, myLoc) {
   let html = `<div class="pu-wrap">`;
   html += `<div class="pu-hdr">`;
   html += `<strong class="pu-name">${name}</strong>`;
-  html += `<span class="pu-status ${isOnline ? 'pu-online' : 'pu-offline'}"><span class="pu-dot"></span>${isOnline ? 'Online' : 'Offline'}</span>`;
   html += `</div>`;
+  // "Sharing live · updated just now" — words and a dot, not a timestamp.
+  {
+    const when = fmtWhen(user.lastUpdate ?? user.lastSeen ?? user.timestamp ?? null, Date.now());
+    const label = isOnline
+      ? `Sharing live${when ? ` · updated ${when}` : ''}`
+      : `Not sharing${when ? ` · last seen ${when}` : ''}`;
+    html += `<div class="pu-status ${isOnline ? 'pu-online' : 'pu-offline'}"><span class="pu-dot"></span>${s(label)}</div>`;
+  }
+
+  // Hearth 02b — a person card, not a data dump. One sentence, then at most
+  // three numbers. Principle 2: "Status is a ring and a word — never a
+  // coordinate." Principle 4: human time, not 6:42:11 PM / ±12 m / 84 ms.
+  // Latitude/longitude, accuracy-in-metres, device and signal are gone.
+  const now = Date.now();
+  const { sentence } = memberSentence(normMember(user), now);
+  if (sentence) html += `<div class="pu-sentence">${s(sentence)}</div>`;
 
   html += `<div class="pu-grid">`;
-  const speed = parseFloat(user.speed) >= 1 ? Math.round(parseFloat(user.speed)) : 0;
-  html += `<span class="pu-lbl">Speed</span><span class="pu-val tabular-nums">${speed} km/h</span>`;
-
   if (myLoc && user.latitude != null && user.longitude != null) {
     const dist = calculateDistance(myLoc.latitude, myLoc.longitude, user.latitude, user.longitude);
     const formatted = formatDistance(dist);
-    if (formatted) html += `<span class="pu-lbl">Distance</span><span class="pu-val tabular-nums">${s(formatted)}</span>`;
+    if (formatted) html += `<span class="pu-lbl">Away</span><span class="pu-val tabular-nums">${s(formatted)}</span>`;
   }
-  if (user.accuracy != null) {
-    html += `<span class="pu-lbl">Accuracy</span><span class="pu-val tabular-nums ${accuracyClass(user.accuracy)}">~${Math.round(user.accuracy)}m</span>`;
-  }
-  if (user.formattedTime) {
-    html += `<span class="pu-lbl">Updated</span><span class="pu-val">${s(user.formattedTime)}</span>`;
+  const speed = parseFloat(user.speed) >= 1 ? Math.round(parseFloat(user.speed)) : 0;
+  if (speed > 0) {
+    html += `<span class="pu-lbl">Speed</span><span class="pu-val tabular-nums">${speed} km/h</span>`;
   }
   if (user.batteryPct != null) {
-    const glyph = user.batteryPct > 75 ? '🔋' : '🪫';
-    html += `<span class="pu-lbl">Battery</span><span class="pu-val tabular-nums ${batteryClass(user.batteryPct)}">${glyph} ${Math.round(user.batteryPct)}%</span>`;
-  }
-  if (user.deviceType) {
-    html += `<span class="pu-lbl">Device</span><span class="pu-val">${s(user.deviceType)}</span>`;
-  }
-  if (user.connectionQuality && user.connectionQuality !== 'Unknown') {
-    html += `<span class="pu-lbl">Signal</span><span class="pu-val ${connectionClass(user.connectionQuality)}">${s(user.connectionQuality)}</span>`;
-  }
-  if (user.latitude != null && user.longitude != null) {
-    html += `<span class="pu-lbl">Position</span><span class="pu-val pu-mono tabular-nums">${Number(user.latitude).toFixed(5)}, ${Number(user.longitude).toFixed(5)}</span>`;
+    html += `<span class="pu-lbl">Battery</span><span class="pu-val tabular-nums ${batteryClass(user.batteryPct)}">${Math.round(user.batteryPct)}%</span>`;
   }
   html += `</div>`;
 
@@ -108,7 +109,8 @@ export function buildMemberPopup(user, myLoc) {
   if (badges.length) html += `<div class="pu-badges">${badges.join('')}</div>`;
 
   if (user.rooms && user.rooms.length > 0) {
-    html += `<div class="pu-rooms"><span class="pu-lbl">Rooms:</span> ${user.rooms.map((r) => s(r)).join(', ')}</div>`;
+    // Rooms are the app's families — name them that way (Hearth "Nair family").
+    html += `<div class="pu-rooms">${user.rooms.map((r) => s(r)).join(' · ')}</div>`;
   }
 
   if (user.userId) {

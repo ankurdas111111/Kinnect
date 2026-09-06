@@ -1122,7 +1122,17 @@
   :global(.pu-wrap)  { min-width: 190px; font-size: 13px; line-height: 1.5; }
   :global(.pu-hdr)   { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid rgba(0,0,0,0.07); }
   :global(.pu-name)  { font-family: var(--font-display); font-size: 15px; font-weight: 700; letter-spacing: -0.01em; color: var(--popup-text-heading, #0f172a); }
-  :global(.pu-status) { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; font-size: 10px; font-weight: 600; }
+  /* Hearth 02b: status is a dot and words on its own line, and the card leads
+     with a sentence rather than a grid of numbers. */
+  :global(.pu-status) { display: flex; align-items: center; gap: 5px; margin: -4px 0 10px; font-size: 11px; font-weight: 600; }
+  :global(.pu-sentence) {
+    font-family: var(--font-serif, var(--font-display));
+    font-style: italic;
+    font-size: 15px;
+    line-height: 1.35;
+    margin-bottom: 12px;
+    color: var(--popup-text-heading, #0f172a);
+  }
   :global(.pu-dot)   { width: 7px; height: 7px; border-radius: 50%; background: currentColor; display: inline-block; }
   :global(.pu-online)  { color: var(--success-500, #22c55e); }
   :global(.pu-offline) { color: var(--gray-400, #9ca3af); }

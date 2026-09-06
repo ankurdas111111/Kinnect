@@ -69,6 +69,13 @@
   }
 
   function close() { open = false; }
+
+  /** Escape closes the sheet. Without this the backdrop stayed up and swallowed
+   *  every click behind it — a keyboard trap, and the app's own modal primitive
+   *  (primitives/Modal.svelte) already behaves this way. */
+  function onWindowKeydown(e) {
+    if (open && e.key === 'Escape') { e.preventDefault(); close(); }
+  }
   // App URL
   let appUrl = $derived(getShareOrigin());
   // Best room to feature in the invite (first one, or none)
@@ -77,9 +84,11 @@
   let waText = $derived(buildWaText($authUser, featuredRoom, appUrl));
 </script>
 
+<svelte:window on:keydown={onWindowKeydown} />
+
 {#if open}
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-  <div class="inv-backdrop" transition:fade={{ duration: 150 }} onclick={self(close)}>
+  <div class="inv-backdrop" transition:fade={{ duration: 150 }} onclick={self(close)} role="dialog" aria-modal="true" aria-label="Invite your family">
     <div class="inv-sheet" transition:fly={{ y: 80, duration: 220 }}>
       <div class="inv-drag-handle" aria-hidden="true"></div>
 
@@ -93,9 +102,13 @@
             <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
           </svg>
         </div>
+        <!-- Hearth 03c: name the family, and say exactly what the link does. -->
         <div class="inv-title-block">
-          <p class="inv-title">Invite Family</p>
-          <p class="inv-sub">Invite family, friends &amp; close ones via WhatsApp</p>
+          <p class="inv-title">{featuredRoom?.name ? `Invite to ${featuredRoom.name}` : 'Invite your family'}</p>
+          <p class="inv-sub">
+            Anyone with this link joins as a member and sees the whole family.
+            You'll get a nudge the moment someone joins, and you can remove anyone later.
+          </p>
         </div>
         <button class="inv-close-btn" onclick={close} aria-label="Close">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -115,9 +128,19 @@
       <!-- Code pill (if available) -->
       {#if featuredRoom || $authUser?.shareCode}
         {@const code = featuredRoom?.code ?? $authUser?.shareCode}
+        <!-- QR + code side by side (Hearth 03c) -->
+        <div class="inv-qr-row">
+          <img
+            class="inv-qr"
+            src="https://api.qrserver.com/v1/create-qr-code/?size=132x132&data={encodeURIComponent(getShareOrigin() + '/#/add-contact/' + code)}&margin=4&bgcolor=ffffff&color=0f0f23"
+            alt="QR code to join {featuredRoom?.name || 'this family'}"
+            width="132" height="132" loading="lazy"
+          />
+          <p class="inv-qr-hint">Scan to join</p>
+        </div>
         <div class="inv-code-row">
           <div class="inv-code-block">
-            <span class="inv-code-label">{featuredRoom ? 'Group code' : 'My code'}</span>
+            <span class="inv-code-label">{featuredRoom ? 'Family code' : 'My code'}</span>
             <span class="inv-code-value">{code}</span>
           </div>
           <button class="inv-copy-code-btn" onclick={copyCode} aria-label="Copy code">
@@ -267,6 +290,31 @@
   }
 
   /* Code row */
+  .inv-qr-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    margin: 0 14px 12px;
+  }
+  .inv-qr {
+    display: block;
+    width: 132px;
+    height: 132px;
+    border-radius: 10px;
+    background: #fff;
+    padding: 6px;
+    box-sizing: content-box;
+  }
+  .inv-qr-hint {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+  }
+
   .inv-code-row {
     margin: 0 14px 12px;
     padding: 10px 14px;

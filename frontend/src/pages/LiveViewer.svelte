@@ -505,7 +505,6 @@
     gap: var(--space-2);
     margin-bottom: var(--space-3);
   }
-  .live-header h2 { margin: 0; }
 
   .rec-dot {
     display: inline-block;
