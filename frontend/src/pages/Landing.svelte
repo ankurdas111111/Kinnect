@@ -18,7 +18,6 @@
    * disabled there). One rAF-throttled scroll listener, no timers.
    */
   import { onMount } from 'svelte';
-  import { navigate } from '../lib/viewTransition.js';
   import { prefersReducedMotion } from '../lib/deviceCapability.js';
 
   // ── Geometry (verbatim from the design) ─────────────────────────────────
@@ -152,12 +151,14 @@
   }
 
   onMount(() => {
+    document.title = 'Kinnect — a quiet map for the people you love';
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll);
     measure();
     pS = pRaw;   // land where the page loads, no initial chase
     requestAnimationFrame(measure);
     return () => {
+      document.title = 'Kinnect';
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onScroll);
       if (raf) cancelAnimationFrame(raf);
@@ -181,8 +182,10 @@
     const tx = vw / 2 - cx * s;
     const ty = (narrow ? vh * 0.4 : vh / 2) - cy * s;
     const k = 1 / s;
-    // SOS window desaturates the map (design 18.85–19.05)
-    const ver = 0.62 * cl((t - 18.83) / 0.05) * (1 - cl((t - 19.03) / 0.06));
+    // SOS window desaturates the map (design 18.85–19.05). The tone itself is
+    // carried by an EDGE tint (radial, clear centre) so the scene stays
+    // legible at the exact moment legibility matters most.
+    const ver = 0.34 * cl((t - 18.83) / 0.05) * (1 - cl((t - 19.03) / 0.06));
 
     const people = PEOPLE.map((per) => {
       const [x, y] = keyed(per.keys, t);
@@ -220,8 +223,8 @@
     });
 
     // ambient tint: ochre while Nani is quiet, vermilion during SOS, sage after
-    const och = 0.22 * cl((t - 16.55) / 0.15) * (1 - cl((t - 17.2) / 0.2));
-    const sag = 0.28 * cl((t - 19.04) / 0.06) * (1 - cl((t - 19.25) / 0.15));
+    const och = 0.14 * cl((t - 16.55) / 0.15) * (1 - cl((t - 17.2) / 0.2));
+    const sag = 0.18 * cl((t - 19.04) / 0.06) * (1 - cl((t - 19.25) / 0.15));
     let tint = { c: 'var(--ochre)', o: och };
     if (ver > tint.o) tint = { c: 'var(--vermilion)', o: ver };
     if (sag > tint.o) tint = { c: 'var(--sage)', o: sag };
@@ -229,8 +232,9 @@
     const hh = Math.floor(t), mm = Math.floor((t - hh) * 60);
     const clock = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 
-    // Last 7% of the story: the map hands off to the closing on paper, no hard cut.
-    const fade = cl((p - 0.93) / 0.07);
+    // Very end of the story: the map hands off to the closing on paper, no
+    // hard cut — late enough that the final chapter gets its clean moment.
+    const fade = cl((p - 0.965) / 0.035);
 
     return { t, tx, ty, s, k, ver, people, routes, chapters, tint, clock, fade, hint: p < 0.015 };
   });
@@ -244,8 +248,10 @@
       <span class="lp-wordmark">Kinnect</span>
       <div class="lp-nav-actions">
         <button class="lp-nav-link" onclick={goStory}>How it works</button>
-        <button class="lp-nav-link" onclick={() => navigate('/login')}>Sign in</button>
-        <button class="lp-nav-pill" onclick={() => navigate('/register')}>Get the app</button>
+        <!-- Real links: middle-click / open-in-tab work, and App.svelte's
+             anchor interception still gives them view transitions. -->
+        <a class="lp-nav-link" href="#/login">Sign in</a>
+        <a class="lp-nav-pill" href="#/register">Get the app</a>
       </div>
     </nav>
 
@@ -257,7 +263,7 @@
         sentence, whether everyone's OK. No feeds. No pings. No dashboard.
       </p>
       <div class="lp-cta-row">
-        <button class="lp-cta lp-cta-primary" onclick={() => navigate('/register')}>Create your family — free</button>
+        <a class="lp-cta lp-cta-primary" href="#/register">Create your family — free</a>
         <button class="lp-cta lp-cta-ghost" onclick={goStory}>See a day with one family ↓</button>
       </div>
     </div>
@@ -289,7 +295,20 @@
 
   <!-- ═══ STORY (scroll-scrubbed) ════════════════════════════════════════ -->
   <section class="lp-story" bind:this={storyEl} aria-label="A day with the Nair family">
-    <div class="lp-stage">
+    <!-- The visual story is scroll-driven; this is its narrative for screen
+         readers, so the section carries meaning without the animation. -->
+    <p class="sr-only">
+      A Tuesday with the Nair family in Bengaluru: everyone wakes at home.
+      Meera walks to school and her pebble traces the route. Arjun drives to
+      work — no pings, just where he is when you look. Through the middle of
+      the day there is nothing to report, so Kinnect says nothing. At 16:40
+      Nani's phone goes quiet — not an alarm, the page just warms — and a call
+      settles it: she was napping. On her walk home from tuition Meera holds
+      SOS; one sentence lands on every phone and Arjun, nine minutes away, is
+      already moving. Twelve minutes later she's safe. By 19:30 everyone's
+      settled — the day ends the way it started. Quiet.
+    </p>
+    <div class="lp-stage" aria-hidden="true">
       <div
         class="lp-cam"
         style:transform={`translate(${scene.tx}px, ${scene.ty}px) scale(${scene.s})`}
@@ -321,7 +340,7 @@
         {/each}
 
         {#each scene.people as per (per.initial)}
-          <div class="lp-person lp-p-{per.initial}" class:lp-sos={per.sos} class:lp-self={per.self}
+          <div class="lp-person lp-p-{per.initial}" class:lp-sos={per.sos} class:lp-self={per.self} class:lp-quiet-p={per.quiet}
             style:left={`${per.x}px`} style:top={`${per.y}px`} style:transform={`scale(${scene.k})`}>
             <div class="lp-person-inner" class:lp-moving={per.moving}>
               <div class="lp-pebble-wrap">
@@ -335,7 +354,7 @@
         {/each}
       </div>
 
-      <div class="lp-tint" style:background={scene.tint.c} style:opacity={scene.tint.o} aria-hidden="true"></div>
+      <div class="lp-tint" style:--tint-c={scene.tint.c} style:opacity={scene.tint.o} aria-hidden="true"></div>
       <div class="lp-stage-fade" style:opacity={scene.fade} aria-hidden="true"></div>
 
       <div class="lp-story-chrome" aria-hidden="true">
@@ -368,8 +387,8 @@
       a thousand. Only people you invite can see anyone — ever.
     </p>
     <div class="lp-cta-row lp-cta-center reveal-scroll">
-      <button class="lp-cta lp-cta-primary" onclick={() => navigate('/register')}>Create your family — free</button>
-      <button class="lp-cta lp-cta-ghost" onclick={() => navigate('/register')}>Get the app</button>
+      <a class="lp-cta lp-cta-primary" href="#/register">Create your family — free</a>
+      <a class="lp-cta lp-cta-ghost" href="#/register">Get the app</a>
     </div>
     <div class="lp-foot">
       <span class="lp-foot-mark">Kinnect</span>
@@ -408,16 +427,18 @@
   .lp-wordmark-sm { font-size: 22px; }
   .lp-nav-actions { display: flex; align-items: center; gap: var(--space-3); }
   .lp-nav-link {
+    display: inline-flex; align-items: center;
     min-height: 44px; padding: 0 var(--space-1);
     border: none; background: transparent; cursor: pointer;
     color: var(--ink-2); font-family: inherit; font-size: var(--text-sm); font-weight: 600;
-    white-space: nowrap;
+    white-space: nowrap; text-decoration: none;
   }
   .lp-nav-link:hover { color: var(--ink); }
   .lp-nav-link:focus-visible, .lp-nav-pill:focus-visible, .lp-cta:focus-visible {
     outline: 2px solid var(--primary-400); outline-offset: 2px;
   }
   .lp-nav-pill {
+    display: inline-flex; align-items: center; text-decoration: none;
     min-height: 44px; padding: 0 var(--space-4);
     border-radius: 999px;
     border: 1px solid color-mix(in oklch, var(--ink) 22%, transparent);
@@ -467,10 +488,11 @@
   .lp-cta-row { display: flex; gap: var(--space-3); flex-wrap: wrap; }
   .lp-cta-center { justify-content: center; margin-top: var(--space-2); }
   .lp-cta {
+    display: inline-flex; align-items: center; justify-content: center;
     min-height: 52px; padding: 0 var(--space-5);
     border-radius: 999px; cursor: pointer;
     font-family: inherit; font-size: var(--text-base); font-weight: 600;
-    white-space: nowrap;
+    white-space: nowrap; text-decoration: none;
     -webkit-tap-highlight-color: transparent;
   }
   .lp-cta-primary { border: none; background: var(--ember); color: var(--text-on-primary, #fff); }
@@ -669,6 +691,9 @@
 
   .lp-person { position: absolute; width: 0; height: 0; transform-origin: 0 0; z-index: 4; }
   .lp-person.lp-self { z-index: 5; }
+  /* A quiet person is the story beat — she must not hide under "You" in the
+     home cluster (later DOM order wins the z tie). */
+  .lp-person.lp-quiet-p { z-index: 5; }
   .lp-person.lp-sos { z-index: 6; }
   .lp-person-inner {
     position: absolute; left: 0; top: 0;
@@ -697,7 +722,7 @@
     transition: background 0.4s, box-shadow 0.4s;
   }
   .lp-pebble.lp-quiet {
-    color: var(--ink-2); opacity: 0.85;
+    color: var(--ink); opacity: 0.9;
     box-shadow: 0 2px 8px rgba(40, 30, 20, 0.22);
   }
   /* In transit: the pebble lifts off the map a touch */
@@ -728,7 +753,12 @@
   .lp-p-A .lp-tag { transform: translateX(-16px); }
   .lp-p-M .lp-tag { transform: translateX(16px); }
 
-  .lp-tint { position: absolute; inset: 0; pointer-events: none; }
+  .lp-tint {
+    position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse 90% 80% at 50% 45%,
+      color-mix(in oklch, var(--tint-c) 35%, transparent) 0%,
+      var(--tint-c) 78%);
+  }
   .lp-stage-fade {
     position: absolute; inset: 0; pointer-events: none; z-index: 8;
     background: linear-gradient(to bottom, transparent 30%, var(--paper) 96%);
