@@ -170,7 +170,17 @@
   function updateMarker(user) {
     if (!map || typeof user.latitude !== 'number') return;
     const lngLat = [user.longitude, user.latitude];
-    const popupHtml = `<strong>${escHtml(user.displayName || 'User')}</strong><br>Speed: ${(user.speed || 0)} km/h<br>Updated: ${escHtml(user.formattedTime || 'N/A')}${user.batteryPct != null ? '<br>Battery: ' + user.batteryPct + '%' : ''}`;
+    // Structured rows, not <br>-joined text — the live link is the app's most
+    // public surface and was rendering MapLibre's unstyled default bubble.
+    const row = (label, value) =>
+      `<div class="lv-pu-row"><span class="lv-pu-label">${label}</span><span class="lv-pu-value">${value}</span></div>`;
+    const popupHtml =
+      `<div class="lv-pu">` +
+      `<div class="lv-pu-name">${escHtml(user.displayName || 'User')}</div>` +
+      row('Speed', `${Math.round(user.speed || 0)} km/h`) +
+      row('Updated', escHtml(user.formattedTime || 'N/A')) +
+      (user.batteryPct != null ? row('Battery', `${user.batteryPct}%`) : '') +
+      `</div>`;
     sharedBy = user.displayName || 'User';
     if (!marker) {
       const el = createMapIcon('var(--primary-500)', '', { markerType: 'contact' });
@@ -510,5 +520,74 @@
     .sos-dock {
       animation: none;
     }
+  }
+
+  /* ── Member popup ────────────────────────────────────────────────────────
+     The viewer previously shipped MapLibre's default white bubble, which read
+     as unbranded on the app's most public surface. Same treatment as the
+     in-app map popup (Map.svelte) so a shared link looks like Kinnect. */
+  :global(.maplibregl-popup-content) {
+    background: rgba(255, 255, 255, 0.96);
+    color: #1e293b;
+    border-radius: var(--radius-xl, 20px);
+    padding: 14px 16px;
+    font-family: var(--font-sans, system-ui, sans-serif);
+    box-shadow:
+      0 12px 40px rgba(0, 0, 0, 0.22),
+      0 0 0 1px rgba(0, 0, 0, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.70);
+    backdrop-filter: blur(28px) saturate(1.8);
+    -webkit-backdrop-filter: blur(28px) saturate(1.8);
+  }
+  :global([data-theme="dark"] .maplibregl-popup-content) {
+    background: rgba(12, 12, 24, 0.94);
+    color: rgba(255, 255, 255, 0.90);
+    box-shadow:
+      0 12px 40px rgba(0, 0, 0, 0.55),
+      0 0 0 1px rgba(255, 255, 255, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+  :global(.maplibregl-popup-tip) { border-top-color: rgba(255, 255, 255, 0.96); }
+  :global([data-theme="dark"] .maplibregl-popup-tip) { border-top-color: rgba(20, 25, 40, 0.92); }
+  :global(.maplibregl-popup-close-button) {
+    color: var(--text-tertiary, rgba(255, 255, 255, 0.5));
+    font-size: 18px;
+    padding: 2px 8px;
+    background: none;
+    border: none;
+  }
+
+  :global(.lv-pu) { min-width: 168px; }
+  :global(.lv-pu-name) {
+    font-family: var(--font-display, system-ui, sans-serif);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  }
+  :global(.maplibregl-popup-content:not([data-theme="dark"] *) .lv-pu-name) {
+    border-bottom-color: rgba(0, 0, 0, 0.08);
+  }
+  :global(.lv-pu-row) {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-4, 16px);
+    font-size: 12px;
+    line-height: 1.9;
+  }
+  :global(.lv-pu-label) {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0.55;
+  }
+  :global(.lv-pu-value) {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
   }
 </style>
