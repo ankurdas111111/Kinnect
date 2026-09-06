@@ -19,12 +19,15 @@
           t = 'dark';
           try { localStorage.setItem('theme', t); } catch (e) {}
         }
+        // HEARTH is light-first ("warm paper instead of dark glass"), so an
+        // unset preference paints light. An explicit stored choice still wins,
+        // and OS dark-mode users still get the night face.
         if (t === 'dark' || t === 'light') {
           document.documentElement.setAttribute('data-theme', t);
-        } else if (window.matchMedia('(prefers-color-scheme: light)').matches) {
-          document.documentElement.setAttribute('data-theme', 'light');
-        } else {
+        } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
           document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+          document.documentElement.setAttribute('data-theme', 'light');
         }
         // Daypart tint pre-paint (buckets must match lib/daypart.js daypartFor)
         if (localStorage.getItem('daypart-enabled') !== '0') {

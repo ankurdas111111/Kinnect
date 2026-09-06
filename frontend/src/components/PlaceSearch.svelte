@@ -479,13 +479,15 @@
   /* ══════════════════════════════════════════════════════════════════════ */
   .ps-wrap { position: relative; width: min(380px, calc(100vw - 24px)); z-index: 20; }
 
-  .ps-bar { display: flex; align-items: center; gap: 6px; background: rgba(5,8,18,0.88); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 9px 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
-  .ps-bar:focus-within { border-color: rgba(99,102,241,0.35); box-shadow: 0 4px 20px rgba(0,0,0,0.3), 0 0 0 3px rgba(99,102,241,0.08); }
-  .ps-icon { color: rgba(255,255,255,0.30); flex-shrink: 0; }
-  .ps-back { display: flex; align-items: center; justify-content: center; background: none; border: none; color: rgba(255,255,255,0.5); cursor: pointer; flex-shrink: 0; padding: 0; min-width: 44px; min-height: 44px; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
-  .ps-back:hover { color: #fff; }
-  .ps-input { flex: 1; background: none; border: none; outline: none; color: rgba(255,255,255,0.90); font-size: 16px; font-weight: 500; font-family: inherit; min-width: 0; }
-  .ps-input::placeholder { color: rgba(255,255,255,0.22); }
+  /* Token-driven so the search bar follows the theme — it was hardcoded
+     white-on-dark and stayed navy on Hearth's warm paper. */
+  .ps-bar { display: flex; align-items: center; gap: 6px; background: var(--glass-bg); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid var(--border-default); border-radius: 14px; padding: 9px 12px; box-shadow: var(--shadow-lg); }
+  .ps-bar:focus-within { border-color: color-mix(in oklch, var(--primary-500) 40%, transparent); box-shadow: var(--shadow-lg), 0 0 0 3px color-mix(in oklch, var(--primary-500) 12%, transparent); }
+  .ps-icon { color: var(--text-tertiary); flex-shrink: 0; }
+  .ps-back { display: flex; align-items: center; justify-content: center; background: none; border: none; color: var(--text-tertiary); cursor: pointer; flex-shrink: 0; padding: 0; min-width: 44px; min-height: 44px; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  .ps-back:hover { color: var(--text-primary); }
+  .ps-input { flex: 1; background: none; border: none; outline: none; color: var(--text-primary); font-size: 16px; font-weight: 500; font-family: inherit; min-width: 0; }
+  .ps-input::placeholder { color: var(--text-tertiary); }
   .ps-clear { display: flex; align-items: center; justify-content: center; background: transparent; border: none; border-radius: 50%; min-width: 44px; min-height: 44px; cursor: pointer; color: rgba(255,255,255,0.4); flex-shrink: 0; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   .ps-clear svg { background: rgba(255,255,255,0.06); border-radius: 50%; padding: 5px; box-sizing: content-box; }
   .ps-clear:hover svg { background: rgba(255,255,255,0.12); }

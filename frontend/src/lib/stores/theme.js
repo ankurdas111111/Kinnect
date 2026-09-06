@@ -58,10 +58,13 @@ function createThemeStore() {
       try {
         stored = normalize(localStorage.getItem('theme'));
       } catch (e) { /* private mode */ }
-      const osLight =
+      // HEARTH is light-first: an unset preference paints the warm paper face.
+      // Must stay in sync with the index.html pre-paint or the theme flips
+      // after hydration. OS dark-mode users still land on the night face.
+      const osDark =
         typeof window !== 'undefined' &&
-        window.matchMedia?.('(prefers-color-scheme: light)').matches;
-      apply(stored || (osLight ? 'light' : 'dark'));
+        window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+      apply(stored || (osDark ? 'dark' : 'light'));
     },
   };
 }

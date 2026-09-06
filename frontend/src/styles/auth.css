@@ -21,14 +21,16 @@
    an unwrapped [data-theme] block silently matches nothing (html is
    outside the component). :root survives scoping; this must too. */
 :global([data-theme="light"]) {
+  /* HEARTH: warm ink, not the cool slate ramp — --gray-900/500 sit at hue
+     265/257 and rendered the auth headline navy on warm paper. */
   --auth-page-bg: var(--surface-0);
-  --auth-page-text: var(--gray-900);
-  --auth-page-text-muted: var(--gray-500);
-  --auth-card-bg: rgba(255, 255, 255, 0.90);
-  --auth-input-bg: rgba(15, 23, 42, 0.04);
-  --auth-input-text: var(--gray-900);
-  --auth-input-placeholder: var(--gray-400);
-  --auth-input-border: rgba(15, 23, 42, 0.12);
+  --auth-page-text: var(--text-primary);
+  --auth-page-text-muted: var(--text-secondary);
+  --auth-card-bg: var(--card, rgba(255, 255, 255, 0.94));
+  --auth-input-bg: var(--paper-2, rgba(15, 23, 42, 0.04));
+  --auth-input-text: var(--text-primary);
+  --auth-input-placeholder: var(--text-tertiary);
+  --auth-input-border: var(--border-default);
 }
 
 /* ── Page shell ─────────────────────────────────────────────────────────── */

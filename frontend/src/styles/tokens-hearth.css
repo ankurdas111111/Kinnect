@@ -1,0 +1,186 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   KINNECT — "HEARTH" (redesign direction, Claude Design `Kinnect Redesign`)
+
+   "Kinnect stops looking like a command centre and starts feeling like a
+   family." Warm paper instead of dark glass. ONE ember accent instead of
+   indigo + emerald + amber + red all competing. The map becomes a soft
+   canvas so the family are the only colour on it.
+
+   HOW THIS WORKS — READ BEFORE EDITING
+   This file does not restyle components. 115 of 157 frontend files already
+   read the semantic tokens (--text-*, --surface-*, --primary-*, …), so
+   Hearth is expressed by REMAPPING those tokens to the design's palette.
+   Every component follows for free; component CSS stays untouched.
+
+   Load order: after tokens-oklch.css (which defines the VIGIL ramps) and
+   before tokens-fx.css (which stays the last word on blur).
+
+   PALETTE — six colours, one accent (values taken verbatim from the design)
+     Paper     oklch(0.975 0.008 80)   ground, sheets
+     Ink       oklch(0.24  0.02  60)   type, icons
+     Ember     oklch(0.55  0.16  38)   you, actions        ← the only accent
+     Sage      oklch(0.50  0.10 150)   live, settled
+     Ochre     oklch(0.55  0.12  75)   needs a look
+     Vermilion oklch(0.55  0.22  27)   SOS only — nothing else is ever red
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Raw Hearth palette (design tokens, verbatim) ────────────────────── */
+  --paper:   oklch(0.975 0.008 80);
+  --paper-2: oklch(0.955 0.01  80);
+  --card:    oklch(1 0 0);
+  --ink:     oklch(0.24 0.02 60);
+  --ink-2:   oklch(0.45 0.02 60);
+  --ink-3:   oklch(0.52 0.02 60);
+  --hairline: oklch(0.24 0.02 60 / 0.10);
+  --ember:   oklch(0.55 0.16 38);
+  --sage:    oklch(0.50 0.10 150);
+  --ochre:   oklch(0.55 0.12 75);
+  --vermilion: oklch(0.55 0.22 27);
+
+  /* Map canvas tokens (warm, low-contrast base) */
+  --map-base:   oklch(0.95 0.012 80);
+  --map-street: oklch(0.99 0.004 80);
+  --map-park:   oklch(0.92 0.035 140);
+  --map-water:  oklch(0.90 0.035 230);
+
+  /* Elevation — warm shadow, not neutral black */
+  --sh:   0  8px 24px oklch(0.3 0.03 60 / 0.12);
+  --sh-up: 0 -8px 32px oklch(0.3 0.03 60 / 0.14);
+
+  /* ── Ember ramp → --primary-* ────────────────────────────────────────
+     Ember is the ONE accent: "you" and actions. L/C follow the design's
+     0.55/0.16 at hue 38, stepped for hover/active and tinted fills. */
+  --primary-50:  oklch(0.97 0.02  38);
+  --primary-100: oklch(0.95 0.03  38);   /* ember tint bg (design) */
+  --primary-200: oklch(0.89 0.06  38);
+  --primary-300: oklch(0.72 0.12  38);
+  --primary-400: oklch(0.63 0.15  38);
+  --primary-500: oklch(0.55 0.16  38);   /* the accent */
+  --primary-600: oklch(0.48 0.15  38);
+  --primary-700: oklch(0.41 0.13  38);
+  --primary-800: oklch(0.35 0.11  38);
+  --primary-900: oklch(0.30 0.09  38);
+  --brand-hue: 38;
+
+  /* ── Sage → --success-* (live, settled) ─────────────────────────────── */
+  --success-400: oklch(0.58 0.10 150);
+  --success-500: oklch(0.50 0.10 150);
+  --success-600: oklch(0.43 0.09 150);
+  --success-700: oklch(0.37 0.08 150);
+
+  /* ── Ochre → --warning-* (needs a look) ─────────────────────────────── */
+  --warning-300: oklch(0.80 0.10 75);
+  --warning-400: oklch(0.63 0.12 75);
+  --warning-500: oklch(0.55 0.12 75);
+  --warning-600: oklch(0.48 0.11 75);
+  --warning-700: oklch(0.41 0.10 75);
+
+  /* ── Vermilion → --danger-* (SOS ONLY) ──────────────────────────────── */
+  --danger-300: oklch(0.72 0.16 27);
+  --danger-400: oklch(0.62 0.20 27);
+  --danger-500: oklch(0.55 0.22 27);
+  --danger-600: oklch(0.48 0.21 27);
+  --danger-700: oklch(0.42 0.19 27);
+
+  /* ── Surfaces — paper, sheets, cards ────────────────────────────────── */
+  --surface-0: var(--paper);
+  --surface-1: var(--card);
+  --surface-2: var(--card);
+  --surface-3: var(--paper-2);
+  --surface-inset: var(--paper-2);
+  --surface-hover: oklch(0.24 0.02 60 / 0.04);
+  --surface-midnight: var(--paper-2);
+
+  /* ── Ink ─────────────────────────────────────────────────────────────── */
+  --text-primary:   var(--ink);
+  --text-secondary: var(--ink-2);
+  --text-tertiary:  var(--ink-3);
+  --text-inverse:   oklch(0.99 0.004 80);
+  --text-on-primary: oklch(0.99 0.004 80);
+
+  /* ── Hairlines ───────────────────────────────────────────────────────── */
+  --border-default: var(--hairline);
+  --border-subtle:  oklch(0.24 0.02 60 / 0.06);
+  --border-strong:  oklch(0.24 0.02 60 / 0.18);
+
+  /* ── Glass → paper. Hearth has sheets, not glass; keep the token so the
+     39 files reading --glass-* keep working, but resolve it to card. ──── */
+  --glass-bg: oklch(1 0 0 / 0.92);
+  --glass-border: var(--hairline);
+
+  /* ── Warm elevation (overrides the neutral-black ramp) ──────────────── */
+  --shadow-xs: 0 1px  2px oklch(0.3 0.03 60 / 0.05);
+  --shadow-sm: 0 2px  6px oklch(0.3 0.03 60 / 0.07);
+  --shadow-md: 0 4px 12px oklch(0.3 0.03 60 / 0.10);
+  --shadow-lg: var(--sh);
+  --shadow-xl: 0 16px 48px oklch(0.3 0.03 60 / 0.16);
+  --shadow-primary: 0 4px 14px oklch(0.55 0.16 38 / 0.28);
+  --shadow-danger:  0 4px 14px oklch(0.55 0.22 27 / 0.28);
+
+  /* ── Status tokens follow the ladder, not the old traffic-light set ─── */
+  --status-live:    var(--sage);
+  --status-stale:   var(--ochre);
+  --status-offline: oklch(0.62 0.01 60);
+  --status-sos:     var(--vermilion);
+
+  /* ── Member wheel — "pebble + ring + one word".
+     Ember is reserved for YOU, so member hues avoid hue 38 and stay clear
+     of sage (150), ochre (75) and vermilion (27). Values from the design's
+     member pebbles; constant L/C so no member outshines another. ─────── */
+  --member-1: oklch(0.58 0.10 240);   /* blue    — Arjun */
+  --member-2: oklch(0.55 0.12 320);   /* plum    — Meera */
+  --member-3: oklch(0.55 0.10 200);   /* teal    */
+  --member-4: oklch(0.52 0.08 280);   /* iris    */
+  --member-1-halo: oklch(0.72 0.08 240);
+  --member-2-halo: oklch(0.70 0.09 320);
+  --member-3-halo: oklch(0.70 0.08 200);
+  --member-4-halo: oklch(0.68 0.06 280);
+  --member-offline: oklch(0.70 0.008 60);
+
+  /* ── Typography — Instrument Serif italic for verdicts, Sans for all else.
+     --font-display drives headings app-wide; the serif verdict voice is
+     applied via .verdict-voice (below) so only verdicts get the italic. ─ */
+  --font-display: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-sans:    'Instrument Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-serif:   'Instrument Serif', ui-serif, Georgia, serif;
+  /* Tabular numerals live in the sans face — the design sets numbers as
+     "8 min · 1.2 km · 64%", sparse and aligned, not in a mono face. */
+  --font-mono:    'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+
+  /* Legacy accent aliases still referenced by a few components */
+  --indigo-400: var(--primary-400);
+  --indigo-500: var(--primary-500);
+  --indigo-600: var(--primary-600);
+  --violet-400: var(--member-2);
+  --grain-opacity: 0.03;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE VERDICT VOICE
+   "Everyone's settled." — Instrument Serif italic, the one place the app
+   speaks in a human sentence. Applied by class so headings elsewhere keep
+   the sans face.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.verdict-voice,
+:global(.verdict-line),
+:global(.hs-headline),
+:global(.verdict-sentence) {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MAP CANVAS — a soft warm sheet so the family are the only colour on it.
+   The base OpenFreeMap Liberty style is a bright neutral; this pushes it
+   warm and low-contrast to match --map-base/--map-street. Canvas only —
+   HTML markers are siblings and keep their true pebble hues.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root:not([data-theme="dark"]) .maplibregl-canvas {
+  filter: saturate(0.62) sepia(0.14) brightness(1.03) contrast(0.94);
+}
+:root:not([data-theme="dark"]) .map-container {
+  background: var(--map-base);
+}
