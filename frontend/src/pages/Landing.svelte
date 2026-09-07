@@ -115,6 +115,39 @@
     return keys[keys.length - 1].slice(1);
   }
 
+  // ── Hero storytime — the whole Tuesday, compressed into one quiet loop ──
+  // The hero doesn't pose the day's ending; it PLAYS the day. Each beat sets
+  // the narrator plate (time · line · tone) and where every pebble is; CSS
+  // transitions glide them between beats. Reduced motion gets the settled
+  // final scene, no timer.
+  const HERO_BEATS = [
+    { time: '07:00', line: 'Good morning, Nair family.', tone: null,
+      P: [78.5, 46, 'home'], A: [82.5, 54, 'home'], M: [80.8, 50.5, 'home'], N: [75.4, 40, 'home'] },
+    { time: '07:40', line: 'Meera walks to school.', tone: null,
+      P: [78.5, 46, 'home'], A: [82.5, 54, 'home'], M: [62, 68.5, 'walking'], N: [75.4, 40, 'home'] },
+    { time: '09:00', line: 'Arjun drives to work.', tone: null,
+      P: [78.5, 46, 'home'], A: [88, 26, 'office'], M: [62, 68.5, 'school'], N: [75.4, 40, 'home'] },
+    { time: '12:30', line: 'Nothing to report.', tone: null,
+      P: [78.5, 46, 'home'], A: [88, 26, 'office'], M: [62, 68.5, 'school'], N: [75.4, 40, 'home'] },
+    { time: '16:40', line: "Nani's phone goes quiet.", tone: 'quiet',
+      P: [78.5, 46, 'home'], A: [88, 26, 'office'], M: [62, 68.5, 'school'], N: [75.4, 40, 'quiet'] },
+    { time: '18:52', line: 'Meera holds SOS.', tone: 'sos',
+      P: [78.5, 46, 'home'], A: [80, 40, 'on his way'], M: [69, 58, 'SOS'], N: [75.4, 40, 'home'] },
+    { time: '19:04', line: "She's safe.", tone: 'safe',
+      P: [78.5, 46, 'home'], A: [71, 55, 'with Meera'], M: [70, 56.5, 'safe'], N: [75.4, 40, 'home'] },
+    { time: '19:30', line: "Everyone's settled.", tone: null,
+      P: [78.5, 46, 'home'], A: [82.5, 54, 'home'], M: [80.8, 50.5, 'home'], N: [75.4, 40, 'home'] },
+  ];
+  const HERO_CAST = [
+    { k: 'P', name: 'You', color: 'var(--ember)' },
+    { k: 'A', name: 'Arjun', color: 'var(--member-1)' },
+    { k: 'M', name: 'Meera', color: 'var(--member-2)' },
+    { k: 'N', name: 'Nani', color: 'var(--member-3)' },
+  ];
+  let heroBeat = $state(HERO_BEATS.length - 1); // settled until the day starts
+  let heroTimer = 0;
+  let hb = $derived(HERO_BEATS[heroBeat]);
+
   // ── Scroll state ────────────────────────────────────────────────────────
   // pRaw is where the scrollbar IS; pS is where the CAMERA is. pS chases pRaw
   // with exponential damping, which is what gives the scrub its weight —
@@ -159,12 +192,28 @@
     measure();
     pS = pRaw;   // land where the page loads, no initial chase
     requestAnimationFrame(measure);
+
+    // Storytime: after the world assembles, the day begins — and keeps
+    // looping. 2.4s per beat; glides are 1.7s so movement reads as travel.
+    if (!prefersReducedMotion()) {
+      const startDay = setTimeout(() => {
+        heroBeat = 0;
+        heroTimer = setInterval(() => {
+          heroBeat = (heroBeat + 1) % HERO_BEATS.length;
+        }, 2400);
+      }, 2000);
+      heroTimer = -1; // sentinel until interval exists
+      var heroStart = startDay;
+    }
+
     return () => {
       document.title = 'Kinnect';
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onScroll);
       if (raf) cancelAnimationFrame(raf);
       if (chaseRaf) cancelAnimationFrame(chaseRaf);
+      if (typeof heroStart !== 'undefined') clearTimeout(heroStart);
+      if (heroTimer && heroTimer !== -1) clearInterval(heroTimer);
     };
   });
 
@@ -257,24 +306,25 @@
           <path class="lp-hg-road lp-hg-road-2" d="M 1140 -40 C 1160 240, 1130 520, 1170 940" />
           <polyline class="lp-hg-route" points="1043,586 1043,470 1218,470 1218,410" />
         </svg>
-        <!-- The family, living in the scene -->
-        <span class="lp-hg-place" style="left: 74.5%; top: 38.5%;">Home</span>
+        <!-- The family, LIVING the day the beats narrate -->
+        <span class="lp-hg-place" style="left: 73.2%; top: 36%;">Home</span>
         <span class="lp-hg-place" style="left: 62%; top: 68.5%;">School</span>
-        <div class="lp-hg-person lp-hg-p1" style="left: 78.5%; top: 46%;">
-          <span class="lp-pebble lp-hg-pebble" style="background: var(--ember);">P</span>
-          <span class="lp-tag">You · home</span>
-        </div>
-        <div class="lp-hg-person lp-hg-p2" style="left: 82.5%; top: 54%;">
-          <span class="lp-pebble lp-hg-pebble" style="background: var(--member-1);">A</span>
-          <span class="lp-tag">Arjun · home</span>
-        </div>
-        <!-- Meera actually walks her route home, on a long quiet loop -->
-        <div class="lp-hg-person lp-hg-meera" style="left: 65.2%; top: 65.1%;">
-          <span class="lp-pebble lp-hg-pebble" style="background: var(--member-2);">M</span>
-          <span class="lp-tag">Meera · heading home</span>
-        </div>
+        <span class="lp-hg-place" style="left: 88%; top: 20.5%;">Office</span>
+        {#each HERO_CAST as c, ci (c.k)}
+          {@const b = hb[c.k]}
+          <div class="lp-hg-person lp-hg-cast{ci}"
+            class:lp-hg-sos={b[2] === 'SOS'}
+            class:lp-hg-quiet={b[2] === 'quiet'}
+            style:left={`${b[0]}%`} style:top={`${b[1]}%`}>
+            <span class="lp-pebble lp-hg-pebble"
+              style:background={b[2] === 'SOS' ? 'var(--vermilion)' : b[2] === 'quiet' ? 'var(--lp-quiet)' : c.color}>{c.k}</span>
+            <span class="lp-tag" class:lp-tag-sos={b[2] === 'SOS'} class:lp-tag-quiet={b[2] === 'quiet'}>{c.name} · {b[2]}</span>
+          </div>
+        {/each}
         </div>
       </div>
+      <!-- the day's tone washes the edges of the world -->
+      <div class="lp-hero-tone" class:lp-tone-quiet={hb.tone === 'quiet'} class:lp-tone-sos={hb.tone === 'sos'} class:lp-tone-safe={hb.tone === 'safe'}></div>
       <!-- a slow wash of daylight over the map -->
       <div class="lp-hg-light"></div>
       <!-- text column readability: paper mist under the headline -->
@@ -292,11 +342,13 @@
       </div>
     </nav>
 
-    <!-- The app's own answer, floating as scenery -->
-    <div class="lp-hero-verdict" aria-hidden="true">
+    <!-- The narrator: the app's one sentence, telling the day as it happens -->
+    <div class="lp-hero-verdict" class:lp-hv-quiet={hb.tone === 'quiet'} class:lp-hv-sos={hb.tone === 'sos'} class:lp-hv-safe={hb.tone === 'safe'} aria-hidden="true">
       <span class="lp-hv-dot"></span>
-      <span class="lp-hv-verdict">Everyone&rsquo;s settled.</span>
-      <span class="lp-hv-clock">19:30</span>
+      {#key heroBeat}
+        <span class="lp-hv-verdict lp-hv-swap">{hb.line}</span>
+      {/key}
+      <span class="lp-hv-clock">{hb.time}</span>
     </div>
 
     <div class="lp-hero-body">
@@ -631,9 +683,10 @@
       opacity: 0;
       animation: lp-pebble-drop 640ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
     }
-    .lp-hg-p1 { animation-delay: 780ms; }
-    .lp-hg-p2 { animation-delay: 900ms; }
-    .lp-hg-meera { animation-delay: 1020ms; }
+    .lp-hg-cast0 { animation-delay: 780ms; }
+    .lp-hg-cast1 { animation-delay: 880ms; }
+    .lp-hg-cast2 { animation-delay: 980ms; }
+    .lp-hg-cast3 { animation-delay: 1080ms; }
     .lp-hg-place { opacity: 0; animation: lp-fade-in 560ms ease-out 1180ms both; }
     .lp-hero-verdict {
       opacity: 0;
@@ -645,15 +698,13 @@
        the settled pebbles breathe; daylight drifts across; the world floats. */
     .lp-hg-drift { animation: lp-world-drift 46s ease-in-out 2s infinite alternate; }
     .lp-hg-light { animation: lp-light-drift 37s ease-in-out 2s infinite alternate; }
-    .lp-hg-meera {
-      animation:
-        lp-pebble-drop 640ms cubic-bezier(0.34, 1.56, 0.64, 1) 1020ms both,
-        lp-meera-walk 24s linear 2.2s infinite;
-    }
     .lp-hg-route { animation: lp-fade-in 500ms ease-out 900ms both, lp-dots-crawl 3.4s linear 2.2s infinite; }
-    .lp-hg-p1 .lp-hg-pebble { animation: lp-breathe 5.2s ease-in-out 2.4s infinite; }
-    .lp-hg-p2 .lp-hg-pebble { animation: lp-breathe 5.2s ease-in-out 3.6s infinite; }
+    .lp-hg-cast0 .lp-hg-pebble { animation: lp-breathe 5.2s ease-in-out 2.4s infinite; }
+    .lp-hg-cast1 .lp-hg-pebble { animation: lp-breathe 5.2s ease-in-out 3.6s infinite; }
+    .lp-hg-cast3 .lp-hg-pebble { animation: lp-breathe 5.2s ease-in-out 4.4s infinite; }
+    .lp-hg-sos .lp-hg-pebble { animation: lp-hg-sos-pulse 1.3s ease-out infinite; }
     .lp-hv-dot { animation: lp-dot-pulse 3s ease-in-out 2.4s infinite; }
+    .lp-hv-swap { animation: lp-line-swap 480ms cubic-bezier(0.16, 1, 0.3, 1) both; }
     /* the closing eyebrow/headline reuse .lp-eyebrow — but their reveal is
        scroll-driven via .reveal-scroll (global.css), so cancel the load-time
        rise there to avoid double animation */
@@ -700,17 +751,13 @@
   @keyframes lp-dots-crawl {
     to { stroke-dashoffset: -9; }
   }
-  /* Meera's commute: constant walking speed along the drawn route
-     (segment lengths 116 / 175 / 60 world-px → 30% / 76% / 92% of the walk),
-     a pause at Home, then a soft reset back to the start. */
-  @keyframes lp-meera-walk {
-    0%   { opacity: 1; transform: translate(-50%, -50%); }
-    30%  { transform: translate(-50%, calc(-50% - 12.9svh)); }
-    76%  { transform: translate(calc(-50% + 10.9vw), calc(-50% - 12.9svh)); }
-    92%  { opacity: 1; transform: translate(calc(-50% + 10.9vw), calc(-50% - 19.5svh)); }
-    95.5%{ opacity: 0; transform: translate(calc(-50% + 10.9vw), calc(-50% - 19.5svh)); }
-    96.5%{ opacity: 0; transform: translate(-50%, -50%); }
-    100% { opacity: 1; transform: translate(-50%, -50%); }
+  @keyframes lp-hg-sos-pulse {
+    0%, 100% { box-shadow: 0 0 0 2px var(--card), 0 0 0 0 color-mix(in oklch, var(--vermilion) 45%, transparent); }
+    60% { box-shadow: 0 0 0 2px var(--card), 0 0 0 14px color-mix(in oklch, var(--vermilion) 0%, transparent); }
+  }
+  @keyframes lp-line-swap {
+    from { opacity: 0; transform: translateY(7px); }
+    to { opacity: 1; transform: translateY(0); }
   }
   @keyframes lp-headline-rise {
     to { opacity: 1; transform: translateY(0); }
@@ -769,7 +816,30 @@
   .lp-hg-person {
     position: absolute; transform: translate(-50%, -50%);
     display: flex; flex-direction: column; align-items: center; gap: 6px;
+    /* beat-to-beat travel: pebbles GLIDE between the day's places */
+    transition: left 1.7s cubic-bezier(0.45, 0.05, 0.35, 1), top 1.7s cubic-bezier(0.45, 0.05, 0.35, 1);
   }
+  .lp-hg-sos .lp-hg-pebble {
+    box-shadow: 0 0 0 2px var(--card), 0 2px 8px rgba(40, 30, 20, 0.3);
+  }
+  .lp-hg-quiet .lp-hg-pebble { color: var(--ink); }
+  /* the day's tone at the edges, story-tint style: centre stays legible */
+  .lp-hero-tone {
+    position: absolute; inset: 0; pointer-events: none;
+    opacity: 0; transition: opacity 900ms ease, --tone-c 0s;
+    background: radial-gradient(ellipse 90% 80% at 60% 45%,
+      transparent 30%, var(--tone-c, transparent) 92%);
+  }
+  .lp-tone-quiet { opacity: 0.28; --tone-c: var(--ochre); }
+  .lp-tone-sos   { opacity: 0.34; --tone-c: var(--vermilion); }
+  .lp-tone-safe  { opacity: 0.24; --tone-c: var(--sage); }
+  /* narrator states: the plate itself carries the day's tone */
+  .lp-hero-verdict { transition: border-color 500ms ease; }
+  .lp-hv-quiet .lp-hv-dot { background: var(--ochre); }
+  .lp-hv-sos .lp-hv-dot { background: var(--vermilion); }
+  .lp-hv-sos { border-color: color-mix(in oklch, var(--vermilion) 45%, transparent); }
+  .lp-hv-safe .lp-hv-dot { background: var(--sage); }
+  .lp-hv-clock { min-width: 5ch; text-align: right; }
   .lp-hg-pebble {
     position: static; width: 36px; height: 36px; font-size: 13px;
     display: flex; align-items: center; justify-content: center;
@@ -787,13 +857,18 @@
   }
   .lp-hero-verdict {
     position: absolute;
-    right: clamp(24px, 5vw, 88px);
-    top: clamp(96px, 15vh, 148px);
-    display: none; align-items: center; gap: 9px;
+    right: clamp(16px, 5vw, 88px);
+    top: clamp(84px, 15vh, 148px);
+    display: inline-flex; align-items: center; gap: 9px;
     padding: 10px 16px; border-radius: 999px;
     background: var(--card);
     border: 1px solid var(--hairline);
     box-shadow: var(--sh);
+    max-width: calc(100vw - 32px);
+  }
+  @media (max-width: 640px) {
+    .lp-hero-verdict { padding: 8px 13px; gap: 7px; }
+    .lp-hv-verdict { font-size: 16px; }
   }
   .lp-hv-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sage); flex-shrink: 0; }
   .lp-hv-verdict {
@@ -804,10 +879,10 @@
     font-size: 12px; font-weight: 600; color: var(--ink-3);
     font-variant-numeric: tabular-nums;
   }
-  /* Scenery earns its place only where there's room for it */
+  /* Scenery earns its place only where there's room for it; the narrator
+     plate stays at every size — the story is the point. */
   .lp-hg-place, .lp-hg-person { display: none; }
   @media (min-width: 1080px) {
-    .lp-hero-verdict { display: inline-flex; }
     .lp-hg-place, .lp-hg-person { display: flex; }
     .lp-hg-place { display: inline-block; }
   }
