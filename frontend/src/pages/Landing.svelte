@@ -331,6 +331,9 @@
       settled — the day ends the way it started. Quiet.
     </p>
     <div class="lp-stage" aria-hidden="true">
+      <!-- lp-cam-breath: the world never fully freezes — a slow ambient
+           camera breath on a wrapper, composited, independent of the scrub -->
+      <div class="lp-cam-breath">
       <div
         class="lp-cam"
         style:transform={`translate(${scene.tx}px, ${scene.ty}px) scale(${scene.s})`}
@@ -420,6 +423,8 @@
           </div>
         {/each}
       </div>
+
+      </div><!-- /lp-cam-breath -->
 
       <div class="lp-tint" style:--tint-c={scene.tint.c} style:opacity={scene.tint.o} aria-hidden="true"></div>
       <div class="lp-stage-fade" style:opacity={scene.fade} aria-hidden="true"></div>
@@ -834,11 +839,46 @@
     background: var(--map-base);
     color: var(--ink);
   }
+  .lp-cam-breath { position: absolute; inset: 0; }
   .lp-cam {
     position: absolute; left: 0; top: 0;
     width: 2000px; height: 1400px;
     transform-origin: 0 0;
     will-change: transform;
+  }
+
+  /* ── Idle life — the story world never fully freezes ──────────────────
+     A slow camera breath rides ABOVE the scrub (separate wrapper), the
+     pebbles breathe in offset phases, the clock's dot pulses, the hint
+     bobs, and the SOS ring actually beats during the emergency. All
+     transform/opacity, all gated on reduced motion. */
+  @media (prefers-reduced-motion: no-preference) {
+    .lp-cam-breath {
+      animation: lp-cam-breath 9s ease-in-out infinite alternate;
+      transform-origin: 50% 45%;
+      will-change: transform;
+    }
+    .lp-pebble { animation: lp-breathe 5.6s ease-in-out infinite; }
+    .lp-p-P .lp-pebble { animation-delay: 0.4s; }
+    .lp-p-A .lp-pebble { animation-delay: 1.6s; }
+    .lp-p-M .lp-pebble { animation-delay: 2.7s; }
+    .lp-p-N .lp-pebble { animation-delay: 3.8s; }
+    .lp-clock-dot { animation: lp-dot-pulse 3s ease-in-out infinite; }
+    .lp-hint.visible { animation: lp-hint-bob 2.4s ease-in-out infinite; }
+    .lp-sos-ring.on { animation: lp-sos-beat 1.5s ease-out infinite; }
+  }
+  @keyframes lp-cam-breath {
+    from { transform: translate(0, 0) scale(1); }
+    to { transform: translate(-9px, -6px) scale(1.015); }
+  }
+  @keyframes lp-hint-bob {
+    0%, 100% { transform: translate(-50%, 0); }
+    50% { transform: translate(-50%, 5px); }
+  }
+  @keyframes lp-sos-beat {
+    0% { transform: translate(-50%, -50%) scale(0.9); opacity: 1; }
+    70% { transform: translate(-50%, -50%) scale(1.22); opacity: 0.55; }
+    100% { transform: translate(-50%, -50%) scale(1.28); opacity: 0; }
   }
   /* City texture at street scale — thin, dense lines read as a map, not a
      spreadsheet. Avenues (3px) over lanes (1px). */
