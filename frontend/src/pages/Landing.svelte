@@ -246,29 +246,37 @@
 
   <!-- ═══ HERO — the page opens already inside the quiet map ═════════════ -->
   <section class="lp-hero">
-    <!-- The world, at rest: whisper-contrast terrain the story will zoom into -->
+    <!-- The world: assembles itself on load, then quietly keeps living -->
     <div class="lp-hero-ground" aria-hidden="true">
-      <svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" class="lp-hg-svg">
-        <path class="lp-hg-green" d="M 716 734 C 752 680, 832 654, 896 666 C 938 674, 952 702, 986 710 C 1016 718, 1032 762, 1018 798 C 1008 824, 978 830, 974 854 C 969 882, 928 906, 884 906 C 852 906, 834 890, 802 898 C 758 909, 706 890, 688 852 C 674 822, 686 800, 678 778 C 672 760, 696 746, 716 734 Z" />
-        <path class="lp-hg-road" d="M -40 700 C 300 640, 640 660, 940 560 C 1220 468, 1420 300, 1660 190" />
-        <path class="lp-hg-road" d="M 1140 -40 C 1160 240, 1130 520, 1170 940" />
-        <polyline class="lp-hg-route" points="1043,586 1043,470 1218,470 1218,410" />
-      </svg>
-      <!-- The family, living in the scene -->
-      <span class="lp-hg-place" style="left: 74.5%; top: 38.5%;">Home</span>
-      <span class="lp-hg-place" style="left: 62%; top: 68.5%;">School</span>
-      <div class="lp-hg-person" style="left: 78.5%; top: 46%;">
-        <span class="lp-pebble lp-hg-pebble" style="background: var(--ember);">P</span>
-        <span class="lp-tag">You · home</span>
+      <div class="lp-hg-drift">
+        <div class="lp-hg-grid"></div>
+        <div class="lp-hg-scene">
+        <svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" class="lp-hg-svg">
+          <path class="lp-hg-green" d="M 716 734 C 752 680, 832 654, 896 666 C 938 674, 952 702, 986 710 C 1016 718, 1032 762, 1018 798 C 1008 824, 978 830, 974 854 C 969 882, 928 906, 884 906 C 852 906, 834 890, 802 898 C 758 909, 706 890, 688 852 C 674 822, 686 800, 678 778 C 672 760, 696 746, 716 734 Z" />
+          <path class="lp-hg-road lp-hg-road-1" d="M -40 700 C 300 640, 640 660, 940 560 C 1220 468, 1420 300, 1660 190" />
+          <path class="lp-hg-road lp-hg-road-2" d="M 1140 -40 C 1160 240, 1130 520, 1170 940" />
+          <polyline class="lp-hg-route" points="1043,586 1043,470 1218,470 1218,410" />
+        </svg>
+        <!-- The family, living in the scene -->
+        <span class="lp-hg-place" style="left: 74.5%; top: 38.5%;">Home</span>
+        <span class="lp-hg-place" style="left: 62%; top: 68.5%;">School</span>
+        <div class="lp-hg-person lp-hg-p1" style="left: 78.5%; top: 46%;">
+          <span class="lp-pebble lp-hg-pebble" style="background: var(--ember);">P</span>
+          <span class="lp-tag">You · home</span>
+        </div>
+        <div class="lp-hg-person lp-hg-p2" style="left: 82.5%; top: 54%;">
+          <span class="lp-pebble lp-hg-pebble" style="background: var(--member-1);">A</span>
+          <span class="lp-tag">Arjun · home</span>
+        </div>
+        <!-- Meera actually walks her route home, on a long quiet loop -->
+        <div class="lp-hg-person lp-hg-meera" style="left: 65.2%; top: 65.1%;">
+          <span class="lp-pebble lp-hg-pebble" style="background: var(--member-2);">M</span>
+          <span class="lp-tag">Meera · heading home</span>
+        </div>
+        </div>
       </div>
-      <div class="lp-hg-person" style="left: 82.5%; top: 54%;">
-        <span class="lp-pebble lp-hg-pebble" style="background: var(--member-1);">A</span>
-        <span class="lp-tag">Arjun · home</span>
-      </div>
-      <div class="lp-hg-person lp-hg-walking" style="left: 65.2%; top: 60%;">
-        <span class="lp-pebble lp-hg-pebble" style="background: var(--member-2);">M</span>
-        <span class="lp-tag">Meera · heading home</span>
-      </div>
+      <!-- a slow wash of daylight over the map -->
+      <div class="lp-hg-light"></div>
       <!-- text column readability: paper mist under the headline -->
       <div class="lp-hero-mist"></div>
     </div>
@@ -597,14 +605,50 @@
       animation: lp-headline-rise 780ms cubic-bezier(0.16, 1, 0.3, 1) 160ms both;
     }
     .lp-cue-line { animation: lp-cue-sweep 2.6s ease-in-out 1.4s infinite; }
-    /* scenery keeps its centering transform — entrance is opacity-only */
-    .lp-hero-verdict, .lp-hg-person, .lp-hg-place {
-      opacity: 0;
-      animation: lp-fade-in 640ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    /* ── THE WORLD ASSEMBLES — a ~1.6s choreography, then it lives ────────
+       grid breathes in → park inks in → roads draw themselves → route dots
+       arrive → pebbles DROP onto the map → labels settle → the verdict
+       plate concludes. Left column words rise in parallel. */
+    .lp-hg-grid { opacity: 0; animation: lp-fade-in 900ms ease-out 60ms both; }
+    .lp-hg-green {
+      opacity: 0; transform-origin: 53% 87%;
+      animation: lp-ink-in 760ms cubic-bezier(0.34, 1.4, 0.64, 1) 220ms both;
     }
-    .lp-hero-verdict { animation-delay: 620ms; }
-    .lp-hg-person { animation-delay: 760ms; }
-    .lp-hg-place { animation-delay: 900ms; }
+    .lp-hg-road {
+      stroke-dasharray: 2400;
+      stroke-dashoffset: 2400;
+      animation: lp-draw 1100ms cubic-bezier(0.55, 0, 0.25, 1) both;
+    }
+    .lp-hg-road-1 { animation-delay: 260ms; }
+    .lp-hg-road-2 { animation-delay: 430ms; }
+    .lp-hg-route { opacity: 0; animation: lp-fade-in 500ms ease-out 900ms both; }
+    .lp-hg-person {
+      opacity: 0;
+      animation: lp-pebble-drop 640ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
+    .lp-hg-p1 { animation-delay: 780ms; }
+    .lp-hg-p2 { animation-delay: 900ms; }
+    .lp-hg-meera { animation-delay: 1020ms; }
+    .lp-hg-place { opacity: 0; animation: lp-fade-in 560ms ease-out 1180ms both; }
+    .lp-hero-verdict {
+      opacity: 0;
+      animation: lp-verdict-in 700ms cubic-bezier(0.16, 1, 0.3, 1) 1320ms both;
+    }
+
+    /* ── AND THEN IT LIVES — long, quiet loops (start after assembly) ─────
+       Meera walks her whole route home; her trail dots crawl the same way;
+       the settled pebbles breathe; daylight drifts across; the world floats. */
+    .lp-hg-drift { animation: lp-world-drift 46s ease-in-out 2s infinite alternate; }
+    .lp-hg-light { animation: lp-light-drift 37s ease-in-out 2s infinite alternate; }
+    .lp-hg-meera {
+      animation:
+        lp-pebble-drop 640ms cubic-bezier(0.34, 1.56, 0.64, 1) 1020ms both,
+        lp-meera-walk 24s linear 2.2s infinite;
+    }
+    .lp-hg-route { animation: lp-fade-in 500ms ease-out 900ms both, lp-dots-crawl 3.4s linear 2.2s infinite; }
+    .lp-hg-p1 .lp-hg-pebble { animation: lp-breathe 5.2s ease-in-out 2.4s infinite; }
+    .lp-hg-p2 .lp-hg-pebble { animation: lp-breathe 5.2s ease-in-out 3.6s infinite; }
+    .lp-hv-dot { animation: lp-dot-pulse 3s ease-in-out 2.4s infinite; }
     /* the closing eyebrow/headline reuse .lp-eyebrow — but their reveal is
        scroll-driven via .reveal-scroll (global.css), so cancel the load-time
        rise there to avoid double animation */
@@ -615,6 +659,53 @@
   }
   @keyframes lp-fade-in {
     to { opacity: 1; }
+  }
+  @keyframes lp-ink-in {
+    from { opacity: 0; transform: scale(0.82); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  @keyframes lp-draw {
+    to { stroke-dashoffset: 0; }
+  }
+  @keyframes lp-pebble-drop {
+    from { opacity: 0; transform: translate(-50%, calc(-50% - 26px)) scale(1.25); }
+    60%  { opacity: 1; transform: translate(-50%, calc(-50% + 3px)) scale(0.97); }
+    to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  }
+  @keyframes lp-verdict-in {
+    from { opacity: 0; transform: translateY(-14px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes lp-world-drift {
+    from { transform: translate(0, 0); }
+    to { transform: translate(-26px, -16px); }
+  }
+  @keyframes lp-light-drift {
+    from { transform: translate(-8%, -5%); }
+    to { transform: translate(8%, 6%); }
+  }
+  @keyframes lp-breathe {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.055); }
+  }
+  @keyframes lp-dot-pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.35); opacity: 0.7; }
+  }
+  @keyframes lp-dots-crawl {
+    to { stroke-dashoffset: -9; }
+  }
+  /* Meera's commute: constant walking speed along the drawn route
+     (segment lengths 116 / 175 / 60 world-px → 30% / 76% / 92% of the walk),
+     a pause at Home, then a soft reset back to the start. */
+  @keyframes lp-meera-walk {
+    0%   { opacity: 1; transform: translate(-50%, -50%); }
+    30%  { transform: translate(-50%, calc(-50% - 12.9svh)); }
+    76%  { transform: translate(calc(-50% + 10.9vw), calc(-50% - 12.9svh)); }
+    92%  { opacity: 1; transform: translate(calc(-50% + 10.9vw), calc(-50% - 19.5svh)); }
+    95.5%{ opacity: 0; transform: translate(calc(-50% + 10.9vw), calc(-50% - 19.5svh)); }
+    96.5%{ opacity: 0; transform: translate(-50%, -50%); }
+    100% { opacity: 1; transform: translate(-50%, -50%); }
   }
   @keyframes lp-headline-rise {
     to { opacity: 1; transform: translateY(0); }
@@ -627,14 +718,29 @@
   /* ── Hero ground — the quiet map IS the page, from the first pixel ────── */
   .lp-hero-ground {
     position: absolute; inset: 0; overflow: hidden; pointer-events: none;
+    background: var(--map-base);
+  }
+  /* Everything ON the map drifts together, imperceptibly — the world floats.
+     Oversized so the slow pan never reveals an edge. */
+  .lp-hg-drift { position: absolute; inset: -48px; }
+  .lp-hg-grid {
+    position: absolute; inset: 0;
     background:
       linear-gradient(90deg, var(--map-street) 0 2px, transparent 2px) 40px 0 / 170px 100%,
       linear-gradient(0deg, var(--map-street) 0 2px, transparent 2px) 0 30px / 100% 150px,
       linear-gradient(90deg, color-mix(in oklch, var(--map-street) 55%, transparent) 0 1px, transparent 1px) 10px 0 / 34px 100%,
-      linear-gradient(0deg, color-mix(in oklch, var(--map-street) 55%, transparent) 0 1px, transparent 1px) 0 8px / 100% 36px,
-      var(--map-base);
+      linear-gradient(0deg, color-mix(in oklch, var(--map-street) 55%, transparent) 0 1px, transparent 1px) 0 8px / 100% 36px;
   }
+  /* scene = the true hero box inside the oversized drift layer, so HTML
+     overlays and SVG geometry share one coordinate space */
+  .lp-hg-scene { position: absolute; inset: 48px; }
   .lp-hg-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .lp-hg-light {
+    position: absolute; inset: -30%;
+    background: radial-gradient(ellipse 34% 30% at 50% 50%,
+      color-mix(in oklch, var(--card) 55%, transparent) 0%, transparent 70%);
+    opacity: 0.5;
+  }
   .lp-hg-green {
     fill: var(--map-park);
     stroke: color-mix(in oklch, var(--ink) 6%, transparent); stroke-width: 1.5;
