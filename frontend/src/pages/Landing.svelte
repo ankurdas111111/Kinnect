@@ -244,8 +244,35 @@
 
 <div class="lp">
 
-  <!-- ═══ HERO ═══════════════════════════════════════════════════════════ -->
+  <!-- ═══ HERO — the page opens already inside the quiet map ═════════════ -->
   <section class="lp-hero">
+    <!-- The world, at rest: whisper-contrast terrain the story will zoom into -->
+    <div class="lp-hero-ground" aria-hidden="true">
+      <svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" class="lp-hg-svg">
+        <path class="lp-hg-green" d="M 716 734 C 752 680, 832 654, 896 666 C 938 674, 952 702, 986 710 C 1016 718, 1032 762, 1018 798 C 1008 824, 978 830, 974 854 C 969 882, 928 906, 884 906 C 852 906, 834 890, 802 898 C 758 909, 706 890, 688 852 C 674 822, 686 800, 678 778 C 672 760, 696 746, 716 734 Z" />
+        <path class="lp-hg-road" d="M -40 700 C 300 640, 640 660, 940 560 C 1220 468, 1420 300, 1660 190" />
+        <path class="lp-hg-road" d="M 1140 -40 C 1160 240, 1130 520, 1170 940" />
+        <polyline class="lp-hg-route" points="1043,586 1043,470 1218,470 1218,410" />
+      </svg>
+      <!-- The family, living in the scene -->
+      <span class="lp-hg-place" style="left: 74.5%; top: 38.5%;">Home</span>
+      <span class="lp-hg-place" style="left: 62%; top: 68.5%;">School</span>
+      <div class="lp-hg-person" style="left: 78.5%; top: 46%;">
+        <span class="lp-pebble lp-hg-pebble" style="background: var(--ember);">P</span>
+        <span class="lp-tag">You · home</span>
+      </div>
+      <div class="lp-hg-person" style="left: 82.5%; top: 54%;">
+        <span class="lp-pebble lp-hg-pebble" style="background: var(--member-1);">A</span>
+        <span class="lp-tag">Arjun · home</span>
+      </div>
+      <div class="lp-hg-person lp-hg-walking" style="left: 65.2%; top: 60%;">
+        <span class="lp-pebble lp-hg-pebble" style="background: var(--member-2);">M</span>
+        <span class="lp-tag">Meera · heading home</span>
+      </div>
+      <!-- text column readability: paper mist under the headline -->
+      <div class="lp-hero-mist"></div>
+    </div>
+
     <nav class="lp-nav" aria-label="Landing">
       <span class="lp-wordmark">Kinnect</span>
       <div class="lp-nav-actions">
@@ -257,42 +284,27 @@
       </div>
     </nav>
 
+    <!-- The app's own answer, floating as scenery -->
+    <div class="lp-hero-verdict" aria-hidden="true">
+      <span class="lp-hv-dot"></span>
+      <span class="lp-hv-verdict">Everyone&rsquo;s settled.</span>
+      <span class="lp-hv-clock">19:30</span>
+    </div>
+
     <div class="lp-hero-body">
       <span class="lp-eyebrow">Family location sharing, without the noise</span>
       <h1 class="lp-headline">A quiet map for the people you love.</h1>
       <p class="lp-sub">
-        Kinnect shows your family as a few pebbles on a map and tells you, in one
-        sentence, whether everyone's OK. No feeds. No pings. No dashboard.
+        Your family as a few pebbles, one honest sentence about how everyone's
+        doing — and nothing else. No feeds. No pings. No dashboard.
       </p>
       <div class="lp-cta-row">
         <a class="lp-cta lp-cta-primary" href="#/register">Create your family — free</a>
-        <button class="lp-cta lp-cta-ghost" onclick={goStory}>See a day with one family ↓</button>
+        <button class="lp-cta-quiet" onclick={goStory}>Walk one Tuesday with the Nairs <span aria-hidden="true">↓</span></button>
       </div>
     </div>
 
-    <!-- The product, in miniature: a settled evening on the quiet map -->
-    <div class="lp-hero-vignette" aria-hidden="true">
-      <div class="lp-hv-head">
-        <span class="lp-hv-dot"></span>
-        <span class="lp-hv-verdict">Everyone&rsquo;s settled.</span>
-        <span class="lp-hv-clock">19:30</span>
-      </div>
-      <div class="lp-hv-map">
-        <div class="lp-hv-park"></div>
-        <svg viewBox="0 0 340 260" class="lp-hv-route">
-          <polyline points="56,224 56,156 150,156 150,118" fill="none" stroke="var(--member-2)"
-            stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="1 7" opacity="0.9" />
-        </svg>
-        <span class="lp-hv-place" style="left:252px; top:88px;">Home</span>
-        <span class="lp-hv-place" style="left:34px; top:238px;">School</span>
-        <div class="lp-hv-pebble" style="left:226px; top:120px; background:var(--ember);">P</div>
-        <div class="lp-hv-pebble" style="left:252px; top:146px; background:var(--member-1);">A</div>
-        <div class="lp-hv-pebble lp-hv-walking" style="left:150px; top:118px; background:var(--member-2);">M</div>
-        <span class="lp-hv-tag">Meera · heading home</span>
-      </div>
-    </div>
-
-    <div class="lp-scroll-cue"><span class="lp-cue-line" aria-hidden="true"></span>Scroll — a Tuesday with the Nair family, Bengaluru</div>
+    <div class="lp-scroll-cue"><span class="lp-cue-line" aria-hidden="true"></span>Scroll — the map remembers the whole day</div>
   </section>
 
   <!-- ═══ STORY (scroll-scrubbed) ════════════════════════════════════════ -->
@@ -425,8 +437,14 @@
     </div>
   </section>
 
-  <!-- ═══ CLOSING ════════════════════════════════════════════════════════ -->
+  <!-- ═══ CLOSING — back on the same ground, settled ═════════════════════ -->
   <section class="lp-closing">
+    <div class="lp-hero-ground lp-closing-ground" aria-hidden="true">
+      <svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" class="lp-hg-svg">
+        <path class="lp-hg-green" d="M 716 214 C 752 160, 832 134, 896 146 C 938 154, 952 182, 986 190 C 1016 198, 1032 242, 1018 278 C 1008 304, 978 310, 974 334 C 969 362, 928 386, 884 386 C 852 386, 834 370, 802 378 C 758 389, 706 370, 688 332 C 674 302, 686 280, 678 258 C 672 240, 696 226, 716 214 Z" />
+        <path class="lp-hg-road" d="M -40 700 C 300 640, 640 660, 940 560 C 1220 468, 1420 300, 1660 190" />
+      </svg>
+    </div>
     <span class="lp-eyebrow reveal-scroll">That's the whole app</span>
     <h2 class="lp-closing-headline reveal-scroll">Everyone's settled.</h2>
     <p class="lp-closing-body reveal-scroll">
@@ -435,7 +453,6 @@
     </p>
     <div class="lp-cta-row lp-cta-center reveal-scroll">
       <a class="lp-cta lp-cta-primary" href="#/register">Create your family — free</a>
-      <a class="lp-cta lp-cta-ghost" href="#/register">Get the app</a>
     </div>
     <div class="lp-foot">
       <span class="lp-foot-mark">Kinnect</span>
@@ -464,7 +481,7 @@
     padding: calc(var(--safe-top, 0px) + var(--space-5)) var(--space-6) var(--space-6);
     box-sizing: border-box;
   }
-  .lp-nav { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+  .lp-nav { position: relative; display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
   .lp-wordmark {
     font-family: var(--font-serif);
     font-style: italic;
@@ -497,12 +514,17 @@
   .lp-nav-pill:hover { border-color: color-mix(in oklch, var(--ink) 38%, transparent); }
 
   .lp-hero-body {
+    position: relative;
     flex: 1;
     display: flex; flex-direction: column; justify-content: center;
     gap: var(--space-6);
     max-width: 960px;
     padding: var(--space-12) 0;
   }
+  @media (min-width: 1080px) {
+    .lp-hero-body { max-width: min(720px, 52vw); }
+  }
+  .lp-scroll-cue { position: relative; }
   .lp-eyebrow {
     font-size: var(--text-xs); font-weight: 600;
     letter-spacing: 0.12em; text-transform: uppercase;
@@ -575,10 +597,14 @@
       animation: lp-headline-rise 780ms cubic-bezier(0.16, 1, 0.3, 1) 160ms both;
     }
     .lp-cue-line { animation: lp-cue-sweep 2.6s ease-in-out 1.4s infinite; }
-    .lp-hero-vignette {
+    /* scenery keeps its centering transform — entrance is opacity-only */
+    .lp-hero-verdict, .lp-hg-person, .lp-hg-place {
       opacity: 0;
-      animation: lp-hv-in 820ms cubic-bezier(0.16, 1, 0.3, 1) 520ms both;
+      animation: lp-fade-in 640ms cubic-bezier(0.16, 1, 0.3, 1) both;
     }
+    .lp-hero-verdict { animation-delay: 620ms; }
+    .lp-hg-person { animation-delay: 760ms; }
+    .lp-hg-place { animation-delay: 900ms; }
     /* the closing eyebrow/headline reuse .lp-eyebrow — but their reveal is
        scroll-driven via .reveal-scroll (global.css), so cancel the load-time
        rise there to avoid double animation */
@@ -587,6 +613,9 @@
   @keyframes lp-rise {
     to { opacity: 1; transform: translateY(0); }
   }
+  @keyframes lp-fade-in {
+    to { opacity: 1; }
+  }
   @keyframes lp-headline-rise {
     to { opacity: 1; transform: translateY(0); }
   }
@@ -594,86 +623,102 @@
     0%, 100% { transform: scaleX(1); opacity: 1; }
     50% { transform: scaleX(1.8); opacity: 0.45; }
   }
-  @keyframes lp-hv-in {
-    from { opacity: 0; transform: translateY(calc(-50% + 30px)) rotate(4.5deg); }
-    to { opacity: 1; transform: translateY(-50%) rotate(2deg); }
-  }
 
-  /* ── Hero vignette — the product in miniature, floating right ─────────── */
-  .lp-hero-vignette {
-    display: none;
+  /* ── Hero ground — the quiet map IS the page, from the first pixel ────── */
+  .lp-hero-ground {
+    position: absolute; inset: 0; overflow: hidden; pointer-events: none;
+    background:
+      linear-gradient(90deg, var(--map-street) 0 2px, transparent 2px) 40px 0 / 170px 100%,
+      linear-gradient(0deg, var(--map-street) 0 2px, transparent 2px) 0 30px / 100% 150px,
+      linear-gradient(90deg, color-mix(in oklch, var(--map-street) 55%, transparent) 0 1px, transparent 1px) 10px 0 / 34px 100%,
+      linear-gradient(0deg, color-mix(in oklch, var(--map-street) 55%, transparent) 0 1px, transparent 1px) 0 8px / 100% 36px,
+      var(--map-base);
+  }
+  .lp-hg-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .lp-hg-green {
+    fill: var(--map-park);
+    stroke: color-mix(in oklch, var(--ink) 6%, transparent); stroke-width: 1.5;
+  }
+  .lp-hg-road {
+    fill: none; stroke: var(--map-street); stroke-width: 12; stroke-linecap: round;
+  }
+  .lp-hg-route {
+    fill: none; stroke: var(--member-2); stroke-width: 3;
+    stroke-linecap: round; stroke-linejoin: round;
+    stroke-dasharray: 1 8; opacity: 0.85;
+  }
+  .lp-hg-place {
+    position: absolute; transform: translate(-50%, -50%);
+    font-size: 11px; font-weight: 600; letter-spacing: 0.02em;
+    color: var(--ink-3);
+    padding: 2px 8px; border-radius: 999px;
+    background: color-mix(in oklch, var(--card) 72%, transparent);
+    white-space: nowrap;
+  }
+  .lp-hg-person {
+    position: absolute; transform: translate(-50%, -50%);
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+  }
+  .lp-hg-pebble {
+    position: static; width: 36px; height: 36px; font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%; color: #fff; font-weight: 700;
+  }
+  .lp-hg-walking .lp-hg-pebble { box-shadow: 0 0 0 2px var(--sage), 0 8px 18px rgba(40, 30, 20, 0.30); }
+  /* the map breathes around the words — soft paper mist keeps the column AA */
+  .lp-hero-mist {
+    position: absolute; left: -12%; top: -6%;
+    width: 78%; height: 116%;
+    background: radial-gradient(ellipse 62% 58% at 38% 52%,
+      var(--paper) 0%,
+      color-mix(in oklch, var(--paper) 88%, transparent) 55%,
+      transparent 78%);
+  }
+  .lp-hero-verdict {
     position: absolute;
     right: clamp(24px, 5vw, 88px);
-    top: 50%;
-    width: min(400px, 30vw);
+    top: clamp(96px, 15vh, 148px);
+    display: none; align-items: center; gap: 9px;
+    padding: 10px 16px; border-radius: 999px;
     background: var(--card);
     border: 1px solid var(--hairline);
-    border-radius: 20px;
-    box-shadow: var(--sh), 0 2px 8px rgba(40, 30, 20, 0.10);
-    overflow: hidden;
-    transform: translateY(-50%) rotate(2deg);
-  }
-  @media (min-width: 1080px) {
-    .lp-hero-vignette { display: block; }
-    .lp-hero-body { max-width: min(760px, 56vw); }
-  }
-  .lp-hv-head {
-    display: flex; align-items: center; gap: 8px;
-    padding: 14px 16px;
-    border-bottom: 1px solid var(--hairline);
+    box-shadow: var(--sh);
   }
   .lp-hv-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sage); flex-shrink: 0; }
   .lp-hv-verdict {
     font-family: var(--font-serif); font-style: italic;
-    font-size: 19px; color: var(--ink);
-    flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-size: 19px; color: var(--ink); white-space: nowrap;
   }
   .lp-hv-clock {
     font-size: 12px; font-weight: 600; color: var(--ink-3);
     font-variant-numeric: tabular-nums;
   }
-  .lp-hv-map {
-    position: relative; height: 260px;
-    background:
-      linear-gradient(90deg, var(--map-street) 0 2px, transparent 2px) 14px 0 / 76px 100%,
-      linear-gradient(0deg, var(--map-street) 0 2px, transparent 2px) 0 10px / 100% 66px,
-      linear-gradient(90deg, var(--map-street) 0 1px, transparent 1px) 4px 0 / 19px 100%,
-      linear-gradient(0deg, var(--map-street) 0 1px, transparent 1px) 0 4px / 100% 17px,
-      var(--map-base);
+  /* Scenery earns its place only where there's room for it */
+  .lp-hg-place, .lp-hg-person { display: none; }
+  @media (min-width: 1080px) {
+    .lp-hero-verdict { display: inline-flex; }
+    .lp-hg-place, .lp-hg-person { display: flex; }
+    .lp-hg-place { display: inline-block; }
   }
-  .lp-hv-park {
-    position: absolute; left: -36px; top: 26px; width: 150px; height: 104px;
-    background: var(--map-park);
-    border-radius: 52% 48% 58% 42% / 55% 46% 54% 45%;
-    box-shadow: inset 0 0 0 1.5px color-mix(in oklch, var(--ink) 7%, transparent);
-  }
-  .lp-hv-route { position: absolute; inset: 0; width: 100%; height: 100%; }
-  .lp-hv-place {
-    position: absolute;
-    font-size: 10px; font-weight: 600; letter-spacing: 0.02em;
+  .lp-cta-quiet {
+    display: inline-flex; align-items: center; gap: 8px;
+    min-height: 52px; padding: 0 var(--space-2);
+    border: none; background: transparent; cursor: pointer;
+    font-family: inherit; font-size: var(--text-base); font-weight: 600;
     color: var(--ink-2);
-    padding: 1px 7px; border-radius: 999px;
-    background: color-mix(in oklch, var(--card) 78%, transparent);
+    border-bottom: 1.5px solid color-mix(in oklch, var(--ink) 25%, transparent);
+    border-radius: 0;
   }
-  .lp-hv-pebble {
-    position: absolute; box-sizing: border-box;
-    width: 30px; height: 30px; margin: -15px 0 0 -15px;
-    border-radius: 50%;
-    border: 2px solid var(--card);
-    box-shadow: 0 0 0 1.5px var(--sage), 0 2px 6px rgba(40, 30, 20, 0.25);
-    display: flex; align-items: center; justify-content: center;
-    color: #fff; font-weight: 700; font-size: 11px;
+  .lp-cta-quiet:hover { color: var(--ink); border-bottom-color: var(--ember); }
+  .lp-cta-quiet:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 3px; }
+
+  .lp-closing { position: relative; }
+  .lp-closing-ground {
+    opacity: 0.5;
+    mask-image: linear-gradient(to bottom, transparent 0%, black 40%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 40%);
   }
-  .lp-hv-tag {
-    position: absolute; left: 150px; top: 138px;
-    transform: translateX(-50%);
-    padding: 2px 8px; border-radius: 999px;
-    background: var(--card);
-    border: 1px solid var(--hairline);
-    box-shadow: 0 1px 2px rgba(40, 30, 20, 0.14);
-    font-size: 10.5px; font-weight: 600; color: var(--ink);
-    white-space: nowrap;
-  }
+  .lp-closing > :global(:not(.lp-closing-ground)) { position: relative; }
 
   /* ── Story ────────────────────────────────────────────────────────────── */
   .lp-story { position: relative; height: 700vh; }
