@@ -122,21 +122,21 @@
   // final scene, no timer.
   const HERO_BEATS = [
     { time: '07:00', line: 'Good morning, Nair family.', tone: null,
-      P: [78.5, 46, 'home'], A: [82.5, 54, 'home'], M: [80.8, 50.5, 'home'], N: [75.4, 40, 'home'] },
+      P: [78.5, 46, 'home'], A: [85, 57, 'home'], M: [81, 51.5, 'home'], N: [72.5, 36.5, 'home'] },
     { time: '07:40', line: 'Meera walks to school.', tone: null,
-      P: [78.5, 46, 'home'], A: [82.5, 54, 'home'], M: [62, 68.5, 'walking'], N: [75.4, 40, 'home'] },
+      P: [78.5, 46, 'home'], A: [85, 57, 'home'], M: [62, 68.5, 'walking'], N: [72.5, 36.5, 'home'] },
     { time: '09:00', line: 'Arjun drives to work.', tone: null,
-      P: [78.5, 46, 'home'], A: [88, 26, 'office'], M: [62, 68.5, 'school'], N: [75.4, 40, 'home'] },
+      P: [78.5, 46, 'home'], A: [88, 26, 'office'], M: [62, 68.5, 'school'], N: [72.5, 36.5, 'home'] },
     { time: '12:30', line: 'Nothing to report.', tone: null,
-      P: [78.5, 46, 'home'], A: [88, 26, 'office'], M: [62, 68.5, 'school'], N: [75.4, 40, 'home'] },
+      P: [78.5, 46, 'home'], A: [88, 26, 'office'], M: [62, 68.5, 'school'], N: [72.5, 36.5, 'home'] },
     { time: '16:40', line: "Nani's phone goes quiet.", tone: 'quiet',
-      P: [78.5, 46, 'home'], A: [88, 26, 'office'], M: [62, 68.5, 'school'], N: [75.4, 40, 'quiet'] },
+      P: [78.5, 46, 'home'], A: [88, 26, 'office'], M: [62, 68.5, 'school'], N: [72.5, 36.5, 'quiet'] },
     { time: '18:52', line: 'Meera holds SOS.', tone: 'sos',
-      P: [78.5, 46, 'home'], A: [80, 40, 'on his way'], M: [69, 58, 'SOS'], N: [75.4, 40, 'home'] },
+      P: [78.5, 46, 'home'], A: [81, 42, 'on his way'], M: [69, 58, 'SOS'], N: [72.5, 36.5, 'home'] },
     { time: '19:04', line: "She's safe.", tone: 'safe',
-      P: [78.5, 46, 'home'], A: [71, 55, 'with Meera'], M: [70, 56.5, 'safe'], N: [75.4, 40, 'home'] },
+      P: [78.5, 46, 'home'], A: [71, 55, 'with Meera'], M: [70, 56.5, 'safe'], N: [72.5, 36.5, 'home'] },
     { time: '19:30', line: "Everyone's settled.", tone: null,
-      P: [78.5, 46, 'home'], A: [82.5, 54, 'home'], M: [80.8, 50.5, 'home'], N: [75.4, 40, 'home'] },
+      P: [78.5, 46, 'home'], A: [85, 57, 'home'], M: [81, 51.5, 'home'], N: [72.5, 36.5, 'home'] },
   ];
   const HERO_CAST = [
     { k: 'P', name: 'You', color: 'var(--ember)' },
@@ -147,6 +147,36 @@
   let heroBeat = $state(HERO_BEATS.length - 1); // settled until the day starts
   let heroTimer = 0;
   let hb = $derived(HERO_BEATS[heroBeat]);
+
+  // ── Diorama camera — pointer parallax + scroll descent ──────────────────
+  // The map is a physical object: it tilts a few degrees toward the pointer,
+  // and flattens to top-down as you scroll into the story (--flat 1 → 0).
+  let heroEl = $state(null);
+  let heroCanvas = $state(null);
+  let webgl = $state(false);
+  let diorama = null;
+  let parallaxOn = false;
+  let pRaf = 0;
+  function onHeroPointer(e) {
+    if (!parallaxOn || pRaf) return;
+    const cx = e.clientX, cy = e.clientY;
+    pRaf = requestAnimationFrame(() => {
+      pRaf = 0;
+      if (!heroEl) return;
+      const r = heroEl.getBoundingClientRect();
+      const mx = ((cx - r.left) / r.width) * 2 - 1;
+      const my = ((cy - r.top) / r.height) * 2 - 1;
+      heroEl.style.setProperty('--px', `${(mx * 3).toFixed(2)}deg`);
+      heroEl.style.setProperty('--py', `${(-my * 2.2).toFixed(2)}deg`);
+      diorama?.setPointer(mx, my);
+    });
+  }
+  function onHeroLeave() {
+    if (!heroEl) return;
+    heroEl.style.setProperty('--px', '0deg');
+    heroEl.style.setProperty('--py', '0deg');
+    diorama?.setPointer(0, 0);
+  }
 
   // ── Scroll state ────────────────────────────────────────────────────────
   // pRaw is where the scrollbar IS; pS is where the CAMERA is. pS chases pRaw
@@ -177,6 +207,14 @@
       const total = r.height - vh;
       pRaw = total > 0 ? cl(-r.top / total) : 0;
     }
+    // Camera descent: leaving the hero flattens the diorama to top-down —
+    // one continuous move from the table view into the story's map view.
+    if (heroEl) {
+      const ht = cl((window.scrollY || document.documentElement.scrollTop || 0) / (vh * 0.85));
+      const f = 1 - sm(ht);
+      heroEl.style.setProperty('--flat', f.toFixed(3));
+      diorama?.setFlat(f);
+    }
     if (prefersReducedMotion()) { pS = pRaw; return; }
     if (!chaseRaf) chaseRaf = requestAnimationFrame(chase);
   }
@@ -192,6 +230,20 @@
     measure();
     pS = pRaw;   // land where the page loads, no initial chase
     requestAnimationFrame(measure);
+
+    // The WebGL diorama streams in as its own chunk; the DOM scene stays as
+    // the no-WebGL fallback. Pointer parallax only for fine pointers.
+    parallaxOn = !prefersReducedMotion() && matchMedia('(pointer: fine)').matches;
+    (async () => {
+      try {
+        const mod = await import('../lib/three/heroDiorama.js');
+        diorama = mod.initHeroDiorama(heroCanvas, { reduced: prefersReducedMotion() });
+        diorama.setBeat(HERO_BEATS[heroBeat]);
+        webgl = true;
+      } catch (e) {
+        console.warn('3D hero unavailable, DOM fallback active', e);
+      }
+    })();
 
     // Storytime: after the world assembles, the day begins — and keeps
     // looping. 2.4s per beat; glides are 1.7s so movement reads as travel.
@@ -214,7 +266,15 @@
       if (chaseRaf) cancelAnimationFrame(chaseRaf);
       if (typeof heroStart !== 'undefined') clearTimeout(heroStart);
       if (heroTimer && heroTimer !== -1) clearInterval(heroTimer);
+      diorama?.destroy();
+      diorama = null;
     };
+  });
+
+  // every beat reaches the 3D world too
+  $effect(() => {
+    const b = hb;
+    diorama?.setBeat(b);
   });
 
   function goStory() {
@@ -294,9 +354,14 @@
 <div class="lp">
 
   <!-- ═══ HERO — the page opens already inside the quiet map ═════════════ -->
-  <section class="lp-hero">
-    <!-- The world: assembles itself on load, then quietly keeps living -->
+  <section class="lp-hero" class:lp-webgl={webgl} bind:this={heroEl}
+    onpointermove={onHeroPointer} onpointerleave={onHeroLeave}>
+    <!-- The world: a paper map on a table — real perspective, pointer
+         parallax, and a camera that descends into it as you scroll -->
     <div class="lp-hero-ground" aria-hidden="true">
+      <!-- WebGL diorama (lazy chunk); the DOM world below is the fallback -->
+      <canvas class="lp-hg-canvas" bind:this={heroCanvas}></canvas>
+      <div class="lp-hg-world">
       <div class="lp-hg-drift">
         <div class="lp-hg-grid"></div>
         <div class="lp-hg-scene">
@@ -316,13 +381,18 @@
             class:lp-hg-sos={b[2] === 'SOS'}
             class:lp-hg-quiet={b[2] === 'quiet'}
             style:left={`${b[0]}%`} style:top={`${b[1]}%`}>
-            <span class="lp-pebble lp-hg-pebble"
-              style:background={b[2] === 'SOS' ? 'var(--vermilion)' : b[2] === 'quiet' ? 'var(--lp-quiet)' : c.color}>{c.k}</span>
-            <span class="lp-tag" class:lp-tag-sos={b[2] === 'SOS'} class:lp-tag-quiet={b[2] === 'quiet'}>{c.name} · {b[2]}</span>
+            <!-- stand: billboarded upright off the board, pivot at the feet -->
+            <div class="lp-hg-stand">
+              <span class="lp-pebble lp-hg-pebble"
+                style:background={b[2] === 'SOS' ? 'var(--vermilion)' : b[2] === 'quiet' ? 'var(--lp-quiet)' : c.color}>{c.k}</span>
+              <span class="lp-tag" class:lp-tag-sos={b[2] === 'SOS'} class:lp-tag-quiet={b[2] === 'quiet'}>{c.name} · {b[2]}</span>
+            </div>
+            <span class="lp-hg-shadow"></span>
           </div>
         {/each}
         </div>
       </div>
+      </div><!-- /lp-hg-world -->
       <!-- the day's tone washes the edges of the world -->
       <div class="lp-hero-tone" class:lp-tone-quiet={hb.tone === 'quiet'} class:lp-tone-sos={hb.tone === 'sos'} class:lp-tone-safe={hb.tone === 'safe'}></div>
       <!-- a slow wash of daylight over the map -->
@@ -772,6 +842,15 @@
     position: absolute; inset: 0; overflow: hidden; pointer-events: none;
     background: var(--map-base);
   }
+  /* WebGL diorama canvas — replaces the DOM world when it initialises */
+  .lp-hg-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: none; }
+  .lp-webgl .lp-hg-canvas { display: block; }
+  .lp-webgl .lp-hg-world, .lp-webgl .lp-hg-light { display: none; }
+  /* DOM-fallback wrappers stay layout-neutral */
+  .lp-hg-world { position: absolute; inset: 0; }
+  .lp-hg-stand { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .lp-hg-shadow { display: none; }
+
   /* Everything ON the map drifts together, imperceptibly — the world floats.
      Oversized so the slow pan never reveals an edge. */
   .lp-hg-drift { position: absolute; inset: -48px; }
