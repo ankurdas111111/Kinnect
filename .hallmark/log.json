@@ -1,0 +1,20 @@
+{
+  "runs": [
+    {
+      "date": "2026-09-10",
+      "scope": "whole-app product-mode craft pass (landing excluded — 7 prior rounds)",
+      "mode": "product", "dials": { "variance": 3, "motion": 3, "density": 5 },
+      "theme": "hearth (established brand — brief wins over calibration list)",
+      "findings_fixed": [
+        "mobile auth: mesh wrapper in flex flow below 768px crushed layout; header white-on-paper",
+        "mobile map: pulse FAB + control cluster floated over open bottom sheet",
+        "StatusPills leaked telemetry (GPS m, latency ms, contradictory Live/Off) → exception-only chips",
+        "family empty-state CTA icon/label mismatch (person-add icon on Open Map)"
+      ],
+      "deferred": [
+        "sheet peek height clips the Now card CTA mid-word on Map tab",
+        "ghost-constellation micro-labels (~10px) below comfortable legibility"
+      ]
+    }
+  ]
+}
