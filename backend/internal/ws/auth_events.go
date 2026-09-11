@@ -405,13 +405,13 @@ func (h *Hub) handlePosition(c *Client, data json.RawMessage) {
 	}
 	h.queuePositionBroadcast(user, lean)
 
-	// liveUpdate viewers need the full snapshot (displayName, rooms, geofence, etc.)
+	// Link viewers get the viewer projection, never the full record.
 	tokens := h.Cache.GetLiveTokensForUser(user.UserID)
 	if len(tokens) > 0 {
-		sanitized := h.Cache.SanitizeUser(user)
-		sanitized["online"] = true
+		viewerView := h.Cache.SanitizeUserForViewer(user)
+		viewerView["online"] = true
 		for token := range tokens {
-			h.SendToGroup("live:"+token, "liveUpdate", map[string]interface{}{"user": sanitized})
+			h.SendToGroup("live:"+token, "liveUpdate", map[string]interface{}{"user": viewerView})
 		}
 	}
 
@@ -530,8 +530,12 @@ func (h *Hub) handlePositionBatch(c *Client, data json.RawMessage) {
 	sanitized["online"] = true
 	h.queuePositionBroadcast(user, sanitized)
 	tokens := h.Cache.GetLiveTokensForUser(user.UserID)
-	for token := range tokens {
-		h.SendToGroup("live:"+token, "liveUpdate", map[string]interface{}{"user": sanitized})
+	if len(tokens) > 0 {
+		viewerView := h.Cache.SanitizeUserForViewer(user)
+		viewerView["online"] = true
+		for token := range tokens {
+			h.SendToGroup("live:"+token, "liveUpdate", map[string]interface{}{"user": viewerView})
+		}
 	}
 	h.runAutoRules(user)
 	h.checkCrowdMode(user) // KR-005: crowd mode must re-evaluate after batch replay, same as single position
@@ -1472,11 +1476,14 @@ func (h *Hub) handleWatchJoin(c *Client, data json.RawMessage) {
 	h.JoinGroup(c.ID(), "watch:"+token)
 	target := h.Cache.GetActiveUser(entry.SocketID)
 	if target == nil {
-		// Target offline - send minimal init
-		c.Send("watchInit", map[string]interface{}{"userId": entry.UserID})
+		// Target offline — the watch page needs the {user, sos} shape either way.
+		c.Send("watchInit", map[string]interface{}{"user": nil, "sos": nil})
 		return
 	}
-	c.Send("watchInit", h.Cache.SanitizeUser(target))
+	c.Send("watchInit", map[string]interface{}{
+		"user": h.Cache.SanitizeUserForViewer(target),
+		"sos":  h.viewerSos(target),
+	})
 }
 
 // handleLiveJoin joins live:token group and sends liveInit.
@@ -1518,10 +1525,15 @@ func (h *Hub) handleLiveJoin(c *Client, data json.RawMessage) {
 
 	target := h.Cache.GetActiveUser(h.Cache.GetUserIdToSocketId(entry.UserID))
 	if target == nil {
-		c.Send("liveInit", map[string]interface{}{"userId": entry.UserID})
+		// Sharer is offline: no identity leak, the page shows its offline state.
+		c.Send("liveInit", map[string]interface{}{"user": nil, "expiresAt": entry.ExpiresAt})
 		return
 	}
-	c.Send("liveInit", map[string]interface{}{"user": h.Cache.SanitizeUser(target)})
+	c.Send("liveInit", map[string]interface{}{
+		"user":      h.Cache.SanitizeUserForViewer(target),
+		"sos":       h.viewerSos(target),
+		"expiresAt": entry.ExpiresAt,
+	})
 }
 
 // handleNudgeUser — Hearth 06b "Nudge": ask a dormant family member to turn

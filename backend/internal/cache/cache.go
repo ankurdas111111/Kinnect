@@ -944,6 +944,40 @@ func (c *Cache) SanitizeUser(user *ActiveUser) map[string]interface{} {
 	return result
 }
 
+// SanitizeUserForViewer is the least-privilege projection sent to share-link
+// recipients (live/watch tokens), who may be unauthenticated strangers holding
+// only a URL. SanitizeUser is the FULL internal record — it carries the home
+// geofence centre, auto-SOS thresholds, check-in schedule, quiet hours, room
+// membership and internal ids — none of which a link recipient needs and all
+// of which would leak the sharer's home address to anyone forwarded the link.
+//
+// Only add a field here when a viewer surface actually renders it.
+func (c *Cache) SanitizeUserForViewer(user *ActiveUser) map[string]interface{} {
+	return map[string]interface{}{
+		"displayName":   user.DisplayName,
+		"latitude":      user.Latitude,
+		"longitude":     user.Longitude,
+		"speed":         user.Speed,
+		"lastUpdate":    user.LastUpdate,
+		"timestamp":     user.LastUpdate, // viewer freshness check reads .timestamp
+		"formattedTime": user.FormattedTime,
+		"batteryPct":    user.BatteryPct,
+		"online":        user.Online,
+		"sos": map[string]interface{}{
+			"active": user.SOS.Active,
+			"at":     user.SOS.At,
+			"reason": user.SOS.Reason,
+			"type":   user.SOS.Type,
+		},
+		// The sharer typed these into the ride sheet specifically to be seen.
+		"rideShare": map[string]interface{}{
+			"active":  user.RideShareActive,
+			"vehicle": user.RideShareVehicle,
+			"dest":    user.RideShareDest,
+		},
+	}
+}
+
 // GetUser returns a user cache entry by ID. Caller must not modify.
 // Updates LastAccessedAt under a write lock so EvictLRU can track recency.
 func (c *Cache) GetUser(userID string) *db.UserCacheEntry {

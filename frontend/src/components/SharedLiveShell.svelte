@@ -207,6 +207,9 @@
     left: 0;
     right: 0;
     z-index: 50;
+    /* Overlay chrome above a draggable map — never a selection target. */
+    user-select: none;
+    -webkit-user-select: none;
     padding: calc(var(--space-3) + env(safe-area-inset-top, 0px)) var(--space-5) var(--space-3);
     background: var(--glass-panel-bg);
     backdrop-filter: var(--glass-panel-blur);

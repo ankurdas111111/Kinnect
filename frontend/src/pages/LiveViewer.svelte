@@ -131,13 +131,17 @@
       connectionIssue = '';
       linkJoinedAt = Date.now();
       if (data.expiresAt) linkExpiresAt = data.expiresAt;
-      if (data.user) { updateMarker(data.user); online = true; statusText = 'Tracking ' + (sharedBy || 'User'); }
-      else { online = false; statusText = (sharedBy || 'User') + ' (offline)'; }
+      // Name comes off the payload, not updateMarker — that early-returns when
+      // the map or a coordinate is missing, which left the pill on "User".
+      if (data.user?.displayName) sharedBy = data.user.displayName;
+      if (data.user) { updateMarker(data.user); online = true; statusText = 'Tracking ' + sharedBy; }
+      else { online = false; statusText = sharedBy + ' (offline)'; }
       if (data.sos?.active) showSos(data.sos);
     });
 
     socket.on('liveUpdate', (data) => {
       if (data.user) {
+        if (data.user.displayName) sharedBy = data.user.displayName;
         updateMarker(data.user);
         online = true;
         statusText = 'Tracking ' + sharedBy;
@@ -145,7 +149,8 @@
       }
     });
 
-    socket.on('liveSosUpdate', (data) => { if (data.active) showSos(data); else hideSos(); });
+    // Viewer contract is {sos}, matching liveInit/watchInit/watchUpdate.
+    socket.on('liveSosUpdate', (data) => { if (data?.sos?.active) showSos(data.sos); else hideSos(); });
 
     socket.on('liveCheckInUpdate', (data) => {
       if (!data?.enabled) { checkinText = ''; return; }

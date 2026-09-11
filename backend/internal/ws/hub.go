@@ -81,6 +81,7 @@ type Hub struct {
 
 	// Free-tier optimizations
 	ConnLimiter     *ConnectionLimiter
+	ViewerLimiter   *ViewerLimiter
 	MemoryMonitor   *MemoryMonitor
 	ShutdownOnce    sync.Once
 	IsShuttingDown  bool
@@ -104,7 +105,10 @@ func NewHub(c *cache.Cache, p *db.Pool, cfg *config.Config) *Hub {
 		pendingPositions: make(map[string]positionBroadcast),
 		rollingBufs:      make(map[string]*rollingBuffer),
 		batchUserLast:    make(map[string]int64),
+		// Both limiters are constructed HERE — InitConnectionLimiter is never
+		// called by any caller, so an init placed there silently stays nil.
 		ConnLimiter:      NewConnectionLimiter(config.MaxWebSocketConnections),
+		ViewerLimiter:    NewViewerLimiter(maxViewerConnsPerIP),
 		MemoryMonitor:    NewMemoryMonitor(10 * time.Second),
 		IsShuttingDown:   false,
 	}
@@ -255,6 +259,22 @@ func (h *Hub) offloadDB(fn func(ctx context.Context)) {
 }
 
 func (h *Hub) handleRegister(c *Client) {
+	// Anonymous share-link viewers are sockets, not users: they take no slot in
+	// the ActiveUser registry, claim no userID→socket mapping (every viewer has
+	// userID "" and would evict the previous one), and are never announced to
+	// anybody. They exist only to receive the live:/watch: group they join.
+	if c.isViewer {
+		h.mu.Lock()
+		h.clients[c.ID()] = c
+		h.mu.Unlock()
+		c.Send("welcome", map[string]interface{}{"socketId": c.ID()})
+		if h.metrics != nil {
+			h.metrics.WSConnectionsActive.Inc()
+			h.metrics.WSConnectionsTotal.Inc()
+		}
+		return
+	}
+
 	userID := c.UserID()
 	role := c.Role()
 	if role == "" {
@@ -418,6 +438,10 @@ func (h *Hub) handleUnregister(c *Client) {
 
 	user := h.Cache.GetActiveUser(clientID)
 	if user == nil {
+		// Viewers have no ActiveUser; still balance the gauge they incremented.
+		if c.isViewer && h.metrics != nil {
+			h.metrics.WSConnectionsActive.Dec()
+		}
 		return
 	}
 
@@ -523,7 +547,22 @@ func (h *Hub) leaveAllGroupsLocked(clientID string) {
 	}
 }
 
+// viewerAllowedEvents is the COMPLETE set an anonymous share-link socket may
+// invoke. Default-deny: anything absent is refused, so adding a handler to the
+// registry never silently widens what a stranger with a URL can reach.
+//   liveJoin/watchJoin — redeem the share token (the token is authorized there)
+//   liveAckSOS         — "I've seen it", keyed off the liveToken set by liveJoin
+var viewerAllowedEvents = map[string]bool{
+	"liveJoin":   true,
+	"watchJoin":  true,
+	"liveAckSOS": true,
+}
+
 func (h *Hub) handleDispatch(dm *dispatchMsg) {
+	if dm.client.isViewer && !viewerAllowedEvents[dm.msg.Event] {
+		slog.Warn("Viewer event refused", "event", dm.msg.Event, "client", dm.client.ID())
+		return
+	}
 	handler, ok := h.handlers[dm.msg.Event]
 	if !ok {
 		slog.Debug("Unknown event", "event", dm.msg.Event, "client", dm.client.ID())
@@ -550,20 +589,31 @@ func (h *Hub) handleBroadcast(bm *broadcastMsg) {
 
 // HandleUpgrade upgrades HTTP to WebSocket using nhooyr/websocket.
 func (h *Hub) HandleUpgrade(w http.ResponseWriter, r *http.Request, sessionData *auth.SessionData) {
-	if sessionData == nil || sessionData.User == nil || sessionData.User.ID == "" {
-		slog.Warn("WebSocket upgrade rejected: no session/user",
-			"hasSession", sessionData != nil,
-			"hasUser", sessionData != nil && sessionData.User != nil,
-			"origin", r.Header.Get("Origin"),
-			"cookie", r.Header.Get("Cookie") != "")
-		http.Error(w, "Session expired", http.StatusUnauthorized)
-		return
+	// Sessionless upgrades are share-link viewers: someone holding a live/watch
+	// URL who has no Kinnect account. They connect as an anonymous VIEWER client
+	// and may only invoke viewerAllowedEvents (enforced fail-closed in
+	// handleDispatch); the share token itself is the capability, checked in
+	// handleLiveJoin/handleWatchJoin against the token store.
+	isViewer := sessionData == nil || sessionData.User == nil || sessionData.User.ID == ""
+	viewerIP := ""
+	if isViewer {
+		viewerIP = clientIP(r)
+		if !h.ViewerLimiter.Acquire(viewerIP) {
+			slog.Warn("Viewer upgrade rejected: per-IP cap", "ip", viewerIP)
+			http.Error(w, "Too many connections", http.StatusTooManyRequests)
+			h.ConnLimiter.ReleaseConnection() // acquired by the HTTP handler pre-upgrade
+			return
+		}
 	}
 
-	userID := sessionData.User.ID
-	role := sessionData.User.Role
-	if role == "" {
-		role = "user"
+	userID := ""
+	role := "viewer"
+	if !isViewer {
+		userID = sessionData.User.ID
+		role = sessionData.User.Role
+		if role == "" {
+			role = "user"
+		}
 	}
 
 	// Derive host:port patterns from configured CORS origins for origin validation.
@@ -588,11 +638,16 @@ func (h *Hub) HandleUpgrade(w http.ResponseWriter, r *http.Request, sessionData 
 	if err != nil {
 		slog.Warn("WebSocket upgrade failed", "error", err, "userID", userID)
 		h.ConnLimiter.ReleaseConnection() // slot was acquired in the HTTP handler before upgrade
+		if isViewer {
+			h.ViewerLimiter.Release(viewerIP)
+		}
 		return
 	}
 	slog.Info("WebSocket connected", "userID", userID, "role", role)
 
 	client := NewClient(h, conn, userID, role)
+	client.isViewer = isViewer
+	client.viewerIP = viewerIP
 	// Do not bind pumps to request context: net/http may cancel it as soon as
 	// the handler returns, which would stop read/write pumps immediately and
 	// leave a seemingly-open but non-functional websocket.

@@ -36,6 +36,10 @@ type Client struct {
 	rateMu    sync.Mutex
 	liveToken string
 	liveViewerName string
+	// isViewer: connected without a session, holding only a share link.
+	// Gated to viewerAllowedEvents at dispatch (hub.go).
+	isViewer  bool
+	viewerIP  string
 	done      chan struct{}
 }
 
@@ -81,6 +85,9 @@ func (c *Client) ReadPump(ctx context.Context) {
 	defer func() {
 		// Release connection limit
 		c.hub.ConnLimiter.ReleaseConnection()
+		if c.isViewer {
+			c.hub.ViewerLimiter.Release(c.viewerIP)
+		}
 
 		select {
 		case c.hub.unregister <- c:

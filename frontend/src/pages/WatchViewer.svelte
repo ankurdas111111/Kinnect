@@ -76,9 +76,12 @@
   let sosNarrative = $state(null);
 
   function update(u) {
-    if (!map || !u || typeof u.latitude !== 'number') return;
-    watchedName = u.displayName || 'User';
-    watchedPhone = u.mobile || '';
+    if (!u) return;
+    // Identity lands even before the first coordinate, so the header never
+    // sits on an empty name while the map waits for a fix.
+    if (u.displayName) watchedName = u.displayName;
+    if (u.mobile) watchedPhone = u.mobile;
+    if (!map || typeof u.latitude !== 'number') return;
     const lngLat = [u.longitude, u.latitude];
     const popupHtml = `<strong>${escapeAttr(u.displayName || 'User')}</strong><br>Lat: ${formatCoordinate(u.latitude)}<br>Lng: ${formatCoordinate(u.longitude)}<br>Speed: ${u.speed || '0'} km/h`;
     if (!marker) {

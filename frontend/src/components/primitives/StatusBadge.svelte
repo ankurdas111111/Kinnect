@@ -49,6 +49,10 @@
     align-items: center;
     gap: var(--space-2);
     min-width: 0;
+    /* Map chrome, not content: a drag that starts on the badge was selecting
+       the label, leaving a highlight block stranded over the live pill. */
+    user-select: none;
+    -webkit-user-select: none;
     padding: var(--space-1) var(--space-3);
     border-radius: var(--radius-full, 9999px);
     font-size: var(--text-sm);

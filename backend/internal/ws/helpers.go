@@ -318,9 +318,17 @@ func (h *Hub) emitSosUpdate(user *cache.ActiveUser) {
 	h.emitLiveSos(user)
 }
 
+// viewerSos is the SOS block for share-link recipients: publicSos without the
+// internal socketId/userId. Link viewers are unauthenticated by design.
+func (h *Hub) viewerSos(user *cache.ActiveUser) map[string]interface{} {
+	full := h.publicSos(user)
+	sos, _ := full["sos"].(map[string]interface{})
+	return sos
+}
+
 // emitLiveSos broadcasts SOS to live links.
 func (h *Hub) emitLiveSos(user *cache.ActiveUser) {
-	payload := h.publicSos(user)
+	payload := map[string]interface{}{"sos": h.viewerSos(user)}
 	tokens := h.Cache.GetLiveTokensForUser(user.UserID)
 	for token := range tokens {
 		h.SendToGroup("live:"+token, "liveSosUpdate", payload)
@@ -387,11 +395,15 @@ func (h *Hub) setSos(user *cache.ActiveUser, active bool, reason, ackBy, sosType
 }
 
 // emitWatch broadcasts to watch:token group.
+// Viewer contract: {user, sos} — the watch page reads payload.user/payload.sos.
 func (h *Hub) emitWatch(user *cache.ActiveUser) {
 	if user.SOS.Token == nil {
 		return
 	}
-	payload := h.publicSos(user)
+	payload := map[string]interface{}{
+		"user": h.Cache.SanitizeUserForViewer(user),
+		"sos":  h.viewerSos(user),
+	}
 	h.SendToGroup("watch:"+*user.SOS.Token, "watchUpdate", payload)
 }
 
