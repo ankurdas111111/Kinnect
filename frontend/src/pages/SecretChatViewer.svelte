@@ -486,7 +486,7 @@
 
         <form class="scv-login-form" on:submit|preventDefault={doLogin} novalidate>
           <div class="scv-field">
-            <label class="scv-sr" for="scv-login-email">Email address</label>
+            <label class="scv-field-label" for="scv-login-email">Email address</label>
             <input
               id="scv-login-email"
               class="scv-input"
@@ -502,7 +502,7 @@
             />
           </div>
           <div class="scv-field">
-            <label class="scv-sr" for="scv-login-pass">Password</label>
+            <label class="scv-field-label" for="scv-login-pass">Password</label>
             <input
               id="scv-login-pass"
               class="scv-input"
@@ -883,6 +883,9 @@
     justify-content: center;
     padding: var(--space-8, 32px) var(--space-4, 16px);
     box-sizing: border-box;
+    /* Login is not vault content — the forced-dark --scv-bg (meant for the
+       PIN gate / messages) read as a disabled scrim here. Un-dim it. */
+    background: var(--surface-0);
   }
 
   .scv-gate-content {
@@ -945,7 +948,7 @@
     margin: 0;
     font-size: var(--text-xl, 1.125rem);
     font-weight: 700;
-    color: rgba(255, 255, 255, 0.92);
+    color: var(--text-primary);
     letter-spacing: -0.01em;
     font-family: var(--font-sans, 'Nunito', sans-serif);
   }
@@ -953,7 +956,7 @@
   .scv-gate-sub {
     margin: 0;
     font-size: var(--text-xs, 0.75rem);
-    color: rgba(255, 255, 255, 0.36);
+    color: var(--text-secondary);
     line-height: var(--leading-relaxed, 1.625);
     font-family: var(--font-sans, 'Nunito', sans-serif);
   }
@@ -968,15 +971,25 @@
 
   .scv-field { width: 100%; }
 
+  .scv-field-label {
+    display: block;
+    margin-bottom: var(--space-1-5, 6px);
+    font-size: var(--text-xs, 0.75rem);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+  }
+
   .scv-input {
     width: 100%;
     box-sizing: border-box;
     min-height: 52px;
     padding: 0 var(--space-4, 16px);
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--surface-3);
     border: 1px solid var(--scv-border-accent);
     border-radius: var(--radius-lg, 14px);
-    color: rgba(255, 255, 255, 0.92);
+    color: var(--text-primary);
     /* 16px — iOS minimum to prevent auto-zoom on focus */
     font-size: 16px;
     font-family: var(--font-sans, 'Nunito', sans-serif);
@@ -988,7 +1001,7 @@
     appearance: none;
   }
 
-  .scv-input::placeholder { color: rgba(255, 255, 255, 0.28); }
+  .scv-input::placeholder { color: var(--text-tertiary); }
 
   .scv-input:focus {
     border-color: var(--scv-accent);
@@ -1011,9 +1024,9 @@
     width: 100%;
     padding: var(--space-4, 16px);
     border-radius: var(--radius-lg, 14px);
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    background: rgba(255, 255, 255, 0.06);
-    color: rgba(255, 255, 255, 0.45);
+    border: 1px solid var(--border-default);
+    background: var(--surface-2);
+    color: var(--text-tertiary);
     font-size: var(--text-base, 1rem);
     font-weight: 700;
     font-family: var(--font-sans, 'Nunito', sans-serif);
@@ -1064,7 +1077,7 @@
     gap: var(--space-1-5, 6px);
     font-size: var(--text-2xs, 0.6875rem);
     font-family: var(--font-mono, 'JetBrains Mono', monospace);
-    color: rgba(255, 255, 255, 0.14);
+    color: var(--text-tertiary);
     letter-spacing: 0.03em;
     margin: 0;
   }
@@ -1514,17 +1527,6 @@
   @keyframes scv-panic-on {
     from { opacity: 0; }
     to   { opacity: 1; }
-  }
-
-  /* ── Utility ──────────────────────────────────────────────────────── */
-  .scv-sr {
-    position: absolute;
-    width: 1px; height: 1px;
-    padding: 0; margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
   }
 
   @keyframes scv-spin { to { transform: rotate(360deg); } }

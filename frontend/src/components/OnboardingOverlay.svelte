@@ -105,14 +105,8 @@
         <div class="onboarding-step" role="tabpanel" aria-label="Step 1: Enable location">
           <div class="brand-icon" aria-hidden="true">
             <svg width="40" height="48" viewBox="0 0 20 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M10 1C5.029 1 1 5.029 1 10c0 6.938 8.25 13.1 9 14.1.75-1 9-7.162 9-14.1C19 5.029 14.971 1 10 1z" fill="url(#kpin-grad)"/>
-              <path d="M7 7v6M7 10l3.5-3M7 10l3.5 3" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-              <defs>
-                <linearGradient id="kpin-grad" x1="0" y1="0" x2="20" y2="24" gradientUnits="userSpaceOnUse">
-                  <stop stop-color="#60a5fa"/>
-                  <stop offset="1" stop-color="#1d4ed8"/>
-                </linearGradient>
-              </defs>
+              <path d="M10 1C5.029 1 1 5.029 1 10c0 6.938 8.25 13.1 9 14.1.75-1 9-7.162 9-14.1C19 5.029 14.971 1 10 1z" fill="white" fill-opacity="0.95"/>
+              <path d="M7 7v6M7 10l3.5-3M7 10l3.5 3" stroke="rgba(255,255,255,0.90)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </div>
           <h2 class="onboarding-title">Welcome to Kinnect</h2>
@@ -274,7 +268,7 @@
     width: 20px;
     border-radius: 3px;
     background: linear-gradient(135deg, var(--primary-500), var(--primary-700));
-    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.30);
+    box-shadow: 0 2px 8px color-mix(in oklch, var(--primary-500) 30%, transparent);
   }
 
   .onboarding-step {
@@ -289,19 +283,20 @@
   .brand-icon {
     width: clamp(76px, 5.5vw, 88px);
     height: clamp(76px, 5.5vw, 88px);
-    background: linear-gradient(135deg, rgba(99,102,241,0.18) 0%, rgba(139,92,246,0.12) 100%);
+    /* Canonical mark — ember squircle, matches Login.svelte's .auth-brand-logo */
+    background: linear-gradient(135deg, var(--primary-400) 0%, var(--primary-600) 50%, var(--primary-800) 100%);
     border-radius: 22px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid rgba(99, 102, 241, 0.28);
-    border-top-color: rgba(99, 102, 241, 0.40);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-top-color: rgba(255, 255, 255, 0.30);
     /* 3D floating icon */
     box-shadow:
-      0 8px 28px rgba(99, 102, 241, 0.22),
-      0 2px 8px rgba(99, 102, 241, 0.15),
-      inset 0 2px 4px rgba(255, 255, 255, 0.15),
-      inset 0 -2px 4px rgba(0, 0, 0, 0.08);
+      0 8px 28px color-mix(in oklch, var(--primary-500) 40%, transparent),
+      0 2px 8px color-mix(in oklch, var(--primary-500) 22%, transparent),
+      inset 0 2px 4px rgba(255, 255, 255, 0.25),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.15);
     transform-style: preserve-3d;
     animation: float-3d 6s ease-in-out infinite;
   }
@@ -331,8 +326,8 @@
     font-size: clamp(12px, 0.85vw, 13px);
     font-weight: 500;
     color: var(--text-tertiary);
-    background: rgba(99, 102, 241, 0.06);
-    border: 1px solid rgba(99, 102, 241, 0.14);
+    background: var(--surface-3);
+    border: 1px solid var(--border-default);
     border-radius: 10px;
     padding: 7px 14px;
   }
@@ -357,7 +352,7 @@
     border: none;
     cursor: pointer;
     box-shadow:
-      0 4px 20px rgba(99, 102, 241, 0.45),
+      0 4px 20px color-mix(in oklch, var(--primary-500) 45%, transparent),
       inset 0 1px 0 rgba(255, 255, 255, 0.20);
     transition: transform 140ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 150ms var(--ease-out);
     letter-spacing: -0.01em;
@@ -365,7 +360,7 @@
 
   .btn-primary-full:hover {
     box-shadow:
-      0 6px 28px rgba(99, 102, 241, 0.55),
+      0 6px 28px color-mix(in oklch, var(--primary-500) 55%, transparent),
       inset 0 1px 0 rgba(255, 255, 255, 0.20);
   }
 
@@ -476,7 +471,7 @@
 
   .code-input:focus {
     border-color: var(--primary-500);
-    box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary-500) 15%, transparent);
   }
 
   /* Family-name input reads as a name, not a code */

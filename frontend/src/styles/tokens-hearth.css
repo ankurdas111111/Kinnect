@@ -299,6 +299,68 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   LEGACY ALIAS SHIMS — tokens components consume that had NO definition.
+   Without these, each var() paints its stale pre-Hearth fallback (teal
+   #14b8a6, emerald #10b981, navy #1e2435) or collapses to `inherit` —
+   the WhatsApp-green call button and the dim SOS-dialog headline were this
+   bug. Aliases only; never point new code at these names.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --brand-primary:      var(--primary-500);
+  --brand-primary-dark: var(--primary-600);
+  --status-danger:      var(--danger-500);
+  --color-success:      var(--success-500);
+  --success-300:        oklch(0.68 0.09 150);
+  /* "info"/check-in accents land on the member-wheel teal — the only
+     in-system hue near the old cyan fallbacks. */
+  --info-300: var(--member-3-halo);
+  --info-400: var(--member-3);
+  --cyan-500: var(--member-3);
+
+  --surface-base:      var(--surface-0);
+  --surface-primary:   var(--surface-1);
+  --surface-raised:    var(--surface-2);
+  --surface-secondary: var(--surface-3);
+  --bg-card:           var(--surface-1);
+  --bg-secondary:      var(--surface-3);
+  --text-quaternary:   var(--text-tertiary);
+
+  --text-on-danger: oklch(0.99 0.004 80);
+  --danger-800:     oklch(0.35 0.15 27);
+  --danger-500-10:  color-mix(in oklch, var(--danger-500) 10%, transparent);
+  --success-500-08: color-mix(in oklch, var(--success-500)  8%, transparent);
+  --success-500-20: color-mix(in oklch, var(--success-500) 20%, transparent);
+  --success-500-28: color-mix(in oklch, var(--success-500) 28%, transparent);
+  --success-500-30: color-mix(in oklch, var(--success-500) 30%, transparent);
+  --warning-500-08: color-mix(in oklch, var(--warning-500)  8%, transparent);
+  --warning-500-12: color-mix(in oklch, var(--warning-500) 12%, transparent);
+  --warning-500-20: color-mix(in oklch, var(--warning-500) 20%, transparent);
+  --warning-500-30: color-mix(in oklch, var(--warning-500) 30%, transparent);
+  --glow-success-sm: 0 0 12px color-mix(in oklch, var(--success-500) 25%, transparent);
+  --shadow-color:    oklch(0.3 0.03 60 / 0.25);
+
+  --font-body: var(--font-sans);
+  --dur-fast:   var(--duration-fast);
+  --dur-normal: var(--duration-normal);
+  --duration-standard:  var(--duration-normal);
+  --duration-countdown: 800ms;
+  --space-7: 1.75rem;
+  /* Below navbar (2000) so sheets/nav stack over the FAB. */
+  --z-fab: 1500;
+
+  /* Map popup ink — the dark block owns night values; light was undefined,
+     which dimmed the SOS confirm headline. */
+  --popup-text-heading: var(--ink);
+  --popup-text-val:     var(--ink);
+  --popup-text-label:   var(--ink-3);
+}
+:root[data-theme="dark"] {
+  --success-300: oklch(0.74 0.09 150);
+  --danger-800:  oklch(0.40 0.17 27);
+  --shadow-color: oklch(0 0 0 / 0.5);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    THE VERDICT VOICE
    "Everyone's settled." — Instrument Serif italic, the one place the app
    speaks in a human sentence. Applied by class so headings elsewhere keep

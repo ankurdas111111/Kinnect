@@ -27,6 +27,7 @@
   let { followMode = $bindable(false) } = $props();
 
   let mapContainer = $state();
+  let destroyed = false;
   let map = $state();
   let markers = new Map();       // sid → maplibregl.Marker
   let markerPopups = new Map();   // sid → maplibregl.Popup
@@ -130,6 +131,9 @@
     const ml = await import('maplibre-gl');
     maplibregl = ml.default;
     await import('maplibre-gl/dist/maplibre-gl.css');
+    // Destroyed during the awaits (remount/navigation race) → the bound
+    // container is gone; constructing maplibre against it throws.
+    if (destroyed || !mapContainer) return;
 
     checkMobile();
     window.addEventListener('resize', debouncedCheckMobile);
@@ -315,6 +319,7 @@
   });
 
   onDestroy(() => {
+    destroyed = true;
     cancelAllAnimations();
     if (renderUsersRaf) cancelAnimationFrame(renderUsersRaf);
     _navFollowUnsub?.();

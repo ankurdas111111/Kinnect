@@ -175,9 +175,11 @@
     fill: none; stroke-width: 1.5; stroke-dasharray: 4 4; opacity: 0.25;
     stroke: color-mix(in oklch, var(--hue) 55%, transparent);
   }
+  /* viewBox scale shrinks these ~12% — 13px/0.75 keeps them legible while
+     staying the quietest text on the card. */
   .cst-ghost-label {
-    fill: var(--text-tertiary); font-size: 11px;
-    font-family: var(--font-sans, inherit); text-anchor: middle; opacity: 0.55;
+    fill: var(--text-secondary); font-size: 13px;
+    font-family: var(--font-sans, inherit); text-anchor: middle; opacity: 0.75;
   }
   .cst-hit { fill: transparent; cursor: pointer; outline: none; }
   .cst-hit:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }

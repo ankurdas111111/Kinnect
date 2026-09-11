@@ -143,8 +143,8 @@
     <!-- Kinnect logo -->
     <div class="add-contact-logo" aria-hidden="true">
       <svg width="28" height="34" viewBox="0 0 20 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M10 1C5.029 1 1 5.029 1 10c0 6.938 8.25 13.1 9 14.1.75-1 9-7.162 9-14.1C19 5.029 14.971 1 10 1z" fill="var(--primary-500)" fill-opacity="0.95"/>
-        <path d="M7 7v6M7 10l3.5-3M7 10l3.5 3" stroke="white" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M10 1C5.029 1 1 5.029 1 10c0 6.938 8.25 13.1 9 14.1.75-1 9-7.162 9-14.1C19 5.029 14.971 1 10 1z" fill="white" fill-opacity="0.95"/>
+        <path d="M7 7v6M7 10l3.5-3M7 10l3.5 3" stroke="rgba(255,255,255,0.90)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     </div>
 
@@ -264,7 +264,8 @@
     width: 56px;
     height: 56px;
     border-radius: 16px;
-    background: var(--surface-inset);
+    /* Canonical mark — white pin on ember squircle, matches Login.svelte */
+    background: linear-gradient(135deg, var(--primary-400) 0%, var(--primary-600) 50%, var(--primary-800) 100%);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -337,10 +338,12 @@
     animation: check-pop 150ms var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
   }
 
+  /* Ochre, not vermilion — vermilion is reserved for SOS */
   .add-contact-icon.error {
-    background: var(--status-sos, var(--danger-500));
-    color: white;
-    box-shadow: var(--glow-sos-sm, var(--shadow-danger, 0 4px 14px oklch(0.55 0.22 27 / 0.25)));
+    background: var(--warning-500-12);
+    border: 2px solid var(--warning-500);
+    color: var(--warning-600);
+    box-shadow: none;
   }
 
   .add-contact-icon.info {

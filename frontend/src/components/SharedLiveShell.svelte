@@ -107,8 +107,10 @@
       style: MAP_STYLE,
       center,
       zoom,
-      attributionControl: true,
+      attributionControl: false,
     });
+    // Default bottom-right attribution collides with viewer footer buttons — move it clear.
+    map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left');
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
     onMap(map);
   });

@@ -1,0 +1,27 @@
+{
+  "$sumi": "1",
+  "meta": { "generated": "2026-09-12T02:10:00+05:30", "updatedBy": ["/brief"] },
+  "persona": {
+    "primary": "A parent (35–55) checking on family between tasks, one-handed, on a phone, often in poor light or low attention. Wants one glance → one verdict.",
+    "secondary": "A teen/elder family member who is being located — must never feel surveilled; SOS must be operable in panic (gloves, shaking hands, low battery)."
+  },
+  "hmw": [
+    "How might a single glance answer 'is everyone okay?' without reading anything?",
+    "How might SOS be impossible to miss and impossible to trigger by accident?",
+    "How might the app stay silent when everything is fine?"
+  ],
+  "constraints": [
+    "Svelte 5 runes + scoped CSS + semantic tokens. NO Tailwind, no CSS frameworks.",
+    "Backend/API/WS contracts are off-limits.",
+    "Initial JS bundle ≤ 120KB gz (size-limit gate); three.js stays a lazy chunk.",
+    "Vermilion appears for SOS only. Ember is the sole accent.",
+    "prefers-reduced-motion honored on every animation.",
+    "Auth rate limit 10 attempts/IP/min — test drivers space logins."
+  ],
+  "success": [
+    "Every surface scores ≥ its pre-redesign visual score (delta reported per surface).",
+    "Zero hardcoded color/space values where a token exists.",
+    "Every screen has empty/loading/error/offline states designed, not defaulted.",
+    "reg-final driver stays green; no new pageerrors."
+  ]
+}

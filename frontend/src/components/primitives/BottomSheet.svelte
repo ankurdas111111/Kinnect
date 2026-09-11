@@ -24,7 +24,10 @@
   let lastFocusedEl = $state(null);
   let wasOpen = $state(false);
 
-  const SNAP_PEEK = 0.65;   // 35% of screen visible from bottom
+  /* 42% visible: the tab pill overlays the bottom ~96px of the peek, so 35%
+     left ~115px of usable body and clipped the first card mid-CTA. Keep in
+     step with MainApp's fabDockOffset. */
+  const SNAP_PEEK = 0.58;
   const SNAP_HALF = 0.45;
   const SNAP_FULL = 0.08;
 
@@ -213,14 +216,11 @@
     <div class="sheet-handle-area">
       <div class="sheet-handle"></div>
     </div>
-    {#if title}
-      <div class="sheet-header">
-        <h3>{title}</h3>
-        <button class="btn btn-icon btn-ghost" onclick={dismiss} aria-label="Close">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-      </div>
-    {/if}
+    <!-- No title row: the active tab already names the section, and the old
+         header burned 40px of a ~200px peek. Close floats over the corner. -->
+    <button class="sheet-close" onclick={dismiss} aria-label="Close {title || 'sheet'}">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
     <div class="sheet-body">
       {@render children?.()}
     </div>
@@ -322,21 +322,30 @@
       inset 0 1px 0 rgba(255, 255, 255, 0.10);
   }
 
-  .sheet-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 var(--space-4) var(--space-2);
-    flex-shrink: 0;
+  .sheet-close {
+    position: absolute;
+    top: var(--space-2);
+    right: var(--space-2);
+    width: 32px;
+    height: 32px;
+    /* 44px touch target via padding-box trick: visual 32, hit area extended */
+    padding: 0;
+    display: grid;
+    place-items: center;
+    border: none;
+    border-radius: var(--radius-full, 9999px);
+    background: var(--surface-hover);
+    color: var(--text-tertiary);
+    cursor: pointer;
+    z-index: 3;
   }
-
-  .sheet-header h3 {
-    font-family: var(--font-display);
-    font-size: var(--text-lg);
-    font-weight: 700;
-    margin: 0;
-    letter-spacing: -0.015em;
+  .sheet-close::before {
+    content: '';
+    position: absolute;
+    inset: -6px;
   }
+  .sheet-close:hover { color: var(--text-primary); }
+  .sheet-close:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
 
   .sheet-body {
     display: flex;
@@ -355,10 +364,13 @@
     padding-bottom: calc(var(--space-4) + var(--tab-bar-clearance));
   }
 
-  /* Fix #2: In peek state (~35% visible = ~230px on 667px), clip the body so
-     partially visible content does not look broken or overflow the sheet edge. */
+  /* In peek state, clip the body — and fade the clip edge so anything taller
+     than the peek reads as "more below", not as a broken cut. The fade sits
+     above the tab-bar clearance so the last visible line stays legible. */
   .sheet.is-peek .sheet-body {
     overflow: hidden;
+    -webkit-mask-image: linear-gradient(to bottom, black calc(100% - var(--tab-bar-clearance, 88px) - 28px), transparent calc(100% - var(--tab-bar-clearance, 88px)));
+    mask-image: linear-gradient(to bottom, black calc(100% - var(--tab-bar-clearance, 88px) - 28px), transparent calc(100% - var(--tab-bar-clearance, 88px)));
   }
 
   /* Ensure sheet body remains scrollable at half and full snap positions. */

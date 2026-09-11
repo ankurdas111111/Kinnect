@@ -438,7 +438,7 @@
     <nav class="lp-nav" aria-label="Landing">
       <span class="lp-wordmark">Kinnect</span>
       <div class="lp-nav-actions">
-        <button class="lp-nav-link" onclick={goStory}>How it works</button>
+        <button class="lp-nav-link lp-nav-how" onclick={goStory}>How it works</button>
         <!-- Real links: middle-click / open-in-tab work, and App.svelte's
              anchor interception still gives them view transitions. -->
         <a class="lp-nav-link" href="#/login">Sign in</a>
@@ -468,7 +468,6 @@
       </div>
     </div>
 
-    <div class="lp-scroll-cue"><span class="lp-cue-line" aria-hidden="true"></span>Scroll — the map remembers the whole day</div>
   </section>
 
   <!-- ═══ STORY (scroll-scrubbed) ════════════════════════════════════════ -->
@@ -597,7 +596,7 @@
           style:transform={`translateY(${c.cardY}px) scale(${c.cardScale})`}
           style:pointer-events={c.o > 0.5 ? 'auto' : 'none'} aria-hidden={c.o < 0.1}>
           <div class="lp-chapter-card" class:lp-card-sos={c.sos} class:lp-card-sage={c.sage}>
-            <span class="lp-chapter-time">{c.time}</span>
+            <!-- No per-card time: the corner clock chip is the story's ONE clock. -->
             <p class="lp-chapter-title" style:transform={`translateY(${c.titleY}px)`}>{c.title}</p>
             <p class="lp-chapter-body" style:opacity={c.bodyO}>{c.body}</p>
           </div>
@@ -681,6 +680,13 @@
     box-shadow: 0 1px 2px rgba(40, 30, 20, 0.08);
   }
   .lp-nav-pill:hover { border-color: color-mix(in oklch, var(--ink) 38%, transparent); }
+  /* At phone widths four nav items overflow and clipped "Get the app" —
+     the story CTA already teaches "How it works", so it yields first. */
+  @media (max-width: 520px) {
+    .lp-nav-how { display: none; }
+    .lp-nav-actions { gap: var(--space-2); }
+    .lp-nav-pill { padding: 0 var(--space-3); }
+  }
 
   .lp-hero-body {
     position: relative;
@@ -693,7 +699,6 @@
   @media (min-width: 1080px) {
     .lp-hero-body { max-width: min(720px, 52vw); }
   }
-  .lp-scroll-cue { position: relative; }
   .lp-eyebrow {
     font-size: var(--text-xs); font-weight: 600;
     letter-spacing: 0.12em; text-transform: uppercase;
@@ -738,18 +743,9 @@
   .lp-cta-ghost { border: 1px solid var(--hairline); background: transparent; color: var(--ink); }
   .lp-cta-ghost:hover { background: var(--surface-hover); }
 
-  .lp-scroll-cue {
-    display: flex; align-items: center; gap: var(--space-2);
-    font-size: 13px; color: var(--ink-3);
-  }
-  .lp-cue-line {
-    width: 28px; height: 1.5px; background: var(--ink-2);
-    transform-origin: left center;
-  }
-
   /* ── Hero entrance — the page arrives with intent ─────────────────────── */
   @media (prefers-reduced-motion: no-preference) {
-    .lp-eyebrow, .lp-sub, .lp-cta-row, .lp-scroll-cue {
+    .lp-eyebrow, .lp-sub, .lp-cta-row {
       opacity: 0;
       transform: translateY(14px);
       animation: lp-rise 640ms cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -757,7 +753,6 @@
     .lp-hero .lp-eyebrow { animation-delay: 80ms; }
     .lp-hero .lp-sub { animation-delay: 340ms; }
     .lp-hero .lp-cta-row { animation-delay: 460ms; }
-    .lp-hero .lp-scroll-cue { animation-delay: 700ms; }
     /* the headline rises out of a clipped line box */
     .lp-headline {
       clip-path: inset(-4% -2% -8% -2%);
@@ -765,7 +760,6 @@
       transform: translateY(0.35em);
       animation: lp-headline-rise 780ms cubic-bezier(0.16, 1, 0.3, 1) 160ms both;
     }
-    .lp-cue-line { animation: lp-cue-sweep 2.6s ease-in-out 1.4s infinite; }
     /* ── THE WORLD ASSEMBLES — a ~1.6s choreography, then it lives ────────
        grid breathes in → park inks in → roads draw themselves → route dots
        arrive → pebbles DROP onto the map → labels settle → the verdict
@@ -865,10 +859,6 @@
   }
   @keyframes lp-headline-rise {
     to { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes lp-cue-sweep {
-    0%, 100% { transform: scaleX(1); opacity: 1; }
-    50% { transform: scaleX(1.8); opacity: 0.45; }
   }
 
   /* ── Hero ground — the quiet map IS the page, from the first pixel ────── */
@@ -1263,12 +1253,6 @@
   }
   .lp-card-sos { background: var(--vermilion); color: #fff; }
   .lp-card-sage { background: oklch(0.93 0.04 150); }
-  .lp-chapter-time {
-    font-size: 11px; font-weight: 700;
-    letter-spacing: 0.1em; text-transform: uppercase;
-    opacity: 0.65;
-    font-variant-numeric: tabular-nums;
-  }
   .lp-chapter-title {
     margin: 0;
     font-family: var(--font-serif);

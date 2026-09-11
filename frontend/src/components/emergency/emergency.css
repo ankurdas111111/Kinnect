@@ -157,17 +157,17 @@
   color: var(--primary-500);
 }
 .ep-blood-pill:active { transform: scale(0.93); }
+/* Selected = unified ember selection language, not danger red — blood type
+   is routine medical info, not an SOS state. */
 .ep-blood-pill--selected {
-  border-color: var(--danger-500);
-  background: var(--danger-500-20);
-  color: var(--danger-600);
+  border-color: transparent;
+  background: var(--primary-500);
+  color: var(--text-on-primary);
 }
 .ep-blood-pill--selected:hover {
-  border-color: var(--danger-500);
-  color: var(--danger-600);
-}
-[data-theme='dark'] .ep-blood-pill--selected {
-  color: var(--danger-400);
+  border-color: transparent;
+  background: var(--primary-600);
+  color: var(--text-on-primary);
 }
 @media (prefers-reduced-motion: reduce) {
   .ep-blood-pill { transition: border-color 150ms var(--ease-out), background 150ms var(--ease-out), color 150ms var(--ease-out); }

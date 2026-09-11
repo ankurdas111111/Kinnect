@@ -178,6 +178,12 @@
         clearCsrf();
         await fetchCsrf();
         await loadSession();
+        // Returning user (signed in, not registered) — mark onboarded so
+        // MainApp's first-run "Welcome to Kinnect" overlay doesn't re-fire
+        // on a fresh browser. Same key shape as MainApp.svelte.
+        if ($authUser?.userId) {
+          localStorage.setItem('kinnect_onboarded_' + $authUser.userId, '1');
+        }
         // If user arrived via QR add-contact link, redirect back to complete it
         const pendingContact = sessionStorage.getItem('kinnect_pending_contact');
         if (pendingContact) {
@@ -328,7 +334,7 @@
               class="input"
               class:is-invalid={passwordError}
               bind:value={password}
-              placeholder="••••••••"
+              placeholder="Your password"
               autocomplete="current-password"
               enterkeyhint="go"
               onblur={() => passwordTouched = true}

@@ -1,0 +1,68 @@
+{
+  "$sumi": "1",
+  "meta": {
+    "generated": "2026-09-12T02:10:00+05:30",
+    "updatedBy": ["/style"],
+    "sector": "family-safety",
+    "mood": "warm, domestic, calm — a hearth, not a command centre",
+    "platform": "web (mobile-first PWA)"
+  },
+  "project": {
+    "framework": "svelte",
+    "styling": "css",
+    "typescript": false
+  },
+  "tokens": {
+    "$schema": "https://design-tokens.github.io/community-group/format/",
+    "color": {
+      "paper":     { "$type": "color", "$value": "oklch(0.975 0.008 80)", "$description": "ground, sheets" },
+      "paper-2":   { "$type": "color", "$value": "oklch(0.955 0.01 80)" },
+      "card":      { "$type": "color", "$value": "oklch(1 0 0)" },
+      "ink":       { "$type": "color", "$value": "oklch(0.24 0.02 60)", "$description": "type, icons" },
+      "ink-2":     { "$type": "color", "$value": "oklch(0.45 0.02 60)" },
+      "ink-3":     { "$type": "color", "$value": "oklch(0.52 0.02 60)" },
+      "ember":     { "$type": "color", "$value": "oklch(0.55 0.16 38)", "$description": "THE one accent: you + actions. Nothing else competes." },
+      "sage":      { "$type": "color", "$value": "oklch(0.50 0.10 150)", "$description": "live, settled" },
+      "ochre":     { "$type": "color", "$value": "oklch(0.55 0.12 75)", "$description": "needs a look" },
+      "vermilion": { "$type": "color", "$value": "oklch(0.55 0.22 27)", "$description": "SOS ONLY — nothing else is ever red" },
+      "member-1":  { "$type": "color", "$value": "oklch(0.58 0.10 240)", "$description": "member pebbles: constant L/C, hues avoid 38/150/75/27" },
+      "member-2":  { "$type": "color", "$value": "oklch(0.55 0.12 320)" },
+      "member-3":  { "$type": "color", "$value": "oklch(0.55 0.10 200)" },
+      "member-4":  { "$type": "color", "$value": "oklch(0.52 0.08 280)" }
+    },
+    "typography": {
+      "display": { "$type": "fontFamily", "$value": ["Instrument Sans", "ui-sans-serif", "system-ui", "sans-serif"] },
+      "serif":   { "$type": "fontFamily", "$value": ["Instrument Serif", "ui-serif", "Georgia", "serif"], "$description": "verdict voice — italic, ONLY on .verdict-voice sentences ('Everyone's settled.')" },
+      "numerals": { "$type": "fontFamily", "$value": ["Instrument Sans"], "$description": "tabular in the sans face — '8 min · 1.2 km', never mono" }
+    },
+    "space": { "$description": "app uses --space-1..12 scale from tokens-oklch.css (4px base)" },
+    "radius": { "$description": "--radius-sm..full from tokens-oklch.css" },
+    "shadow": {
+      "warm-md": { "$type": "shadow", "$value": "0 4px 12px oklch(0.3 0.03 60 / 0.10)", "$description": "elevation is warm-toned, never neutral black in light theme" }
+    },
+    "duration": { "$description": "UI motion < 300ms; ease-out enters, springs on presses" },
+    "easing": {},
+    "z": {},
+    "$themes": {
+      "light": { "note": "bare :root in frontend/src/styles/tokens-hearth.css is the source of truth" },
+      "dark": {
+        "note": "HEARTH NIGHT at :root[data-theme=\"dark\"] (specificity 0,2,0 beats legacy VIGIL block)",
+        "paper": "oklch(0.21 0.01 60)",
+        "ink": "oklch(0.95 0.008 80)",
+        "ember": "oklch(0.76 0.13 38)",
+        "text-on-primary": "oklch(0.20 0.04 38)"
+      }
+    }
+  },
+  "tone": {
+    "formality": "domestic, first-name, plain words — the app speaks like a family member, not a dispatcher",
+    "traits": ["calm", "warm", "concrete", "quiet-by-default (silence when everyone's settled)"],
+    "wordsToUse": ["settled", "on his way", "holds", "home", "Everyone's settled."],
+    "wordsToAvoid": ["monitor", "track(ing) as noun", "asset", "target", "alert (as verb toward family)", "dashboard jargon", "telemetry in UI copy"]
+  },
+  "references": [
+    { "app": "Find My (Apple)", "platform": "ios", "stealThis": "silence as the default state", "takeaway": "no chrome when nothing needs attention" },
+    { "app": "Linear", "platform": "web", "stealThis": "restraint + one accent", "takeaway": "hierarchy from type and space, not boxes" },
+    { "app": "Airbnb", "platform": "web", "stealThis": "warm editorial serif moments", "takeaway": "the verdict voice: one human sentence per screen" }
+  ]
+}

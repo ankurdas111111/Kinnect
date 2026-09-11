@@ -1,9 +1,8 @@
 <script>
   /**
-   * CompletenessMeter — SVG progress ring + status badge for the emergency
-   * profile. Progress semantics (how full the form is), deliberately NOT
-   * CountdownRing (which encodes temporal decay). Stays local to
-   * components/emergency/*.
+   * CompletenessMeter — SVG progress ring for the emergency profile. Progress
+   * semantics (how full the form is), deliberately NOT CountdownRing (which
+   * encodes temporal decay). Stays local to components/emergency/*.
    *
    * Presentational: props only.
    *   progress    — 0–100 integer
@@ -44,23 +43,6 @@
   </div>
 
   <div class="ep-meter-info">
-    <span class="ep-badge" class:ep-badge--complete={isComplete} class:ep-badge--incomplete={!isComplete}>
-      {#if isComplete}
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <polyline points="20 6 9 17 4 12"/>
-        </svg>
-        Profile Complete
-      {:else}
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="10"/>
-          <line x1="12" y1="8" x2="12" y2="12"/>
-          <line x1="12" y1="16" x2="12.01" y2="16"/>
-        </svg>
-        Incomplete
-      {/if}
-    </span>
     <span class="ep-meter-count">{filledCount} of {totalFields} key fields complete</span>
     {#if lastUpdated}
       <span class="ep-last-updated">Updated {lastUpdated}</span>
@@ -111,20 +93,21 @@
     transition: stroke-dashoffset 400ms var(--ease-out), stroke 250ms var(--ease-out);
   }
   .ep-ring-fill--complete { stroke: var(--success-500); }
+  /* Number + % render as one unit — same color/baseline, not a detached pair */
   .ep-ring-pct {
     position: absolute;
     inset: 0;
     display: grid;
     place-items: center;
-    font-size: var(--text-sm);
+    font-size: var(--text-xl);
     font-weight: 700;
     color: var(--text-primary);
     font-variant-numeric: tabular-nums;
   }
   .ep-ring-pct-sign {
-    font-size: 0.62em;
-    font-weight: 600;
-    color: var(--text-tertiary);
+    font-size: var(--text-sm);
+    font-weight: 700;
+    color: var(--text-primary);
     margin-left: 1px;
   }
   .ep-meter-info {
@@ -141,36 +124,6 @@
   .ep-last-updated {
     font-size: var(--text-xs);
     color: var(--text-tertiary);
-  }
-
-  /* ── Status badge ─────────────────────────────────────────────────────── */
-  .ep-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1-5);
-    align-self: flex-start;
-    padding: var(--space-1) var(--space-2-5);
-    border-radius: var(--radius-full, 9999px);
-    font-size: var(--text-xs);
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
-  }
-  .ep-badge--complete {
-    background: var(--success-500-12);
-    color: var(--success-600);
-    border: 1px solid var(--success-500-20);
-  }
-  :global([data-theme='dark']) .ep-badge--complete {
-    color: var(--success-400);
-  }
-  .ep-badge--incomplete {
-    background: color-mix(in oklch, var(--warning-500) 12%, transparent);
-    color: var(--warning-600);
-    border: 1px solid color-mix(in oklch, var(--warning-500) 22%, transparent);
-  }
-  :global([data-theme='dark']) .ep-badge--incomplete {
-    color: var(--warning-400);
   }
 
   @media (prefers-reduced-motion: reduce) {

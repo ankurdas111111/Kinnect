@@ -1,0 +1,28 @@
+{
+  "$sumi": "1",
+  "meta": { "generated": "2026-09-12T02:40:00+05:30", "updatedBy": ["/grade"] },
+  "direction": "Hearth — warm domestic paper, single ember accent, verdict voice. The app should feel like a kitchen table, not a control room.",
+  "designerDNA": [
+    { "match": "Notion (warm neutrality, content-first)", "where": "app surfaces" },
+    { "match": "Airbnb (editorial serif warmth)", "where": "verdict voice, landing" },
+    { "match": "Apple Find My (silence as default)", "where": "status ladder" }
+  ],
+  "score": {
+    "scale": "10-dim Awwwards-weighted, sumi visual-design-mastery",
+    "before": {
+      "app": 6.0,
+      "landing": 8.0, "auth": 7.4, "dashboard": 6.8, "emergency": 6.8,
+      "addcontact": 6.5, "checkins": 6.3, "activity": 6.2, "replay": 6.0,
+      "onboarding": 5.8, "liveviewer": 5.8, "map": 5.5, "sos_confirm": 5.5,
+      "monitoring": 5.5, "chatviewer": 4.8, "watchviewer": 4.5
+    },
+    "after": {
+      "app": 7.3,
+      "landing": 8.4, "auth": 7.8, "dashboard": 7.4, "emergency": 7.3,
+      "addcontact": 7.4, "checkins": 7.0, "activity": 7.2, "replay": 6.8,
+      "onboarding": 7.0, "liveviewer": 7.2, "map": 7.2, "sos_confirm": 8.0,
+      "monitoring": 6.5, "chatviewer": 6.8, "watchviewer": 7.0
+    },
+    "evidence": ".sumi/audit-2026-09-12.md"
+  }
+}

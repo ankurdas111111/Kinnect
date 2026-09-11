@@ -22,6 +22,8 @@
   let initTimeout = null;
   let watchedName = $state('');
   let watchedPhone = $state('');
+  let linkDead = $state(false);
+  let deadKind = $state('ended');   // 'ended' (server said so) | 'unreachable' (init timeout)
 
   // Canonical connection state — shared derivation (lib/presence.js).
   // deriveConnState never returns 'sos' (SOS is an orthogonal safety state,
@@ -44,11 +46,16 @@
   }
 
   function scheduleInitTimeout() {
-    clearInitTimeout();
+    // Fire-once: reconnect retries land every ≤3s, so resetting the 8s timer
+    // on each connect_error meant it could never elapse.
+    if (initTimeout) return;
     initTimeout = setTimeout(() => {
-      if (!hasInit) {
-        bannerText = 'Unable to load watch session. The link may be invalid, expired, or unavailable.';
-        bannerSos = true;
+      if (!hasInit && !linkDead) {
+        // Escalate to the terminal card — an endless "reconnecting" banner is a
+        // lie when the socket can never come up (anonymous WS is refused at the
+        // upgrade today, so this is the path every logged-out viewer hits).
+        linkDead = true;
+        deadKind = 'unreachable';
       }
     }, CONNECTION_TIMEOUT_MS);
   }
@@ -100,15 +107,36 @@
     }
 
     socket = createRealtimeSocket({ auth: { viewer: true } });
-    socket.on('connect', () => { scheduleInitTimeout(); socket.emit('watchJoin', { token }); });
-    socket.on('connect_error', () => { if (!hasInit) scheduleInitTimeout(); bannerText = 'Connection error. Retrying...'; bannerSos = true; });
-    socket.on('disconnect', () => { if (!hasInit) scheduleInitTimeout(); bannerText = 'Disconnected. Reconnecting...'; bannerSos = true; });
+    socket.on('connect', () => {
+      if (linkDead) return;
+      scheduleInitTimeout();
+      socket.emit('watchJoin', { token });
+    });
+    socket.on('connect_error', () => {
+      if (linkDead) return;
+      if (!hasInit) scheduleInitTimeout();
+      bannerText = 'Connection error. Retrying...';
+      bannerSos = true;
+    });
+    socket.on('disconnect', () => {
+      if (linkDead) return;
+      if (!hasInit) scheduleInitTimeout();
+      bannerText = hasInit ? 'Disconnected. Reconnecting...' : 'Trying to reach this link…';
+      bannerSos = true;
+    });
+    // Backend-authoritative terminal state for an invalid/expired token (auth_events.go:1468).
+    socket.on('watchError', () => {
+      linkDead = true;
+      clearInitTimeout();
+    });
     socket.on('watchInit', (payload) => {
+      if (linkDead) return;
       hasInit = true; clearInitTimeout(); bannerText = 'Connected.';
       update(payload?.user); setBanner(payload?.sos);
       if (payload?.sos?.narrative) sosNarrative = payload.sos.narrative;
     });
     socket.on('watchUpdate', (payload) => {
+      if (linkDead) return;
       update(payload?.user); setBanner(payload?.sos);
       if (payload?.sos?.narrative) sosNarrative = payload.sos.narrative;
     });
@@ -136,6 +164,20 @@
   {sosActive}
   onMap={handleMap}
 >
+  {#snippet overlay()}
+    {#if linkDead}
+      <div class="dead-link-overlay">
+        <div class="dead-link-card">
+          <h2 class="dead-link-title">{deadKind === 'ended' ? 'This link has ended' : "We can't reach this link"}</h2>
+          <p class="dead-link-body">{deadKind === 'ended'
+            ? 'Watch links stop working when sharing ends or the link expires. Ask for a fresh link if you still need it.'
+            : 'It may have ended, or the connection may be down. Try again in a moment, or ask for a fresh link.'}</p>
+          <button class="btn btn-primary" onclick={() => window.location.hash = '#/landing'}>Open Kinnect</button>
+        </div>
+      </div>
+    {/if}
+  {/snippet}
+
   {#snippet header()}
     <div class="watch-header-inner" role="status" aria-live="polite">
       {#if hasInit && watchedName}
@@ -282,6 +324,10 @@
     z-index: 50;
     display: flex;
     gap: var(--space-2);
+    background: var(--surface-1);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-xl);
+    padding: var(--space-2) var(--space-3);
     box-shadow: var(--shadow-lg);
   }
   .bottom-controls a {
@@ -341,6 +387,47 @@
       width: 260px;
       bottom: calc(var(--space-4) + 48px);
     }
+  }
+
+  /* Terminal state — invalid/expired token (watchError). Routine, not an
+     emergency, so no danger styling: dimmed backdrop + calm surface card. */
+  .dead-link-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 100;
+    background: rgba(0, 0, 0, 0.5); /* raw-color-ok: modal scrim, no scrim token exists yet */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+    padding: var(--space-4);
+  }
+
+  .dead-link-card {
+    max-width: 360px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3);
+    text-align: center;
+    padding: var(--space-8);
+    background: var(--surface-1);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-2xl);
+    box-shadow: var(--shadow-xl);
+  }
+
+  .dead-link-title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .dead-link-body {
+    margin: 0;
+    color: var(--text-secondary);
   }
 
   @media (prefers-reduced-motion: reduce) {

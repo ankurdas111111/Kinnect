@@ -54,6 +54,9 @@
   // ── Derived family state — read from the shared verdict store (zero DB) ────
   let members = $derived($familyMembers);
   let verdict = $derived($familyVerdict);
+  // Zero-member state: nothing to report on, so "Invite" is the one real
+  // action — it takes the filled-primary emphasis, "I'm safe" quiets down.
+  let zeroMembers = $derived(members.length === 0);
 
   // Hearth 06: rooms are this app's families, so the room name titles the page.
   let familyName = $derived($myRooms?.[0]?.name || 'Your family');
@@ -89,6 +92,9 @@
     if (nudged.has(userId)) return;
     socket.emit('nudgeUser', { userId });
     nudged = new Set([...nudged, userId]);
+  }
+  function nudgeAll() {
+    notSharing.forEach((c) => nudge(c.userId));
   }
   function lastSharedLabel(c) {
     if (!c.lastUpdate) return "hasn't shared yet";
@@ -133,12 +139,12 @@
 
         <!-- One row of real actions, ember reserved for the primary one -->
         <div class="d-cta-row">
-          <div class="d-cta-pulse"><PulseButton /></div>
+          <div class="d-cta-pulse"><PulseButton quiet={zeroMembers} /></div>
           <button class="d-cta" onclick={() => push('/')}>
             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
             Share live
           </button>
-          <button class="d-cta d-cta-accent" onclick={() => push('/')}>
+          <button class="d-cta" class:d-cta-accent={!zeroMembers} class:d-cta-filled={zeroMembers} onclick={() => push('/')}>
             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Invite
           </button>
@@ -159,11 +165,11 @@
 
       <!-- Slim text nav, not a wall of tiles (06a footer) -->
       <nav class="d-nav" aria-label="More">
-        <button class="d-nav-link" onclick={() => visitFeature('activity', '/activity')}>Activity{#if !visited.activity}<span class="d-dot"></span>{/if}</button>
-        <button class="d-nav-link" onclick={() => visitFeature('replay', '/replay')}>Routes{#if !visited.replay}<span class="d-dot"></span>{/if}</button>
-        <button class="d-nav-link" onclick={() => visitFeature('checkins', '/checkins')}>Check-ins{#if !visited.checkins}<span class="d-dot"></span>{/if}</button>
+        <button class="d-nav-link" onclick={() => visitFeature('activity', '/activity')}>Activity</button>
+        <button class="d-nav-link" onclick={() => visitFeature('replay', '/replay')}>Routes</button>
+        <button class="d-nav-link" onclick={() => visitFeature('checkins', '/checkins')}>Check-ins</button>
         <button class="d-nav-link" onclick={() => push('/')}>Places</button>
-        <button class="d-nav-link" class:d-nav-sos={$mySosActive} onclick={() => visitFeature('emergency', '/emergency')}>Emergency{#if !visited.emergency}<span class="d-dot d-dot-red"></span>{/if}</button>
+        <button class="d-nav-link" class:d-nav-sos={$mySosActive} onclick={() => visitFeature('emergency', '/emergency')}>Emergency</button>
       </nav>
     </div>
 
@@ -189,7 +195,10 @@
         {#if notSharing.length > 0}
           <!-- Hearth 06b: dormant members are named, dated, and nudgeable -->
           <div class="d-dormant">
-            <p class="d-dormant-head">Not sharing · {notSharing.length}</p>
+            <div class="d-dormant-head-row">
+              <p class="d-dormant-head">Not sharing · {notSharing.length}</p>
+              <button class="d-nudge-all" onclick={nudgeAll}>Nudge all</button>
+            </div>
             {#each notSharing as c (c.userId)}
               <div class="d-dormant-row">
                 <span class="d-dormant-name">{(c.displayName || '?').split(' ')[0]}</span>
@@ -395,6 +404,13 @@
     color: var(--primary-600);
   }
   .d-cta-accent:hover { background: color-mix(in oklch, var(--primary-500) 18%, transparent); }
+  /* Zero-member state only: Invite becomes the one real action */
+  .d-cta-filled {
+    background: var(--primary-500);
+    border-color: transparent;
+    color: var(--text-on-primary);
+  }
+  .d-cta-filled:hover { background: var(--primary-600); }
   .d-cta-pulse :global(button) { min-height: 44px; }
 
   /* ── Cards ───────────────────────────────────────────────────────────────── */
@@ -450,12 +466,20 @@
     padding-top: var(--space-2);
     border-top: 1px solid var(--border-subtle);
   }
+  .d-dormant-head-row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
   .d-dormant-head {
     margin: 0 0 var(--space-1);
     font-size: var(--text-2xs, 10px); font-weight: 700;
     text-transform: uppercase; letter-spacing: 0.08em;
     color: var(--text-tertiary);
   }
+  .d-nudge-all {
+    background: none; border: none; padding: 0; cursor: pointer;
+    font-family: inherit; font-size: var(--text-xs); font-weight: 600;
+    color: var(--primary-600);
+  }
+  .d-nudge-all:hover { text-decoration: underline; }
+  .d-nudge-all:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
   .d-dormant-row {
     display: grid; grid-template-columns: auto 1fr auto; align-items: center;
     gap: var(--space-2); min-height: 36px;
@@ -529,9 +553,6 @@
   .act-checkin { color: var(--info-300, #22d3ee); }
   .act-sos-on { border-color: var(--danger-500-20, rgba(239,68,68,0.25)); animation: sos-b 2s ease-in-out infinite; }
   @keyframes sos-b { 0%,100% { border-color: rgba(239,68,68,0.15); } 50% { border-color: rgba(239,68,68,0.45); } }
-  .d-dot { position: absolute; top: 6px; right: 6px; width: 6px; height: 6px; border-radius: 50%; background: var(--warning-400); }
-  .d-dot-red { background: var(--danger-500); }
-  .d-dot-cyan { background: var(--info-400, #22d3ee); }
 
   /* ── Rhythm hints opt-in toggle (subtle, non-alarmist) ────────────────────── */
   .d-rhythm-toggle {

@@ -21,7 +21,9 @@ import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
 const PALETTES = {
   light: {
     board: 0xf2eee6, street: 0xfdfcf9, faint: 0xf7f4ec,
-    park: 0xd9e6d0, block: 0xe8e3d8,
+    /* park/block carry a touch more contrast vs the board so the diorama
+       reads as a place at hero distance, not blank graph paper */
+    park: 0xcfe0c2, block: 0xe0dacb,
     ink: 0x2a231c, tagBg: '#ffffff', tagText: '#2a231c', tagMut: '#837a70',
     ember: 0xb0532c, m1: 0x4a7ba6, m2: 0x8d5a8f, m3: 0x3f7d78,
     quiet: 0xc7c0b4, vermilion: 0xb2392e, sage: 0x47795b, ochre: 0xb9822f,
@@ -65,7 +67,9 @@ export function initHeroDiorama(canvas, { reduced = false } = {}) {
   renderer.shadowMap.type = THREE.PCFShadowMap;
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(pal.fog, 200, 460);
+  /* Far edge sized for the portrait story pull-back (radius up to ~300) —
+     at 460 the whole board fogged out on phones. */
+  scene.fog = new THREE.Fog(pal.fog, 230, 620);
 
   const camera = new THREE.PerspectiveCamera(38, 1, 1, 900);
 
@@ -428,14 +432,22 @@ export function initHeroDiorama(canvas, { reduced = false } = {}) {
       const polar = THREE.MathUtils.lerp(0.34, 1.02, flat) + ptrY * 0.05 * flat;
       const azim = -0.42 + Math.sin(t * 0.07) * 0.045 + ptrX * 0.075 * flat;
       const radius = THREE.MathUtils.lerp(215, 178, flat);
-      tgt = HERO_TARGET;
+      // Wide viewports: aim left of the tokens so the inhabited neighbourhood
+      // sits right of the headline instead of hiding behind it.
+      tgt = camera.aspect > 1.1
+        ? new THREE.Vector3(-14, 0, HERO_TARGET.z)
+        : HERO_TARGET;
       wantPosX = tgt.x + radius * Math.sin(polar) * Math.sin(azim);
       wantPosY = radius * Math.cos(polar);
       wantPosZ = tgt.z + radius * Math.sin(polar) * Math.cos(azim);
     } else {
       const [cx, cy, s] = storyCam;
       tgt = new THREE.Vector3(sx(cx), 0, sz(cy));
-      const radius = 150 / s;
+      // Story keyframes were framed for ~16:10; portrait's narrower horizontal
+      // FOV cropped family members at the viewport edge — pull back to keep
+      // the framed WIDTH roughly constant across aspects.
+      const aspectComp = Math.min(1.5, Math.max(1, Math.pow(1.45 / camera.aspect, 0.5)));
+      const radius = (150 / s) * aspectComp;
       const polar = 0.32 + ptrY * 0.02;
       const azim = -0.18 + ptrX * 0.03;
       wantPosX = tgt.x + radius * Math.sin(polar) * Math.sin(azim);

@@ -116,7 +116,7 @@
   {#if !$networkGraph}
     <p class="empty-state">Loading network…</p>
   {:else if layoutNodes.length <= 1}
-    <p class="empty-state">Add contacts or join rooms to see your network.</p>
+    <p class="empty-state">Add contacts or join rooms to see your people here.</p>
   {:else}
     <!-- Legend -->
     <div class="legend-row">

@@ -270,7 +270,7 @@
       <div in:fade={{ duration: 200 }}>
         <EmptyState
           title="No check-in schedule yet"
-          body="Turn on monitoring below and we'll pulse a reminder on your interval — your family is alerted only if you miss it."
+          body="Turn it on and we'll remind you to check in. Your family only hears about it if you miss one."
           tone="primary"
         >
           {#snippet icon()}
@@ -315,7 +315,7 @@
     <!-- ── Overdue tolerance ───────────────────────────────────────────────── -->
     <section class="settings-card" class:settings-card-dimmed={!enabled}>
       <div class="settings-label-block">
-        <span class="settings-label">Alert after missing by</span>
+        <span class="settings-label">If you miss it, wait</span>
         <span class="settings-hint">Grace period before your contacts are notified</span>
       </div>
       <div class="pill-group" role="group" aria-label="Overdue tolerance">
@@ -671,8 +671,8 @@
   }
   .pill-btn:hover:not(:disabled) { background: var(--surface-3, var(--surface-2)); color: var(--text-primary); }
   .pill-btn.pill-active {
-    background: var(--primary-600);
-    color: var(--text-inverse, white);
+    background: var(--primary-500);
+    color: var(--text-on-primary);
     border-color: var(--primary-500);
     box-shadow: var(--glow-primary);
   }

@@ -140,16 +140,18 @@
 		return 'status-warning';
 	};
 
+	// Neutral (below-threshold) reading is not a health confirmation — no
+	// class, so it falls back to metric-hero-value's neutral text-primary.
 	const getMemoryWarning = (mb) => {
 		if (mb > 800) return 'status-error';
 		if (mb > 500) return 'status-warning';
-		return 'status-ok';
+		return '';
 	};
 
 	const getGoroutineWarning = (count) => {
 		if (count > 10000) return 'status-error';
 		if (count > 5000) return 'status-warning';
-		return 'status-ok';
+		return '';
 	};
 
 	const formatBytes = (bytes) => {
@@ -174,6 +176,8 @@
 </script>
 
 <div class="dashboard">
+	<div class="internal-banner" role="note">Internal diagnostics — not part of the family app.</div>
+
 	<header class="header">
 		<div class="header-lead">
 			<div class="title-row">
@@ -423,6 +427,16 @@
 		min-height: 100vh;
 		padding: calc(var(--safe-top, env(safe-area-inset-top, 0px)) + var(--space-5)) var(--space-5)
 			calc(var(--space-6) + var(--safe-bottom, env(safe-area-inset-bottom, 0px)));
+	}
+
+	.internal-banner {
+		background: var(--warning-500-12);
+		border: 1px solid var(--warning-500-30);
+		color: var(--text-secondary);
+		border-radius: var(--radius-lg);
+		padding: var(--space-2) var(--space-3);
+		margin-bottom: var(--space-4);
+		font-size: var(--text-sm);
 	}
 
 	.header {

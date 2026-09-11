@@ -24,6 +24,8 @@
   let sosAcks = $state('');
   let sosAcked = $state(false);
   let expired = $state(false);
+  let linkDead = $state(false);
+  let deadKind = $state('ended');   // 'ended' (server said so) | 'unreachable' (init timeout)
   let checkinText = $state('');
   let checkinOverdue = $state(false);
   let sosAudioInterval = null;
@@ -105,12 +107,15 @@
   }
 
   function scheduleInitTimeout() {
-    clearInitTimeout();
+    // Fire-once: reconnect retries land every ≤3s, so resetting the 8s timer
+    // on each connect_error meant it could never elapse.
+    if (initTimeout) return;
     initTimeout = setTimeout(() => {
-      if (!hasInit) {
-        online = false;
-        connectionIssue = 'Unable to load live session. The link may be invalid, expired, or the user is unavailable.';
-        statusText = connectionIssue;
+      if (!hasInit && !linkDead) {
+        // Terminal card, not an endless banner — the anonymous WS upgrade is
+        // refused today, so logged-out viewers always land here.
+        linkDead = true;
+        deadKind = 'unreachable';
       }
     }, CONNECTION_TIMEOUT_MS);
   }
@@ -151,17 +156,22 @@
     });
 
     socket.on('liveExpired', () => { expired = true; clearInitTimeout(); });
+    // Backend-authoritative terminal state for an invalid/expired token (auth_events.go:1504).
+    socket.on('liveError', () => { linkDead = true; clearInitTimeout(); });
     socket.on('disconnect', () => {
+      if (linkDead) return;
       online = false;
       statusText = sharedBy + ' (reconnecting...)';
       if (!hasInit) scheduleInitTimeout();
     });
     socket.on('connect_error', () => {
+      if (linkDead) return;
       online = false;
       statusText = 'Connection error. Retrying...';
       if (!hasInit) scheduleInitTimeout();
     });
     socket.on('connect', () => {
+      if (linkDead) return;
       if (!hasInit) scheduleInitTimeout();
       if (viewerName) socket.emit('liveJoin', { token, viewerName });
     });
@@ -270,11 +280,21 @@
   showSignal={online && !!freshnessText}
   {signalLevel}
   freshnessLabel={freshnessText}
-  expiryPercent={!showNameOverlay && !expired && linkExpiresAt ? expiryPercent : null}
+  expiryPercent={!showNameOverlay && !expired && !linkDead && linkExpiresAt ? expiryPercent : null}
   onMap={handleMap}
 >
   {#snippet overlay()}
-    {#if expired}
+    {#if linkDead}
+      <div class="overlay">
+        <div class="dead-link-card">
+          <h2 class="dead-link-title">{deadKind === 'ended' ? 'This link has ended' : "We can't reach this link"}</h2>
+          <p class="dead-link-body">{deadKind === 'ended'
+            ? 'Live links stop working when sharing ends or the link expires. Ask for a fresh link if you still need it.'
+            : 'It may have ended, or the connection may be down. Try again in a moment, or ask for a fresh link.'}</p>
+          <button class="btn btn-primary" onclick={() => window.location.hash = '#/landing'}>Open Kinnect</button>
+        </div>
+      </div>
+    {:else if expired}
       <div class="overlay">
         <div class="card expired-card">
           <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--danger-500)" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
@@ -294,9 +314,10 @@
             <span class="rec-dot animate-rec-blink" aria-hidden="true"></span>
             <span class="live-badge-word">Live</span>
           </div>
-          <!-- Hearth 05b: one sentence, one field. Plain words, no jargon. -->
+          <!-- Hearth 05b: one sentence, one field. Plain words, no jargon.
+               Token is unvalidated at this point — no per-name claim yet. -->
           <h2 class="gate-headline verdict-voice">
-            {sharedBy !== 'User' ? `${sharedBy} is sharing their live location with you.` : 'Someone is sharing their live location with you.'}
+            You've been invited to watch a live location.
           </h2>
           <p class="gate-sub">
             {sharedBy !== 'User' ? `${sharedBy} will see that you're watching` : "They'll see that you're watching"}, and this link stops on its own.
@@ -307,12 +328,12 @@
           <input id="lv-viewer-name" class="input input-lg" placeholder="Your name" bind:value={viewerName} onkeydown={e => e.key === 'Enter' && startViewing()} />
           <button class="btn btn-primary btn-lg" style="width:100%;margin-top:var(--space-3);" onclick={startViewing}>Start watching</button>
           <p class="gate-foot">Nothing is stored. Closing this page stops watching.</p>
-          <p class="text-sm text-muted" style="margin-top:var(--space-2);">Want your own account? <a href="/#/register">Sign up</a> or <a href="/#/login">Log in</a></p>
+          <p class="text-sm text-muted" style="margin-top:var(--space-2);">Want your own account? <a href="/#/register" class="gate-link">Sign up</a> or <a href="/#/login" class="gate-link">Log in</a></p>
         </div>
       </div>
     {/if}
 
-    {#if !showNameOverlay && !expired && connectionIssue}
+    {#if !showNameOverlay && !expired && !linkDead && connectionIssue}
       <div class="live-error">
         <span>{connectionIssue}</span>
         <button class="btn btn-sm btn-secondary" onclick={() => window.location.reload()}>Retry</button>
@@ -321,13 +342,13 @@
   {/snippet}
 
   {#snippet cardExtras()}
-    {#if !showNameOverlay && !expired && checkinText}
+    {#if !showNameOverlay && !expired && !linkDead && checkinText}
       <div class="glass-checkin" class:overdue={checkinOverdue}>{checkinText}</div>
     {/if}
   {/snippet}
 
   {#snippet docks()}
-    {#if !showNameOverlay && !expired}
+    {#if !showNameOverlay && !expired && !linkDead}
       <a href="/#/login" class="live-brand" aria-label="Powered by Kinnect">Powered by Kinnect</a>
     {/if}
 
@@ -395,6 +416,47 @@
   .expired-card h2 {
     color: var(--danger-500);
     margin-top: var(--space-3);
+  }
+
+  /* Terminal state — invalid/expired token (liveError). Routine, not an
+     emergency, so no danger styling: dimmed backdrop + calm surface card. */
+  .dead-link-card {
+    max-width: 360px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3);
+    text-align: center;
+    padding: var(--space-8);
+    background: var(--surface-1);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-2xl);
+    box-shadow: var(--shadow-xl);
+  }
+
+  .dead-link-title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .dead-link-body {
+    margin: 0;
+    color: var(--text-secondary);
+  }
+
+  /* Gate account links — real links, not default browser blue */
+  .gate-link {
+    color: var(--primary-600);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .gate-link:focus-visible {
+    outline: 2px solid var(--primary-400);
+    outline-offset: 2px;
   }
 
   .glass-checkin {
@@ -511,7 +573,8 @@
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background: var(--color-rec);
+    /* Live = sage, never the SOS red/pink this dot used to borrow */
+    background: var(--success-500);
     flex-shrink: 0;
     animation: recording-blink 1.2s ease-in-out infinite;
   }
@@ -536,7 +599,7 @@
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: var(--success-500);
+    color: var(--success-600);
   }
   .gate-headline {
     margin: var(--space-3) 0 var(--space-2);

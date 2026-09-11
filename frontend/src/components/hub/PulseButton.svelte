@@ -14,6 +14,9 @@
   import { haptics } from '../../lib/haptics.js';
   import { allowMotion } from '../../lib/stores/effects.js';
 
+  /** @type {{ quiet?: boolean }} quiet — secondary emphasis (zero-member dashboard state) */
+  let { quiet = false } = $props();
+
   const KEY = 'kinnect_pulse_self';
   let checkedAt = $state(null); // ms of today's check-in, or null
 
@@ -41,7 +44,7 @@
   let timeStr = $derived(checkedAt ? new Date(checkedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '');
 </script>
 
-<button class="pulse" class:done={checkedAt} class:calm={!$allowMotion} onclick={pulse}
+<button class="pulse" class:done={checkedAt} class:quiet class:calm={!$allowMotion} onclick={pulse}
   aria-label={checkedAt ? `Checked in at ${timeStr}. Tap to reassure your family again` : 'Tell your family you are safe'}>
   <span class="pulse-glyph" aria-hidden="true">
     {#if checkedAt}
@@ -71,6 +74,14 @@
   .pulse:hover { background: var(--primary-400); }
   .pulse:active { transform: scale(0.97); }
   .pulse:focus-visible { outline: 2px solid var(--primary-300); outline-offset: 2px; }
+
+  /* Quiet secondary — used only when Invite takes the filled-primary emphasis instead */
+  .pulse.quiet:not(.done) {
+    background: color-mix(in oklch, var(--primary-500) 12%, transparent);
+    border-color: color-mix(in oklch, var(--primary-500) 30%, transparent);
+    color: var(--primary-600);
+  }
+  .pulse.quiet:not(.done):hover { background: color-mix(in oklch, var(--primary-500) 18%, transparent); }
 
   /* Checked-in: settle to a calm success surface */
   .pulse.done {

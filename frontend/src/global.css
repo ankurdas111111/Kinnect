@@ -2061,17 +2061,22 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
 .narrative-status.moving { color: var(--primary-500); font-style: normal; font-weight: 600; }
 [data-theme="dark"] .narrative-status.moving { color: var(--primary-400); }
 
-/* ── SOS confirm modal — premium upgrade ─────────────────────────────────── */
+/* ── SOS confirm modal — Hearth paper card, vermilion reserved for accents.
+   (Was a hardcoded near-black VIGIL card: ink-on-dark inverted the title/body
+   hierarchy in light theme.) ─────────────────────────────────────────────── */
 .sos-confirm-card-spatial {
-  background: rgba(8, 8, 20, 0.96);
-  border: 1px solid rgba(239, 68, 68, 0.28);
-  border-top-color: rgba(239, 68, 68, 0.50);
+  background: var(--surface-1);
+  border: 1px solid color-mix(in oklch, var(--danger-500) 28%, transparent);
+  border-top-color: color-mix(in oklch, var(--danger-500) 50%, transparent);
   border-radius: var(--radius-2xl);
   padding: 32px 28px 24px;
   max-width: 340px;
   width: 100%;
   text-align: center;
-  box-shadow: 0 0 0 1px rgba(239,68,68,0.08), var(--glow-sos), 0 32px 64px rgba(0,0,0,0.60);
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--danger-500) 8%, transparent),
+    var(--glow-sos),
+    var(--shadow-xl);
   animation: spatial-arrive 300ms var(--ease-spring) both;
 }
 
@@ -2084,13 +2089,13 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: rgba(239, 68, 68, 0.12);
-  border: 2px solid rgba(239, 68, 68, 0.35);
+  background: color-mix(in oklch, var(--danger-500) 12%, transparent);
+  border: 2px solid color-mix(in oklch, var(--danger-500) 35%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 0 auto 16px;
-  box-shadow: 0 0 24px rgba(239, 68, 68, 0.20);
+  box-shadow: 0 0 24px color-mix(in oklch, var(--danger-500) 20%, transparent);
   animation: sos-urgent-pulse 2s ease-in-out infinite;
 }
 

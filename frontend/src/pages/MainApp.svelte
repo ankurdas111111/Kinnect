@@ -359,16 +359,11 @@
     sheetOpen = $uiShellStore.sheetOpen;
   });
 
-  // Fix #2: Reactive FAB dock offset — lifts the SOS FAB above the BottomSheet when the
-  // sheet is open on mobile. The FAB's `bottom` is kept static; we animate
-  // `translateY(calc(-1 * var(--fab-dock-offset)))` instead of `bottom` to keep the
-  // movement on the GPU compositor and avoid layout thrash.
-  // When the sheet is open: offset = tab-bar + safe-area + spacing + sheet peek (~35vh).
-  // When closed:            offset = 0 (no upward shift needed; static `bottom` already
-  //                         accounts for tab-bar + safe-area + spacing via CSS).
-  let fabDockOffset = $derived((isMobile && sheetOpen)
-    ? `min(35vh, 280px)`
-    : `0px`);
+  // SOS FAB never moves: panic muscle-memory needs ONE spot. It layers above
+  // the sheet (z-panel+2) and lands on the sheet's tab-bar-clearance padding,
+  // so nothing actionable is ever underneath it. The --fab-dock-offset var
+  // stays in the transform chain for the hold/press states.
+  let fabDockOffset = `0px`;
 
   // Wire SOS state to global CSS app-state for full-app red tint
   run(() => {
@@ -930,6 +925,14 @@
   {#snippet map()}
 
       <MapView {followMode} />
+      <!-- Location-paused empty state: without it the map is a whole-country
+           zoom with zero guidance — the emptiest moment gets one quiet line. -->
+      {#if !$tracking && !$myLocation}
+        <div class="map-waiting" role="status">
+          <span class="map-waiting-title verdict-voice">The map is waiting.</span>
+          <span class="map-waiting-sub">Tap Start and you'll appear right here.</span>
+        </div>
+      {/if}
       <div class="place-search-overlay">
         <PlaceSearch
           on:select={e => mapFlyTo.set({ lat: e.detail.lat, lng: e.detail.lng, zoom: 15 })}
@@ -1407,6 +1410,24 @@
     bottom: calc(var(--bottom-tab-height, 56px) + var(--safe-bottom, 0px) + var(--space-4));
   }
 
+  /* ── Map waiting hint (location paused, nobody placed yet) ────────────── */
+  .map-waiting {
+    position: absolute;
+    left: 50%; top: 38%;
+    transform: translate(-50%, -50%);
+    display: flex; flex-direction: column; align-items: center; gap: var(--space-1);
+    padding: var(--space-3) var(--space-5);
+    background: var(--glass-bg);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-md);
+    pointer-events: none;
+    text-align: center;
+    z-index: 5;
+  }
+  .map-waiting-title { font-size: var(--text-lg); color: var(--text-primary); }
+  .map-waiting-sub { font-size: var(--text-sm); color: var(--text-secondary); }
+
   /* ── SOS Confirmation Modal ───────────────────────────────────────────── */
   .sos-confirm-backdrop {
     position: fixed;
@@ -1441,6 +1462,7 @@
     gap: 10px;
     justify-content: center;
   }
+  /* Card is Hearth paper now — the old white-on-dark ghost was invisible. */
   .sos-cancel-btn {
     flex: 1;
     min-height: 44px;
@@ -1448,13 +1470,13 @@
     border-radius: var(--radius-lg);
     font-weight: 600;
     font-size: 14px;
-    background: rgba(255, 255, 255, 0.07);
-    color: rgba(255, 255, 255, 0.70);
-    border: 1px solid rgba(255, 255, 255, 0.10);
+    background: var(--surface-3);
+    color: var(--text-primary);
+    border: 1px solid var(--border-strong);
     cursor: pointer;
     transition: background var(--duration-fast) var(--ease-out);
   }
-  .sos-cancel-btn:hover { background: rgba(255, 255, 255, 0.12); }
+  .sos-cancel-btn:hover { background: var(--surface-hover); }
   .sos-cancel-btn:focus-visible,
   .sos-send-btn:focus-visible,
   .battery-allow-btn:focus-visible,

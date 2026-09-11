@@ -252,7 +252,9 @@
   let targetUser = $derived(targetUserId
     ? (() => { for (const [, u] of $otherUsers) { if (u.userId === targetUserId) return u; } return null; })()
     : null);
-  let displayName = $derived(targetUser?.displayName || targetUserId || 'Route');
+  // No 'Route' literal fallback — a real name is useful context, a repeat of
+  // the page title is not, so the subtitle simply stays empty until then.
+  let displayName = $derived(targetUser?.displayName || targetUserId || '');
   // Stats
   let totalPoints = $derived(points.length);
   let totalDistKm = $derived(calcDist(points));
@@ -279,18 +281,20 @@
       <h1 class="rp-title">Route Replay</h1>
       {#if displayName}<span class="rp-sub">{displayName}</span>{/if}
     </div>
-    <!-- Window selector -->
-    <div class="window-pills" role="group" aria-label="Time window">
-      {#each WINDOWS as w}
-        <button
-          class="window-pill tactile"
-          class:active={windowMinutes === w}
-          onclick={() => setWindow(w)}
-          aria-pressed={windowMinutes === w}
-          aria-label="{w} minutes"
-        >{w}m</button>
-      {/each}
-    </div>
+    <!-- Window selector — only meaningful once a person is selected -->
+    {#if targetUserId}
+      <div class="window-pills" role="group" aria-label="Time window">
+        {#each WINDOWS as w}
+          <button
+            class="window-pill tactile"
+            class:active={windowMinutes === w}
+            onclick={() => setWindow(w)}
+            aria-pressed={windowMinutes === w}
+            aria-label="{w} minutes"
+          >{w}m</button>
+        {/each}
+      </div>
+    {/if}
   </header>
 
   <!-- Map -->
@@ -527,13 +531,14 @@
     margin: 0;
   }
 
+  /* True secondary button — the previous tinted-ghost read as disabled */
   .action-btn {
     padding: var(--space-2) var(--space-5);
     min-height: 44px;
     border-radius: var(--radius-full);
-    background: var(--primary-500-20);
-    border: 1px solid var(--primary-500-30);
-    color: var(--primary-400);
+    background: var(--surface-1);
+    border: 1.5px solid color-mix(in oklch, var(--primary-500) 45%, transparent);
+    color: var(--primary-600);
     font-family: var(--font-display);
     font-size: var(--text-sm);
     font-weight: 600;
@@ -542,7 +547,7 @@
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
   }
-  .action-btn:hover { background: var(--primary-500-30); }
+  .action-btn:hover { background: var(--primary-50); }
   .action-btn:focus-visible {
     outline: 2px solid var(--primary-500);
     outline-offset: 2px;

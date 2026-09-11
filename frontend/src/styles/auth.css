@@ -427,21 +427,15 @@
   transform: translateY(-4px);
 }
 
-/* Teal gradient accent line at the top of the card */
+/* Crisp ember top border — was a soft blurred gradient streak */
 .auth-card::before {
   content: '';
   position: absolute;
   top: 0;
-  left: 8%;
-  right: 8%;
+  left: 0;
+  right: 0;
   height: 2px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    color-mix(in oklch, var(--primary-500) 70%, transparent) 50%,
-    transparent 100%
-  );
-  border-radius: 0 0 3px 3px;
+  background: var(--primary-500);
 }
 
 @media (max-width: 480px) {

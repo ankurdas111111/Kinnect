@@ -71,7 +71,7 @@
 <section class="roster" aria-label="Your family">
   {#if members.length === 0}
     <GhostConstellation
-      title="Add your first family member"
+      title="Bring your people in"
       body="Invite someone to share locations, or open the map to start watching over your people."
       ctaLabel="Open the map"
       memberCount={0}

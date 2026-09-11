@@ -103,7 +103,7 @@
       <StatusBadge state={connState} announce={false} />
     </div>
 
-    <button class="icon-btn" onclick={clearFeed} aria-label="Clear feed" disabled={$activityEvents.length === 0}>
+    <button class="icon-btn icon-btn-clear" onclick={clearFeed} aria-label="Clear feed" disabled={$activityEvents.length === 0}>
       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
         <polyline points="3 6 5 6 21 6"/>
         <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
@@ -133,7 +133,7 @@
           title="Nothing here yet"
           body={connState === 'offline'
             ? 'Events resume when you reconnect'
-            : 'Activity appears in real time as events happen on your network'}
+            : 'Activity shows up here as your people move through their day.'}
         >
           {#snippet icon()}
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -258,6 +258,8 @@
   .icon-btn:hover { background: var(--surface-hover, rgba(255,255,255,0.11)); }
   .icon-btn:active { transform: scale(0.88); transition-duration: 60ms; }
   .icon-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+  /* Clear feed is a secondary action — toned down from the primary back button */
+  .icon-btn-clear { color: var(--text-secondary); }
 
   .act-title-group { flex: 1; display: flex; align-items: center; gap: var(--space-2); }
 
@@ -298,10 +300,10 @@
   }
   .filter-chip:hover { background: var(--surface-hover, rgba(255,255,255,0.09)); color: var(--text-primary); }
   .filter-chip.active {
-    background: var(--primary-500-20);
-    border-color: var(--primary-500-20);
-    color: var(--primary-300, var(--primary-400));
-    box-shadow: var(--glow-primary-sm);
+    background: var(--primary-500);
+    border-color: transparent;
+    color: var(--text-on-primary);
+    font-weight: 600;
   }
 
   /* Feed */
@@ -429,7 +431,8 @@
     padding: var(--space-10) var(--space-6);
   }
 
-  /* CTA inside EmptyState action slot */
+  /* CTA inside EmptyState action slot — true secondary button, not a tinted
+     ghost that reads as disabled */
   .cta-btn {
     min-height: 44px;
     padding: 0 var(--space-5);
@@ -437,15 +440,15 @@
     font-size: var(--text-sm);
     font-weight: 600;
     font-family: var(--font-display);
-    background: var(--primary-500-20);
-    border: 1px solid var(--primary-500-20);
-    color: var(--primary-300, var(--primary-400));
+    background: var(--surface-1);
+    border: 1.5px solid color-mix(in oklch, var(--primary-500) 45%, transparent);
+    color: var(--primary-600);
     cursor: pointer;
-    transition: background 150ms, box-shadow 150ms;
+    transition: background 150ms;
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
   }
-  .cta-btn:hover { background: var(--primary-500-30, var(--primary-500-20)); box-shadow: var(--glow-primary-sm); }
+  .cta-btn:hover { background: var(--primary-50); }
 
   @media (prefers-reduced-motion: reduce) {
     .feed-avatar, .feed-icon { transition: none; }

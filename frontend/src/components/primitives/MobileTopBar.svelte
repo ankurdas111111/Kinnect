@@ -194,14 +194,14 @@
     }
   }
 
-  /* Dashboard shortcut — teal tint to stand out */
+  /* Dashboard shortcut — quiet chip; ember is the only accent */
   .dashboard-btn {
-    background: rgba(20, 184, 166, 0.10);
-    border-color: rgba(20, 184, 166, 0.20);
-    color: var(--primary-500);
+    background: color-mix(in oklch, var(--primary-500) 8%, transparent);
+    border-color: color-mix(in oklch, var(--primary-500) 20%, transparent);
+    color: var(--primary-600);
   }
   .dashboard-btn:active {
-    background: rgba(20, 184, 166, 0.18);
+    background: color-mix(in oklch, var(--primary-500) 16%, transparent);
   }
 
   .dot {
