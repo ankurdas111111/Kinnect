@@ -1095,11 +1095,14 @@
         {/if}
       </button>
 
-      <!-- Pulse Check-In FAB -->
-      <PulseButton />
+      <!-- Pulse Check-In FAB — steps aside with the rest of the map controls
+           while the mobile sheet covers the map -->
+      <div class="pulse-float" class:fab-wrapper--sheeted={isMobile && sheetOpen}>
+        <PulseButton />
+      </div>
 
       <!-- FAB cluster — bottom-right: track + center + follow -->
-      <div class="fab-wrapper" class:fab-wrapper--mobile={isMobile}>
+      <div class="fab-wrapper" class:fab-wrapper--mobile={isMobile} class:fab-wrapper--sheeted={isMobile && sheetOpen}>
         <MapFab
           isTracking={$tracking}
           {followMode}
@@ -1376,6 +1379,20 @@
   }
   :global(.app-layout.sidebar-closed:not(.mobile)) .sos-fab {
     left: calc(var(--sidebar-collapsed, 56px) + var(--space-4));
+  }
+
+  /* Map controls step aside while the sheet covers the map — floating over
+   panel content read as three colliding layers on a phone. visibility
+   (not just opacity) so pointer events die with the fade, and a fixed
+   full-viewport pulse wrapper so its fixed child keeps its coordinates. */
+  .pulse-float {
+    position: fixed; inset: 0; pointer-events: none; z-index: var(--z-fab, 40);
+  }
+  .pulse-float > :global(*) { pointer-events: auto; }
+  .fab-wrapper--sheeted {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 180ms ease, visibility 0s linear 180ms;
   }
 
   /* ── MapFab wrapper ───────────────────────────────────────────────────── */

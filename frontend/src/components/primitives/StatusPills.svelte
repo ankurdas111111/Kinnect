@@ -22,16 +22,16 @@
   } = $props();
 </script>
 
+<!-- Quiet by default: chips appear only when something needs attention.
+     The header already narrates the normal states ("Sharing live",
+     "Location paused") — repeating them here was noise, and raw telemetry
+     (GPS metres, latency ms) never belonged in a family app. -->
 <div class="status-pills" role="status" aria-live="polite">
-  <NetworkStateChip {isOnline} {socketConnected} {bufferedCount} />
-  <div class="pill" class:ok={trackingActive} class:warn={!trackingActive}>
-    {trackingActive ? 'Tracking On' : 'Tracking Off'}
-  </div>
-  <div class="pill">
-    GPS {#if lastAccuracy != null}~{Math.round(lastAccuracy)}m{:else}--{/if}
-  </div>
-  {#if latencyMs != null}
-    <div class="pill">Latency {Math.round(latencyMs)}ms</div>
+  {#if !isOnline || !socketConnected || bufferedCount > 0}
+    <NetworkStateChip {isOnline} {socketConnected} {bufferedCount} />
+  {/if}
+  {#if trackingActive && lastAccuracy != null && lastAccuracy > 120}
+    <div class="pill warn">Weak GPS signal</div>
   {/if}
 </div>
 

@@ -73,7 +73,7 @@
     <GhostConstellation
       title="Add your first family member"
       body="Invite someone to share locations, or open the map to start watching over your people."
-      ctaLabel="Open Map"
+      ctaLabel="Open the map"
       memberCount={0}
       oninvite={() => push('/')}
     />
