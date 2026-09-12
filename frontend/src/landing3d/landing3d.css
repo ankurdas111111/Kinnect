@@ -1,0 +1,158 @@
+/* Landing island. Reads Hearth tokens from the host app — this file defines no
+   colours of its own, so the page follows the theme like everything else. */
+
+.l3d {
+  position: relative;
+  min-height: 100vh;
+  color: var(--text-primary);
+  background: var(--surface-0);
+  font-family: var(--font-sans);
+}
+
+/* ONE canvas, fixed behind the whole document. Every section scrolls over it. */
+.l3d-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 900ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.l3d-stage.is-ready { opacity: 1; }
+.l3d-canvas { display: block; width: 100%; height: 100%; }
+
+.l3d > *:not(.l3d-stage) { position: relative; z-index: 1; }
+
+/* ── Nav ─────────────────────────────────────────────────────────────────── */
+.l3d-nav {
+  position: sticky; top: 0;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) clamp(var(--space-4), 4vw, var(--space-10));
+  z-index: 3;
+}
+.l3d-word {
+  font-family: var(--font-serif); font-style: italic;
+  font-size: var(--text-xl); letter-spacing: -0.01em;
+}
+.l3d-nav-actions { display: flex; align-items: center; gap: var(--space-3); }
+.l3d-link {
+  min-height: 44px; display: inline-flex; align-items: center;
+  color: var(--text-secondary); text-decoration: none;
+  font-size: var(--text-sm); font-weight: 600;
+}
+.l3d-link:hover { color: var(--text-primary); }
+.l3d-pill {
+  min-height: 44px; display: inline-flex; align-items: center;
+  padding: 0 var(--space-5); border-radius: var(--radius-full, 999px);
+  background: var(--primary-500); color: var(--text-on-primary);
+  text-decoration: none; font-size: var(--text-sm); font-weight: 700;
+  box-shadow: var(--shadow-md);
+  transition: transform 150ms var(--ease-out), background 150ms var(--ease-out);
+}
+.l3d-pill:hover { background: var(--primary-600); transform: translateY(-1px); }
+.l3d-link:focus-visible, .l3d-pill:focus-visible, .l3d-cta:focus-visible, .l3d-cta-quiet:focus-visible {
+  outline: 2px solid var(--primary-400); outline-offset: 3px;
+}
+
+/* ── Hero ────────────────────────────────────────────────────────────────── */
+.l3d-hero {
+  min-height: 82vh;
+  display: flex; flex-direction: column; justify-content: center;
+  gap: var(--space-5);
+  padding: var(--space-8) clamp(var(--space-4), 4vw, var(--space-10));
+  max-width: 42rem;
+}
+.l3d-eyebrow {
+  margin: 0; font-size: var(--text-xs); font-weight: 600;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-tertiary);
+}
+.l3d-h1 {
+  margin: 0;
+  font-family: var(--font-serif); font-style: italic; font-weight: 400;
+  font-size: clamp(2.6rem, 7vw, 5.2rem);
+  line-height: 1.02; letter-spacing: -0.025em;
+}
+.l3d-h2 {
+  margin: 0;
+  font-family: var(--font-serif); font-style: italic; font-weight: 400;
+  font-size: clamp(2rem, 5vw, 3.4rem); line-height: 1.05; letter-spacing: -0.02em;
+}
+.l3d-sub {
+  margin: 0; max-width: 34ch;
+  font-size: clamp(1rem, 1.6vw, 1.2rem); line-height: 1.6; color: var(--text-secondary);
+}
+.l3d-cta-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); }
+.l3d-cta {
+  min-height: 52px; display: inline-flex; align-items: center;
+  padding: 0 var(--space-6); border-radius: var(--radius-full, 999px);
+  background: var(--primary-500); color: var(--text-on-primary);
+  text-decoration: none; font-weight: 700; font-size: var(--text-base);
+  box-shadow: var(--shadow-lg);
+  transition: transform 150ms var(--ease-out), background 150ms var(--ease-out);
+}
+.l3d-cta:hover { background: var(--primary-600); transform: translateY(-1px); }
+.l3d-cta-quiet {
+  min-height: 44px; display: inline-flex; align-items: center;
+  color: var(--text-primary); text-decoration: none;
+  font-weight: 600; font-size: var(--text-sm);
+  border-bottom: 1px solid var(--border-strong);
+}
+
+/* ── Story beats ─────────────────────────────────────────────────────────── */
+.l3d-beat {
+  min-height: 92vh;
+  display: flex; align-items: center;
+  padding: 0 clamp(var(--space-4), 4vw, var(--space-10));
+}
+.l3d-card {
+  max-width: 30rem;
+  padding: var(--space-5) var(--space-6);
+  border-radius: var(--radius-2xl, 20px);
+  background: var(--glass-bg);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(10px) saturate(1.2);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  opacity: 0.42;
+  transform: translateY(10px);
+  transition: opacity 420ms var(--ease-out), transform 420ms var(--ease-out);
+}
+.l3d-card.is-live { opacity: 1; transform: none; }
+.l3d-card[data-tone='sos']  { border-color: color-mix(in oklch, var(--danger-500) 45%, transparent); }
+.l3d-card[data-tone='safe'] { border-color: color-mix(in oklch, var(--success-500) 45%, transparent); }
+.l3d-card[data-tone='quiet']{ border-color: color-mix(in oklch, var(--warning-500) 45%, transparent); }
+
+.l3d-time {
+  font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.1em;
+  color: var(--text-tertiary); font-variant-numeric: tabular-nums;
+}
+.l3d-line {
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-serif); font-style: italic;
+  font-size: clamp(1.5rem, 3vw, 2.1rem); line-height: 1.15; letter-spacing: -0.015em;
+}
+.l3d-where {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm); color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+
+/* ── Close ───────────────────────────────────────────────────────────────── */
+.l3d-close {
+  min-height: 88vh;
+  display: flex; flex-direction: column; justify-content: center;
+  gap: var(--space-5);
+  padding: var(--space-10) clamp(var(--space-4), 4vw, var(--space-10));
+  max-width: 44rem;
+}
+.l3d-foot {
+  display: flex; flex-wrap: wrap; gap: var(--space-4);
+  margin-top: var(--space-10);
+  font-size: var(--text-sm); color: var(--text-tertiary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .l3d-stage, .l3d-card, .l3d-pill, .l3d-cta { transition: none; }
+  .l3d-card { opacity: 1; transform: none; }
+}

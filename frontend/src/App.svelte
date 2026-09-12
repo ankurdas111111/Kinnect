@@ -13,7 +13,7 @@
   // what is needed for Login, Register, and the main app shell.
   const routes = {
     '/': MainApp,
-    '/landing': wrap({ asyncComponent: () => import('./pages/Landing.svelte') }),
+    '/landing': wrap({ asyncComponent: () => import('./pages/Landing3D.svelte') }),
     '/dashboard': wrap({ asyncComponent: () => import('./pages/FamilyDashboard.svelte') }),
     '/login': Login,
     '/register': Register,
