@@ -5,7 +5,6 @@
   import { authUser } from '../lib/stores/auth.js';
   import { myRooms } from '../lib/stores/rooms.js';
   import { socket } from '../lib/socket.js';
-  import { ensurePushSubscription } from '../lib/push.js';
 
   /**
    * @typedef {Object} Props
@@ -40,7 +39,7 @@
   // where the safety reason is on screen, rather than leaving it in Settings.
   // Fire-and-forget: a declined prompt must not block onboarding.
   function askForAlerts() {
-    ensurePushSubscription({ prompt: true }).catch(() => {});
+    import('../lib/push.js').then(m => m.ensurePushSubscription({ prompt: true })).catch(() => {});
   }
 
   function handleCreateFamily() {
