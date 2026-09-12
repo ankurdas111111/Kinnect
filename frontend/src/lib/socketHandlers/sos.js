@@ -93,9 +93,13 @@ export function register(socket, ctx) {
           alertState.set({
             visible: true,
             title: isGeofence ? `${from} left their safe zone` : `${from} needs help`,
-            body: reason || 'They triggered an SOS alert.',
+            // A bare "SOS" reason under the title "X needs help" is noise.
+            // Only show the body when the reason actually adds something.
+            body: /^sos( triggered)?$/i.test((reason || '').trim()) ? '' : reason,
             actions: [
-              { label: "I'm here — I can help", kind: 'btn-primary', onClick: () => socket.emit('ackSOS', { socketId: s.socketId }) }
+              // Short enough to fit the footer button at 375px — the long
+              // version wrapped and overflowed the card.
+              { label: "I'm on my way", kind: 'btn-primary', onClick: () => socket.emit('ackSOS', { socketId: s.socketId }) }
             ],
             alarmMs: isGeofence ? 7000 : 10000
           });

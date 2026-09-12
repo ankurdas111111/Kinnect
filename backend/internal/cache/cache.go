@@ -978,6 +978,15 @@ func (c *Cache) SanitizeUserForViewer(user *ActiveUser) map[string]interface{} {
 	}
 }
 
+// LocationLabelFor resolves a coordinate to one of the user's saved places
+// ("Home", "School"), or "" when it matches none. Exported so the SOS payload
+// can name a place instead of shipping bare coordinates to a panicking reader.
+func (c *Cache) LocationLabelFor(userID string, lat, lng *float64) string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.inferLocationLabel(userID, lat, lng)
+}
+
 // GetUser returns a user cache entry by ID. Caller must not modify.
 // Updates LastAccessedAt under a write lock so EvictLRU can track recency.
 func (c *Cache) GetUser(userID string) *db.UserCacheEntry {

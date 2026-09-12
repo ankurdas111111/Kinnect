@@ -164,8 +164,12 @@
     overscroll-behavior: none;
   }
 
+  /* An urgent modal is an SOS. It outranks EVERYTHING, including the
+     first-run onboarding overlay at --z-topmost, which was covering "someone
+     needs help" with "Give your family a name" for any new user. */
   .modal-backdrop.urgent {
-    background: rgba(185, 28, 28, 0.22);
+    z-index: calc(var(--z-topmost, 9000) + 10);
+    background: color-mix(in oklch, var(--danger-700) 22%, transparent);
     backdrop-filter: blur(10px) saturate(1.6);
     -webkit-backdrop-filter: blur(10px) saturate(1.6);
   }

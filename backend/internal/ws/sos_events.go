@@ -81,7 +81,11 @@ func (h *Hub) assembleSosNarrative(user *cache.ActiveUser, triggerRule string) *
 		narrative.MotionSummary = fmt.Sprintf(
 			"Stationary for %d min before SOS", longestStationary/60000)
 	} else {
-		narrative.MotionSummary = fmt.Sprintf("Active movement in last 30 min (%d fixes)", len(entries))
+		fixWord := "fixes"
+		if len(entries) == 1 {
+			fixWord = "fix"
+		}
+		narrative.MotionSummary = fmt.Sprintf("Moving in the last 30 min (%d %s)", len(entries), fixWord)
 	}
 
 	return narrative

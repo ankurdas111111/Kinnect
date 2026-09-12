@@ -5,6 +5,10 @@
   import Modal from './primitives/Modal.svelte';
   import Card from './primitives/Card.svelte';
   import { haptics } from '../lib/haptics.js';
+  import { myLocation, focusUser } from '../lib/stores/map.js';
+  import { calculateDistance } from '../lib/tracking.js';
+  import { startCall } from '../lib/webrtc.js';
+  import { push as navigate } from 'svelte-spa-router';
 
 
 
@@ -85,9 +89,75 @@
   })());
   let activeNarrative  = $derived(activeSosData?.narrative   || null);
   let activeMedicalCard = $derived(activeSosData?.medicalCard || null);
-  run(() => {
-    if (activeMedicalCard) medCardOpen = true;
-  }); // auto-expand when data arrives
+
+  // ── Who and where ────────────────────────────────────────────────────────
+  // The person raising the SOS, straight off the alert payload. Reading it
+  // here rather than from the local users map matters: a recipient opening the
+  // app cold from a push notification has no local map yet.
+  let sosPerson = $derived((() => {
+    for (const [, s] of $activeSosUsers) {
+      if (s?.sos?.active) return s;
+    }
+    return null;
+  })());
+
+  let personName = $derived(sosPerson?.displayName || 'them');
+  // First name only: "Call Claude QA" wrapped to two lines in the action row.
+  let firstName = $derived((sosPerson?.displayName || '').split(' ')[0] || 'them');
+
+  // Distance from me to them. Null when either side has no fix — an unknown
+  // distance must read as unknown, never as zero.
+  let distanceKm = $derived((() => {
+    const me = $myLocation;
+    if (!me || sosPerson?.latitude == null || sosPerson?.longitude == null) return null;
+    return calculateDistance(me.latitude, me.longitude, sosPerson.latitude, sosPerson.longitude) / 1000;
+  })());
+
+  let distanceText = $derived(
+    distanceKm == null ? null
+      : distanceKm < 1 ? `${Math.round(distanceKm * 1000)} m from you`
+      : `${distanceKm.toFixed(1)} km from you`
+  );
+
+  // The headline is whichever fact is most useful to someone about to move:
+  // a place name ("Near School") if we have one, otherwise the distance, which
+  // is the actionable number. "Somewhere on the map" said nothing and buried
+  // the distance in the subline.
+  let hasFix = $derived(sosPerson?.latitude != null);
+  let whereHeadline = $derived(
+    sosPerson?.locationLabel || distanceText || (hasFix ? 'On the map' : null)
+  );
+  // Don't repeat the headline underneath it.
+  let whereMeta = $derived(
+    whereHeadline && whereHeadline !== distanceText ? distanceText : null
+  );
+
+  let fixAge = $derived((() => {
+    const ts = sosPerson?.lastUpdate;
+    if (!ts) return null;
+    const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
+    if (s < 45) return 'just now';
+    if (s < 3600) return `${Math.round(s / 60)} min ago`;
+    return `${Math.round(s / 3600)} h ago`;
+  })());
+
+  function seeOnMap() {
+    if (!sosPerson) return;
+    focusUser.set(sosPerson.socketId || '__self__');
+    dismiss();
+    navigate('/');
+  }
+
+  function callThem() {
+    if (!sosPerson?.userId) return;
+    haptics.tap?.();
+    startCall(sosPerson.userId, sosPerson.displayName || 'Contact');
+    dismiss();
+  }
+
+  // Medical detail is for the person who has already arrived, or for a
+  // responder they hand the phone to. It is not the first thing a parent
+  // needs, so it opens on demand rather than on arrival.
   run(() => {
     if ($alertState.visible && $alertState.alarmMs > 0) {
       startAlarm();
@@ -118,7 +188,41 @@
         </svg>
       </div>
 
-      <p class="alert-body">{$alertState.body}</p>
+      {#if $alertState.body}
+        <p class="alert-body">{$alertState.body}</p>
+      {/if}
+
+      <!-- ── WHERE — the first question a reader actually asks. Above the
+           medical card, because a parent 2 km away needs a direction to drive
+           before they need a blood type. ─────────────────────────────────── -->
+      {#if sosPerson}
+        <div class="sos-where" role="group" aria-label="Location">
+          {#if whereHeadline}
+            <p class="sos-where-place">{whereHeadline}</p>
+            <p class="sos-where-meta">
+              {#if whereMeta}<span class="sos-where-dist">{whereMeta}</span>{/if}
+              {#if whereMeta && fixAge}<span aria-hidden="true"> · </span>{/if}
+              {#if fixAge}<span>updated {fixAge}</span>{/if}
+            </p>
+          {:else}
+            <p class="sos-where-place sos-where-unknown">No location yet</p>
+            <p class="sos-where-meta">Their phone hasn't sent a position. Call them.</p>
+          {/if}
+        </div>
+
+        <!-- ── ACT — three things a person can do, in the order they'd do
+             them. These sit above the fold; medical detail is below. ─────── -->
+        <div class="sos-actions">
+          <button class="sos-act sos-act-primary" onclick={callThem}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.01-.24 11.36 11.36 0 0 0 3.56.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.56a1 1 0 0 1-.25 2.11z"/></svg>
+            Call {firstName}
+          </button>
+          <button class="sos-act" onclick={seeOnMap}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            See on map
+          </button>
+        </div>
+      {/if}
 
       <!-- Motion narrative chips -->
       {#if activeNarrative}
@@ -340,13 +444,77 @@
     padding-top: var(--space-2);
   }
 
+  /* ── Where ────────────────────────────────────────────────────────────── */
+  .sos-where {
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-lg);
+    background: var(--surface-3);
+    border: 1px solid var(--border-default);
+    text-align: center;
+  }
+  .sos-where-place {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.25;
+  }
+  .sos-where-unknown { color: var(--text-secondary); font-weight: 600; }
+  .sos-where-meta {
+    margin: var(--space-1) 0 0;
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    line-height: 1.4;
+  }
+  .sos-where-dist { font-variant-numeric: tabular-nums; }
+
+  /* ── Act ──────────────────────────────────────────────────────────────── */
+  .sos-actions {
+    display: flex;
+    gap: var(--space-2);
+    width: 100%;
+  }
+  .sos-act {
+    flex: 1;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-2-5) var(--space-3);
+    border-radius: var(--radius-lg);
+    border: 1.5px solid color-mix(in oklch, var(--primary-500) 45%, transparent);
+    background: var(--surface-1);
+    color: var(--primary-600);
+    font-family: var(--font-display);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--duration-fast) var(--ease-out),
+                transform var(--duration-fast) var(--ease-out);
+  }
+  .sos-act:hover { background: var(--primary-50); }
+  .sos-act:active { transform: scale(0.98); }
+  .sos-act:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
+  .sos-act-primary {
+    background: var(--primary-500);
+    border-color: var(--primary-500);
+    color: var(--text-on-primary);
+  }
+  .sos-act-primary:hover { background: var(--primary-600); }
+  @media (prefers-reduced-motion: reduce) {
+    .sos-act, .sos-act:active { transition: none; transform: none; }
+  }
+
   .alert-sos-icon {
     width: 72px;
     height: 72px;
     border-radius: 50%;
-    background: radial-gradient(circle at 35% 35%, rgba(239,68,68,0.25) 0%, rgba(239,68,68,0.12) 100%);
-    border: 2px solid rgba(239, 68, 68, 0.55);
-    border-top-color: rgba(255, 80, 80, 0.80);
+    background: radial-gradient(circle at 35% 35%, color-mix(in oklch, var(--danger-500) 25%, transparent) 0%, color-mix(in oklch, var(--danger-500) 12%, transparent) 100%);
+    border: 2px solid color-mix(in oklch, var(--danger-500) 55%, transparent);
+    border-top-color: color-mix(in oklch, var(--danger-400) 80%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -355,10 +523,10 @@
     animation: sos-neon-ring 1.4s ease-in-out infinite;
     flex-shrink: 0;
     box-shadow:
-      0 0 0 6px rgba(239, 68, 68, 0.12),
-      0 0 0 12px rgba(239, 68, 68, 0.06),
-      0 0 0 20px rgba(239, 68, 68, 0.03),
-      0 0 40px rgba(239, 68, 68, 0.35),
+      0 0 0 6px color-mix(in oklch, var(--danger-500) 12%, transparent),
+      0 0 0 12px color-mix(in oklch, var(--danger-500) 6%, transparent),
+      0 0 0 20px color-mix(in oklch, var(--danger-500) 3%, transparent),
+      0 0 40px color-mix(in oklch, var(--danger-500) 35%, transparent),
       inset 0 1px 0 rgba(255,255,255,0.15);
   }
 
@@ -368,7 +536,7 @@
     position: absolute;
     inset: -14px;
     border-radius: 50%;
-    border: 2px solid rgba(239, 68, 68, 0.35);
+    border: 2px solid color-mix(in oklch, var(--danger-500) 35%, transparent);
     animation: sos-ring-radiate 1.4s ease-out infinite;
     pointer-events: none;
   }
@@ -379,7 +547,7 @@
     position: absolute;
     inset: -14px;
     border-radius: 50%;
-    border: 1.5px solid rgba(239, 68, 68, 0.20);
+    border: 1.5px solid color-mix(in oklch, var(--danger-500) 20%, transparent);
     animation: sos-ring-radiate 1.4s ease-out 0.7s infinite;
     pointer-events: none;
   }
@@ -417,22 +585,22 @@
   }
 
   .narrative-chip.motion  {
-    background: rgba(245,158,11,0.15);
+    background: color-mix(in oklch, var(--warning-500) 15%, transparent);
     color: var(--warning-500);
-    border: 1px solid rgba(245,158,11,0.30);
-    box-shadow: 0 0 6px rgba(245,158,11,0.20);
+    border: 1px solid color-mix(in oklch, var(--warning-500) 30%, transparent);
+    box-shadow: 0 0 6px color-mix(in oklch, var(--warning-500) 20%, transparent);
   }
   .narrative-chip.battery {
-    background: rgba(16,185,129,0.12);
+    background: color-mix(in oklch, var(--success-500) 12%, transparent);
     color: var(--success-500);
-    border: 1px solid rgba(16,185,129,0.25);
-    box-shadow: 0 0 6px rgba(16,185,129,0.18);
+    border: 1px solid color-mix(in oklch, var(--success-500) 25%, transparent);
+    box-shadow: 0 0 6px color-mix(in oklch, var(--success-500) 18%, transparent);
   }
   .narrative-chip.trigger {
-    background: rgba(239,68,68,0.12);
+    background: color-mix(in oklch, var(--danger-500) 12%, transparent);
     color: var(--danger-500);
-    border: 1px solid rgba(239,68,68,0.28);
-    box-shadow: 0 0 6px rgba(239,68,68,0.22);
+    border: 1px solid color-mix(in oklch, var(--danger-500) 28%, transparent);
+    box-shadow: 0 0 6px color-mix(in oklch, var(--danger-500) 22%, transparent);
     animation: chip-breathe-sos 1.8s ease-in-out infinite;
   }
 
@@ -480,7 +648,7 @@
     background: var(--danger-500-12);
     color: var(--danger-500);
     flex-shrink: 0;
-    box-shadow: 0 0 8px rgba(239, 68, 68, 0.25);
+    box-shadow: 0 0 8px color-mix(in oklch, var(--danger-500) 25%, transparent);
   }
 
   .med-card-title {
@@ -509,7 +677,7 @@
     flex-direction: column;
     gap: 1px;
     background: var(--danger-500-12);
-    border-top: 1px solid rgba(239, 68, 68, 0.15);
+    border-top: 1px solid color-mix(in oklch, var(--danger-500) 15%, transparent);
     max-height: calc(100dvh - 160px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
@@ -557,12 +725,12 @@
     line-height: 1;
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.02em;
-    text-shadow: 0 0 18px rgba(239, 68, 68, 0.35);
+    text-shadow: 0 0 18px color-mix(in oklch, var(--danger-500) 35%, transparent);
   }
 
   /* Allergies — red highlight */
   .med-row-alert {
-    background: rgba(239, 68, 68, 0.07);
+    background: color-mix(in oklch, var(--danger-500) 7%, transparent);
   }
   .med-row-alert .med-field-label { color: var(--danger-600); }
 

@@ -364,9 +364,21 @@ func (h *Hub) publicSos(user *cache.ActiveUser) map[string]interface{} {
 			"lastSignalTs":  user.SOS.Narrative.LastSignalTs,
 		}
 	}
+	// Location travels WITH the alert. Recipients already receive this user's
+	// coordinates continuously through the position broadcast, so this adds no
+	// exposure — it makes the alert self-sufficient, which matters because the
+	// reader may be opening the app cold from a push notification with no
+	// prior state. "Where is she" is the first question and the payload has to
+	// answer it. No phone number: contacts do not exchange numbers today, and
+	// the in-app call path (webrtc:offer) already lets them reach each other.
 	return map[string]interface{}{
 		"socketId": user.SocketID, "userId": user.UserID, "displayName": user.DisplayName,
-		"sos": sosMap,
+		"latitude":      user.Latitude,
+		"longitude":     user.Longitude,
+		"locationLabel": h.Cache.LocationLabelFor(user.UserID, user.Latitude, user.Longitude),
+		"accuracy":      user.Accuracy,
+		"lastUpdate":    user.LastUpdate,
+		"sos":           sosMap,
 	}
 }
 
