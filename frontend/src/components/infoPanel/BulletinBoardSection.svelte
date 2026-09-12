@@ -214,7 +214,7 @@
   }
   .btn-note-delete:hover {
     color: var(--danger-500);
-    background: rgba(239, 68, 68, 0.10);
+    background: color-mix(in oklch, var(--danger-500) 10%, transparent);
   }
 
   .note-body {

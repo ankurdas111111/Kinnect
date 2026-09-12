@@ -123,10 +123,10 @@
     transition: background 0.1s;
     touch-action: manipulation; -webkit-tap-highlight-color: transparent;
   }
-  .sr-row:hover, .sr-hl { background: rgba(99,102,241,0.10); }
-  .sr-row:active { background: rgba(99,102,241,0.18); }
+  .sr-row:hover, .sr-hl { background: color-mix(in oklch, var(--primary-500) 10%, transparent); }
+  .sr-row:active { background: color-mix(in oklch, var(--primary-500) 18%, transparent); }
   .sr-icon {
-    color: rgba(99,102,241,0.55); flex-shrink: 0;
+    color: color-mix(in oklch, var(--primary-500) 55%, transparent); flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
     width: 20px; height: 20px;
   }

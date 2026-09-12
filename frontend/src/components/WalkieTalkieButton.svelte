@@ -101,8 +101,8 @@
   }
 
   .call-bar.connected {
-    background: rgba(20, 184, 166, 0.1);
-    border: 1px solid rgba(20, 184, 166, 0.3);
+    background: color-mix(in oklch, var(--primary-500) 10%, transparent);
+    border: 1px solid color-mix(in oklch, var(--primary-500) 30%, transparent);
   }
 
   .call-label {
@@ -133,7 +133,7 @@
     gap: var(--space-2, 8px);
     min-height: 44px;
     padding: var(--space-2, 8px) var(--space-4, 16px);
-    background: var(--brand-primary, #14b8a6);
+    background: var(--brand-primary, var(--primary-500));
     color: var(--text-on-primary);
     border: none;
     border-radius: var(--radius-md, 8px);
@@ -144,8 +144,8 @@
   }
 
   .btn-ptt:active {
-    background: var(--brand-primary-dark, #0d9488);
-    box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.35);
+    background: var(--brand-primary-dark, var(--primary-600));
+    box-shadow: 0 0 0 4px color-mix(in oklch, var(--primary-500) 35%, transparent);
   }
 
   /* ── Cancel / End button ──────────────────────────────────────── */
@@ -153,9 +153,9 @@
     min-width: 48px;
     min-height: 44px;
     padding: var(--space-2, 8px) var(--space-3, 12px);
-    background: rgba(239, 68, 68, 0.15);
-    color: var(--status-danger, #ef4444);
-    border: 1px solid rgba(239, 68, 68, 0.3);
+    background: color-mix(in oklch, var(--danger-500) 15%, transparent);
+    color: var(--status-danger, var(--danger-500));
+    border: 1px solid color-mix(in oklch, var(--danger-500) 30%, transparent);
     border-radius: var(--radius-md, 8px);
     font-size: var(--text-sm, 13px);
     font-weight: 600;
@@ -164,7 +164,7 @@
   }
 
   .btn-cancel:hover {
-    background: rgba(239, 68, 68, 0.25);
+    background: color-mix(in oklch, var(--danger-500) 25%, transparent);
   }
 
   /* ── Idle Talk button (fits inside card-actions row) ─────────── */

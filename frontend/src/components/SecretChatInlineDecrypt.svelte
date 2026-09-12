@@ -82,8 +82,8 @@
     flex-wrap: nowrap;
     margin-top: var(--space-1, 4px);
     padding: var(--space-2, 8px) var(--space-2-5, 10px);
-    background: var(--chat-accent-subtle, rgba(20, 184, 166, 0.08));
-    border: 1px solid var(--chat-border-accent, rgba(20, 184, 166, 0.22));
+    background: var(--chat-accent-subtle, color-mix(in oklch, var(--primary-500) 8%, transparent));
+    border: 1px solid var(--chat-border-accent, color-mix(in oklch, var(--primary-500) 22%, transparent));
     border-radius: var(--radius-lg, 14px);
     width: 100%;
     box-sizing: border-box;
@@ -120,15 +120,15 @@
   }
 
   .sid-pin:focus {
-    border-color: var(--chat-accent, #14b8a6);
-    box-shadow: 0 0 0 2px var(--chat-accent-subtle, rgba(20, 184, 166, 0.08));
+    border-color: var(--chat-accent, var(--primary-500));
+    box-shadow: 0 0 0 2px var(--chat-accent-subtle, color-mix(in oklch, var(--primary-500) 8%, transparent));
   }
 
   .sid-btn {
     padding: var(--space-2-5, 10px) var(--space-4, 16px);
     border-radius: var(--radius-sm2, 8px);
     border: none;
-    background: var(--chat-accent, #14b8a6);
+    background: var(--chat-accent, var(--primary-500));
     color: var(--text-on-primary);
     font-size: var(--text-xs, 0.75rem);
     font-weight: 700;
@@ -142,21 +142,21 @@
   }
 
   .sid-btn:hover:not(:disabled) {
-    background: var(--primary-400, #2dd4bf);
+    background: var(--primary-400, var(--primary-400));
     transform: scale(1.02);
   }
 
   .sid-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
   .sid-btn:focus-visible {
-    outline: 2px solid var(--chat-accent, #14b8a6);
+    outline: 2px solid var(--chat-accent, var(--primary-500));
     outline-offset: 2px;
   }
 
   .sid-err {
     font-size: var(--text-2xs, 0.6875rem);
     font-family: var(--font-sans, 'Nunito', sans-serif);
-    color: var(--danger-400, #f87171);
+    color: var(--danger-400, var(--danger-400));
     width: 100%;
     font-weight: 500;
   }

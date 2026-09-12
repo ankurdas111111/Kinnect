@@ -277,7 +277,7 @@
     transition: border-color 0.15s;
   }
   .cpd-input:focus {
-    border-color: var(--primary-400, #818cf8);
+    border-color: var(--primary-400, var(--primary-400));
     background: var(--surface-2, #fff);
   }
 
@@ -300,12 +300,12 @@
     transition: border-color 0.12s, background 0.12s;
   }
   .cpd-icon-btn:hover {
-    background: var(--primary-50, #eef2ff);
+    background: var(--primary-50, var(--primary-50));
     border-color: var(--primary-200, #c7d2fe);
   }
   .cpd-icon-btn.selected {
-    background: var(--primary-50, #eef2ff);
-    border-color: var(--primary-400, #818cf8);
+    background: var(--primary-50, var(--primary-50));
+    border-color: var(--primary-400, var(--primary-400));
   }
 
   .cpd-emoji { font-size: 20px; line-height: 1; }
@@ -341,12 +341,12 @@
     transition: border-color 0.12s, background 0.12s;
   }
   .cpd-vis-btn:hover:not(:disabled) {
-    background: var(--primary-50, #eef2ff);
+    background: var(--primary-50, var(--primary-50));
     border-color: var(--primary-200, #c7d2fe);
   }
   .cpd-vis-btn.selected {
-    background: var(--primary-50, #eef2ff);
-    border-color: var(--primary-400, #818cf8);
+    background: var(--primary-50, var(--primary-50));
+    border-color: var(--primary-400, var(--primary-400));
   }
   .cpd-vis-btn:disabled {
     opacity: 0.4;
@@ -377,7 +377,7 @@
     width: 100%;
     padding: 8px 12px;
     border-radius: var(--radius-md, 10px);
-    border: 1.5px solid var(--primary-400, #818cf8);
+    border: 1.5px solid var(--primary-400, var(--primary-400));
     background: var(--surface-1, #f8fafc);
     color: var(--text-primary, #0f172a);
     font-size: 16px; /* 16px minimum prevents iOS Safari auto-zoom on focus */
@@ -390,11 +390,11 @@
 
   .cpd-error {
     font-size: 12px;
-    color: var(--danger-500, #ef4444);
-    background: rgba(239, 68, 68, 0.08);
+    color: var(--danger-500, var(--danger-500));
+    background: color-mix(in oklch, var(--danger-500) 8%, transparent);
     padding: 6px 10px;
     border-radius: 8px;
-    border: 1px solid rgba(239, 68, 68, 0.2);
+    border: 1px solid color-mix(in oklch, var(--danger-500) 20%, transparent);
   }
 
   .cpd-footer {

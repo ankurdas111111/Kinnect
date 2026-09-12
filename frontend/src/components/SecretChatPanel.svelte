@@ -827,15 +827,15 @@
      components (SecretChatGate, SecretChatMessage, SecretChatCompose).
      ───────────────────────────────────────────────────────────── */
   .scp-backdrop {
-    --chat-accent:        var(--primary-500, #14b8a6);
-    --chat-accent-dim:    rgba(20, 184, 166, 0.18);
-    --chat-accent-subtle: rgba(20, 184, 166, 0.08);
-    --chat-accent-glow:   rgba(20, 184, 166, 0.28);
+    --chat-accent:        var(--primary-500, var(--primary-500));
+    --chat-accent-dim:    color-mix(in oklch, var(--primary-500) 18%, transparent);
+    --chat-accent-subtle: color-mix(in oklch, var(--primary-500) 8%, transparent);
+    --chat-accent-glow:   color-mix(in oklch, var(--primary-500) 28%, transparent);
     --chat-bg:            #060610;
     --chat-surface:       #0a0a18;
     --chat-elevated:      #0f0f20;
     --chat-border:        rgba(255, 255, 255, 0.07);
-    --chat-border-accent: rgba(20, 184, 166, 0.22);
+    --chat-border-accent: color-mix(in oklch, var(--primary-500) 22%, transparent);
   }
 
   /* ── Panic effects ──────────────────────────────────────────── */
@@ -849,10 +849,10 @@
 
   @keyframes scp-glitch {
     0%   { background: transparent; clip-path: inset(0 0 100% 0); }
-    10%  { background: rgba(20,184,166,0.3); clip-path: inset(10% 0 60% 0); transform: translateX(4px); }
-    20%  { background: rgba(248,113,113,0.2); clip-path: inset(40% 0 20% 0); transform: translateX(-3px); }
+    10%  { background: color-mix(in oklch, var(--primary-500) 30%, transparent); clip-path: inset(10% 0 60% 0); transform: translateX(4px); }
+    20%  { background: color-mix(in oklch, var(--danger-400) 20%, transparent); clip-path: inset(40% 0 20% 0); transform: translateX(-3px); }
     30%  { background: rgba(255,255,255,0.15); clip-path: inset(60% 0 10% 0); transform: translateX(5px); }
-    40%  { background: rgba(20,184,166,0.2); clip-path: inset(0 0 80% 0); transform: translateX(-2px); }
+    40%  { background: color-mix(in oklch, var(--primary-500) 20%, transparent); clip-path: inset(0 0 80% 0); transform: translateX(-2px); }
     50%  { background: rgba(0,0,0,0.9); clip-path: inset(0 0 0 0); transform: translateX(0); }
     60%  { background: rgba(0,0,0,0.95); clip-path: inset(0 0 0 0); }
     80%  { background: rgba(0,0,0,0.98); }
@@ -928,7 +928,7 @@
     height: min(86dvh, 660px);
     box-shadow:
       0 32px 80px rgba(0, 0, 0, 0.9),
-      0 0 0 1px rgba(20, 184, 166, 0.08),
+      0 0 0 1px color-mix(in oklch, var(--primary-500) 8%, transparent),
       inset 0 1px 0 rgba(255, 255, 255, 0.06);
     position: relative;
     /*
@@ -950,9 +950,9 @@
     position: absolute;
     inset: 0;
     background:
-      radial-gradient(ellipse 70% 50% at 15% 0%,   rgba(20, 184, 166, 0.07) 0%, transparent 55%),
-      radial-gradient(ellipse 50% 40% at 85% 100%,  rgba(20, 184, 166, 0.05) 0%, transparent 50%),
-      radial-gradient(ellipse 40% 35% at 50% 50%,   rgba(6, 182, 212, 0.03)  0%, transparent 55%);
+      radial-gradient(ellipse 70% 50% at 15% 0%,   color-mix(in oklch, var(--primary-500) 7%, transparent) 0%, transparent 55%),
+      radial-gradient(ellipse 50% 40% at 85% 100%,  color-mix(in oklch, var(--primary-500) 5%, transparent) 0%, transparent 50%),
+      radial-gradient(ellipse 40% 35% at 50% 50%,   color-mix(in oklch, var(--member-3) 3%, transparent)  0%, transparent 55%);
     pointer-events: none;
     border-radius: inherit;
     z-index: 0;
@@ -1005,7 +1005,7 @@
     top: 0; left: 0;
     width: 100%;
     height: 2px;
-    background: linear-gradient(90deg, var(--chat-accent) 0%, rgba(6, 182, 212, 0.7) 100%);
+    background: linear-gradient(90deg, var(--chat-accent) 0%, color-mix(in oklch, var(--member-3) 70%, transparent) 100%);
     transform-origin: left center;
     transition: transform 1s linear, opacity 0.5s;
     z-index: 10;
@@ -1135,18 +1135,18 @@
     animation: scp-pulse-accent 2.4s ease-in-out infinite;
   }
   .scp-presence-dot--online {
-    background: var(--success-400, #34d399);
-    box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.2);
+    background: var(--success-400, var(--success-400));
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--success-400) 20%, transparent);
     animation: scp-pulse-green 2.4s ease-in-out infinite;
   }
 
   @keyframes scp-pulse-accent {
     0%, 100% { box-shadow: 0 0 0 0 var(--chat-accent-glow); }
-    50%       { box-shadow: 0 0 0 5px rgba(20, 184, 166, 0); }
+    50%       { box-shadow: 0 0 0 5px color-mix(in oklch, var(--primary-500) 0%, transparent); }
   }
   @keyframes scp-pulse-green {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.5); }
-    50%       { box-shadow: 0 0 0 5px rgba(52, 211, 153, 0); }
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--success-400) 50%, transparent); }
+    50%       { box-shadow: 0 0 0 5px color-mix(in oklch, var(--success-400) 0%, transparent); }
   }
 
   /* ── Header buttons ──────────────────────────────────────── */
@@ -1189,7 +1189,7 @@
   }
   .scp-invite-btn:hover { background: var(--chat-accent-dim); box-shadow: 0 0 16px var(--chat-accent-glow); }
   .scp-invite-btn:focus-visible { outline: 2px solid var(--chat-accent); outline-offset: 2px; }
-  .scp-invite-btn--copied { border-color: rgba(52, 211, 153, 0.4); background: rgba(52, 211, 153, 0.08); color: var(--success-400, #34d399); }
+  .scp-invite-btn--copied { border-color: color-mix(in oklch, var(--success-400) 40%, transparent); background: color-mix(in oklch, var(--success-400) 8%, transparent); color: var(--success-400, var(--success-400)); }
 
   /* ── Messages area ───────────────────────────────────────── */
   main.scp-msgs {
@@ -1266,13 +1266,13 @@
 
   .scp-empty-lock-ring--outer {
     inset: 0;
-    background: rgba(20, 184, 166, 0.04);
+    background: color-mix(in oklch, var(--primary-500) 4%, transparent);
     animation: empty-ring-pulse 3s ease-in-out infinite;
   }
 
   .scp-empty-lock-ring--inner {
     inset: 12px;
-    background: rgba(20, 184, 166, 0.07);
+    background: color-mix(in oklch, var(--primary-500) 7%, transparent);
     animation: empty-ring-pulse 3s ease-in-out infinite 0.5s;
   }
 
@@ -1287,7 +1287,7 @@
     color: var(--chat-accent);
     position: relative;
     z-index: 1;
-    box-shadow: 0 0 32px rgba(20, 184, 166, 0.2);
+    box-shadow: 0 0 32px color-mix(in oklch, var(--primary-500) 20%, transparent);
   }
 
   @keyframes empty-ring-pulse {

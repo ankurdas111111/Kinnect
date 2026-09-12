@@ -119,10 +119,10 @@
 
   .delete-confirm-btn {
     padding: 14px;
-    background: rgba(239, 68, 68, 0.12);
-    border: 1px solid rgba(239, 68, 68, 0.28);
+    background: color-mix(in oklch, var(--danger-500) 12%, transparent);
+    border: 1px solid color-mix(in oklch, var(--danger-500) 28%, transparent);
     border-radius: var(--radius-lg);
-    color: var(--danger-400, #f87171);
+    color: var(--danger-400, var(--danger-400));
     font-family: var(--font-sans);
     font-size: var(--text-base);
     font-weight: 700;
@@ -131,6 +131,6 @@
     -webkit-tap-highlight-color: transparent;
     min-height: 44px;
   }
-  .delete-confirm-btn:hover { background: rgba(239, 68, 68, 0.20); }
+  .delete-confirm-btn:hover { background: color-mix(in oklch, var(--danger-500) 20%, transparent); }
   .delete-confirm-btn:active { transform: scale(0.97); transition-duration: 60ms; }
 </style>

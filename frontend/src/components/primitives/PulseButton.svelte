@@ -84,8 +84,8 @@
     width: 48px;
     height: 48px;
     border-radius: var(--radius-full);
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.95) 0%, rgba(5, 150, 105, 0.95) 100%);
-    border: 1.5px solid rgba(16, 185, 129, 0.55);
+    background: linear-gradient(135deg, color-mix(in oklch, var(--success-500) 95%, transparent) 0%, color-mix(in oklch, var(--success-600) 95%, transparent) 100%);
+    border: 1.5px solid color-mix(in oklch, var(--success-500) 55%, transparent);
     color: white;
     display: flex;
     align-items: center;
@@ -94,8 +94,8 @@
     touch-action: none;
     /* 3D raised button */
     box-shadow:
-      0 6px 20px rgba(16, 185, 129, 0.40),
-      0 2px 6px rgba(16, 185, 129, 0.25),
+      0 6px 20px color-mix(in oklch, var(--success-500) 40%, transparent),
+      0 2px 6px color-mix(in oklch, var(--success-500) 25%, transparent),
       inset 0 2px 4px rgba(255, 255, 255, 0.18),
       inset 0 -2px 4px rgba(0, 0, 0, 0.15);
     transform-style: preserve-3d;
@@ -118,19 +118,19 @@
   .pulse-fab:active {
     transform: perspective(600px) translateZ(-6px) scale(0.88);
     box-shadow:
-      0 1px 6px rgba(16, 185, 129, 0.30),
+      0 1px 6px color-mix(in oklch, var(--success-500) 30%, transparent),
       inset 0 3px 6px rgba(0, 0, 0, 0.20);
   }
 
   .pulse-fab.feedback-ok {
-    background: rgba(16, 185, 129, 1);
-    box-shadow: 0 0 28px rgba(16, 185, 129, 0.65);
+    background: var(--success-500);
+    box-shadow: 0 0 28px color-mix(in oklch, var(--success-500) 65%, transparent);
   }
 
   .pulse-fab.feedback-callme {
-    background: rgba(245, 158, 11, 0.95);
-    border-color: rgba(245, 158, 11, 0.5);
-    box-shadow: 0 0 28px rgba(245, 158, 11, 0.55);
+    background: color-mix(in oklch, var(--warning-500) 95%, transparent);
+    border-color: color-mix(in oklch, var(--warning-500) 50%, transparent);
+    box-shadow: 0 0 28px color-mix(in oklch, var(--warning-500) 55%, transparent);
   }
 
   .pulse-label {

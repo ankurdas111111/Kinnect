@@ -196,26 +196,26 @@
   /* ── States ───────────────────────────────────────────────────────────── */
   .field-inner.state-focused {
     border-color: var(--primary-400);
-    background: var(--surface-3, rgba(20, 184, 166, 0.04));
+    background: var(--surface-3, color-mix(in oklch, var(--primary-500) 4%, transparent));
     box-shadow:
-      0 0 0 3px rgba(20, 184, 166, 0.18),
-      0 0 0 6px rgba(20, 184, 166, 0.06),
+      0 0 0 3px color-mix(in oklch, var(--primary-500) 18%, transparent),
+      0 0 0 6px color-mix(in oklch, var(--primary-500) 6%, transparent),
       inset 0 2px 4px rgba(0, 0, 0, 0.06);
   }
 
   .field-inner.state-error {
     border-color: var(--danger-500);
     box-shadow:
-      0 0 0 3px rgba(239, 68, 68, 0.14),
-      inset 0 2px 4px rgba(239, 68, 68, 0.06);
+      0 0 0 3px color-mix(in oklch, var(--danger-500) 14%, transparent),
+      inset 0 2px 4px color-mix(in oklch, var(--danger-500) 6%, transparent);
     animation: field-shake 0.38s var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1));
   }
 
   .field-inner.state-success {
     border-color: var(--success-500);
     box-shadow:
-      0 0 0 3px rgba(16, 185, 129, 0.14),
-      inset 0 2px 4px rgba(16, 185, 129, 0.04);
+      0 0 0 3px color-mix(in oklch, var(--success-500) 14%, transparent),
+      inset 0 2px 4px color-mix(in oklch, var(--success-500) 4%, transparent);
   }
 
   @keyframes field-shake {

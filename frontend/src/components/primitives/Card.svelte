@@ -282,10 +282,10 @@
   }
 
   /* ── Glow variants ────────────────────────────────────────────────────── */
-  .card.glow-primary { box-shadow: var(--glow-primary, 0 0 24px rgba(20,184,166,0.38)), 0 4px 16px rgba(0,0,0,0.20); }
-  .card.glow-success { box-shadow: 0 0 24px rgba(16,185,129,0.38), 0 4px 16px rgba(0,0,0,0.20); }
-  .card.glow-danger  { box-shadow: var(--glow-sos, 0 0 24px rgba(239,68,68,0.42)), 0 4px 16px rgba(0,0,0,0.20); }
-  .card.glow-warning { box-shadow: 0 0 24px rgba(245,158,11,0.38), 0 4px 16px rgba(0,0,0,0.20); }
+  .card.glow-primary { box-shadow: var(--glow-primary, 0 0 24px color-mix(in oklch, var(--primary-500) 38%, transparent)), 0 4px 16px rgba(0,0,0,0.20); }
+  .card.glow-success { box-shadow: 0 0 24px color-mix(in oklch, var(--success-500) 38%, transparent), 0 4px 16px rgba(0,0,0,0.20); }
+  .card.glow-danger  { box-shadow: var(--glow-sos, 0 0 24px color-mix(in oklch, var(--danger-500) 42%, transparent)), 0 4px 16px rgba(0,0,0,0.20); }
+  .card.glow-warning { box-shadow: 0 0 24px color-mix(in oklch, var(--warning-500) 38%, transparent), 0 4px 16px rgba(0,0,0,0.20); }
 
   /* ── Shine layer ──────────────────────────────────────────────────────── */
   .card-shine {
@@ -308,18 +308,18 @@
     background: var(--glass-edge-light, linear-gradient(
       90deg,
       transparent 0%,
-      rgba(20, 184, 166, 0.55) 30%,
-      rgba(20, 184, 166, 0.55) 70%,
+      color-mix(in oklch, var(--primary-500) 55%, transparent) 30%,
+      color-mix(in oklch, var(--primary-500) 55%, transparent) 70%,
       transparent 100%
     ));
-    box-shadow: 0 0 6px var(--primary-500-30, rgba(20, 184, 166, 0.30));
+    box-shadow: 0 0 6px var(--primary-500-30, color-mix(in oklch, var(--primary-500) 30%, transparent));
     pointer-events: none;
     border-radius: 0 0 2px 2px;
   }
 
-  .card.glow-danger  .card-edge-line { background: linear-gradient(90deg, transparent, rgba(239,68,68,0.55), transparent); }
-  .card.glow-success .card-edge-line { background: linear-gradient(90deg, transparent, rgba(16,185,129,0.55), transparent); }
-  .card.glow-warning .card-edge-line { background: linear-gradient(90deg, transparent, rgba(245,158,11,0.55), transparent); }
+  .card.glow-danger  .card-edge-line { background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--danger-500) 55%, transparent), transparent); }
+  .card.glow-success .card-edge-line { background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--success-500) 55%, transparent), transparent); }
+  .card.glow-warning .card-edge-line { background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--warning-500) 55%, transparent), transparent); }
 
   /* ── Reduced motion ───────────────────────────────────────────────────── */
   @media (prefers-reduced-motion: reduce) {

@@ -50,8 +50,8 @@
   .anomaly-chip:hover { opacity: 0.82; }
 
   .chip-unusual {
-    background: rgba(245, 158, 11, 0.14);
-    border: 1px solid rgba(245, 158, 11, 0.30);
+    background: color-mix(in oklch, var(--warning-500) 14%, transparent);
+    border: 1px solid color-mix(in oklch, var(--warning-500) 30%, transparent);
     color: var(--warning-500);
   }
   .chip-unknown {

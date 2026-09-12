@@ -266,11 +266,11 @@
     width: 300px;
     /* Teal-tinted dark surface — matches SecretChatPanel token system */
     background: #0a0a18;
-    border: 1px solid rgba(20, 184, 166, 0.12);
+    border: 1px solid color-mix(in oklch, var(--primary-500) 12%, transparent);
     border-radius: var(--radius-xl, 20px);
     box-shadow:
       0 16px 48px rgba(0, 0, 0, 0.75),
-      0 0 0 1px rgba(20, 184, 166, 0.06),
+      0 0 0 1px color-mix(in oklch, var(--primary-500) 6%, transparent),
       inset 0 1px 0 rgba(255, 255, 255, 0.04);
     display: flex;
     flex-direction: column;
@@ -312,13 +312,13 @@
     color: rgba(255, 255, 255, 0.65);
     background: rgba(255, 255, 255, 0.04);
   }
-  /* Teal active state — replaces purple #818cf8 */
+  /* Teal active state — replaces purple var(--primary-400) */
   .sp-tab--active {
-    color: var(--primary-500, #14b8a6);
-    border-bottom-color: var(--primary-500, #14b8a6);
+    color: var(--primary-500, var(--primary-500));
+    border-bottom-color: var(--primary-500, var(--primary-500));
   }
   .sp-tab:focus-visible {
-    outline: 2px solid var(--primary-500, #14b8a6);
+    outline: 2px solid var(--primary-500, var(--primary-500));
     outline-offset: -2px;
   }
 
@@ -358,13 +358,13 @@
     background: rgba(255, 255, 255, 0.07);
     transform: scale(1.12);
   }
-  /* Teal active press — replaces purple rgba(129,140,248,0.18) */
+  /* Teal active press — replaces purple color-mix(in oklch, var(--primary-400) 18%, transparent) */
   .sp-sticker-btn:active {
-    background: rgba(20, 184, 166, 0.16);
+    background: color-mix(in oklch, var(--primary-500) 16%, transparent);
     transform: scale(0.95);
   }
   .sp-sticker-btn:focus-visible {
-    outline: 2px solid var(--primary-500, #14b8a6);
+    outline: 2px solid var(--primary-500, var(--primary-500));
     outline-offset: 2px;
   }
 

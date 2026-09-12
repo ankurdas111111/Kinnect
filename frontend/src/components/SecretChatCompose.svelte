@@ -328,7 +328,7 @@
        frosted panel provided by .fx-glass stays on-brand instead of adopting
        the app-wide violet edge. Background / blur / shadow come from .fx-glass. */
     --glass-border:        var(--chat-border, rgba(255, 255, 255, 0.07));
-    --glass-border-strong: var(--chat-border-accent, rgba(20, 184, 166, 0.22));
+    --glass-border-strong: var(--chat-border-accent, color-mix(in oklch, var(--primary-500) 22%, transparent));
     /* Consume keyboard-offset CSS var set by parent's VisualViewport listener.
        This moves the compose bar up by the keyboard height on iOS Chrome/Safari
        without changing the stacking context (no translateY on parent). */
@@ -362,17 +362,17 @@
     touch-action: manipulation;
   }
   .scc-icon-btn:hover { color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.06); }
-  .scc-icon-btn:focus-visible { outline: 2px solid var(--chat-accent, #14b8a6); outline-offset: 2px; }
+  .scc-icon-btn:focus-visible { outline: 2px solid var(--chat-accent, var(--primary-500)); outline-offset: 2px; }
   .scc-icon-btn:disabled { opacity: 0.22; cursor: not-allowed; }
   .scc-icon-btn--panic { color: rgba(255,255,255,0.30); }
-  .scc-icon-btn--panic:hover { color: var(--danger-400, #f87171); background: rgba(248,113,113,0.07); }
+  .scc-icon-btn--panic:hover { color: var(--danger-400, var(--danger-400)); background: color-mix(in oklch, var(--danger-400) 7%, transparent); }
   .scc-icon-btn--loading { cursor: wait; }
-  .scc-icon-btn--active { color: var(--chat-accent, #14b8a6); background: var(--chat-accent-subtle, rgba(20,184,166,0.08)); }
+  .scc-icon-btn--active { color: var(--chat-accent, var(--primary-500)); background: var(--chat-accent-subtle, color-mix(in oklch, var(--primary-500) 8%, transparent)); }
 
   .scc-mini-spinner {
     width: 15px; height: 15px;
     border: 2px solid rgba(255,255,255,0.15);
-    border-top-color: var(--chat-accent, #14b8a6);
+    border-top-color: var(--chat-accent, var(--primary-500));
     border-radius: var(--radius-full, 9999px);
     animation: scc-spin 0.7s linear infinite;
   }
@@ -413,8 +413,8 @@
     }
   }
   .scc-compose-text:focus {
-    border-color: var(--chat-border-accent, rgba(20,184,166,0.22));
-    box-shadow: 0 0 0 3px var(--chat-accent-subtle, rgba(20,184,166,0.08));
+    border-color: var(--chat-border-accent, color-mix(in oklch, var(--primary-500) 22%, transparent));
+    box-shadow: 0 0 0 3px var(--chat-accent-subtle, color-mix(in oklch, var(--primary-500) 8%, transparent));
   }
   .scc-compose-text::placeholder { color: rgba(255,255,255,0.32); }
 
@@ -432,14 +432,14 @@
     touch-action: manipulation;
   }
   .scc-send-btn--active {
-    background: linear-gradient(135deg, var(--primary-400, #2dd4bf) 0%, var(--primary-600, #0d9488) 100%);
+    background: linear-gradient(135deg, var(--primary-400, var(--primary-400)) 0%, var(--primary-600, var(--primary-600)) 100%);
     color: #fff;
-    box-shadow: 0 2px 12px rgba(20, 184, 166, 0.4);
+    box-shadow: 0 2px 12px color-mix(in oklch, var(--primary-500) 40%, transparent);
   }
-  .scc-send-btn--active:hover { transform: scale(1.06); box-shadow: 0 4px 20px rgba(20,184,166,0.6); }
+  .scc-send-btn--active:hover { transform: scale(1.06); box-shadow: 0 4px 20px color-mix(in oklch, var(--primary-500) 60%, transparent); }
   .scc-send-btn--active:active { transform: scale(0.93); }
   .scc-send-btn:disabled { opacity: 0.28; cursor: not-allowed; box-shadow: none; }
-  .scc-send-btn:focus-visible { outline: 2px solid var(--chat-accent, #14b8a6); outline-offset: 2px; }
+  .scc-send-btn:focus-visible { outline: 2px solid var(--chat-accent, var(--primary-500)); outline-offset: 2px; }
 
   .scc-send-ring {
     width: 16px; height: 16px;
@@ -486,7 +486,7 @@
     transition: background 0.1s, color 0.1s;
   }
   .scc-attach-item:hover { background: rgba(255,255,255,0.07); color: #fff; }
-  .scc-attach-item:focus-visible { outline: 2px solid var(--chat-accent, #14b8a6); outline-offset: 2px; }
+  .scc-attach-item:focus-visible { outline: 2px solid var(--chat-accent, var(--primary-500)); outline-offset: 2px; }
 
   /* ── Meta row ─────────────────────────────────────────────────── */
   .scc-compose-meta {
@@ -502,7 +502,7 @@
     font-family: var(--font-sans, 'Nunito', sans-serif);
     color: rgba(255, 255, 255, 0.4);
   }
-  .scc-compose-hint svg { color: var(--chat-accent, #14b8a6); }
+  .scc-compose-hint svg { color: var(--chat-accent, var(--primary-500)); }
 
   .scc-char-count {
     font-size: var(--text-2xs, 0.6875rem);
@@ -511,7 +511,7 @@
     font-variant-numeric: tabular-nums;
     transition: color 0.2s;
   }
-  .scc-char-count--warn { color: var(--danger-400, #f87171); }
+  .scc-char-count--warn { color: var(--danger-400, var(--danger-400)); }
 
   /* ── Screen-reader only ───────────────────────────────────────── */
   .scc-sr {

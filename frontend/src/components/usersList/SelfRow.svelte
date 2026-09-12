@@ -78,10 +78,10 @@
 
   /* Self row — subtle primary left accent */
   .me {
-    background: rgba(99, 102, 241, 0.04);
-    box-shadow: inset 3px 0 0 rgba(99, 102, 241, 0.50);
+    background: color-mix(in oklch, var(--primary-500) 4%, transparent);
+    box-shadow: inset 3px 0 0 color-mix(in oklch, var(--primary-500) 50%, transparent);
   }
-  .me:hover { background: rgba(99, 102, 241, 0.08); }
+  .me:hover { background: color-mix(in oklch, var(--primary-500) 8%, transparent); }
 
   .user-avatar {
     width: 44px;
@@ -113,7 +113,7 @@
     box-shadow:
       0 0 0 2.5px var(--primary-500),
       0 0 0 5px rgba(0, 0, 0, 0.55),
-      0 0 16px rgba(99, 102, 241, 0.40);
+      0 0 16px color-mix(in oklch, var(--primary-500) 40%, transparent);
   }
 
   /* Self: pulsing live ring */
@@ -162,14 +162,14 @@
     font-size: 0.6875rem; /* 11px */
     font-weight: 700;
     color: var(--success-500);
-    background: rgba(16, 185, 129, 0.12);
-    border: 1px solid rgba(16, 185, 129, 0.30);
+    background: color-mix(in oklch, var(--success-500) 12%, transparent);
+    border: 1px solid color-mix(in oklch, var(--success-500) 30%, transparent);
     border-radius: var(--radius-full);
     padding: 2px 7px 2px 5px;
     line-height: 1.3;
     flex-shrink: 0;
     letter-spacing: 0.02em;
-    box-shadow: 0 0 6px rgba(16, 185, 129, 0.22), inset 0 1px 0 rgba(255,255,255,0.10);
+    box-shadow: 0 0 6px color-mix(in oklch, var(--success-500) 22%, transparent), inset 0 1px 0 rgba(255,255,255,0.10);
   }
 
   .you-badge-dot {

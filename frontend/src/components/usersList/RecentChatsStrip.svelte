@@ -130,7 +130,7 @@
   }
 
   .recent-avatar-btn:hover .recent-avatar {
-    border-color: rgba(20,184,166,0.4);
+    border-color: color-mix(in oklch, var(--primary-500) 40%, transparent);
   }
 
   .recent-unread {
@@ -142,7 +142,7 @@
     background: var(--danger-500);
     border-radius: 50%;
     border: 2px solid var(--surface-base);
-    box-shadow: 0 0 4px rgba(239,68,68,0.5);
+    box-shadow: 0 0 4px color-mix(in oklch, var(--danger-500) 50%, transparent);
   }
 
   .recent-name {

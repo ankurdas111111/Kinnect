@@ -94,9 +94,9 @@
   .pill-clickable { cursor: pointer; }
   .pill-clickable:hover { opacity: 0.82; }
 
-  .pill-green { background: rgba(16, 185, 129, 0.16); color: var(--success-500); border: 1px solid rgba(16, 185, 129, 0.28); }
-  .pill-amber { background: rgba(245, 158, 11, 0.14); color: var(--warning-500); border: 1px solid rgba(245, 158, 11, 0.26); }
-  .pill-red   { background: rgba(239, 68, 68, 0.14);  color: var(--danger-500);  border: 1px solid rgba(239, 68, 68, 0.26); }
+  .pill-green { background: color-mix(in oklch, var(--success-500) 16%, transparent); color: var(--success-500); border: 1px solid color-mix(in oklch, var(--success-500) 28%, transparent); }
+  .pill-amber { background: color-mix(in oklch, var(--warning-500) 14%, transparent); color: var(--warning-500); border: 1px solid color-mix(in oklch, var(--warning-500) 26%, transparent); }
+  .pill-red   { background: color-mix(in oklch, var(--danger-500) 14%, transparent);  color: var(--danger-500);  border: 1px solid color-mix(in oklch, var(--danger-500) 26%, transparent); }
   .pill-gray  { background: var(--surface-2); color: var(--text-tertiary); border: 1px solid var(--border-subtle); }
 
   .pill-pulse { animation: sos-urgent-pulse 2.5s ease-in-out infinite; }

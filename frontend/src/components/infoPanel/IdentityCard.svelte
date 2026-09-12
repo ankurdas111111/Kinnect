@@ -61,9 +61,9 @@
 <style>
   /* ── Identity Card ──────────────────────────────────────────────── */
   .identity-card {
-    background: linear-gradient(135deg, rgba(20, 184, 166, 0.06) 0%, rgba(99, 102, 241, 0.04) 60%, transparent 100%);
-    border: 1px solid rgba(20, 184, 166, 0.18);
-    border-top-color: rgba(45, 212, 191, 0.32);
+    background: linear-gradient(135deg, color-mix(in oklch, var(--primary-500) 6%, transparent) 0%, color-mix(in oklch, var(--primary-500) 4%, transparent) 60%, transparent 100%);
+    border: 1px solid color-mix(in oklch, var(--primary-500) 18%, transparent);
+    border-top-color: color-mix(in oklch, var(--primary-400) 32%, transparent);
     border-radius: var(--radius-xl);
     padding: var(--space-4);
     display: flex;
@@ -75,8 +75,8 @@
     flex-shrink: 0;
     position: relative;
     box-shadow:
-      0 0 16px rgba(20, 184, 166, 0.08),
-      inset 0 1px 0 rgba(45, 212, 191, 0.10);
+      0 0 16px color-mix(in oklch, var(--primary-500) 8%, transparent),
+      inset 0 1px 0 color-mix(in oklch, var(--primary-400) 10%, transparent);
     overflow: hidden;
   }
 
@@ -88,7 +88,7 @@
     background: linear-gradient(
       105deg,
       transparent 30%,
-      rgba(20,184,166,0.06) 50%,
+      color-mix(in oklch, var(--primary-500) 6%, transparent) 50%,
       transparent 70%
     );
     transform: translateX(-100%);
@@ -109,8 +109,8 @@
     letter-spacing: 0.08em;
     color: var(--primary-400);
     text-shadow:
-      0 0 10px rgba(20, 184, 166, 0.55),
-      0 0 24px rgba(20, 184, 166, 0.25);
+      0 0 10px color-mix(in oklch, var(--primary-500) 55%, transparent),
+      0 0 24px color-mix(in oklch, var(--primary-500) 25%, transparent);
   }
 
   /* Skeleton placeholder while the share code is loading */

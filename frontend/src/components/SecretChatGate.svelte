@@ -222,22 +222,22 @@
         0deg,
         transparent,
         transparent 28px,
-        rgba(20, 184, 166, 0.025) 28px,
-        rgba(20, 184, 166, 0.025) 29px
+        color-mix(in oklch, var(--primary-500) 2.5%, transparent) 28px,
+        color-mix(in oklch, var(--primary-500) 2.5%, transparent) 29px
       ),
       repeating-linear-gradient(
         60deg,
         transparent,
         transparent 28px,
-        rgba(20, 184, 166, 0.015) 28px,
-        rgba(20, 184, 166, 0.015) 29px
+        color-mix(in oklch, var(--primary-500) 1.5%, transparent) 28px,
+        color-mix(in oklch, var(--primary-500) 1.5%, transparent) 29px
       ),
       repeating-linear-gradient(
         120deg,
         transparent,
         transparent 28px,
-        rgba(20, 184, 166, 0.015) 28px,
-        rgba(20, 184, 166, 0.015) 29px
+        color-mix(in oklch, var(--primary-500) 1.5%, transparent) 28px,
+        color-mix(in oklch, var(--primary-500) 1.5%, transparent) 29px
       );
     animation: gate-hex-drift 20s linear infinite;
     pointer-events: none;
@@ -253,8 +253,8 @@
     position: absolute;
     inset: 0;
     background:
-      radial-gradient(ellipse 55% 45% at 50% 40%, rgba(20, 184, 166, 0.11) 0%, transparent 65%),
-      radial-gradient(ellipse 40% 30% at 80% 75%, rgba(6, 182, 212, 0.07) 0%, transparent 55%);
+      radial-gradient(ellipse 55% 45% at 50% 40%, color-mix(in oklch, var(--primary-500) 11%, transparent) 0%, transparent 65%),
+      radial-gradient(ellipse 40% 30% at 80% 75%, color-mix(in oklch, var(--member-3) 7%, transparent) 0%, transparent 55%);
     pointer-events: none;
     animation: gate-glow-breathe 7s ease-in-out infinite;
   }
@@ -306,18 +306,18 @@
   .gate-icon-ring {
     position: absolute;
     border-radius: var(--radius-full, 9999px);
-    border: 1px solid var(--chat-border-accent, rgba(20, 184, 166, 0.22));
+    border: 1px solid var(--chat-border-accent, color-mix(in oklch, var(--primary-500) 22%, transparent));
   }
 
   .gate-icon-ring--outer {
     inset: 0;
-    background: rgba(20, 184, 166, 0.04);
+    background: color-mix(in oklch, var(--primary-500) 4%, transparent);
     animation: gate-ring-pulse 3s ease-in-out infinite;
   }
 
   .gate-icon-ring--inner {
     inset: 12px;
-    background: rgba(20, 184, 166, 0.07);
+    background: color-mix(in oklch, var(--primary-500) 7%, transparent);
     animation: gate-ring-pulse 3s ease-in-out infinite 0.5s;
   }
 
@@ -330,29 +330,29 @@
     width: 56px;
     height: 56px;
     border-radius: var(--radius-full, 9999px);
-    background: var(--chat-accent-subtle, rgba(20, 184, 166, 0.08));
-    border: 1px solid var(--chat-border-accent, rgba(20, 184, 166, 0.22));
+    background: var(--chat-accent-subtle, color-mix(in oklch, var(--primary-500) 8%, transparent));
+    border: 1px solid var(--chat-border-accent, color-mix(in oklch, var(--primary-500) 22%, transparent));
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--chat-accent, #14b8a6);
+    color: var(--chat-accent, var(--primary-500));
     position: relative;
     z-index: 1;
-    box-shadow: 0 0 32px rgba(20, 184, 166, 0.2);
+    box-shadow: 0 0 32px color-mix(in oklch, var(--primary-500) 20%, transparent);
     animation: gate-icon-breathe 5s ease-in-out infinite;
     transition: box-shadow 0.4s var(--ease-out), color 0.3s, background 0.3s, border-color 0.3s;
     flex-shrink: 0;
   }
 
   @keyframes gate-icon-breathe {
-    0%, 100% { box-shadow: 0 0 24px rgba(20, 184, 166, 0.20); }
-    50%       { box-shadow: 0 0 48px rgba(20, 184, 166, 0.36); }
+    0%, 100% { box-shadow: 0 0 24px color-mix(in oklch, var(--primary-500) 20%, transparent); }
+    50%       { box-shadow: 0 0 48px color-mix(in oklch, var(--primary-500) 36%, transparent); }
   }
 
   .gate-icon--success {
-    color: var(--success-400, #34d399);
-    border-color: rgba(52, 211, 153, 0.35);
-    background: rgba(52, 211, 153, 0.08);
+    color: var(--success-400, var(--success-400));
+    border-color: color-mix(in oklch, var(--success-400) 35%, transparent);
+    background: color-mix(in oklch, var(--success-400) 8%, transparent);
     animation: gate-icon-success 0.5s var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1));
   }
 
@@ -414,9 +414,9 @@
 
   .gate-dot--filled,
   :global(.scv-pin-dot--filled) {
-    background: var(--chat-accent, #14b8a6);
+    background: var(--chat-accent, var(--primary-500));
     border-color: transparent;
-    box-shadow: 0 0 8px rgba(20, 184, 166, 0.5);
+    box-shadow: 0 0 8px color-mix(in oklch, var(--primary-500) 50%, transparent);
   }
 
   .gate-dot--active,
@@ -438,7 +438,7 @@
     width: 100%;
     padding: var(--space-4, 16px);
     background: rgba(255, 255, 255, 0.07);
-    border: 1px solid var(--chat-border-accent, rgba(20, 184, 166, 0.30));
+    border: 1px solid var(--chat-border-accent, color-mix(in oklch, var(--primary-500) 30%, transparent));
     border-radius: var(--radius-lg, 14px);
     color: rgba(255, 255, 255, 0.92);
     /* 26px > 16px iOS threshold — prevents auto-zoom, signals vault-weight */
@@ -448,7 +448,7 @@
     font-family: var(--font-mono, 'JetBrains Mono', monospace);
     outline: none;
     transition: border-color 0.2s, box-shadow 0.2s;
-    caret-color: var(--chat-accent, #14b8a6);
+    caret-color: var(--chat-accent, var(--primary-500));
     -webkit-appearance: none;
     appearance: none;
     min-height: 64px;
@@ -464,8 +464,8 @@
   }
 
   .gate-pin-input:focus {
-    border-color: var(--chat-accent, #14b8a6);
-    box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    border-color: var(--chat-accent, var(--primary-500));
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary-500) 12%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.04);
   }
 
   @keyframes gate-shake {
@@ -479,15 +479,15 @@
 
   .gate-pin-input--shake {
     animation: gate-shake 0.48s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
-    border-color: var(--danger-400, #f87171);
-    box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.12);
+    border-color: var(--danger-400, var(--danger-400));
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--danger-400) 12%, transparent);
   }
 
   .gate-field-err {
     margin: 0;
     font-size: var(--text-xs, 0.75rem);
     font-family: var(--font-sans, 'Nunito', sans-serif);
-    color: var(--danger-400, #f87171);
+    color: var(--danger-400, var(--danger-400));
     font-weight: 500;
   }
 
@@ -523,20 +523,20 @@
   .gate-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
   .gate-btn:focus-visible {
-    outline: 2px solid var(--chat-accent, #14b8a6);
+    outline: 2px solid var(--chat-accent, var(--primary-500));
     outline-offset: 2px;
   }
 
   .gate-btn--ready {
-    background: linear-gradient(135deg, var(--primary-400, #2dd4bf) 0%, var(--primary-600, #0d9488) 100%);
+    background: linear-gradient(135deg, var(--primary-400, var(--primary-400)) 0%, var(--primary-600, var(--primary-600)) 100%);
     color: #fff;
     border-color: transparent;
-    box-shadow: 0 4px 22px rgba(20, 184, 166, 0.42);
+    box-shadow: 0 4px 22px color-mix(in oklch, var(--primary-500) 42%, transparent);
   }
 
   .gate-btn--ready:hover:not(:disabled) {
     transform: translateY(-1px);
-    box-shadow: 0 6px 30px rgba(20, 184, 166, 0.58);
+    box-shadow: 0 6px 30px color-mix(in oklch, var(--primary-500) 58%, transparent);
   }
 
   .gate-btn--ready:active:not(:disabled) {

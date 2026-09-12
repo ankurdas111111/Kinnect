@@ -59,7 +59,7 @@
     font-size: 0.6875rem;
     font-weight: 800;
     color: white;
-    background: linear-gradient(135deg, var(--danger-500, #ef4444), var(--danger-700, #b91c1c));
+    background: linear-gradient(135deg, var(--danger-500, var(--danger-500)), var(--danger-700, var(--danger-700)));
     border-radius: var(--radius-full);
     padding: 2px 8px 2px 5px;
     line-height: 1.3;

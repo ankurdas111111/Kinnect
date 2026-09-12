@@ -17,7 +17,7 @@ color  — particle color (default danger red)
    */
 
   /** @type {Props} */
-  let { active = false, color = 'rgba(239, 68, 68, 0.9)' } = $props();
+  let { active = false, color = 'color-mix(in oklch, var(--danger-500) 90%, transparent)' } = $props();
 
   // 12 particles, evenly distributed around the circle
   const PARTICLE_COUNT = 12;
@@ -76,7 +76,7 @@ color  — particle color (default danger red)
     width: var(--spb-size);
     height: var(--spb-size);
     border-radius: 50%;
-    background: var(--spb-color, rgba(239, 68, 68, 0.9));
+    background: var(--spb-color, color-mix(in oklch, var(--danger-500) 90%, transparent));
     top: 50%;
     left: 50%;
     margin-top: calc(var(--spb-size) / -2);
@@ -114,14 +114,14 @@ color  — particle color (default danger red)
     width: 100%;
     height: 100%;
     border-radius: 50%;
-    border: 2px solid var(--spb-color, rgba(239, 68, 68, 0.8));
+    border: 2px solid var(--spb-color, color-mix(in oklch, var(--danger-500) 80%, transparent));
     animation: spb-ring-expand 600ms cubic-bezier(0, 0.9, 0.57, 1) both;
     will-change: transform, opacity;
   }
 
   .spb-flash-ring-2 {
     animation-delay: 80ms;
-    border-color: rgba(239, 68, 68, 0.5);
+    border-color: color-mix(in oklch, var(--danger-500) 50%, transparent);
     border-width: 1px;
   }
 

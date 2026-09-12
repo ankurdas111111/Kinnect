@@ -204,8 +204,8 @@
 <style>
   /* MERIDIAN: Amber card for auto-SOS section */
   .auto-sos-card {
-    background: rgba(245, 158, 11, 0.07);
-    border: 1px solid rgba(245, 158, 11, 0.22);
+    background: color-mix(in oklch, var(--warning-500) 7%, transparent);
+    border: 1px solid color-mix(in oklch, var(--warning-500) 22%, transparent);
     border-radius: var(--radius-md);
     padding: var(--space-3);
     margin: var(--space-2) 0;
@@ -219,7 +219,7 @@
     font-weight: 700;
     letter-spacing: 0.10em;
     text-transform: uppercase;
-    color: var(--warning-600, #d97706);
+    color: var(--warning-600, var(--warning-600));
     margin-bottom: var(--space-2);
   }
 </style>

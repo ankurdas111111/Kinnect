@@ -118,7 +118,7 @@
   }
 
   .toggle.live {
-    background: var(--danger-500, #ef4444);
+    background: var(--danger-500, var(--danger-500));
   }
 
   .stats {

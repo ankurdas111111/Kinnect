@@ -15,11 +15,11 @@
   const TOOLTIP_W = 304;
 
   const features = [
-    { color: '#6366f1', label: 'Live Map',          desc: 'Everyone, real time'       },
-    { color: '#10b981', label: 'Activity Feed',     desc: 'What\'s been happening'    },
-    { color: '#f59e0b', label: 'Route History',     desc: 'Replay recent journeys'    },
-    { color: '#ef4444', label: 'Emergency Profile', desc: 'Critical info, always ready' },
-    { color: '#8b5cf6', label: 'Check-ins',         desc: 'Scheduled safety pings'    },
+    { color: 'var(--primary-500)', label: 'Live Map',          desc: 'Everyone, real time'       },
+    { color: 'var(--success-500)', label: 'Activity Feed',     desc: 'What\'s been happening'    },
+    { color: 'var(--warning-500)', label: 'Route History',     desc: 'Replay recent journeys'    },
+    { color: 'var(--danger-500)', label: 'Emergency Profile', desc: 'Critical info, always ready' },
+    { color: 'var(--member-4)', label: 'Check-ins',         desc: 'Scheduled safety pings'    },
   ];
 
   onMount(() => {
@@ -82,7 +82,7 @@
       aria-hidden="true"
     >
       <line x1="1" y1="0" x2="1" y2="20"
-        stroke="rgba(251,191,36,0.45)"
+        stroke="color-mix(in oklch, var(--warning-400) 45%, transparent)"
         stroke-width="1.5"
         stroke-dasharray="3 2.5"
       />
@@ -137,8 +137,8 @@
        9999px vignette every frame — GPU-rule violation). */
     box-shadow:
       0 0 0 9999px rgba(4, 3, 14, 0.93),
-      0 0 0 2px  rgba(251, 191, 36, 0.78),
-      0 0 0 5px  rgba(251, 191, 36, 0.12);
+      0 0 0 2px  color-mix(in oklch, var(--warning-400) 78%, transparent),
+      0 0 0 5px  color-mix(in oklch, var(--warning-400) 12%, transparent);
   }
 
   .hs-hole::after {
@@ -147,8 +147,8 @@
     inset: 0;
     border-radius: inherit;
     box-shadow:
-      0 0 0 3px   rgba(251, 191, 36, 0.30),
-      0 0 44px 6px rgba(251, 191, 36, 0.42);
+      0 0 0 3px   color-mix(in oklch, var(--warning-400) 30%, transparent),
+      0 0 44px 6px color-mix(in oklch, var(--warning-400) 42%, transparent);
     opacity: 0.35;
     animation: spot-breathe 2.6s ease-in-out infinite;
   }
@@ -171,7 +171,7 @@
   .hs-card {
     position: absolute;
     background: rgba(9, 7, 22, 0.97);
-    border: 1px solid rgba(251, 191, 36, 0.20);
+    border: 1px solid color-mix(in oklch, var(--warning-400) 20%, transparent);
     border-radius: 18px;
     padding: 0 20px 20px;
     overflow: hidden;
@@ -179,7 +179,7 @@
     -webkit-backdrop-filter: blur(28px);
     box-shadow:
       0 28px 64px rgba(0, 0, 0, 0.65),
-      0 0 0 1px rgba(251, 191, 36, 0.06),
+      0 0 0 1px color-mix(in oklch, var(--warning-400) 6%, transparent),
       inset 0 1px 0 rgba(255, 255, 255, 0.04);
     cursor: default;
   }
@@ -188,7 +188,7 @@
   .hs-accent-bar {
     height: 3px;
     margin: 0 -20px 18px;
-    background: linear-gradient(90deg, #f59e0b 0%, #d97706 60%, transparent 100%);
+    background: linear-gradient(90deg, var(--warning-500) 0%, var(--warning-600) 60%, transparent 100%);
     opacity: 0.85;
   }
 
@@ -197,7 +197,7 @@
     font-weight: 800;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: #f59e0b;
+    color: var(--warning-500);
     margin: 0 0 7px;
     font-family: var(--font-display, system-ui);
   }
@@ -271,7 +271,7 @@
     flex: 1;
     height: 38px;
     border-radius: 11px;
-    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    background: linear-gradient(135deg, var(--warning-500) 0%, var(--warning-600) 100%);
     color: #0d0a02;
     font-size: 13px;
     font-weight: 800;
@@ -280,12 +280,12 @@
     cursor: pointer;
     letter-spacing: -0.01em;
     transition: transform 0.12s, box-shadow 0.15s;
-    box-shadow: 0 4px 18px rgba(245, 158, 11, 0.38), 0 0 0 1px rgba(245,158,11,0.3);
+    box-shadow: 0 4px 18px color-mix(in oklch, var(--warning-500) 38%, transparent), 0 0 0 1px color-mix(in oklch, var(--warning-500) 30%, transparent);
   }
 
   .hs-btn-primary:hover {
     transform: translateY(-1px);
-    box-shadow: 0 7px 22px rgba(245, 158, 11, 0.52), 0 0 0 1px rgba(245,158,11,0.4);
+    box-shadow: 0 7px 22px color-mix(in oklch, var(--warning-500) 52%, transparent), 0 0 0 1px color-mix(in oklch, var(--warning-500) 40%, transparent);
   }
 
   .hs-btn-primary:active { transform: scale(0.96); transition-duration: 60ms; }

@@ -82,11 +82,11 @@
     position: absolute;
     width: 80px; height: 80px;
     border-radius: 50%;
-    background: rgba(239, 68, 68, 0.90);
+    background: color-mix(in oklch, var(--danger-500) 90%, transparent);
     transform: translate(-50%, -50%);
     box-shadow:
-      0 0 40px rgba(239, 68, 68, 0.70),
-      0 0 80px rgba(239, 68, 68, 0.40);
+      0 0 40px color-mix(in oklch, var(--danger-500) 70%, transparent),
+      0 0 80px color-mix(in oklch, var(--danger-500) 40%, transparent);
     animation: spb-flash 650ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
@@ -94,7 +94,7 @@
   .spb-ring {
     position: absolute;
     border-radius: 50%;
-    border: 2px solid rgba(239, 68, 68, 0.70);
+    border: 2px solid color-mix(in oklch, var(--danger-500) 70%, transparent);
     transform: translate(-50%, -50%);
     animation: spb-ring-expand 800ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
@@ -106,7 +106,7 @@
 
   .spb-ring-2 {
     width: 60px; height: 60px;
-    border-color: rgba(252, 165, 165, 0.50);
+    border-color: color-mix(in oklch, var(--danger-300) 50%, transparent);
     animation-delay: 120ms;
   }
 
@@ -115,8 +115,8 @@
     position: absolute;
     width: 7px; height: 7px;
     border-radius: 50%;
-    background: rgba(239, 68, 68, 0.90);
-    box-shadow: 0 0 8px rgba(239, 68, 68, 0.60);
+    background: color-mix(in oklch, var(--danger-500) 90%, transparent);
+    box-shadow: 0 0 8px color-mix(in oklch, var(--danger-500) 60%, transparent);
     transform: translate(-50%, -50%);
     animation: spb-particle 750ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
     will-change: transform, opacity;

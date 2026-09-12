@@ -161,28 +161,28 @@
     box-shadow:
       var(--elevation-4),
       inset 0 1px 0 rgba(255,255,255,0.08),
-      -2px 0 12px rgba(20,184,166,0.25);
+      -2px 0 12px color-mix(in oklch, var(--primary-500) 25%, transparent);
   }
   .toast-success {
     border-left-color: var(--success-500);
     box-shadow:
       var(--elevation-4),
       inset 0 1px 0 rgba(255,255,255,0.08),
-      -2px 0 14px rgba(16,185,129,0.30);
+      -2px 0 14px color-mix(in oklch, var(--success-500) 30%, transparent);
   }
   .toast-error {
     border-left-color: var(--danger-500);
     box-shadow:
       var(--elevation-4),
       inset 0 1px 0 rgba(255,255,255,0.08),
-      -2px 0 14px rgba(239,68,68,0.32);
+      -2px 0 14px color-mix(in oklch, var(--danger-500) 32%, transparent);
   }
   .toast-warning {
     border-left-color: var(--warning-500);
     box-shadow:
       var(--elevation-4),
       inset 0 1px 0 rgba(255,255,255,0.08),
-      -2px 0 12px rgba(245,158,11,0.28);
+      -2px 0 12px color-mix(in oklch, var(--warning-500) 28%, transparent);
   }
 
   .toast-icon {
@@ -196,24 +196,24 @@
   }
 
   .toast-info .toast-icon    {
-    background: rgba(20,184,166,0.16);
+    background: color-mix(in oklch, var(--primary-500) 16%, transparent);
     color: var(--primary-400);
-    box-shadow: 0 0 8px rgba(20,184,166,0.20);
+    box-shadow: 0 0 8px color-mix(in oklch, var(--primary-500) 20%, transparent);
   }
   .toast-success .toast-icon {
-    background: rgba(16,185,129,0.16);
+    background: color-mix(in oklch, var(--success-500) 16%, transparent);
     color: var(--success-400);
-    box-shadow: 0 0 8px rgba(16,185,129,0.22);
+    box-shadow: 0 0 8px color-mix(in oklch, var(--success-500) 22%, transparent);
   }
   .toast-error .toast-icon   {
-    background: rgba(239,68,68,0.16);
+    background: color-mix(in oklch, var(--danger-500) 16%, transparent);
     color: var(--danger-400);
-    box-shadow: 0 0 8px rgba(239,68,68,0.24);
+    box-shadow: 0 0 8px color-mix(in oklch, var(--danger-500) 24%, transparent);
   }
   .toast-warning .toast-icon {
-    background: rgba(245,158,11,0.16);
+    background: color-mix(in oklch, var(--warning-500) 16%, transparent);
     color: var(--warning-400);
-    box-shadow: 0 0 8px rgba(245,158,11,0.20);
+    box-shadow: 0 0 8px color-mix(in oklch, var(--warning-500) 20%, transparent);
   }
 
   .toast-message {
@@ -259,19 +259,19 @@
 
   .toast-info .toast-progress    {
     background: linear-gradient(90deg, var(--primary-500), var(--primary-400));
-    box-shadow: 0 0 4px rgba(20,184,166,0.50);
+    box-shadow: 0 0 4px color-mix(in oklch, var(--primary-500) 50%, transparent);
   }
   .toast-success .toast-progress {
     background: linear-gradient(90deg, var(--success-500), var(--success-400));
-    box-shadow: 0 0 4px rgba(16,185,129,0.50);
+    box-shadow: 0 0 4px color-mix(in oklch, var(--success-500) 50%, transparent);
   }
   .toast-error .toast-progress   {
     background: linear-gradient(90deg, var(--danger-500), var(--danger-400));
-    box-shadow: 0 0 4px rgba(239,68,68,0.50);
+    box-shadow: 0 0 4px color-mix(in oklch, var(--danger-500) 50%, transparent);
   }
   .toast-warning .toast-progress {
     background: linear-gradient(90deg, var(--warning-500), var(--warning-400));
-    box-shadow: 0 0 4px rgba(245,158,11,0.50);
+    box-shadow: 0 0 4px color-mix(in oklch, var(--warning-500) 50%, transparent);
   }
 
   @keyframes toast-progress {

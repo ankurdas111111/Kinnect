@@ -90,14 +90,14 @@
   .live { color: var(--status-live, #22c55e); }
   .live .dot { animation: pulse-live 2s ease-in-out infinite; }
 
-  .stale { color: var(--status-stale, #f59e0b); }
+  .stale { color: var(--status-stale, var(--warning-500)); }
 
-  .old { color: var(--danger-500, #ef4444); }
+  .old { color: var(--danger-500, var(--danger-500)); }
 
   .offline { color: var(--status-offline, #94a3b8); }
   .offline .dot { opacity: 0.5; }
 
-  .sos { color: var(--status-sos, #ef4444); }
+  .sos { color: var(--status-sos, var(--danger-500)); }
   .sos .dot { animation: pulse-sos 1s ease-in-out infinite; }
 
   .waiting { color: var(--text-tertiary); }

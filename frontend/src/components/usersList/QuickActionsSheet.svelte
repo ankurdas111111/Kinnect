@@ -158,7 +158,7 @@
     position: absolute;
     inset: -3px;
     border-radius: 50%;
-    box-shadow: 0 0 0 2.5px var(--danger-500), 0 0 12px rgba(239,68,68,0.5);
+    box-shadow: 0 0 0 2.5px var(--danger-500), 0 0 12px color-mix(in oklch, var(--danger-500) 50%, transparent);
     animation: sos-urgent-pulse 1s ease-in-out infinite;
     pointer-events: none;
   }
@@ -182,12 +182,12 @@
 
   .qa-user-status {
     font-size: var(--text-xs, 12px);
-    color: var(--success-500, #10b981);
+    color: var(--success-500, var(--success-500));
     font-weight: 600;
   }
 
   .qa-status-offline { color: var(--text-tertiary); }
-  .qa-status-sos { color: var(--danger-500, #ef4444); }
+  .qa-status-sos { color: var(--danger-500, var(--danger-500)); }
 
   .qa-actions {
     display: flex;
@@ -234,12 +234,12 @@
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: rgba(99,102,241,0.14);
-    border: 1px solid rgba(99,102,241,0.22);
+    background: color-mix(in oklch, var(--primary-500) 14%, transparent);
+    border: 1px solid color-mix(in oklch, var(--primary-500) 22%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--primary-400, #818cf8);
+    color: var(--primary-400, var(--primary-400));
     flex-shrink: 0;
   }
 

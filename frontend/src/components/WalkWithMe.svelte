@@ -306,7 +306,7 @@
     background: var(--primary-500);
     border-color: var(--primary-500);
     transform: scale(1.15);
-    box-shadow: 0 0 0 3px var(--primary-500-20, rgba(99,102,241,0.2));
+    box-shadow: 0 0 0 3px var(--primary-500-20, color-mix(in oklch, var(--primary-500) 20%, transparent));
   }
   /* Active-step ring: .fx-ambient so tokens-fx.css suppresses at data-fx=minimal */
   .step-item.step-active .step-bead.fx-ambient {
@@ -314,13 +314,13 @@
     animation: wwm-step-ring 2s var(--ease-in-out, ease-in-out) infinite;
   }
   .step-item.step-active .step-label {
-    color: var(--primary-300, #a5b4fc);
+    color: var(--primary-300, var(--primary-300));
   }
 
   /* Complete node: success tint + checkmark */
   .step-item.step-complete .step-bead {
-    background: var(--success-500, #10b981);
-    border-color: var(--success-500, #10b981);
+    background: var(--success-500, var(--success-500));
+    border-color: var(--success-500, var(--success-500));
     color: white;
   }
   .step-item.step-complete .step-label {
@@ -336,7 +336,7 @@
 
   /* Active-step soft ring pulse — decorative ambient */
   @keyframes wwm-step-ring {
-    0%, 100% { box-shadow: 0 0 0 3px var(--primary-500-20, rgba(99,102,241,0.2)); }
+    0%, 100% { box-shadow: 0 0 0 3px var(--primary-500-20, color-mix(in oklch, var(--primary-500) 20%, transparent)); }
     50%       { box-shadow: 0 0 0 7px transparent; }
   }
 
@@ -432,7 +432,7 @@
     outline-offset: 2px;
   }
   .wwm-place-sel {
-    background: var(--primary-500-20, rgba(99,102,241,0.15)) !important;
+    background: var(--primary-500-20, color-mix(in oklch, var(--primary-500) 15%, transparent)) !important;
     border-color: var(--primary-500) !important;
     color: var(--primary-300);
   }
@@ -454,7 +454,7 @@
   }
   .wwm-input:focus {
     border-color: var(--primary-500);
-    box-shadow: 0 0 0 3px var(--primary-500-20, rgba(99,102,241,0.15));
+    box-shadow: 0 0 0 3px var(--primary-500-20, color-mix(in oklch, var(--primary-500) 15%, transparent));
   }
   .wwm-input::placeholder { color: var(--text-tertiary); }
 
@@ -493,7 +493,7 @@
     outline-offset: 2px;
   }
   .wwm-watcher-sel {
-    background: var(--primary-500-20, rgba(99,102,241,0.15)) !important;
+    background: var(--primary-500-20, color-mix(in oklch, var(--primary-500) 15%, transparent)) !important;
     border-color: var(--primary-500) !important;
     color: var(--primary-300);
   }
@@ -504,10 +504,10 @@
     height: 7px;
     border-radius: 50%;
     flex-shrink: 0;
-    background: var(--status-live, #10b981); /* token, not literal */
+    background: var(--status-live, var(--success-500)); /* token, not literal */
   }
   .wwm-w-dot.wwm-w-sos {
-    background: var(--status-sos, #ef4444);
+    background: var(--status-sos, var(--danger-500));
   }
 
   /* ── Start CTA ───────────────────────────────────────────────── */
@@ -526,10 +526,10 @@
     transition:
       box-shadow var(--duration-normal, 200ms) var(--ease-out),
       opacity var(--duration-fast, 100ms) var(--ease-out);
-    box-shadow: 0 2px 12px var(--primary-500-30, rgba(99,102,241,0.3));
+    box-shadow: 0 2px 12px var(--primary-500-30, color-mix(in oklch, var(--primary-500) 30%, transparent));
   }
   .wwm-start:hover {
-    box-shadow: 0 4px 18px var(--primary-500-30, rgba(99,102,241,0.4));
+    box-shadow: 0 4px 18px var(--primary-500-30, color-mix(in oklch, var(--primary-500) 40%, transparent));
   }
   .wwm-start:focus-visible {
     outline: 2px solid var(--primary-400);
@@ -548,8 +548,8 @@
     height: 56px;
     border-radius: 50%;
     margin: 0 auto var(--space-3, 12px);
-    background: var(--primary-500-20, rgba(99,102,241,0.12));
-    border: 1px solid var(--primary-500-30, rgba(99,102,241,0.25));
+    background: var(--primary-500-20, color-mix(in oklch, var(--primary-500) 12%, transparent));
+    border: 1px solid var(--primary-500-30, color-mix(in oklch, var(--primary-500) 25%, transparent));
     display: flex;
     align-items: center;
     justify-content: center;
@@ -562,7 +562,7 @@
   }
 
   @keyframes wwm-icon-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 var(--primary-500-20, rgba(99,102,241,0.2)); }
+    0%, 100% { box-shadow: 0 0 0 0 var(--primary-500-20, color-mix(in oklch, var(--primary-500) 20%, transparent)); }
     50%       { box-shadow: 0 0 0 10px transparent; }
   }
 
@@ -581,8 +581,8 @@
     min-height: 44px;
     display: flex;
     align-items: center;
-    background: var(--primary-500-20, rgba(99,102,241,0.15));
-    border: 1px solid var(--primary-500-30, rgba(99,102,241,0.3));
+    background: var(--primary-500-20, color-mix(in oklch, var(--primary-500) 15%, transparent));
+    border: 1px solid var(--primary-500-30, color-mix(in oklch, var(--primary-500) 30%, transparent));
     color: var(--primary-300);
     cursor: pointer;
     outline: none;
@@ -590,7 +590,7 @@
       background-color var(--duration-fast, 100ms) var(--ease-out),
       box-shadow var(--duration-fast, 100ms) var(--ease-out);
   }
-  .wwm-share:hover { background: var(--primary-500-20, rgba(99,102,241,0.22)); }
+  .wwm-share:hover { background: var(--primary-500-20, color-mix(in oklch, var(--primary-500) 22%, transparent)); }
   .wwm-share:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
 
   .wwm-end {
@@ -601,15 +601,15 @@
     min-height: 44px;
     display: flex;
     align-items: center;
-    background: rgba(239,68,68,0.12); /* raw-color-ok: no --danger-* alpha token exists */
-    border: 1px solid rgba(239,68,68,0.25); /* raw-color-ok */
-    color: var(--danger-400, #f87171);
+    background: color-mix(in oklch, var(--danger-500) 12%, transparent); /* raw-color-ok: no --danger-* alpha token exists */
+    border: 1px solid color-mix(in oklch, var(--danger-500) 25%, transparent); /* raw-color-ok */
+    color: var(--danger-400, var(--danger-400));
     cursor: pointer;
     outline: none;
     transition:
       background-color var(--duration-fast, 100ms) var(--ease-out);
   }
-  .wwm-end:hover { background: rgba(239,68,68,0.18); } /* raw-color-ok */
+  .wwm-end:hover { background: color-mix(in oklch, var(--danger-500) 18%, transparent); } /* raw-color-ok */
   .wwm-end:focus-visible { outline: 2px solid var(--danger-400); outline-offset: 2px; }
 
   /* ── Arrived state — calm green moment ──────────────────────── */
@@ -618,7 +618,7 @@
     padding: var(--space-6, 24px) var(--space-4, 16px);
     /* single entry animation — not infinite; calm-core: one 300ms pulse then static */
     animation: wwm-arrived-enter 300ms var(--ease-out) forwards;
-    border: 1.5px solid var(--ring-color-live, var(--status-live, #10b981));
+    border: 1.5px solid var(--ring-color-live, var(--status-live, var(--success-500)));
   }
 
   @keyframes wwm-arrived-enter {
@@ -631,12 +631,12 @@
     height: 64px;
     border-radius: 50%;
     margin: 0 auto var(--space-3, 12px);
-    background: rgba(16,185,129,0.12); /* raw-color-ok: --success-* alpha not tokenised */
-    border: 2px solid var(--ring-color-live, var(--status-live, #10b981));
+    background: color-mix(in oklch, var(--success-500) 12%, transparent); /* raw-color-ok: --success-* alpha not tokenised */
+    border: 2px solid var(--ring-color-live, var(--status-live, var(--success-500)));
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--success-500, #10b981);
+    color: var(--success-500, var(--success-500));
     /* One pop on entry — not infinite */
     animation: wwm-arrived-pop 300ms var(--ease-spring, cubic-bezier(0.34,1.56,0.64,1)) forwards;
   }
@@ -657,14 +657,14 @@
     justify-content: center;
     font-size: var(--text-base, 15px);
     font-weight: 700;
-    background: rgba(16,185,129,0.15); /* raw-color-ok */
-    border: 1px solid var(--ring-color-live, var(--status-live, #10b981));
-    color: var(--success-400, #34d399);
+    background: color-mix(in oklch, var(--success-500) 15%, transparent); /* raw-color-ok */
+    border: 1px solid var(--ring-color-live, var(--status-live, var(--success-500)));
+    color: var(--success-400, var(--success-400));
     cursor: pointer;
     outline: none;
     transition: background-color var(--duration-fast, 100ms) var(--ease-out);
   }
-  .wwm-done:hover { background: rgba(16,185,129,0.22); } /* raw-color-ok */
+  .wwm-done:hover { background: color-mix(in oklch, var(--success-500) 22%, transparent); } /* raw-color-ok */
   .wwm-done:focus-visible { outline: 2px solid var(--success-400); outline-offset: 2px; }
 
   /* ── Reduced motion ──────────────────────────────────────────── */

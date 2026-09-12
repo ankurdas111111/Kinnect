@@ -225,16 +225,16 @@
     color: #fff;
     border: 1px solid rgba(255, 255, 255, 0.14);
     box-shadow:
-      0 6px 20px rgba(20, 184, 166, 0.38),
-      0 2px 6px  rgba(20, 184, 166, 0.22),
+      0 6px 20px color-mix(in oklch, var(--primary-500) 38%, transparent),
+      0 2px 6px  color-mix(in oklch, var(--primary-500) 22%, transparent),
       inset 0 1px 0 rgba(255, 255, 255, 0.22),
       inset 0 -2px 6px rgba(0, 0, 0, 0.14);
   }
 
   .btn-primary:hover:not(:disabled) {
     box-shadow:
-      0 10px 32px rgba(20, 184, 166, 0.52),
-      0 4px 12px  rgba(20, 184, 166, 0.30),
+      0 10px 32px color-mix(in oklch, var(--primary-500) 52%, transparent),
+      0 4px 12px  color-mix(in oklch, var(--primary-500) 30%, transparent),
       inset 0 1px 0 rgba(255, 255, 255, 0.26),
       inset 0 -2px 6px rgba(0, 0, 0, 0.12);
     filter: brightness(1.06);
@@ -277,14 +277,14 @@
     color: #fff;
     border: 1px solid rgba(255, 255, 255, 0.10);
     box-shadow:
-      0 6px 20px rgba(239, 68, 68, 0.32),
+      0 6px 20px color-mix(in oklch, var(--danger-500) 32%, transparent),
       inset 0 1px 0 rgba(255, 255, 255, 0.18),
       inset 0 -2px 6px rgba(0, 0, 0, 0.15);
   }
 
   .btn-danger:hover:not(:disabled) {
     box-shadow:
-      0 8px 28px rgba(239, 68, 68, 0.46),
+      0 8px 28px color-mix(in oklch, var(--danger-500) 46%, transparent),
       inset 0 1px 0 rgba(255, 255, 255, 0.22),
       inset 0 -2px 6px rgba(0, 0, 0, 0.12);
     filter: brightness(1.06);
@@ -296,14 +296,14 @@
     color: #fff;
     border: 1px solid rgba(255, 255, 255, 0.12);
     box-shadow:
-      0 6px 20px rgba(16, 185, 129, 0.36),
+      0 6px 20px color-mix(in oklch, var(--success-500) 36%, transparent),
       inset 0 1px 0 rgba(255, 255, 255, 0.20),
       inset 0 -2px 6px rgba(0, 0, 0, 0.12);
   }
 
   .btn-success:hover:not(:disabled) {
     filter: brightness(1.08);
-    box-shadow: 0 8px 28px rgba(16, 185, 129, 0.48);
+    box-shadow: 0 8px 28px color-mix(in oklch, var(--success-500) 48%, transparent);
   }
 
   /* ── Shimmer sweep (hover) ────────────────────────────────────────────── */
@@ -347,7 +347,7 @@
 
   .btn-ghost .btn-ripple,
   .btn-secondary .btn-ripple {
-    background: rgba(20, 184, 166, 0.18);
+    background: color-mix(in oklch, var(--primary-500) 18%, transparent);
   }
 
   @keyframes btn-ripple-expand {

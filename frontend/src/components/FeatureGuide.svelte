@@ -270,8 +270,8 @@
     text-transform: uppercase;
     letter-spacing: 0.1em;
     color: var(--primary-400);
-    background: rgba(20, 184, 166, 0.12);
-    border: 1px solid rgba(20, 184, 166, 0.25);
+    background: color-mix(in oklch, var(--primary-500) 12%, transparent);
+    border: 1px solid color-mix(in oklch, var(--primary-500) 25%, transparent);
     padding: 3px 10px;
     border-radius: 99px;
   }
@@ -308,8 +308,8 @@
     width: clamp(56px, 4vw, 68px);
     height: clamp(56px, 4vw, 68px);
     border-radius: 16px;
-    background: linear-gradient(135deg, rgba(20, 184, 166, 0.15), rgba(99, 102, 241, 0.10));
-    border: 1px solid rgba(20, 184, 166, 0.25);
+    background: linear-gradient(135deg, color-mix(in oklch, var(--primary-500) 15%, transparent), color-mix(in oklch, var(--primary-500) 10%, transparent));
+    border: 1px solid color-mix(in oklch, var(--primary-500) 25%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;

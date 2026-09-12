@@ -155,8 +155,8 @@
 <style>
   /* ── Safety Zone ────────────────────────────────────────────────── */
   .safety-zone {
-    background: rgba(239, 68, 68, 0.03);
-    border: 1px solid rgba(239, 68, 68, 0.10);
+    background: color-mix(in oklch, var(--danger-500) 3%, transparent);
+    border: 1px solid color-mix(in oklch, var(--danger-500) 10%, transparent);
     border-radius: var(--radius-xl);
     padding: var(--space-4);
     display: flex;
@@ -164,8 +164,8 @@
     gap: var(--space-3);
   }
   :global([data-theme="dark"]) .safety-zone {
-    background: rgba(239, 68, 68, 0.05);
-    border-color: rgba(239, 68, 68, 0.14);
+    background: color-mix(in oklch, var(--danger-500) 5%, transparent);
+    border-color: color-mix(in oklch, var(--danger-500) 14%, transparent);
   }
   .safety-actions {
     display: grid;
@@ -181,7 +181,7 @@
     gap: var(--space-2-5);
     padding: var(--space-3) var(--space-4);
     background: linear-gradient(135deg, var(--danger-600), var(--danger-500));
-    border: 1px solid rgba(239, 68, 68, 0.40);
+    border: 1px solid color-mix(in oklch, var(--danger-500) 40%, transparent);
     border-top-color: rgba(255, 100, 100, 0.48);
     border-radius: var(--radius-lg);
     color: white;
@@ -216,7 +216,7 @@
     flex-shrink: 0;
   }
   .sos-action-btn.sos-live .sos-icon-wrap {
-    background: rgba(239, 68, 68, 0.12);
+    background: color-mix(in oklch, var(--danger-500) 12%, transparent);
     color: var(--danger-500);
   }
 
@@ -233,8 +233,8 @@
     justify-content: center;
     gap: 3px;
     padding: var(--space-2) var(--space-3);
-    background: rgba(16, 185, 129, 0.08);
-    border: 1px solid rgba(16, 185, 129, 0.18);
+    background: color-mix(in oklch, var(--success-500) 8%, transparent);
+    border: 1px solid color-mix(in oklch, var(--success-500) 18%, transparent);
     border-radius: var(--radius-lg);
     color: var(--success-500);
     font-family: var(--font-display);
@@ -246,33 +246,33 @@
     transition: background 150ms var(--ease-out), box-shadow 150ms var(--ease-out);
   }
   .ok-action-btn:hover {
-    background: rgba(16, 185, 129, 0.14);
-    box-shadow: 0 0 16px rgba(16, 185, 129, 0.18);
+    background: color-mix(in oklch, var(--success-500) 14%, transparent);
+    box-shadow: 0 0 16px color-mix(in oklch, var(--success-500) 18%, transparent);
   }
   .ok-action-btn--active {
-    background: rgba(239, 68, 68, 0.10);
-    border-color: rgba(239, 68, 68, 0.25);
+    background: color-mix(in oklch, var(--danger-500) 10%, transparent);
+    border-color: color-mix(in oklch, var(--danger-500) 25%, transparent);
     color: var(--danger-500);
   }
   .ok-action-btn--active:hover {
-    background: rgba(239, 68, 68, 0.16);
+    background: color-mix(in oklch, var(--danger-500) 16%, transparent);
   }
   .ok-action-btn--crowd {
-    background: rgba(245, 158, 11, 0.12);
-    border-color: rgba(245, 158, 11, 0.28);
-    color: var(--warning-500, #f59e0b);
+    background: color-mix(in oklch, var(--warning-500) 12%, transparent);
+    border-color: color-mix(in oklch, var(--warning-500) 28%, transparent);
+    color: var(--warning-500, var(--warning-500));
   }
   .ok-action-btn--crowd:hover {
-    background: rgba(245, 158, 11, 0.18);
+    background: color-mix(in oklch, var(--warning-500) 18%, transparent);
   }
   /* F2: I'm Safe button — teal/green variant */
   .ok-action-btn--safe {
-    background: rgba(6, 182, 212, 0.10);
-    border-color: rgba(6, 182, 212, 0.24);
-    color: var(--cyan-500, #06b6d4);
+    background: color-mix(in oklch, var(--member-3) 10%, transparent);
+    border-color: color-mix(in oklch, var(--member-3) 24%, transparent);
+    color: var(--cyan-500, var(--member-3));
   }
   .ok-action-btn--safe:hover {
-    background: rgba(6, 182, 212, 0.18);
+    background: color-mix(in oklch, var(--member-3) 18%, transparent);
   }
 
   @media (prefers-reduced-motion: reduce) {

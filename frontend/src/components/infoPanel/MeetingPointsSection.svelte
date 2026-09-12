@@ -123,9 +123,9 @@
     letter-spacing: 0.06em;
     padding: 2px 6px;
     border-radius: var(--radius-full);
-    background: rgba(16, 185, 129, 0.14);
+    background: color-mix(in oklch, var(--success-500) 14%, transparent);
     color: var(--success-500);
-    border: 1px solid rgba(16, 185, 129, 0.25);
+    border: 1px solid color-mix(in oklch, var(--success-500) 25%, transparent);
   }
 
   .meeting-point-info {

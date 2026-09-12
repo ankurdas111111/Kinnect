@@ -163,11 +163,11 @@
     gap: 3px;
     font-size: var(--text-xs);
     font-weight: 600;
-    color: var(--warning-600, #d97706);
+    color: var(--warning-600, var(--warning-600));
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 120px;
   }
-  :global([data-theme="dark"]) .eta-chip { color: var(--warning-300, #fcd34d); }
+  :global([data-theme="dark"]) .eta-chip { color: var(--warning-300, var(--warning-300)); }
 </style>

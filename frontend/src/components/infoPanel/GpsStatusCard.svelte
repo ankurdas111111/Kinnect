@@ -102,13 +102,13 @@
     user-select: none;
   }
   .gps-live-card.is-tracking {
-    border-color: rgba(16, 185, 129, 0.35);
-    border-top-color: rgba(16, 185, 129, 0.55);
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.09) 0%, transparent 65%);
+    border-color: color-mix(in oklch, var(--success-500) 35%, transparent);
+    border-top-color: color-mix(in oklch, var(--success-500) 55%, transparent);
+    background: linear-gradient(135deg, color-mix(in oklch, var(--success-500) 9%, transparent) 0%, transparent 65%);
     box-shadow:
-      0 0 20px rgba(16, 185, 129, 0.12),
-      0 0 0 1px rgba(16, 185, 129, 0.08),
-      inset 0 1px 0 rgba(16, 185, 129, 0.12);
+      0 0 20px color-mix(in oklch, var(--success-500) 12%, transparent),
+      0 0 0 1px color-mix(in oklch, var(--success-500) 8%, transparent),
+      inset 0 1px 0 color-mix(in oklch, var(--success-500) 12%, transparent);
   }
   .gps-accuracy-label {
     font-family: var(--font-display);
@@ -139,9 +139,9 @@
   .gps-ping.active {
     background: var(--success-500);
     box-shadow:
-      0 0 6px rgba(16, 185, 129, 0.75),
-      0 0 12px rgba(16, 185, 129, 0.40),
-      0 0 20px rgba(16, 185, 129, 0.18);
+      0 0 6px color-mix(in oklch, var(--success-500) 75%, transparent),
+      0 0 12px color-mix(in oklch, var(--success-500) 40%, transparent),
+      0 0 20px color-mix(in oklch, var(--success-500) 18%, transparent);
     animation: gps-pulse 2.2s ease-in-out infinite;
   }
   .gps-ping.active::before {
@@ -149,7 +149,7 @@
     position: absolute;
     inset: -4px;
     border-radius: 50%;
-    background: rgba(16, 185, 129, 0.22);
+    background: color-mix(in oklch, var(--success-500) 22%, transparent);
     animation: gps-ring 2.2s ease-out infinite;
   }
   @keyframes gps-pulse {
@@ -198,16 +198,16 @@
     align-items: center;
     justify-content: center;
     gap: 0;
-    background: rgba(99, 102, 241, 0.10);
-    border: 1px solid rgba(99, 102, 241, 0.22);
-    border-top-color: rgba(129, 140, 248, 0.35);
+    background: color-mix(in oklch, var(--primary-500) 10%, transparent);
+    border: 1px solid color-mix(in oklch, var(--primary-500) 22%, transparent);
+    border-top-color: color-mix(in oklch, var(--primary-400) 35%, transparent);
     border-radius: var(--radius-md);
     padding: var(--space-1-5) var(--space-3);
     flex-shrink: 0;
     min-width: 52px;
     text-align: center;
     box-shadow:
-      0 0 10px rgba(99, 102, 241, 0.14),
+      0 0 10px color-mix(in oklch, var(--primary-500) 14%, transparent),
       inset 0 1px 0 rgba(255,255,255,0.08);
   }
   .speed-num {

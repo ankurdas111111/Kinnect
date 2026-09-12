@@ -101,7 +101,7 @@
     overflow: hidden;
     box-shadow:
       0 16px 48px rgba(0, 0, 0, 0.75),
-      0 0 0 1px rgba(20, 184, 166, 0.12),
+      0 0 0 1px color-mix(in oklch, var(--primary-500) 12%, transparent),
       inset 0 1px 0 rgba(255, 255, 255, 0.05);
     animation: ep-pop var(--duration-normal, 200ms) var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
   }
@@ -111,7 +111,7 @@
     --background:               #0a0a18;
     --border-color:             rgba(255, 255, 255, 0.07);
     --border-size:              1px;
-    --button-active-background: rgba(20, 184, 166, 0.18);
+    --button-active-background: color-mix(in oklch, var(--primary-500) 18%, transparent);
     --button-hover-background:  rgba(255, 255, 255, 0.07);
     --category-emoji-padding:   4px;
     --category-emoji-size:      1.6rem;
@@ -119,7 +119,7 @@
     --category-font-size:       0.7rem;
     --emoji-padding:            5px;
     --emoji-size:               1.5rem;
-    --indicator-color:          #14b8a6;
+    --indicator-color:          var(--primary-500);
     --indicator-height:         2px;
     --input-border-color:       rgba(255, 255, 255, 0.10);
     --input-border-radius:      var(--radius-md, 10px);
@@ -130,7 +130,7 @@
     --input-padding:            8px 12px;
     --input-placeholder-color:  rgba(255, 255, 255, 0.28);
     --num-columns:              8;
-    --outline-color:            rgba(20, 184, 166, 0.45);
+    --outline-color:            color-mix(in oklch, var(--primary-500) 45%, transparent);
     --outline-size:             2px;
     --skintone-border-radius:   50%;
     --category-padding:         4px 8px;

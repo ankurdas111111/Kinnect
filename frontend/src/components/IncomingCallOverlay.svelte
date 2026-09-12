@@ -89,17 +89,17 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(20, 184, 166, 0.15);
-    border: 2px solid rgba(20, 184, 166, 0.4);
+    background: color-mix(in oklch, var(--primary-500) 15%, transparent);
+    border: 2px solid color-mix(in oklch, var(--primary-500) 40%, transparent);
     border-radius: 50%;
-    color: var(--brand-primary, #14b8a6);
+    color: var(--brand-primary, var(--primary-500));
   }
 
   .ring-pulse {
     position: absolute;
     inset: -8px;
     border-radius: 50%;
-    border: 2px solid rgba(20, 184, 166, 0.35);
+    border: 2px solid color-mix(in oklch, var(--primary-500) 35%, transparent);
     animation: ring 1.4s ease-out infinite;
   }
 
@@ -148,20 +148,20 @@
   }
 
   .btn-decline {
-    background: rgba(239, 68, 68, 0.15);
-    color: var(--status-danger, #ef4444);
-    border: 1px solid rgba(239, 68, 68, 0.3);
+    background: color-mix(in oklch, var(--danger-500) 15%, transparent);
+    color: var(--status-danger, var(--danger-500));
+    border: 1px solid color-mix(in oklch, var(--danger-500) 30%, transparent);
   }
 
-  .btn-decline:hover { background: rgba(239, 68, 68, 0.25); }
+  .btn-decline:hover { background: color-mix(in oklch, var(--danger-500) 25%, transparent); }
 
   .btn-accept {
-    background: var(--brand-primary, #14b8a6);
+    background: var(--brand-primary, var(--primary-500));
     color: #fff;
-    box-shadow: 0 4px 16px rgba(20, 184, 166, 0.35);
+    box-shadow: 0 4px 16px color-mix(in oklch, var(--primary-500) 35%, transparent);
   }
 
-  .btn-accept:hover { background: var(--brand-primary-dark, #0d9488); }
+  .btn-accept:hover { background: var(--brand-primary-dark, var(--primary-600)); }
 
   @media (prefers-reduced-motion: reduce) {
     .call-sheet { animation: none; }

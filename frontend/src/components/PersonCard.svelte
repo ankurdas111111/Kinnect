@@ -24,8 +24,8 @@
   /** @type {Props} */
   let { user = null, onClose = null } = $props();
 
-  let color      = $derived(user ? getUserColor(user.userId) : '#6366f1');
-  let colorLight = $derived(user ? getUserColorLight(user.userId) : 'rgba(99,102,241,0.15)');
+  let color      = $derived(user ? getUserColor(user.userId) : 'var(--primary-500)');
+  let colorLight = $derived(user ? getUserColorLight(user.userId) : 'color-mix(in oklch, var(--primary-500) 15%, transparent)');
 
   let initials = $derived(user
     ? (user.displayName || '').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?'

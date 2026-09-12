@@ -196,11 +196,11 @@
     overflow: hidden;
     /* urgent neon glass */
     background: rgba(8, 3, 3, 0.92);
-    border: 1px solid rgba(239, 68, 68, 0.40);
+    border: 1px solid color-mix(in oklch, var(--danger-500) 40%, transparent);
     border-top-color: rgba(255, 80, 80, 0.55);
     box-shadow:
-      0 0 0 1px rgba(239, 68, 68, 0.15),
-      0 8px 32px rgba(239, 68, 68, 0.28),
+      0 0 0 1px color-mix(in oklch, var(--danger-500) 15%, transparent),
+      0 8px 32px color-mix(in oklch, var(--danger-500) 28%, transparent),
       0 2px 8px rgba(0, 0, 0, 0.55),
       inset 0 1px 0 rgba(255, 255, 255, 0.10);
     backdrop-filter: blur(28px) saturate(1.6);
@@ -211,15 +211,15 @@
   @keyframes sf-neon-pulse {
     0%, 100% {
       box-shadow:
-        0 0 0 1px rgba(239, 68, 68, 0.15),
-        0 8px 32px rgba(239, 68, 68, 0.28),
+        0 0 0 1px color-mix(in oklch, var(--danger-500) 15%, transparent),
+        0 8px 32px color-mix(in oklch, var(--danger-500) 28%, transparent),
         0 2px 8px rgba(0, 0, 0, 0.55),
         inset 0 1px 0 rgba(255, 255, 255, 0.10);
     }
     50% {
       box-shadow:
-        0 0 0 2px rgba(239, 68, 68, 0.28),
-        0 8px 48px rgba(239, 68, 68, 0.40),
+        0 0 0 2px color-mix(in oklch, var(--danger-500) 28%, transparent),
+        0 8px 48px color-mix(in oklch, var(--danger-500) 40%, transparent),
         0 2px 8px rgba(0, 0, 0, 0.55),
         inset 0 1px 0 rgba(255, 255, 255, 0.10);
     }
@@ -228,22 +228,22 @@
   @keyframes sf-mount-glow {
     0%   {
       box-shadow:
-        0 0 0 0 rgba(239, 68, 68, 0),
-        0 8px 32px rgba(239, 68, 68, 0.22),
+        0 0 0 0 color-mix(in oklch, var(--danger-500) 0%, transparent),
+        0 8px 32px color-mix(in oklch, var(--danger-500) 22%, transparent),
         0 2px 8px rgba(0, 0, 0, 0.45),
         inset 0 1px 0 rgba(255, 255, 255, 0.08);
     }
     30%  {
       box-shadow:
-        0 0 0 6px rgba(239, 68, 68, 0.18),
-        0 8px 48px rgba(239, 68, 68, 0.50),
+        0 0 0 6px color-mix(in oklch, var(--danger-500) 18%, transparent),
+        0 8px 48px color-mix(in oklch, var(--danger-500) 50%, transparent),
         0 2px 8px rgba(0, 0, 0, 0.45),
         inset 0 1px 0 rgba(255, 255, 255, 0.08);
     }
     100% {
       box-shadow:
-        0 0 0 0 rgba(239, 68, 68, 0),
-        0 8px 32px rgba(239, 68, 68, 0.22),
+        0 0 0 0 color-mix(in oklch, var(--danger-500) 0%, transparent),
+        0 8px 32px color-mix(in oklch, var(--danger-500) 22%, transparent),
         0 2px 8px rgba(0, 0, 0, 0.45),
         inset 0 1px 0 rgba(255, 255, 255, 0.08);
     }
@@ -292,14 +292,14 @@
     border-radius: 50%;
     background: var(--danger-500);
     box-shadow:
-      0 0 6px rgba(239, 68, 68, 0.80),
-      0 0 12px rgba(239, 68, 68, 0.45),
-      0 0 20px rgba(239, 68, 68, 0.20);
+      0 0 6px color-mix(in oklch, var(--danger-500) 80%, transparent),
+      0 0 12px color-mix(in oklch, var(--danger-500) 45%, transparent),
+      0 0 20px color-mix(in oklch, var(--danger-500) 20%, transparent);
     animation: sf-pulse 1.2s ease-in-out infinite;
   }
   @keyframes sf-pulse {
-    0%, 100% { transform: scale(1);    opacity: 1;   box-shadow: 0 0 6px rgba(239,68,68,0.80), 0 0 12px rgba(239,68,68,0.45); }
-    50%       { transform: scale(1.55); opacity: 0.75; box-shadow: 0 0 10px rgba(239,68,68,0.90), 0 0 22px rgba(239,68,68,0.60), 0 0 36px rgba(239,68,68,0.25); }
+    0%, 100% { transform: scale(1);    opacity: 1;   box-shadow: 0 0 6px color-mix(in oklch, var(--danger-500) 80%, transparent), 0 0 12px color-mix(in oklch, var(--danger-500) 45%, transparent); }
+    50%       { transform: scale(1.55); opacity: 0.75; box-shadow: 0 0 10px color-mix(in oklch, var(--danger-500) 90%, transparent), 0 0 22px color-mix(in oklch, var(--danger-500) 60%, transparent), 0 0 36px color-mix(in oklch, var(--danger-500) 25%, transparent); }
   }
 
   /* Blood type badge */
@@ -312,14 +312,14 @@
     height: 22px;
     padding: 0 6px;
     border-radius: 6px;
-    background: rgba(239, 68, 68, 0.22);
-    border: 1px solid rgba(239, 68, 68, 0.50);
+    background: color-mix(in oklch, var(--danger-500) 22%, transparent);
+    border: 1px solid color-mix(in oklch, var(--danger-500) 50%, transparent);
     color: var(--danger-300);
     font-size: 11px;
     font-weight: 800;
     letter-spacing: 0.03em;
     font-variant-numeric: tabular-nums;
-    box-shadow: 0 0 8px rgba(239, 68, 68, 0.35), inset 0 1px 0 rgba(255,255,255,0.12);
+    box-shadow: 0 0 8px color-mix(in oklch, var(--danger-500) 35%, transparent), inset 0 1px 0 rgba(255,255,255,0.12);
   }
 
   .sf-name {
@@ -340,8 +340,8 @@
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--danger-400);
-    background: rgba(239, 68, 68, 0.15);
-    border: 1px solid rgba(239, 68, 68, 0.30);
+    background: color-mix(in oklch, var(--danger-500) 15%, transparent);
+    border: 1px solid color-mix(in oklch, var(--danger-500) 30%, transparent);
     border-radius: 5px;
     padding: 2px 6px;
   }
@@ -367,7 +367,7 @@
 
   /* ── Expanded body ─────────────────────────────────────────────────────── */
   .sf-body {
-    border-top: 1px solid rgba(239, 68, 68, 0.18);
+    border-top: 1px solid color-mix(in oklch, var(--danger-500) 18%, transparent);
     display: flex;
     flex-direction: column;
     gap: 1px;
@@ -384,7 +384,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 10px 14px 8px;
-    background: rgba(239, 68, 68, 0.08);
+    background: color-mix(in oklch, var(--danger-500) 8%, transparent);
   }
   .sf-bt-label {
     font-size: 10px;
@@ -412,7 +412,7 @@
     background: rgba(255, 255, 255, 0.03);
   }
   .sf-med-row-alert {
-    background: rgba(239, 68, 68, 0.07);
+    background: color-mix(in oklch, var(--danger-500) 7%, transparent);
   }
   .sf-med-icon {
     flex-shrink: 0;
@@ -447,7 +447,7 @@
     display: flex;
     flex-direction: column;
     gap: 1px;
-    border-top: 1px solid rgba(239, 68, 68, 0.14);
+    border-top: 1px solid color-mix(in oklch, var(--danger-500) 14%, transparent);
   }
   .sf-contacts-heading {
     display: block;
@@ -495,8 +495,8 @@
     min-height: 44px;
     min-width: 44px;
     border-radius: 9px;
-    background: var(--success-500-20, rgba(16, 185, 129, 0.18));
-    border: 1px solid rgba(16, 185, 129, 0.35);
+    background: var(--success-500-20, color-mix(in oklch, var(--success-500) 18%, transparent));
+    border: 1px solid color-mix(in oklch, var(--success-500) 35%, transparent);
     color: var(--success-400);
     font-size: 11px;
     font-weight: 700;
@@ -509,7 +509,7 @@
     -webkit-tap-highlight-color: transparent;
   }
   .sf-call-btn:hover {
-    background: rgba(16, 185, 129, 0.28);
+    background: color-mix(in oklch, var(--success-500) 28%, transparent);
     transform: scale(1.04);
   }
   @media (hover: none) {

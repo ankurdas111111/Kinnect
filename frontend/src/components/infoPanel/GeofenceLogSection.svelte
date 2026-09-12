@@ -133,15 +133,15 @@
   }
 
   .log-entry .log-badge {
-    background: rgba(16, 185, 129, 0.14);
+    background: color-mix(in oklch, var(--success-500) 14%, transparent);
     color: var(--success-500);
-    border: 1px solid rgba(16, 185, 129, 0.25);
+    border: 1px solid color-mix(in oklch, var(--success-500) 25%, transparent);
   }
 
   .log-exit .log-badge {
-    background: rgba(239, 68, 68, 0.12);
+    background: color-mix(in oklch, var(--danger-500) 12%, transparent);
     color: var(--danger-500);
-    border: 1px solid rgba(239, 68, 68, 0.22);
+    border: 1px solid color-mix(in oklch, var(--danger-500) 22%, transparent);
   }
 
   .log-name {

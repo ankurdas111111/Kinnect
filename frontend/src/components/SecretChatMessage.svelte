@@ -396,7 +396,7 @@
       var(--primary-500-12) 0%,
       var(--primary-500-08) 100%
     );
-    border: 1px solid var(--chat-border-accent, rgba(20, 184, 166, 0.22));
+    border: 1px solid var(--chat-border-accent, color-mix(in oklch, var(--primary-500) 22%, transparent));
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 2px 8px rgba(0, 0, 0, 0.25);
     max-width: 100%;
     overflow: hidden;
@@ -406,7 +406,7 @@
     font-family: var(--font-mono, 'JetBrains Mono', monospace);
     font-size: var(--text-2xs, 0.6875rem);
     letter-spacing: 0.04em;
-    color: rgba(20, 184, 166, 0.55);
+    color: color-mix(in oklch, var(--primary-500) 55%, transparent);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -417,7 +417,7 @@
 
   /* Lock glyph — prominent trust cue on every sent (encrypted) bubble */
   .lock-icon {
-    color: var(--chat-accent, #14b8a6);
+    color: var(--chat-accent, var(--primary-500));
     opacity: 0.9;
     flex-shrink: 0;
     display: flex;
@@ -466,12 +466,12 @@
   }
 
   .relock-btn:hover {
-    color: var(--chat-accent, #14b8a6);
-    background: var(--chat-accent-dim, rgba(20, 184, 166, 0.18));
+    color: var(--chat-accent, var(--primary-500));
+    background: var(--chat-accent-dim, color-mix(in oklch, var(--primary-500) 18%, transparent));
   }
 
   .relock-btn:focus-visible {
-    outline: 2px solid var(--chat-accent, #14b8a6);
+    outline: 2px solid var(--chat-accent, var(--primary-500));
     outline-offset: 1px;
   }
 
@@ -519,20 +519,20 @@
   }
 
   .bubble--locked:focus-visible {
-    outline: 2px solid var(--chat-accent, #14b8a6);
+    outline: 2px solid var(--chat-accent, var(--primary-500));
     outline-offset: 2px;
   }
 
   .bubble--locked-active {
-    border-color: var(--chat-border-accent, rgba(20, 184, 166, 0.22));
-    background: var(--chat-accent-subtle, rgba(20, 184, 166, 0.08));
+    border-color: var(--chat-border-accent, color-mix(in oklch, var(--primary-500) 22%, transparent));
+    background: var(--chat-accent-subtle, color-mix(in oklch, var(--primary-500) 8%, transparent));
     border-style: solid;
   }
 
   /* Encrypted lock glyph stays a clear, accent-tinted trust cue while locked */
   .locked-lock,
   .locked-photo-label svg {
-    color: var(--chat-accent, #14b8a6);
+    color: var(--chat-accent, var(--primary-500));
     opacity: 0.8;
     flex-shrink: 0;
   }
@@ -561,8 +561,8 @@
     position: absolute;
     inset: 0;
     background:
-      radial-gradient(ellipse 60% 50% at 30% 40%, rgba(20, 184, 166, 0.15) 0%, transparent 60%),
-      radial-gradient(ellipse 40% 55% at 70% 60%, rgba(6, 182, 212, 0.10) 0%, transparent 55%),
+      radial-gradient(ellipse 60% 50% at 30% 40%, color-mix(in oklch, var(--primary-500) 15%, transparent) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 55% at 70% 60%, color-mix(in oklch, var(--member-3) 10%, transparent) 0%, transparent 55%),
       linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(0, 0, 0, 0.3) 100%);
     filter: blur(10px);
   }
@@ -608,15 +608,15 @@
     width: 8px;
     height: 8px;
     border-radius: var(--radius-full, 9999px);
-    background: var(--chat-accent, #14b8a6);
-    box-shadow: 0 0 0 0 var(--chat-accent-glow, rgba(20, 184, 166, 0.28));
+    background: var(--chat-accent, var(--primary-500));
+    box-shadow: 0 0 0 0 var(--chat-accent-glow, color-mix(in oklch, var(--primary-500) 28%, transparent));
     animation: pulse-accent 1.8s ease-in-out infinite;
     flex-shrink: 0;
   }
 
   @keyframes pulse-accent {
-    0%, 100% { box-shadow: 0 0 0 0 var(--chat-accent-glow, rgba(20, 184, 166, 0.28)); }
-    50%       { box-shadow: 0 0 0 5px rgba(20, 184, 166, 0); }
+    0%, 100% { box-shadow: 0 0 0 0 var(--chat-accent-glow, color-mix(in oklch, var(--primary-500) 28%, transparent)); }
+    50%       { box-shadow: 0 0 0 5px color-mix(in oklch, var(--primary-500) 0%, transparent); }
   }
 
   .msg-ago {
@@ -648,7 +648,7 @@
   }
 
   .msg-time--unread {
-    color: var(--chat-accent, #14b8a6);
+    color: var(--chat-accent, var(--primary-500));
     font-weight: 600;
   }
 
@@ -656,8 +656,8 @@
     width: 6px;
     height: 6px;
     border-radius: var(--radius-full, 9999px);
-    background: var(--chat-accent, #14b8a6);
-    box-shadow: 0 0 5px var(--chat-accent-glow, rgba(20, 184, 166, 0.28));
+    background: var(--chat-accent, var(--primary-500));
+    box-shadow: 0 0 5px var(--chat-accent-glow, color-mix(in oklch, var(--primary-500) 28%, transparent));
     flex-shrink: 0;
   }
 
@@ -669,7 +669,7 @@
     transition: color 0.3s;
   }
 
-  .tick--seen { color: var(--chat-accent, #14b8a6); }
+  .tick--seen { color: var(--chat-accent, var(--primary-500)); }
 
   .tick--pulse {
     animation: tick-seen-pulse 0.6s var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1));
@@ -677,15 +677,15 @@
 
   @keyframes tick-seen-pulse {
     0%   { color: rgba(255, 255, 255, 0.28); transform: scale(1); }
-    40%  { color: #fbbf24; transform: scale(1.4); }
-    100% { color: var(--chat-accent, #14b8a6); transform: scale(1); }
+    40%  { color: var(--warning-400); transform: scale(1.4); }
+    100% { color: var(--chat-accent, var(--primary-500)); transform: scale(1); }
   }
 
   /* ── Countdown bar ───────────────────────────────────────────── */
   .countdown {
     font-size: var(--text-2xs, 0.6875rem);
     font-family: var(--font-mono, 'JetBrains Mono', monospace);
-    color: var(--chat-accent, #14b8a6);
+    color: var(--chat-accent, var(--primary-500));
     font-variant-numeric: tabular-nums;
     display: flex;
     align-items: center;
@@ -707,7 +707,7 @@
     position: absolute;
     inset: 0;
     right: calc(100% - var(--pct, 100%));
-    background: var(--chat-accent, #14b8a6);
+    background: var(--chat-accent, var(--primary-500));
     border-radius: var(--radius-full, 9999px);
     transition: right 1s linear;
   }
@@ -746,19 +746,19 @@
     min-height: 44px;
   }
 
-  .delete-btn:hover { color: var(--danger-400, #f87171); background: rgba(248, 113, 113, 0.08); }
-  .delete-btn--confirm { color: var(--danger-400, #f87171); background: rgba(248, 113, 113, 0.12); }
-  .delete-btn:focus-visible { outline: 2px solid var(--danger-400, #f87171); outline-offset: 2px; }
+  .delete-btn:hover { color: var(--danger-400, var(--danger-400)); background: color-mix(in oklch, var(--danger-400) 8%, transparent); }
+  .delete-btn--confirm { color: var(--danger-400, var(--danger-400)); background: color-mix(in oklch, var(--danger-400) 12%, transparent); }
+  .delete-btn:focus-visible { outline: 2px solid var(--danger-400, var(--danger-400)); outline-offset: 2px; }
 
   /* ── Pending / failed bubble states ─────────────────────────── */
   .bubble--pending {
     opacity: 0.55;
     background: linear-gradient(
       135deg,
-      rgba(20, 184, 166, 0.08) 0%,
-      rgba(20, 184, 166, 0.04) 100%
+      color-mix(in oklch, var(--primary-500) 8%, transparent) 0%,
+      color-mix(in oklch, var(--primary-500) 4%, transparent) 100%
     );
-    border-color: rgba(20, 184, 166, 0.14);
+    border-color: color-mix(in oklch, var(--primary-500) 14%, transparent);
     animation: pending-pulse 1.4s ease-in-out infinite;
   }
 
@@ -770,32 +770,32 @@
   .bubble--failed {
     background: linear-gradient(
       135deg,
-      rgba(248, 113, 113, 0.12) 0%,
-      rgba(248, 113, 113, 0.06) 100%
+      color-mix(in oklch, var(--danger-400) 12%, transparent) 0%,
+      color-mix(in oklch, var(--danger-400) 6%, transparent) 100%
     );
-    border-color: rgba(248, 113, 113, 0.3);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 2px 8px rgba(248, 113, 113, 0.12);
+    border-color: color-mix(in oklch, var(--danger-400) 30%, transparent);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 2px 8px color-mix(in oklch, var(--danger-400) 12%, transparent);
   }
 
   .cipher-text--pending {
-    color: rgba(20, 184, 166, 0.35);
+    color: color-mix(in oklch, var(--primary-500) 35%, transparent);
     letter-spacing: 0.18em;
   }
 
   .cipher-text--failed {
-    color: rgba(248, 113, 113, 0.5);
+    color: color-mix(in oklch, var(--danger-400) 50%, transparent);
     letter-spacing: 0.18em;
   }
 
   .status-icon {
-    color: rgba(20, 184, 166, 0.4);
+    color: color-mix(in oklch, var(--primary-500) 40%, transparent);
     flex-shrink: 0;
     display: flex;
     align-items: center;
   }
 
   .status-icon--failed {
-    color: rgba(248, 113, 113, 0.7);
+    color: color-mix(in oklch, var(--danger-400) 70%, transparent);
   }
 
   /* Retry row — appears below the failed bubble */
@@ -811,9 +811,9 @@
     gap: var(--space-1, 4px);
     padding: var(--space-1, 4px) var(--space-2, 8px);
     border-radius: var(--radius-sm2, 8px);
-    border: 1px solid rgba(248, 113, 113, 0.3);
-    background: rgba(248, 113, 113, 0.06);
-    color: rgba(248, 113, 113, 0.8);
+    border: 1px solid color-mix(in oklch, var(--danger-400) 30%, transparent);
+    background: color-mix(in oklch, var(--danger-400) 6%, transparent);
+    color: color-mix(in oklch, var(--danger-400) 80%, transparent);
     font-size: var(--text-2xs, 0.6875rem);
     font-family: var(--font-sans, 'Nunito', sans-serif);
     cursor: pointer;
@@ -823,13 +823,13 @@
   }
 
   .retry-btn:hover {
-    color: #f87171;
-    background: rgba(248, 113, 113, 0.12);
-    border-color: rgba(248, 113, 113, 0.5);
+    color: var(--danger-400);
+    background: color-mix(in oklch, var(--danger-400) 12%, transparent);
+    border-color: color-mix(in oklch, var(--danger-400) 50%, transparent);
   }
 
   .retry-btn:focus-visible {
-    outline: 2px solid #f87171;
+    outline: 2px solid var(--danger-400);
     outline-offset: 2px;
   }
 
