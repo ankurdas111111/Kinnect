@@ -2,6 +2,7 @@
   import { run, self } from 'svelte/legacy';
 
   import { onMount, onDestroy, tick } from 'svelte';
+  import { ensurePushSubscription } from '../lib/push.js';
   import { push } from 'svelte-spa-router';
   import { authUser, authLoading } from '../lib/stores/auth.js';
   import { socket, setupSocketHandlers, cancelReconnectBanner, setBanner as socketSetBanner } from '../lib/socket.js';
@@ -719,6 +720,10 @@
     setSocketConnected(socket.connected);
     setBufferedCount(bufferSize());
 
+    // Re-register an already-granted device so the server always holds a live
+    // endpoint for SOS. Never prompts; silent when permission was refused.
+    const pushTimer = setTimeout(() => { ensurePushSubscription({ prompt: false }); }, 3000);
+
     const onOnline = () => setOnlineStatus(true);
     const onOffline = () => setOnlineStatus(false);
     const onSocketConnect = () => {
@@ -829,6 +834,7 @@
       mounted = false;
       sosHoldStop();   // never leave the hold rAF running past unmount
       clearInterval(profileInterval);
+      clearTimeout(pushTimer);
       stopTracking();
       stopGyroscope();
       window.removeEventListener('resize', debouncedCheckMobile);

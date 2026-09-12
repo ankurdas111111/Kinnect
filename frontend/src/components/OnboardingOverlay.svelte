@@ -5,6 +5,7 @@
   import { authUser } from '../lib/stores/auth.js';
   import { myRooms } from '../lib/stores/rooms.js';
   import { socket } from '../lib/socket.js';
+  import { ensurePushSubscription } from '../lib/push.js';
 
   /**
    * @typedef {Object} Props
@@ -33,6 +34,13 @@
   // them to create another one; go straight to connecting.
   function nextAfterPermission() {
     step = ($myRooms?.length || 0) > 0 ? 3 : 2;
+  }
+
+  // An SOS can only reach a phone that is in a pocket via push, so ask here,
+  // where the safety reason is on screen, rather than leaving it in Settings.
+  // Fire-and-forget: a declined prompt must not block onboarding.
+  function askForAlerts() {
+    ensurePushSubscription({ prompt: true }).catch(() => {});
   }
 
   function handleCreateFamily() {
@@ -116,7 +124,7 @@
             Your location is private. Only your family can see it.
           </div>
           <div class="onboarding-actions">
-            <button class="btn-primary-full" onclick={() => { dispatch('requestPermission'); nextAfterPermission(); }}>
+            <button class="btn-primary-full" onclick={() => { dispatch('requestPermission'); askForAlerts(); nextAfterPermission(); }}>
               Turn on location
             </button>
             <button class="btn-ghost-sm" onclick={nextAfterPermission}>Maybe later</button>

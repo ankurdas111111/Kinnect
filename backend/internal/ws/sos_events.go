@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"math"
 	"strings"
 	"time"
@@ -191,8 +192,48 @@ func (h *Hub) handleTriggerSOS(c *Client, data json.RawMessage) {
 		})
 	}
 
+	// ── Push: the only path that reaches a contact who is not in the app ──
+	// Everything above this line is a WebSocket emit, which lands only on
+	// contacts who happen to have Kinnect open. At 11pm nobody does, and the
+	// SMS relay below is three minutes away and needs Twilio configured.
+	// Visible-set is by USER id (not socket id), so offline contacts are
+	// included — that is the entire point.
+	//
+	// Body carries no location, address or medical data: it renders on a
+	// locked screen that anyone holding the phone can read.
+	h.sendSosPush(user)
+
 	// ── Panic Relay: start 3-minute SMS escalation timer ─────────────────
 	h.StartPanicRelayTimer(user)
+}
+
+// sosPushRecipients returns the user IDs to push an SOS to: everyone who can
+// see this user, minus the sender. Keyed by USER id, so a contact whose phone
+// is asleep is included — the socket-based fan-out above cannot reach them.
+func (h *Hub) sosPushRecipients(user *cache.ActiveUser) []string {
+	recipients := make([]string, 0, 8)
+	for uid := range h.Cache.GetVisibleSet(user.UserID) {
+		if uid == user.UserID || uid == "" {
+			continue
+		}
+		recipients = append(recipients, uid)
+	}
+	return recipients
+}
+
+// sendSosPush notifies every contact who can see this user, connected or not.
+func (h *Hub) sendSosPush(user *cache.ActiveUser) {
+	name := user.DisplayName
+	if name == "" {
+		name = "Someone in your circle"
+	}
+	recipients := h.sosPushRecipients(user)
+	if len(recipients) == 0 {
+		slog.Warn("SOS raised with no contacts to notify", "userID", user.UserID)
+		return
+	}
+	slog.Info("SOS push fan-out", "userID", user.UserID, "recipients", len(recipients))
+	h.SendPushToUsers(recipients, "SOS from "+name, name+" needs help. Open Kinnect to see where they are.")
 }
 
 // sanitizeMedicalCard keeps only known string fields and truncates each to 500 chars.
