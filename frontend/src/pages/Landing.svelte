@@ -18,6 +18,8 @@
    * disabled there). One rAF-throttled scroll listener, no timers.
    */
   import { onMount } from 'svelte';
+  import { push } from 'svelte-spa-router';
+  import { landingIsBlocked } from '../lib/entryPoint.js';
   import { prefersReducedMotion } from '../lib/deviceCapability.js';
 
   // ── Geometry (verbatim from the design) ─────────────────────────────────
@@ -234,6 +236,10 @@
   }
 
   onMount(() => {
+    // The native app must never show marketing. Someone who installed Kinnect
+    // does not need to be sold it, and a store reviewer landing on a pitch page
+    // instead of a sign-in is a rejection risk.
+    if (landingIsBlocked()) { push('/login'); return; }
     document.title = 'Kinnect — a quiet map for the people you love';
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll);

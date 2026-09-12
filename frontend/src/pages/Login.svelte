@@ -3,6 +3,7 @@
 
   import { navigate } from '../lib/viewTransition.js';
   import { authUser, loadSession } from '../lib/stores/auth.js';
+  import { markReturningVisitor } from '../lib/entryPoint.js';
   import { apiPost, fetchCsrf, clearCsrf } from '../lib/api.js';
   import { COUNTRY_CODES, COUNTRY_MAP, validateMobileLength } from '../lib/countryCodes.js';
   import { toasts } from '../lib/stores/toast.js';
@@ -178,6 +179,7 @@
         clearCsrf();
         await fetchCsrf();
         await loadSession();
+        markReturningVisitor();   // never re-pitch the landing to this browser
         // Returning user (signed in, not registered) — mark onboarded so
         // MainApp's first-run "Welcome to Kinnect" overlay doesn't re-fire
         // on a fresh browser. Same key shape as MainApp.svelte.

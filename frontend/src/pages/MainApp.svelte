@@ -4,6 +4,7 @@
   import { onMount, onDestroy, tick } from 'svelte';
   import { push } from 'svelte-spa-router';
   import { authUser, authLoading } from '../lib/stores/auth.js';
+  import { loggedOutRoute } from '../lib/entryPoint.js';
   import { socket, setupSocketHandlers, cancelReconnectBanner, setBanner as socketSetBanner } from '../lib/socket.js';
   import { banner, mySosActive } from '../lib/stores/sos.js';
   import { startLiveShareActivity, endLiveShareActivity } from '../lib/liveActivities.js';
@@ -330,7 +331,9 @@
   }
 
   run(() => {
-    if (!$authLoading && !$authUser) push('/login');
+    // First-time web visitors get the pitch; returning visitors and the native
+    // app get the login form. One rule, in lib/entryPoint.js.
+    if (!$authLoading && !$authUser) push(loggedOutRoute());
   });
   let isAdmin = $derived($authUser && $authUser.role === 'admin');
 

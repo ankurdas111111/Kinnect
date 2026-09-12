@@ -3,6 +3,7 @@
 
   import { navigate } from '../lib/viewTransition.js';
   import { authUser, loadSession } from '../lib/stores/auth.js';
+  import { markReturningVisitor } from '../lib/entryPoint.js';
   import { apiPost, fetchCsrf, clearCsrf } from '../lib/api.js';
   import { COUNTRY_CODES, COUNTRY_MAP, validateMobileLength } from '../lib/countryCodes.js';
   import { toasts } from '../lib/stores/toast.js';
@@ -203,6 +204,7 @@
         clearCsrf();
         await fetchCsrf();
         await loadSession();
+      markReturningVisitor();
         // If user arrived via QR add-contact link, redirect back to complete it
         const pendingContact = sessionStorage.getItem('kinnect_pending_contact');
         if (pendingContact) {
