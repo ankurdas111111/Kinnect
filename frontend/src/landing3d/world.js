@@ -20,18 +20,20 @@ export const MARKER_H = 10;
 
 export const PALETTE = {
   light: {
-    ground: '#ddd2bf', road: '#b0a288', roadEdge: '#998b6f',
+    ground: '#d8ccb6', road: '#9b8d73', roadEdge: '#7f735c',
     park: '#c2d6b0', parkDark: '#adc79a', water: '#cbdce4',
-    wall: '#f3eee4', wallAlt: '#e7e0d2', roof: '#c2b49d', roofAlt: '#b0a086',
+    wall: '#ece5d8', wallAlt: '#ded6c5', roof: '#c2b49d', roofAlt: '#b0a086',
     ink: '#2a231c', fog: '#ded4c2',
     ember: '#b0532c', sage: '#47795b', vermilion: '#b2392e', ochre: '#b9822f',
     m1: '#4a7ba6', m2: '#8d5a8f', m3: '#3f7d78',
   },
   dark: {
-    ground: '#221d17', road: '#2b251d', roadEdge: '#332c22',
-    park: '#2a3527', parkDark: '#222c20', water: '#243038',
-    wall: '#332c23', wallAlt: '#2b2520', roof: '#3d342a', roofAlt: '#332b23',
-    ink: '#f2ede4', fog: '#221d17',
+    // Night surfaces are MID-TONE, not black. The darkness comes from the
+    // lighting; painting them dark as well is what produced a black screen.
+    ground: '#3a332a', road: '#4a4238', roadEdge: '#332d25',
+    park: '#3c4a36', parkDark: '#33402e', water: '#2f4455',
+    wall: '#6b6054', wallAlt: '#5d5348', roof: '#4e453a', roofAlt: '#443c32',
+    ink: '#f2ede4', fog: '#1a1712',
     ember: '#e08a5a', sage: '#6fa384', vermilion: '#d45a4a', ochre: '#cf9b45',
     m1: '#6d9fc9', m2: '#b07fb2', m3: '#5da39d',
   },

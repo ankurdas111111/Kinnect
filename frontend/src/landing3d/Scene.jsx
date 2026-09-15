@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { Environment, ContactShadows, RoundedBox } from '@react-three/drei';
 import * as THREE from 'three';
 import { BOARD, PALETTE, BUILDINGS, ROADS, PARK, WATER, PERSON_R, MARKER_H } from './world.js';
+import CityProps from './CityProps.jsx';
 
 /** Extrude a closed polygon (park, water) into a slab with a soft edge. */
 function polyGeometry(points, depth) {
@@ -74,23 +75,54 @@ export default function Scene({ theme = 'light', tone = null, people = [] }) {
 
   return (
     <group>
-      {/* Key light casts the shadows that give the block its form. A single
-          directional source reads as late afternoon; two would flatten it. */}
-      <directionalLight
-        position={[90, 140, 70]}
-        intensity={tone === 'sos' ? 1.05 : 1.45}
-        castShadow
-        shadow-mapSize={[2048, 2048]}
-        shadow-bias={-0.0006}
-        shadow-normalBias={0.02}
-      >
-        <orthographicCamera attach="shadow-camera" args={[-170, 170, 150, -150, 1, 600]} />
-      </directionalLight>
-      <ambientLight intensity={theme === 'dark' ? 0.22 : 0.34} color={pal.fog} />
+      {/* LIGHTING
+          Day is a warm late-afternoon key with a bright sky bounce.
+          Night is NOT "the same scene, dimmer" — that is what produced a black
+          screen. It is a low cool moon for silhouette, a raised ambient floor so
+          nothing crushes to pure black, and the city's own lit windows doing the
+          actual work. */}
+      {theme === 'dark' ? (
+        <>
+          {/* moon: low intensity, cool, steep — enough for edges, not for fill */}
+          <directionalLight
+            position={[-70, 150, -40]}
+            intensity={0.75}
+            color="#9fb6d8"
+            castShadow
+            shadow-mapSize={[2048, 2048]}
+            shadow-bias={-0.0006}
+            shadow-normalBias={0.02}
+          >
+            <orthographicCamera attach="shadow-camera" args={[-170, 170, 150, -150, 1, 600]} />
+          </directionalLight>
+          {/* sky/ground bounce — stops shadowed faces going to zero */}
+          <hemisphereLight args={['#4a5a78', '#2a221a', 0.85]} />
+          <ambientLight intensity={0.5} color="#6b7a94" />
+          {/* the warm city glow sitting over the block */}
+          <pointLight position={[20, 45, 0]} color="#ffb877" intensity={2600} distance={340} decay={2} />
+        </>
+      ) : (
+        <>
+          <directionalLight
+            position={[90, 140, 70]}
+            intensity={tone === 'sos' ? 1.25 : 1.65}
+            color="#fff3e2"
+            castShadow
+            shadow-mapSize={[2048, 2048]}
+            shadow-bias={-0.0006}
+            shadow-normalBias={0.02}
+          >
+            <orthographicCamera attach="shadow-camera" args={[-170, 170, 150, -150, 1, 600]} />
+          </directionalLight>
+          <hemisphereLight args={['#cfe0f2', '#c9bda6', 0.42]} />
+          <ambientLight intensity={0.22} color={pal.fog} />
+        </>
+      )}
 
-      {/* An HDRI environment is what makes the materials stop looking like flat
-          paint. It is the cheapest realism available and costs no shadow map. */}
-      <Environment preset={theme === 'dark' ? 'night' : 'city'} environmentIntensity={theme === 'dark' ? 0.18 : 0.3} />
+      <Environment
+        preset={theme === 'dark' ? 'night' : 'city'}
+        environmentIntensity={theme === 'dark' ? 0.5 : 0.38}
+      />
 
       {/* Ground */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow position={[0, -0.02, 0]}>
@@ -139,6 +171,8 @@ export default function Scene({ theme = 'light', tone = null, people = [] }) {
         </group>
       ))}
 
+      <CityProps theme={theme} />
+
       {/* People. A pebble is 2.4m across against a 9-34m building, so the scale
           finally reads: these are people standing in a city. */}
       {people.map((p) => (
@@ -181,6 +215,7 @@ export default function Scene({ theme = 'light', tone = null, people = [] }) {
       {/* Grounding shadow under the whole block. This is the difference between
           objects sitting ON a plane and objects floating above one. */}
       <ContactShadows
+        key={theme}
         position={[0, 0.02, 0]}
         scale={BOARD.w * 1.4}
         far={60}
