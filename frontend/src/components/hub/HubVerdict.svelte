@@ -47,43 +47,42 @@
 {/snippet}
 
 <style>
+  /* Family Circle: the verdict is a FRAMELESS typographic statement at the
+     crest — no card, no border, no glass. The serif italic voice comes from
+     the global .verdict-line rule (tokens-hearth.css). */
   .verdict {
     position: relative;
     display: block; width: 100%; text-align: left;
-    padding: var(--space-5); margin: 0;
-    border: 1px solid var(--border-default);
-    border-left: 3px solid var(--verdict-accent, var(--success-500));
-    border-radius: var(--radius-lg, 16px);
-    background: var(--glass-bg);
-    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-    overflow: hidden; color: inherit; font: inherit;
+    padding: var(--space-4) 0; margin: 0;
+    border: none;
+    background: transparent;
+    color: inherit; font: inherit;
     -webkit-tap-highlight-color: transparent;
   }
   button.verdict { cursor: pointer; }
-  button.verdict:focus-visible { outline: 2px solid var(--verdict-accent, var(--primary-400)); outline-offset: 2px; }
+  button.verdict:focus-visible { outline: 2px solid var(--verdict-accent, var(--primary-500)); outline-offset: 2px; border-radius: var(--radius-sm); }
 
-  /* Per-tone accent + ambient wash (opacity-only crossfade between two stacked layers) */
-  .verdict-safe    { --verdict-accent: var(--success-500); --verdict-wash: var(--success-500-08); }
-  .verdict-caution { --verdict-accent: var(--warning-500); --verdict-wash: var(--warning-500-08); }
-  .verdict-alert   { --verdict-accent: var(--danger-500); --verdict-wash: var(--danger-500-12); }
+  /* Sage settled · ochre needs-a-look · vermilion strictly SOS (alert). */
+  .verdict-safe    { --verdict-accent: var(--success-600); --verdict-wash: transparent; }
+  .verdict-caution { --verdict-accent: var(--warning-600); --verdict-wash: color-mix(in oklch, var(--warning-500) 7%, transparent); }
+  .verdict-alert   { --verdict-accent: var(--danger-500);  --verdict-wash: color-mix(in oklch, var(--danger-500) 9%, transparent); }
 
   .verdict-tint {
     position: absolute; inset: 0; pointer-events: none;
     background: radial-gradient(ellipse 90% 120% at 0% 0%, var(--verdict-wash) 0%, transparent 70%);
-    transition: background var(--duration-slow, 400ms) var(--ease-out, ease);
+    transition: background var(--duration-slow) var(--ease-out);
   }
 
   .verdict-line {
     position: relative; margin: 0 0 var(--space-1);
-    font-family: var(--font-display, system-ui);
-    font-size: clamp(1.4rem, 4.5vw, 2rem); font-weight: 700;
-    letter-spacing: -0.02em; line-height: 1.2; color: var(--text-primary);
+    font-size: clamp(var(--text-2xl), 3vw, var(--text-3xl));
+    line-height: 1.4; color: var(--text-primary);
   }
-  .verdict-word { color: var(--verdict-accent); }
+  .verdict-word { color: var(--verdict-accent); font-style: inherit; }
 
   .verdict-detail {
     position: relative; margin: 0;
-    font-size: var(--text-sm, 13px); color: var(--text-tertiary);
+    font-size: var(--text-base); line-height: 1.5; color: var(--text-secondary);
     font-variant-numeric: tabular-nums;
   }
 

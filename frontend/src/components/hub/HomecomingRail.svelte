@@ -1,12 +1,17 @@
 <script>
   /**
-   * HomecomingRail — live "who's almost home" strip.
+   * HomecomingRail — live "who's almost home", spoken as quiet paper rows
+   * (Stitch "Family Circle"): a warm pebble plus one plain-language sentence
+   * ("Elena is heading to Home — about 4 min away."), with a hairline
+   * reassurance ribbon that fills as they close in. No cards, no borders.
    *
-   * Renders one card per member currently converging on a saved place, with a
-   * client-side ETA countdown and a progress ribbon that fills as they close in.
-   * When the server-side arrival monitor drops a member from arrivalProjections
-   * (i.e. they arrived), the card plays a one-shot "landed" settle + soft haptic,
-   * then self-dismisses. Collapses to nothing when nobody is en route.
+   * When the server-side arrival monitor drops a member from
+   * arrivalProjections (i.e. they arrived), the row settles into a sage
+   * "arrived" sentence + soft haptic, then self-dismisses after 60s.
+   * Collapses to nothing when nobody is en route.
+   *
+   * The section heading lives in the parent (FamilyDashboard) — this renders
+   * only the rows, so the title never appears twice.
    *
    * DB load: ZERO. Reads only the in-memory arrivalProjections store (WS-fed).
    */
@@ -18,9 +23,8 @@
   import { getUserColor } from '../../lib/getUserColor.js';
   import { fmtEta } from '../../lib/hubStatus.js';
   import { haptics } from '../../lib/haptics.js';
-  import AvatarRing from '../primitives/AvatarRing.svelte';
 
-  const LANDED_TTL = 60_000; // keep a "got home" chip for 60s
+  const LANDED_TTL = 60_000; // keep a "got home" row for 60s
 
   // Non-reactive per-user tracking: initial distance (for progress) + seenAt.
   const tracked = new Map(); // userId → { firstDist, seenAt, etaSeconds }
@@ -72,7 +76,7 @@
     if ($allowMotion) haptics.success();
   }
 
-  // Cache display metadata so a landed chip can still name the person/place.
+  // Cache display metadata so a landed row can still name the person/place.
   let nameCache = new Map();
   $effect(() => {
     for (const a of projections) nameCache.set(a.userId, { displayName: a.displayName, placeName: a.placeName });
@@ -106,7 +110,7 @@
   onMount(() => {
     tickInterval = setInterval(() => {
       nowTick = Date.now();
-      // prune expired landed chips
+      // prune expired landed rows
       const cutoff = Date.now() - LANDED_TTL;
       if (landed.some((l) => l.at < cutoff)) landed = landed.filter((l) => l.at >= cutoff);
     }, 1000);
@@ -117,100 +121,115 @@
 </script>
 
 {#if show}
-  <section class="rail" aria-label="Coming home">
-    <h2 class="rail-title">Coming home</h2>
-    <div class="rail-track">
-      {#each projections as a (a.userId)}
-        {@const color = getUserColor(a.userId)}
-        <button class="rail-card" style="--mc:{color}" onclick={() => openMember(a.userId)}
-          aria-label="{a.displayName || 'Someone'} heading to {a.placeName || 'a saved place'}, about {fmtEta(etaFor(a))} away — view on map">
-          <div class="rail-top">
-            <AvatarRing ring="live" size={36}>
-              <span class="rail-init">{(a.displayName || '?')[0].toUpperCase()}</span>
-            </AvatarRing>
-            <div class="rail-meta">
-              <span class="rail-name">{a.displayName || 'Someone'}</span>
-              <span class="rail-dest">→ {a.placeName || 'saved place'}</span>
-            </div>
-            <span class="rail-eta">{fmtEta(etaFor(a))}</span>
-          </div>
-          <div class="rail-bar" aria-hidden="true">
-            <span class="rail-fill" class:animate={$allowMotion} style="transform:scaleX({progressFor(a)})"></span>
-          </div>
-        </button>
-      {/each}
+  <!-- The "Coming home" heading + landmark live in FamilyDashboard's section. -->
+  <div class="hc">
+    {#each projections as a (a.userId)}
+      {@const color = getUserColor(a.userId)}
+      <button class="hc-row" style="--mc:{color}" onclick={() => openMember(a.userId)}
+        aria-label="{a.displayName || 'Someone'} heading to {a.placeName || 'a saved place'}, about {fmtEta(etaFor(a))} away — view on map">
+        <span class="hc-pebble">
+          {#if $allowMotion}<span class="hc-halo" aria-hidden="true"></span>{/if}
+          <span class="hc-init">{(a.displayName || '?')[0].toUpperCase()}</span>
+        </span>
+        <span class="hc-body">
+          <span class="hc-sentence">
+            {a.displayName || 'Someone'} is heading to {a.placeName || 'a saved place'} —
+            about <span class="hc-eta">{fmtEta(etaFor(a))}</span> away.
+          </span>
+          <span class="hc-bar" aria-hidden="true">
+            <span class="hc-fill" class:animate={$allowMotion} style="transform:scaleX({progressFor(a)})"></span>
+          </span>
+        </span>
+      </button>
+    {/each}
 
-      {#each landed as l (l.userId)}
-        <div class="rail-card rail-landed" aria-label="{l.displayName} arrived at {l.placeName || 'a saved place'}">
-          <div class="rail-top">
-            <AvatarRing ring="live" size={36}>
-              <span class="rail-init">{(l.displayName || '?')[0].toUpperCase()}</span>
-            </AvatarRing>
-            <div class="rail-meta">
-              <span class="rail-name">{l.displayName}</span>
-              <span class="rail-dest rail-arrived">Arrived{l.placeName ? ` · ${l.placeName}` : ''}</span>
-            </div>
-            <span class="rail-check" aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    {#each landed as l (l.userId)}
+      <div class="hc-row hc-landed" aria-label="{l.displayName} arrived at {l.placeName || 'a saved place'}">
+        <span class="hc-pebble hc-pebble-landed">
+          <span class="hc-init">{(l.displayName || '?')[0].toUpperCase()}</span>
+        </span>
+        <span class="hc-body">
+          <span class="hc-sentence hc-sentence-landed">
+            {l.displayName} arrived{l.placeName ? ` at ${l.placeName}` : ''} safely.
+            <span class="hc-check" aria-hidden="true">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
             </span>
-          </div>
-          <div class="rail-bar" aria-hidden="true"><span class="rail-fill rail-fill-done"></span></div>
-        </div>
-      {/each}
-    </div>
-  </section>
+          </span>
+          <span class="hc-bar" aria-hidden="true"><span class="hc-fill hc-fill-done"></span></span>
+        </span>
+      </div>
+    {/each}
+  </div>
 {/if}
 
 <style>
-  .rail { padding: 0 var(--space-5); margin-top: var(--space-3); }
-  .rail-title {
-    font-size: var(--text-2xs, 10px); font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.08em; color: var(--text-tertiary); margin: 0 0 var(--space-2);
-  }
-  .rail-track {
-    display: flex; gap: var(--space-2); overflow-x: auto;
-    scroll-snap-type: x proximity; scrollbar-width: none;
-    padding-bottom: var(--space-1);
-  }
-  .rail-track::-webkit-scrollbar { display: none; }
+  /* Quiet paper rows separated by whitespace — never bordered cards. */
+  .hc { display: flex; flex-direction: column; gap: var(--space-4); }
 
-  .rail-card {
-    flex: 0 0 auto; width: 232px; min-height: 44px;
-    scroll-snap-align: start;
-    display: flex; flex-direction: column; gap: var(--space-2);
-    padding: var(--space-3);
-    background: var(--glass-bg);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-lg, 14px);
-    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  .hc-row {
+    display: flex; align-items: flex-start; gap: var(--space-4);
+    min-height: 44px;
+    padding: var(--space-2);
+    margin: calc(-1 * var(--space-2));
+    background: transparent; border: none;
+    border-radius: var(--radius-md);
     cursor: pointer; text-align: left; color: inherit; font: inherit;
-    transition: border-color var(--duration-fast, 150ms) var(--ease-out, ease),
-                background var(--duration-fast, 150ms) var(--ease-out, ease);
+    transition: background var(--duration-fast) var(--ease-out);
     -webkit-tap-highlight-color: transparent;
   }
-  .rail-card:hover { border-color: color-mix(in srgb, var(--mc) 40%, transparent); background: var(--surface-hover); }
-  .rail-card:focus-visible { outline: 2px solid var(--mc, var(--primary-400)); outline-offset: 2px; }
-  .rail-landed { cursor: default; border-color: var(--success-500-20); background: var(--success-500-08); }
+  button.hc-row:hover { background: var(--surface-hover); }
+  button.hc-row:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 2px; }
+  .hc-landed { cursor: default; }
 
-  .rail-top { display: flex; align-items: center; gap: var(--space-2); }
-  .rail-init { font-size: 13px; font-weight: 800; color: var(--mc, var(--primary-400)); line-height: 1; user-select: none; }
-  .rail-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-  .rail-name { font-size: var(--text-sm, 13px); font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .rail-dest { font-size: 11px; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .rail-arrived { color: var(--success-400); font-weight: 600; }
-  .rail-eta { font-size: var(--text-sm, 14px); font-weight: 700; font-family: var(--font-mono, monospace); font-variant-numeric: tabular-nums; color: var(--text-secondary); white-space: nowrap; }
-  .rail-check { color: var(--success-400); display: flex; }
-
-  .rail-bar { height: 3px; border-radius: var(--radius-full, 999px); background: var(--surface-2); overflow: hidden; }
-  .rail-fill {
-    display: block; height: 100%; width: 100%; border-radius: 999px;
-    transform-origin: left center; transform: scaleX(0);
-    background: linear-gradient(90deg, color-mix(in srgb, var(--mc) 60%, transparent), var(--mc));
+  /* Warm pebble with the live breathing halo (transform/opacity only). */
+  .hc-pebble {
+    position: relative; flex-shrink: 0; margin-top: 2px;
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: var(--radius-full);
+    background: var(--primary-100);
   }
-  .rail-fill.animate { transition: transform 1s var(--ease-out, cubic-bezier(0.16,1,0.3,1)); }
-  .rail-fill-done { transform: scaleX(1); background: var(--success-500); }
+  .hc-pebble-landed { background: color-mix(in oklch, var(--success-500) 12%, transparent); }
+  .hc-init {
+    position: relative;
+    font-size: var(--text-sm); font-weight: 600; line-height: 1;
+    color: var(--mc, var(--primary-700)); user-select: none;
+  }
+  .hc-pebble-landed .hc-init { color: var(--success-600); }
+  .hc-halo {
+    position: absolute; inset: 0; border-radius: inherit;
+    box-shadow: 0 0 0 var(--space-1) color-mix(in oklch, var(--primary-500) 28%, transparent);
+    opacity: 0; transform: scale(0.94);
+    animation: hc-breathe 3.6s ease-in-out infinite;
+    pointer-events: none;
+  }
+  @keyframes hc-breathe {
+    0%, 100% { opacity: 0; transform: scale(0.94); }
+    50%      { opacity: 1; transform: scale(1.06); }
+  }
+
+  .hc-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+  /* One plain-language sentence — body register, soft numbers inline. */
+  .hc-sentence { font-size: var(--text-base); line-height: 1.5; color: var(--text-primary); }
+  .hc-eta { font-variant-numeric: tabular-nums; color: var(--primary-700); font-weight: 500; }
+  .hc-sentence-landed { color: var(--success-600); }
+  .hc-check { display: inline-flex; vertical-align: middle; color: var(--success-500); margin-left: var(--space-1); }
+
+  /* Hairline reassurance ribbon — quiet, subordinate, GPU-only fill. */
+  .hc-bar {
+    height: 3px; border-radius: var(--radius-full);
+    background: var(--surface-inset); overflow: hidden;
+  }
+  .hc-fill {
+    display: block; height: 100%; width: 100%; border-radius: inherit;
+    transform-origin: left center; transform: scaleX(0);
+    background: var(--primary-500);
+  }
+  .hc-fill.animate { transition: transform 1s var(--ease-out); }
+  .hc-fill-done { transform: scaleX(1); background: var(--success-500); }
 
   @media (prefers-reduced-motion: reduce) {
-    .rail-fill { transition: none !important; }
+    .hc-fill { transition: none !important; }
+    .hc-halo { animation: none !important; opacity: 0 !important; }
   }
 </style>

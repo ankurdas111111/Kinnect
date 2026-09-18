@@ -12,7 +12,6 @@
   import { authUser } from '../../lib/stores/auth.js';
   import { dailyActivity } from '../../lib/stores/activity.js';
   import { emitGetDailyActivity } from '../../lib/socket.js';
-  import { allowMotion } from '../../lib/stores/effects.js';
 
   let myUserId = $derived($authUser?.userId);
   let hasData = $derived(myUserId ? $dailyActivity.has(myUserId) : false);
@@ -62,6 +61,10 @@
   }
 </script>
 
+<!-- Family Circle: the design bans dashboards, so the week is spoken first as
+     one quiet sentence; beneath it, seven small day-dots trace the rhythm —
+     a murmur, never a KPI chart. Numbers stay reachable per-day (tooltip +
+     screen-reader text). -->
 <section class="week" aria-label="Your week">
   <div class="week-head">
     <h3 class="week-title">Your week</h3>
@@ -69,54 +72,73 @@
   </div>
 
   {#if loading && !hasData}
-    <div class="week-bars" role="status" aria-label="Loading your week" aria-busy="true">
-      {#each Array(7) as _, i (i)}<span class="bar bar-skel" style="height:{30 + (i % 4) * 14}%"></span>{/each}
+    <div class="week-dots" role="status" aria-label="Loading your week" aria-busy="true">
+      {#each Array(7) as _, i (i)}
+        <span class="day-cell"><span class="dot dot-skel"></span><span class="day-lbl">·</span></span>
+      {/each}
     </div>
   {:else if days.length === 0}
     <p class="week-empty">Move around with tracking on and your week fills in here.</p>
   {:else}
-    <div class="week-bars">
+    <p class="week-caption">{caption}</p>
+    <div class="week-dots">
       {#each days as d (d.date)}
-        {@const h = Math.round(((d.activeMinutes || 0) / maxMin) * 100)}
-        <span class="bar-cell" title="{d.activeMinutes || 0} active min · {((d.distanceM || 0) / 1000).toFixed(1)} km">
-          <span class="bar-track">
-            <span class="bar bar-fill" class:today={isToday(d.date)} class:animate={$allowMotion} style="height:{Math.max(6, h)}%"></span>
-          </span>
-          <span class="bar-lbl" class:today-lbl={isToday(d.date)}>{dayInitial(d.date)}</span>
+        {@const ratio = (d.activeMinutes || 0) / maxMin}
+        <span class="day-cell" title="{d.activeMinutes || 0} active min · {((d.distanceM || 0) / 1000).toFixed(1)} km">
+          <span
+            class="dot"
+            class:dot-quiet={(d.activeMinutes || 0) === 0}
+            class:dot-today={isToday(d.date)}
+            style="--w: {(0.25 + ratio * 0.75).toFixed(2)}"
+            aria-hidden="true"
+          ></span>
+          <span class="day-lbl" class:today-lbl={isToday(d.date)} aria-hidden="true">{dayInitial(d.date)}</span>
+          <span class="sr-only">{d.date}: {d.activeMinutes || 0} active minutes, {((d.distanceM || 0) / 1000).toFixed(1)} kilometres</span>
         </span>
       {/each}
     </div>
-    <p class="week-caption">{caption}</p>
   {/if}
 </section>
 
 <style>
-  .week { display: flex; flex-direction: column; gap: var(--space-2); }
-  .week-head { display: flex; align-items: baseline; justify-content: space-between; }
-  .week-title { margin: 0; font-size: var(--text-2xs, 10px); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); }
-  .week-sub { font-size: 9px; color: var(--text-tertiary); opacity: 0.7; }
+  .week { display: flex; flex-direction: column; gap: var(--space-3); }
+  .week-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
+  /* Quiet label register — matches the page's other section labels. */
+  .week-title { margin: 0; font-size: var(--text-sm); font-weight: 500; color: var(--text-secondary); }
+  .week-sub { font-size: var(--text-xs); color: var(--text-tertiary); }
 
-  .week-bars { display: flex; align-items: flex-end; gap: var(--space-2); height: 72px; }
-  .bar-cell { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; }
-  .bar-track { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
-  .bar {
-    width: 100%; max-width: 22px; border-radius: var(--radius-sm, 5px);
-    background: var(--primary-500-30);
-    transform-origin: bottom center;
+  /* The sentence carries the meaning; body register, ink. */
+  .week-caption { margin: 0; font-size: var(--text-base); line-height: 1.5; color: var(--text-primary); }
+  .week-empty { margin: 0; font-size: var(--text-base); line-height: 1.5; color: var(--text-tertiary); }
+
+  /* Seven small pebble-dots, left→right. Weight is opacity (--w), so the row
+     reads as a soft rhythm, not a bar chart. */
+  .week-dots { display: flex; align-items: center; gap: var(--space-4); }
+  .day-cell { display: flex; flex-direction: column; align-items: center; gap: var(--space-1); }
+  .dot {
+    width: 10px; height: 10px; border-radius: var(--radius-full);
+    background: var(--primary-500);
+    opacity: var(--w, 0.25);
   }
-  .bar-fill.animate { animation: grow var(--duration-slow, 500ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both; }
-  @keyframes grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
-  .bar.today { background: var(--primary-500); box-shadow: 0 0 8px var(--primary-500-30); }
-  .bar-skel { background: var(--surface-inset); animation: shimmer 1.4s ease-in-out infinite; }
-  @keyframes shimmer { 0%,100% { opacity: 0.5; } 50% { opacity: 0.85; } }
-  .bar-lbl { font-size: 9px; font-weight: 600; color: var(--text-tertiary); }
-  .today-lbl { color: var(--primary-300); font-weight: 800; }
-
-  .week-caption { margin: 0; font-size: var(--text-xs, 12px); color: var(--text-secondary); }
-  .week-empty { margin: 0; font-size: var(--text-xs, 12px); color: var(--text-tertiary); }
+  /* A day with no movement is an open circle — shape, not just color. */
+  .dot-quiet {
+    background: transparent;
+    border: 1px solid var(--outline-variant);
+    opacity: 1;
+  }
+  .dot-today {
+    background: var(--primary-500); opacity: 1;
+    box-shadow: 0 0 0 var(--space-1) color-mix(in oklch, var(--primary-500) 18%, transparent);
+  }
+  .dot-skel {
+    background: var(--surface-inset); opacity: 1;
+    animation: shimmer 1.4s ease-in-out infinite;
+  }
+  @keyframes shimmer { 0%,100% { opacity: 0.5; } 50% { opacity: 0.9; } }
+  .day-lbl { font-size: var(--text-2xs); font-weight: 500; color: var(--text-tertiary); }
+  .today-lbl { color: var(--primary-700); font-weight: 600; }
 
   @media (prefers-reduced-motion: reduce) {
-    .bar-fill.animate { animation: none !important; }
-    .bar-skel { animation: none !important; }
+    .dot-skel { animation: none !important; }
   }
 </style>

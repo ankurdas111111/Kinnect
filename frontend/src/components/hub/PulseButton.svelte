@@ -59,37 +59,43 @@
 </button>
 
 <style>
+  /* Hearth / Family Circle — the reference's primary ember button: warm fill,
+     paper-white label, approachable medium radius (never a pill, never a card). */
   .pulse {
     width: 100%; min-height: 48px;
     display: flex; align-items: center; justify-content: center; gap: var(--space-2);
-    padding: 0 var(--space-4);
-    border-radius: var(--radius-full, 999px);
-    border: 1px solid var(--primary-500-30);
+    padding: 0 var(--space-5);
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
     background: var(--primary-500);
-    color: var(--text-on-primary); font-family: var(--font-display, system-ui);
-    font-size: var(--text-sm, 14px); font-weight: 700; cursor: pointer;
-    transition: transform var(--duration-fast, 120ms) var(--ease-out), background var(--duration-standard, 200ms) var(--ease-out), border-color var(--duration-standard, 200ms) var(--ease-out);
+    color: var(--text-on-primary); font-family: var(--font-sans);
+    font-size: var(--text-base); font-weight: 600; cursor: pointer;
+    box-shadow: var(--shadow-xs);
+    transition: transform var(--duration-fast) var(--ease-out), background var(--duration-normal) var(--ease-out), border-color var(--duration-normal) var(--ease-out), color var(--duration-normal) var(--ease-out);
     -webkit-tap-highlight-color: transparent;
   }
-  .pulse:hover { background: var(--primary-400); }
+  .pulse:hover { background: var(--primary-600); }
   .pulse:active { transform: scale(0.97); }
-  .pulse:focus-visible { outline: 2px solid var(--primary-300); outline-offset: 2px; }
+  .pulse:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 2px; }
 
-  /* Quiet secondary — used only when Invite takes the filled-primary emphasis instead */
+  /* Quiet secondary — the reference's paper-outline button. Used only when
+     Invite takes the filled-ember emphasis instead (zero-member state). */
   .pulse.quiet:not(.done) {
-    background: color-mix(in oklch, var(--primary-500) 12%, transparent);
-    border-color: color-mix(in oklch, var(--primary-500) 30%, transparent);
-    color: var(--primary-600);
+    background: transparent;
+    border-color: var(--outline-variant);
+    color: var(--primary-700);
+    box-shadow: none;
   }
-  .pulse.quiet:not(.done):hover { background: color-mix(in oklch, var(--primary-500) 18%, transparent); }
+  .pulse.quiet:not(.done):hover { background: var(--surface-hover); }
 
-  /* Checked-in: settle to a calm success surface */
+  /* Checked-in: settle onto a calm sage tint — arrival/settled language */
   .pulse.done {
-    background: var(--success-500-12);
-    border-color: var(--success-500-30);
-    color: var(--success-300);
+    background: color-mix(in oklch, var(--success-500) 12%, transparent);
+    border-color: color-mix(in oklch, var(--success-500) 30%, transparent);
+    color: var(--success-600);
+    box-shadow: none;
   }
-  .pulse.done:hover { background: var(--success-500-20); }
+  .pulse.done:hover { background: color-mix(in oklch, var(--success-500) 18%, transparent); }
 
   .pulse-glyph { display: flex; }
   /* Gentle heartbeat on the un-tapped call to action — GPU-only, calm-gated */

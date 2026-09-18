@@ -55,7 +55,7 @@
   let members = $derived($familyMembers);
   let verdict = $derived($familyVerdict);
   // Zero-member state: nothing to report on, so "Invite" is the one real
-  // action — it takes the filled-primary emphasis, "I'm safe" quiets down.
+  // action — it takes the filled-ember emphasis, "I'm safe" quiets down.
   let zeroMembers = $derived(members.length === 0);
 
   // Hearth 06: rooms are this app's families, so the room name titles the page.
@@ -104,514 +104,458 @@
   }
 </script>
 
-<div class="d d-{verdict.tone}" class:d-ready={mounted}>
-  <!-- ONE ambient tint, driven by the real verdict tone (replaces aurora+noise+glow pile-up) -->
-  <div class="d-ambient" aria-hidden="true"></div>
-
-  <!-- Header (Hearth 06): back to map · wordmark · family · date + you -->
-  <header class="d-header">
-    <button class="d-back tactile" onclick={() => push('/')} aria-label="Back to map">
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
-      Map
-    </button>
-    <span class="d-wordmark">Kinnect</span>
-    <span class="d-family-name">{familyName}</span>
-    <div class="d-head-right">
-      <span class="d-when">{dateStr} · {timeStr}</span>
-      <span class="d-avatar" aria-hidden="true">{initials}</span>
+<!-- Family Circle: one warm-paper column (max 640px), the verdict spoken at
+     the crest, people as pebble rows, everything else quiet prose. -->
+<div class="fc fc-{verdict.tone}" class:fc-ready={mounted}>
+  <!-- Top app bar — paper, frameless, wordmark in the serif voice -->
+  <header class="fc-bar">
+    <div class="fc-bar-inner">
+      <button class="fc-back" onclick={() => push('/')} aria-label="Back to map">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <span class="fc-wordmark verdict-voice">Kinnect</span>
+      <div class="fc-bar-right">
+        <span class="fc-when">{dateStr} · {timeStr}</span>
+        <span class="fc-avatar" aria-hidden="true">{initials}</span>
+      </div>
     </div>
   </header>
 
-  <!-- Content — two columns on desktop, one on phone (06a / 06c) -->
-  <div class="d-content">
-    <div class="d-main">
-      <section class="d-now" aria-labelledby="d-now-head">
-        <p class="d-eyebrow" id="d-now-head">Right now</p>
-        <h1 class="d-verdict verdict-voice">{verdict.sentence}</h1>
-        {#if nobodySharing}
-          <p class="d-verdict-detail">
-            Nobody in {familyName} is sharing at the moment. One nudge asks everyone to turn
-            sharing back on — or invite someone new.
-          </p>
-        {:else if verdict.detail}
-          <p class="d-verdict-detail">{verdict.detail}</p>
-        {/if}
+  <main class="fc-col">
+    <!-- Verdict crest: frameless, honest human sentence -->
+    <section class="fc-crest" aria-labelledby="fc-crest-head">
+      <p class="fc-eyebrow" id="fc-crest-head">
+        <span class="fc-eyebrow-dot" aria-hidden="true"></span>
+        {familyName} · right now
+      </p>
+      <h1 class="fc-verdict verdict-voice">{verdict.sentence}</h1>
+      {#if nobodySharing}
+        <p class="fc-crest-detail">
+          Nobody in {familyName} is sharing at the moment. One nudge asks everyone to turn
+          sharing back on — or invite someone new.
+        </p>
+      {:else if verdict.detail}
+        <p class="fc-crest-detail">{verdict.detail}</p>
+      {/if}
 
-        <!-- One row of real actions, ember reserved for the primary one -->
-        <div class="d-cta-row">
-          <div class="d-cta-pulse"><PulseButton quiet={zeroMembers} /></div>
-          <button class="d-cta" onclick={() => push('/')}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-            Share live
-          </button>
-          <button class="d-cta" class:d-cta-accent={!zeroMembers} class:d-cta-filled={zeroMembers} onclick={() => push('/')}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Invite
-          </button>
+      <!-- One row of real actions, ember reserved for the primary one -->
+      <div class="fc-actions">
+        <div class="fc-action-pulse"><PulseButton quiet={zeroMembers} /></div>
+        <button class="fc-action" onclick={() => push('/')}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+          Share live
+        </button>
+        <button class="fc-action" class:fc-action-filled={zeroMembers} onclick={() => push('/')}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Invite
+        </button>
+      </div>
+    </section>
+
+    <!-- Circle status: continuous quiet paper rows -->
+    <section class="fc-section" aria-label="Your circle">
+      <div class="fc-section-head">
+        <h2 class="fc-label">Your circle{members.length ? ` (${members.length})` : ''}</h2>
+      </div>
+      <FamilyRoster {members} myLocation={$myLocation} now={nowMs} />
+      {#if members.length > 0}
+        <button class="fc-rhythm-toggle" role="switch" aria-checked={$rhythmEnabled}
+          onclick={() => setRhythmEnabled(!$rhythmEnabled)}>
+          <span class="fc-rhythm-dot" class:on={$rhythmEnabled} aria-hidden="true"></span>
+          {$rhythmEnabled ? 'Rhythm hints on' : 'Show rhythm hints'}
+        </button>
+      {/if}
+      <InviteStrip {members} />
+    </section>
+
+    <!-- Where everyone is — names as pebble chips, dormant people nudgeable -->
+    <section class="fc-section" aria-label="Where everyone is">
+      <div class="fc-section-head">
+        <h2 class="fc-label">Where everyone is</h2>
+        <button class="fc-more" onclick={() => push('/')}>Open map →</button>
+      </div>
+      {#if members.length === 0}
+        <p class="fc-empty">Nobody to show yet. Invite someone and they'll appear here.</p>
+      {:else}
+        <div class="fc-chips">
+          {#each members.slice(0, 8) as m (m.userId || m.socketId)}
+            <span class="fc-chip" style="--hue: var(--member-{(Math.abs([...(m.displayName || '?')].reduce((a, c) => a + c.charCodeAt(0), 0)) % 4) + 1})">
+              <span class="fc-chip-dot" aria-hidden="true"></span>
+              {(m.displayName || '?').split(' ')[0]}
+            </span>
+          {/each}
         </div>
-      </section>
-
-      <section class="d-family card">
-        <FamilyRoster {members} myLocation={$myLocation} now={nowMs} />
-        {#if members.length > 0}
-          <button class="d-rhythm-toggle" role="switch" aria-checked={$rhythmEnabled}
-            onclick={() => setRhythmEnabled(!$rhythmEnabled)}>
-            <span class="d-rhythm-dot" class:on={$rhythmEnabled}></span>
-            {$rhythmEnabled ? 'Rhythm hints on' : 'Show rhythm hints'}
-          </button>
-        {/if}
-        <div class="d-invite-slot"><InviteStrip {members} /></div>
-      </section>
-
-      <!-- Slim text nav, not a wall of tiles (06a footer) -->
-      <nav class="d-nav" aria-label="More">
-        <button class="d-nav-link" onclick={() => visitFeature('activity', '/activity')}>Activity</button>
-        <button class="d-nav-link" onclick={() => visitFeature('replay', '/replay')}>Routes</button>
-        <button class="d-nav-link" onclick={() => visitFeature('checkins', '/checkins')}>Check-ins</button>
-        <button class="d-nav-link" onclick={() => push('/')}>Places</button>
-        <button class="d-nav-link" class:d-nav-sos={$mySosActive} onclick={() => visitFeature('emergency', '/emergency')}>Emergency</button>
-      </nav>
-    </div>
-
-    <!-- Right column: where everyone is, coming home, today, your week -->
-    <aside class="d-side" aria-label="Family overview">
-      <section class="card d-card">
-        <header class="d-card-head">
-          <h2 class="d-card-title">Where everyone is</h2>
-          <button class="d-card-more" onclick={() => push('/')}>Open map →</button>
-        </header>
-        {#if members.length === 0}
-          <p class="d-empty">Nobody to show yet. Invite someone and they'll appear here.</p>
-        {:else}
-          <div class="d-pebbles">
-            {#each members.slice(0, 8) as m (m.userId || m.socketId)}
-              <span class="d-pebble" style="--hue: var(--member-{(Math.abs([...(m.displayName || '?')].reduce((a, c) => a + c.charCodeAt(0), 0)) % 4) + 1})">
-                <span class="d-pebble-dot" aria-hidden="true"></span>
-                {(m.displayName || '?').split(' ')[0]}
-              </span>
-            {/each}
+      {/if}
+      {#if notSharing.length > 0}
+        <!-- Hearth 06b: dormant members are named, dated, and nudgeable -->
+        <div class="fc-dormant">
+          <div class="fc-dormant-head-row">
+            <h3 class="fc-sublabel">Not sharing · {notSharing.length}</h3>
+            <button class="fc-more" onclick={nudgeAll}>Nudge all</button>
           </div>
-        {/if}
-        {#if notSharing.length > 0}
-          <!-- Hearth 06b: dormant members are named, dated, and nudgeable -->
-          <div class="d-dormant">
-            <div class="d-dormant-head-row">
-              <p class="d-dormant-head">Not sharing · {notSharing.length}</p>
-              <button class="d-nudge-all" onclick={nudgeAll}>Nudge all</button>
+          {#each notSharing as c (c.userId)}
+            <div class="fc-dormant-row">
+              <span class="fc-dormant-name">{(c.displayName || '?').split(' ')[0]}</span>
+              <span class="fc-dormant-when">{lastSharedLabel(c)}</span>
+              <button
+                class="fc-nudge"
+                disabled={nudged.has(c.userId)}
+                onclick={() => nudge(c.userId)}
+                aria-label="Nudge {c.displayName} to share their location"
+              >{nudged.has(c.userId) ? 'Nudged ✓' : 'Nudge'}</button>
             </div>
-            {#each notSharing as c (c.userId)}
-              <div class="d-dormant-row">
-                <span class="d-dormant-name">{(c.displayName || '?').split(' ')[0]}</span>
-                <span class="d-dormant-when">{lastSharedLabel(c)}</span>
-                <button
-                  class="d-nudge tactile"
-                  disabled={nudged.has(c.userId)}
-                  onclick={() => nudge(c.userId)}
-                  aria-label="Nudge {c.displayName} to share their location"
-                >{nudged.has(c.userId) ? 'Nudged ✓' : 'Nudge'}</button>
-              </div>
-            {/each}
-          </div>
+          {/each}
+        </div>
+      {/if}
+    </section>
+
+    <!-- Coming home -->
+    <section class="fc-section" aria-label="Coming home">
+      <div class="fc-section-head">
+        <h2 class="fc-label">Coming home</h2>
+      </div>
+      <!-- HomecomingRail self-hides when there is nothing to project, which
+           left an empty section. 06b: say what would fill it. -->
+      {#if $arrivalProjections && $arrivalProjections.size > 0}
+        <HomecomingRail />
+      {:else}
+        <p class="fc-empty-strong">Nobody's heading home right now.</p>
+        <p class="fc-empty">This fills in once someone sets a Home place and starts sharing.</p>
+      {/if}
+    </section>
+
+    <!-- Today -->
+    <section class="fc-section" aria-label="Today">
+      <div class="fc-section-head">
+        <h2 class="fc-label">Today</h2>
+        {#if $activityEvents.length > 0}
+          <button class="fc-more" onclick={() => push('/activity')}>All activity →</button>
         {/if}
-      </section>
+      </div>
+      {#if $activityEvents.length === 0}
+        <!-- 06b: an empty day is a sentence, not a blank panel -->
+        <p class="fc-empty-strong">Nothing happened today.</p>
+        <p class="fc-empty">A quiet day is a good day. Nothing to review.</p>
+      {:else}
+        <div class="fc-today">
+          {#each $activityEvents.slice(0, 3) as ev (ev.id)}
+            <button class="fc-today-row" onclick={() => push('/activity')}>
+              <span class="fc-today-ts">{formatAge(nowMs - ev.ts)}</span>
+              <span class="fc-event-dot fc-event-{ev.type}" aria-hidden="true"></span>
+              <span class="fc-today-msg">{ev.message}</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
+    </section>
 
-      <section class="card d-card">
-        <h2 class="d-card-title">Coming home</h2>
-        <!-- HomecomingRail self-hides when there is nothing to project, which
-             left an empty card. 06b: say what would fill it. -->
-        {#if $arrivalProjections && $arrivalProjections.size > 0}
-          <HomecomingRail />
-        {:else}
-          <p class="d-empty-strong">Nobody's heading home right now.</p>
-          <p class="d-empty">This fills in once someone sets a Home place and starts sharing.</p>
-        {/if}
-      </section>
+    <!-- WeeklyRhythm renders its own "Your week / Private to you" header —
+         no wrapper header here, or the section shows the title twice. -->
+    <section class="fc-section" aria-label="Your week">
+      <WeeklyRhythm />
+    </section>
 
-      <section class="card d-card">
-        <header class="d-card-head">
-          <h2 class="d-card-title">Today</h2>
-          {#if $activityEvents.length > 0}
-            <button class="d-card-more" onclick={() => push('/activity')}>All activity →</button>
-          {/if}
-        </header>
-        {#if $activityEvents.length === 0}
-          <!-- 06b: an empty day is a sentence, not a blank panel -->
-          <p class="d-empty-strong">Nothing happened today.</p>
-          <p class="d-empty">A quiet day is a good day. Nothing to review.</p>
-        {:else}
-          <div class="d-today">
-            {#each $activityEvents.slice(0, 3) as ev (ev.id)}
-              <button class="d-today-row" onclick={() => push('/activity')}>
-                <span class="d-today-ts">{formatAge(nowMs - ev.ts)}</span>
-                <span class="d-recent-dot d-recent-{ev.type}" aria-hidden="true"></span>
-                <span class="d-today-msg">{ev.message}</span>
-              </button>
-            {/each}
-          </div>
-        {/if}
-      </section>
+    <!-- Slim text nav, not a wall of tiles -->
+    <nav class="fc-nav" aria-label="More">
+      <button class="fc-nav-link" onclick={() => visitFeature('activity', '/activity')}>
+        Activity{#if !visited.activity}<span class="fc-new" aria-hidden="true"></span><span class="sr-only">(new)</span>{/if}
+      </button>
+      <button class="fc-nav-link" onclick={() => visitFeature('replay', '/replay')}>
+        Routes{#if !visited.replay}<span class="fc-new" aria-hidden="true"></span><span class="sr-only">(new)</span>{/if}
+      </button>
+      <button class="fc-nav-link" onclick={() => visitFeature('checkins', '/checkins')}>
+        Check-ins{#if !visited.checkins}<span class="fc-new" aria-hidden="true"></span><span class="sr-only">(new)</span>{/if}
+      </button>
+      <button class="fc-nav-link" onclick={() => push('/')}>Places</button>
+      <button class="fc-nav-link" class:fc-nav-sos={$mySosActive} onclick={() => visitFeature('emergency', '/emergency')}>
+        Emergency{#if !visited.emergency}<span class="fc-new" aria-hidden="true"></span><span class="sr-only">(new)</span>{/if}
+      </button>
+    </nav>
 
-      <!-- WeeklyRhythm renders its own "Your week / Private to you" header —
-           no wrapper header here, or the card shows the title twice. -->
-      <section class="card d-card">
-        <WeeklyRhythm />
-      </section>
-    </aside>
-
-    <div class="d-spacer"></div>
-  </div>
+    <div class="fc-spacer"></div>
+  </main>
 </div>
 
 <style>
-  .d {
-    position: relative;
-    height: 100dvh; overflow: hidden;
-    background: var(--surface-0, #050812);
-    color: var(--text-primary, #fff);
-    font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
-    opacity: 0; transition: opacity var(--duration-slow, 500ms) var(--ease-out, ease);
-  }
-  .d.d-ready { opacity: 1; }
-
-  /* ── Single ambient tint (opacity-only crossfade between tones) ───────────── */
-  .d-ambient {
-    position: fixed; inset: 0; pointer-events: none; z-index: 0;
-    background:
-      radial-gradient(ellipse 70% 55% at 20% 12%, var(--amb-a) 0%, transparent 62%),
-      radial-gradient(ellipse 60% 45% at 85% 80%, var(--amb-b) 0%, transparent 60%);
-    transition: background var(--duration-slow, 600ms) var(--ease-out, ease);
-  }
-  /* Hearth: the page is warm paper, so the tone wash is a whisper of the tone
-     colour — the old emerald/indigo pair read as a green stain on cream. */
-  .d-safe    { --amb-a: color-mix(in oklch, var(--sage) 5%, transparent);      --amb-b: transparent; }
-  .d-caution { --amb-a: color-mix(in oklch, var(--ochre) 7%, transparent);     --amb-b: transparent; }
-  .d-alert   { --amb-a: color-mix(in oklch, var(--vermilion) 9%, transparent); --amb-b: transparent; }
-
-  /* ── Header ───────────────────────────────────────────────────────────────── */
-  .d-header {
-    position: fixed; top: 0; left: 0; right: 0; z-index: 20;
-    display: flex; align-items: center; gap: var(--space-3);
-    padding: calc(var(--safe-top, 0px) + var(--space-2)) var(--space-5) var(--space-2);
-    background: color-mix(in oklch, var(--surface-0) 88%, transparent);
-    backdrop-filter: blur(24px) saturate(1.5); -webkit-backdrop-filter: blur(24px) saturate(1.5);
-    border-bottom: 1px solid var(--border-subtle);
-  }
-  .d-wordmark {
-    font-family: var(--font-serif, var(--font-display));
-    font-style: italic;
-    font-size: var(--text-lg);
+  /* ── Ground: warm paper, one calm column ─────────────────────────────────── */
+  .fc {
+    height: 100dvh; overflow-y: auto;
+    -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain;
+    background: var(--paper);
     color: var(--text-primary);
+    font-family: var(--font-sans);
+    opacity: 0; transition: opacity var(--duration-slow) var(--ease-out);
   }
-  .d-family-name { font-size: var(--text-sm); font-weight: 600; color: var(--text-secondary); }
-  .d-head-right { margin-left: auto; display: flex; align-items: center; gap: var(--space-3); }
-  .d-when {
+  .fc.fc-ready { opacity: 1; }
+
+  /* ── Top app bar — sticky paper, no border, no glass ────────────────────── */
+  .fc-bar {
+    position: sticky; top: 0; z-index: 20;
+    background: var(--paper);
+    padding-top: var(--safe-top, 0px);
+  }
+  .fc-bar-inner {
+    max-width: 640px; margin-inline: auto;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-4);
+    min-height: 64px;
+  }
+  .fc-back {
+    width: 44px; height: 44px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: none; border: none; border-radius: var(--radius-full);
+    color: var(--primary-700); cursor: pointer;
+    transition: background var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .fc-back:hover { background: var(--surface-3); }
+  .fc-back:active { transform: scale(0.95); }
+  .fc-back:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 2px; }
+  /* Screen-title register — the one other place the serif voice speaks */
+  .fc-wordmark {
+    font-size: var(--text-xl);
+    color: var(--primary-700);
+    letter-spacing: -0.01em;
+  }
+  .fc-bar-right { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+  .fc-when {
     font-size: var(--text-xs); color: var(--text-tertiary);
     font-variant-numeric: tabular-nums; white-space: nowrap;
   }
-  .d-avatar {
-    width: 30px; height: 30px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    background: var(--primary-500); color: var(--text-on-primary);
-    font-size: 11px; font-weight: 700; letter-spacing: 0.02em; flex-shrink: 0;
-  }
   @media (max-width: 640px) {
-    .d-wordmark, .d-when { display: none; }
+    .fc-when { display: none; }
   }
-  .d-back {
-    display: flex; align-items: center; gap: 4px; min-height: 44px;
-    padding: 0 var(--space-3) 0 var(--space-2);
-    background: var(--surface-inset, rgba(255,255,255,0.06)); border: 1px solid var(--border-default, rgba(255,255,255,0.08));
-    border-radius: var(--radius-full, 22px);
-    color: var(--text-secondary); font-size: var(--text-xs); font-weight: 600; cursor: pointer;
-    transition: background var(--duration-fast, 150ms) var(--ease-out), color var(--duration-fast, 150ms) var(--ease-out);
-    -webkit-tap-highlight-color: transparent;
-  }
-  .d-back:hover { background: var(--surface-hover); color: var(--text-primary); }
-  .d-back:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
-
-  /* ── Content: two columns on desktop (06a), one on phone (06c) ───────────── */
-  .d-content {
-    position: relative; z-index: 5;
-    height: 100dvh; overflow-y: auto;
-    -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain;
-    padding: calc(var(--safe-top, 0px) + 60px) var(--space-5) var(--space-8);
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: var(--space-5);
-    align-content: start;
-  }
-  @media (min-width: 1024px) {
-    .d-content {
-      grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
-      gap: var(--space-6);
-      max-width: 1360px;
-      margin-inline: auto;
-      width: 100%;
-    }
-  }
-  .d-main, .d-side {
-    display: flex; flex-direction: column; gap: var(--space-4);
-    min-width: 0;
+  /* Your own pebble */
+  .fc-avatar {
+    width: 32px; height: 32px; border-radius: var(--radius-full); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--primary-100); color: var(--primary-700);
+    font-size: var(--text-xs); font-weight: 600; letter-spacing: 0.02em;
   }
 
-  /* Staggered entrance — transform/opacity only */
-  .d-main, .d-side {
-    opacity: 0; transform: translateY(10px);
-    transition: opacity var(--duration-slow, 500ms) var(--ease-out), transform var(--duration-slow, 500ms) var(--ease-out);
+  /* ── The column — max 640px, sections separated by whitespace only ──────── */
+  .fc-col {
+    max-width: 640px; margin-inline: auto;
+    padding: var(--space-2) var(--space-4) var(--space-8);
+    display: flex; flex-direction: column; gap: var(--space-8);
   }
-  .d-ready .d-main { opacity: 1; transform: none; transition-delay: 40ms; }
-  .d-ready .d-side { opacity: 1; transform: none; transition-delay: 140ms; }
+  .fc-section { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
 
-  /* ── "Right now" — the page answers before it shows anything ─────────────── */
-  .d-eyebrow {
+  /* Gentle entrance — opacity/transform only */
+  .fc-crest, .fc-section, .fc-nav {
+    opacity: 0; transform: translateY(8px);
+    transition: opacity var(--duration-slow) var(--ease-out), transform var(--duration-slow) var(--ease-out);
+  }
+  .fc-ready .fc-crest, .fc-ready .fc-section, .fc-ready .fc-nav { opacity: 1; transform: none; }
+  .fc-ready .fc-crest { transition-delay: 40ms; }
+  .fc-ready .fc-section { transition-delay: 120ms; }
+  .fc-ready .fc-nav { transition-delay: 180ms; }
+
+  /* ── Verdict crest — a frameless typographic statement ──────────────────── */
+  .fc-crest { display: flex; flex-direction: column; padding-top: var(--space-2); }
+  .fc-eyebrow {
     margin: 0 0 var(--space-2);
-    font-size: var(--text-xs); font-weight: 600;
-    letter-spacing: 0.08em; text-transform: uppercase;
-    color: var(--text-tertiary);
+    display: flex; align-items: center; gap: var(--space-2);
+    font-size: var(--text-2xs); font-weight: 600;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--text-secondary);
   }
-  .d-verdict {
+  /* Tone dot — sage settled, ochre needs-a-look, vermilion strictly SOS
+     (alert only ever means SOS). Words beside it, never color alone. */
+  .fc-eyebrow-dot { width: 8px; height: 8px; border-radius: var(--radius-full); flex-shrink: 0; }
+  .fc-safe    .fc-eyebrow-dot { background: var(--success-500); }
+  .fc-caution .fc-eyebrow-dot { background: var(--warning-500); }
+  .fc-alert   .fc-eyebrow-dot { background: var(--danger-500); }
+
+  .fc-verdict {
     margin: 0;
-    font-size: clamp(2rem, 4.4vw, 3.25rem);
-    line-height: 1.05;
+    font-size: clamp(var(--text-2xl), 4vw, var(--text-3xl));
+    line-height: 1.4;
     color: var(--text-primary);
   }
-  .d-verdict-detail {
-    margin: var(--space-3) 0 0;
-    font-size: var(--text-base);
-    line-height: 1.55;
+  .fc-crest-detail {
+    margin: var(--space-2) 0 0;
+    font-size: var(--text-base); line-height: 1.5;
     color: var(--text-secondary);
     max-width: 54ch;
   }
-  .d-cta-row {
-    display: flex; align-items: center; gap: var(--space-2);
-    flex-wrap: wrap; margin-top: var(--space-4);
+
+  /* ── Companionship triggers — one ember fill, paper outlines beside it ──── */
+  .fc-actions {
+    display: flex; align-items: stretch; gap: var(--space-3);
+    flex-wrap: wrap; margin-top: var(--space-5);
   }
-  .d-cta {
-    display: inline-flex; align-items: center; gap: var(--space-2);
-    min-height: 44px; padding: 0 var(--space-4);
-    background: var(--surface-1); color: var(--text-primary);
-    border: 1px solid var(--border-default); border-radius: var(--radius-full, 999px);
-    font-size: var(--text-sm); font-weight: 600; font-family: inherit; cursor: pointer;
-    transition: background var(--duration-fast, 150ms) var(--ease-out), border-color var(--duration-fast, 150ms) var(--ease-out);
+  .fc-action-pulse { flex: 1 1 100%; }
+  @media (min-width: 480px) {
+    .fc-action-pulse { flex: 1 1 auto; min-width: 0; }
+  }
+  .fc-action {
+    display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+    min-height: 48px; padding: 0 var(--space-5);
+    background: transparent; color: var(--primary-700);
+    border: 1px solid var(--outline-variant); border-radius: var(--radius-md);
+    font-size: var(--text-base); font-weight: 500; font-family: inherit; cursor: pointer;
+    transition: background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
     -webkit-tap-highlight-color: transparent;
   }
-  .d-cta:hover { background: var(--surface-hover); }
-  .d-cta:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
-  /* Ember stays reserved for the one action worth taking */
-  .d-cta-accent {
-    background: color-mix(in oklch, var(--primary-500) 12%, transparent);
-    border-color: color-mix(in oklch, var(--primary-500) 30%, transparent);
-    color: var(--primary-600);
-  }
-  .d-cta-accent:hover { background: color-mix(in oklch, var(--primary-500) 18%, transparent); }
+  .fc-action:hover { background: var(--surface-hover); }
+  .fc-action:active { transform: scale(0.97); }
+  .fc-action:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 2px; }
   /* Zero-member state only: Invite becomes the one real action */
-  .d-cta-filled {
+  .fc-action-filled {
     background: var(--primary-500);
     border-color: transparent;
     color: var(--text-on-primary);
+    font-weight: 600;
+    box-shadow: var(--shadow-xs);
   }
-  .d-cta-filled:hover { background: var(--primary-600); }
-  .d-cta-pulse :global(button) { min-height: 44px; }
+  .fc-action-filled:hover { background: var(--primary-600); }
 
-  /* ── Cards ───────────────────────────────────────────────────────────────── */
-  .card {
-    background: var(--surface-1);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-lg, 16px);
-    padding: var(--space-4);
-    box-shadow: var(--shadow-sm);
+  /* ── Section furniture — quiet labels, text links, honest empty states ──── */
+  .fc-section-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: var(--space-3);
   }
-  .d-card { display: flex; flex-direction: column; gap: var(--space-3); }
-
-  /* The roster's ghost-constellation empty state is sized for a whole panel;
-     inside the dashboard card it swallowed the left column. Scale the stage
-     down here only — the panel version is untouched. */
-  .d-family :global(.gc-stage) { transform: scale(0.68); transform-origin: center; margin: calc(-1 * var(--space-6)) 0; }
-  @media (prefers-reduced-motion: reduce) {
-    .d-family :global(.gc-stage) { transform: scale(0.68); }
+  .fc-label {
+    margin: 0; font-family: var(--font-sans);
+    font-size: var(--text-sm); font-weight: 500;
+    letter-spacing: 0.01em; color: var(--text-secondary);
   }
-  .d-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
-  .d-card-title {
-    margin: 0; font-family: var(--font-display);
-    font-size: var(--text-sm); font-weight: 700;
-    letter-spacing: 0.02em; color: var(--text-primary);
+  .fc-sublabel {
+    margin: 0; font-size: var(--text-xs); font-weight: 600;
+    color: var(--text-tertiary); letter-spacing: 0.02em;
   }
-  .d-card-more {
-    background: none; border: none; padding: 0; cursor: pointer;
-    font-family: inherit; font-size: var(--text-xs); font-weight: 600;
-    color: var(--primary-600);
+  .fc-more {
+    background: none; border: none; padding: var(--space-1); margin: calc(-1 * var(--space-1));
+    cursor: pointer; font-family: inherit;
+    font-size: var(--text-sm); font-weight: 600;
+    color: var(--primary-700);
+    min-height: 44px; display: inline-flex; align-items: center;
+    -webkit-tap-highlight-color: transparent;
   }
-  .d-card-more:hover { text-decoration: underline; }
-  .d-card-more:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
-  .d-card-note { font-size: var(--text-xs); color: var(--text-tertiary); }
+  .fc-more:hover { text-decoration: underline; }
+  .fc-more:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 2px; border-radius: var(--radius-sm); }
 
   /* Honest empty states (06b) — a sentence, never a blank panel */
-  .d-empty-strong { margin: 0; font-size: var(--text-sm); font-weight: 600; color: var(--text-primary); }
-  .d-empty { margin: 0; font-size: var(--text-sm); line-height: 1.5; color: var(--text-tertiary); }
+  .fc-empty-strong { margin: 0; font-size: var(--text-base); font-weight: 500; color: var(--text-primary); }
+  .fc-empty { margin: 0; font-size: var(--text-base); line-height: 1.5; color: var(--text-tertiary); }
 
-  /* Pebbles — name tags, not coordinates */
-  .d-pebbles { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-  .d-pebble {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 5px var(--space-3);
-    background: var(--surface-3); border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-full, 999px);
-    font-size: var(--text-xs); font-weight: 600; color: var(--text-secondary);
+  /* ── Name chips — warm capsules, not coordinates ────────────────────────── */
+  .fc-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+  .fc-chip {
+    display: inline-flex; align-items: center; gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    background: var(--surface-2);
+    border-radius: var(--radius-full);
+    font-size: var(--text-sm); font-weight: 500; color: var(--text-secondary);
   }
-  .d-pebble-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--hue, var(--primary-500)); }
+  .fc-chip-dot { width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--hue, var(--primary-500)); }
 
-  /* Dormant members (06b) — quiet list under the pebbles, one Nudge each */
-  .d-dormant {
-    display: flex; flex-direction: column; gap: var(--space-1);
-    padding-top: var(--space-2);
-    border-top: 1px solid var(--border-subtle);
+  /* ── Dormant members — quiet rows, one Nudge each ───────────────────────── */
+  .fc-dormant {
+    display: flex; flex-direction: column; gap: var(--space-2);
+    padding-top: var(--space-3);
   }
-  .d-dormant-head-row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
-  .d-dormant-head {
-    margin: 0 0 var(--space-1);
-    font-size: var(--text-2xs, 10px); font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.08em;
-    color: var(--text-tertiary);
-  }
-  .d-nudge-all {
-    background: none; border: none; padding: 0; cursor: pointer;
-    font-family: inherit; font-size: var(--text-xs); font-weight: 600;
-    color: var(--primary-600);
-  }
-  .d-nudge-all:hover { text-decoration: underline; }
-  .d-nudge-all:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
-  .d-dormant-row {
+  .fc-dormant-head-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+  .fc-dormant-row {
     display: grid; grid-template-columns: auto 1fr auto; align-items: center;
-    gap: var(--space-2); min-height: 36px;
+    gap: var(--space-3); min-height: 44px;
   }
-  .d-dormant-name { font-size: var(--text-sm); font-weight: 600; color: var(--text-secondary); }
-  .d-dormant-when {
+  .fc-dormant-name { font-size: var(--text-base); font-weight: 500; color: var(--text-primary); }
+  .fc-dormant-when {
     font-size: var(--text-xs); color: var(--text-tertiary);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .d-nudge {
-    min-height: 32px; padding: 0 var(--space-3);
-    background: color-mix(in oklch, var(--primary-500) 10%, transparent);
-    border: 1px solid color-mix(in oklch, var(--primary-500) 24%, transparent);
-    border-radius: var(--radius-full, 999px);
-    font-family: inherit; font-size: var(--text-xs); font-weight: 700;
-    color: var(--primary-600); cursor: pointer;
-    transition: background var(--duration-fast, 150ms) var(--ease-out);
+  .fc-nudge {
+    min-height: 44px; padding: 0 var(--space-4);
+    background: transparent;
+    border: 1px solid var(--outline-variant);
+    border-radius: var(--radius-md);
+    font-family: inherit; font-size: var(--text-sm); font-weight: 600;
+    color: var(--primary-700); cursor: pointer;
+    transition: background var(--duration-fast) var(--ease-out);
     -webkit-tap-highlight-color: transparent;
   }
-  .d-nudge:hover:not(:disabled) { background: color-mix(in oklch, var(--primary-500) 16%, transparent); }
-  .d-nudge:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
-  .d-nudge:disabled { opacity: 0.55; cursor: default; color: var(--text-tertiary); border-color: var(--border-subtle); background: transparent; }
-
-  /* Today timeline */
-  .d-today { display: flex; flex-direction: column; }
-  .d-today-row {
-    display: grid; grid-template-columns: auto auto 1fr; align-items: center;
-    gap: var(--space-2); padding: var(--space-2) 0;
-    background: none; border: none; text-align: left; cursor: pointer;
-    font-family: inherit; color: inherit;
-    border-bottom: 1px solid var(--border-subtle);
+  .fc-nudge:hover:not(:disabled) { background: var(--surface-hover); }
+  .fc-nudge:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 2px; }
+  .fc-nudge:disabled {
+    cursor: default; color: var(--text-tertiary);
+    border-color: transparent; background: transparent;
   }
-  .d-today-row:last-child { border-bottom: none; }
-  .d-today-row:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
-  .d-today-ts {
+
+  /* ── Today — time, dot, sentence; whitespace between rows ───────────────── */
+  .fc-today { display: flex; flex-direction: column; gap: var(--space-2); }
+  .fc-today-row {
+    display: grid; grid-template-columns: auto auto 1fr; align-items: center;
+    gap: var(--space-3); min-height: 44px;
+    padding: var(--space-1) var(--space-2); margin: 0 calc(-1 * var(--space-2));
+    background: none; border: none; border-radius: var(--radius-md);
+    text-align: left; cursor: pointer;
+    font-family: inherit; color: inherit;
+    transition: background var(--duration-fast) var(--ease-out);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .fc-today-row:hover { background: var(--surface-hover); }
+  .fc-today-row:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 2px; }
+  .fc-today-ts {
     font-size: var(--text-xs); color: var(--text-tertiary);
     font-variant-numeric: tabular-nums; min-width: 4.5ch;
   }
-  .d-today-msg { font-size: var(--text-sm); color: var(--text-secondary); }
+  .fc-event-dot { width: 6px; height: 6px; border-radius: var(--radius-full); flex-shrink: 0; background: var(--primary-500); }
+  .fc-event-offline { background: var(--status-offline); }
+  /* SOS events are the one sanctioned vermilion outside the SOS screens */
+  .fc-event-sos_start { background: var(--danger-500); }
+  .fc-event-sos_end { background: var(--success-500); }
+  .fc-event-contact { background: var(--success-500); }
+  .fc-today-msg { font-size: var(--text-base); line-height: 1.5; color: var(--text-primary); }
 
-  /* Slim text nav (06a footer) */
-  .d-nav { display: flex; flex-wrap: wrap; gap: var(--space-4); padding-top: var(--space-2); }
-  .d-nav-link {
+  /* ── Rhythm hints opt-in toggle (subtle, non-alarmist) ──────────────────── */
+  .fc-rhythm-toggle {
+    display: inline-flex; align-items: center; gap: var(--space-2);
+    align-self: flex-start; min-height: 44px;
+    padding: var(--space-1) var(--space-2); margin-left: calc(-1 * var(--space-2));
+    background: none; border: none; cursor: pointer;
+    font-family: inherit; font-size: var(--text-xs); font-weight: 500;
+    color: var(--text-tertiary);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .fc-rhythm-toggle:hover { color: var(--text-secondary); }
+  .fc-rhythm-toggle:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 2px; border-radius: var(--radius-sm); }
+  .fc-rhythm-dot {
+    width: 8px; height: 8px; border-radius: var(--radius-full);
+    background: var(--outline-variant);
+    transition: background var(--duration-fast) var(--ease-out);
+  }
+  .fc-rhythm-dot.on { background: var(--primary-500); }
+
+  /* ── Slim text nav ──────────────────────────────────────────────────────── */
+  .fc-nav { display: flex; flex-wrap: wrap; gap: var(--space-5); row-gap: 0; }
+  .fc-nav-link {
     position: relative;
     background: none; border: none; padding: var(--space-2) 0; cursor: pointer;
-    font-family: inherit; font-size: var(--text-sm); font-weight: 600;
+    font-family: inherit; font-size: var(--text-base); font-weight: 500;
     color: var(--text-secondary); min-height: 44px;
-  }
-  .d-nav-link:hover { color: var(--text-primary); }
-  .d-nav-link:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; border-radius: var(--radius-sm, 6px); }
-  .d-nav-sos { color: var(--danger-500); }
-
-  /* ── Quick actions ────────────────────────────────────────────────────────── */
-  .d-actions { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--space-2); }
-  .d-act {
-    position: relative; min-height: 64px;
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-1);
-    padding: var(--space-2) var(--space-1);
-    background: var(--glass-bg, rgba(255,255,255,0.03)); border: 1px solid var(--border-default, rgba(255,255,255,0.06));
-    border-radius: var(--radius-md, 12px);
-    color: var(--text-secondary); font-size: 10px; font-weight: 600; cursor: pointer;
-    transition: border-color var(--duration-fast, 150ms) var(--ease-out), background var(--duration-fast, 150ms) var(--ease-out);
     -webkit-tap-highlight-color: transparent;
   }
-  .d-act:hover { border-color: rgba(255,255,255,0.14); background: rgba(255,255,255,0.05); }
-  .d-act:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
-  .act-map { color: var(--primary-400); }
-  .act-activity { color: var(--success-300, #34d399); }
-  .act-replay { color: var(--warning-300, #fbbf24); }
-  .act-sos { color: var(--danger-400); }
-  .act-checkin { color: var(--info-300, #22d3ee); }
-  .act-sos-on { border-color: var(--danger-500-20, rgba(239,68,68,0.25)); animation: sos-b 2s ease-in-out infinite; }
-  @keyframes sos-b { 0%,100% { border-color: rgba(239,68,68,0.15); } 50% { border-color: rgba(239,68,68,0.45); } }
+  .fc-nav-link:hover { color: var(--text-primary); }
+  .fc-nav-link:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 2px; border-radius: var(--radius-sm); }
+  /* Active SOS is the one place this nav may speak vermilion */
+  .fc-nav-sos { color: var(--danger-500); font-weight: 600; }
+  /* First-run "new" dot — a quiet ember fleck beside the label */
+  .fc-new {
+    position: absolute; top: var(--space-2); right: calc(-1 * var(--space-2));
+    width: 6px; height: 6px; border-radius: var(--radius-full);
+    background: var(--primary-500);
+  }
 
-  /* ── Rhythm hints opt-in toggle (subtle, non-alarmist) ────────────────────── */
-  .d-rhythm-toggle {
-    display: inline-flex; align-items: center; gap: var(--space-2);
-    align-self: flex-start; margin-top: var(--space-3); min-height: 32px;
-    padding: var(--space-1) var(--space-2);
-    background: none; border: none; cursor: pointer;
-    font-size: 11px; font-weight: 600; color: var(--text-tertiary);
-    -webkit-tap-highlight-color: transparent;
-  }
-  .d-rhythm-toggle:hover { color: var(--text-secondary); }
-  .d-rhythm-toggle:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; border-radius: var(--radius-sm, 6px); }
-  .d-rhythm-dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: var(--border-strong, rgba(255,255,255,0.22));
-    transition: background var(--duration-fast, 150ms) var(--ease-out), box-shadow var(--duration-fast, 150ms) var(--ease-out);
-  }
-  .d-rhythm-dot.on { background: var(--primary-400); box-shadow: 0 0 6px var(--primary-500-30, rgba(99,102,241,0.5)); }
-  .d-family { display: flex; flex-direction: column; }
-
-  /* ── Recent activity peek ─────────────────────────────────────────────────── */
-  .d-recent { display: flex; flex-direction: column; gap: var(--space-2); }
-  .d-recent-head {
-    display: flex; align-items: center; justify-content: space-between;
-    background: none; border: none; padding: 0; min-height: 24px; cursor: pointer;
-    font-size: var(--text-2xs, 10px); font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.08em; color: var(--text-tertiary);
-    -webkit-tap-highlight-color: transparent;
-  }
-  .d-recent-head:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; border-radius: var(--radius-sm, 6px); }
-  .d-recent-more { color: var(--primary-300, #c4b5fd); font-weight: 600; text-transform: none; letter-spacing: 0; }
-  .d-recent-list { display: flex; flex-direction: column; gap: var(--space-1); }
-  .d-recent-row {
-    display: flex; align-items: center; gap: var(--space-2); min-height: 40px;
-    padding: var(--space-2) var(--space-3);
-    background: var(--glass-bg, rgba(255,255,255,0.03));
-    border: 1px solid var(--border-default, rgba(255,255,255,0.06));
-    border-radius: var(--radius-md, 12px);
-    cursor: pointer; text-align: left; color: inherit; font: inherit;
-    -webkit-tap-highlight-color: transparent;
-    transition: border-color var(--duration-fast, 150ms) var(--ease-out), background var(--duration-fast, 150ms) var(--ease-out);
-  }
-  .d-recent-row:hover { border-color: rgba(255,255,255,0.12); background: rgba(255,255,255,0.05); }
-  .d-recent-row:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
-  .d-recent-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: var(--primary-400); }
-  .d-recent-dot.d-recent-offline { background: var(--text-tertiary); }
-  .d-recent-dot.d-recent-sos_start { background: var(--danger-500); }
-  .d-recent-dot.d-recent-sos_end { background: var(--success-500); }
-  .d-recent-dot.d-recent-contact { background: var(--success-400, #34d399); }
-  .d-recent-msg { flex: 1; min-width: 0; font-size: var(--text-xs, 12px); color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .d-recent-ts { font-size: 10px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; flex-shrink: 0; }
-
-  .d-spacer { height: calc(var(--safe-bottom, 0px) + var(--space-8)); flex-shrink: 0; }
+  .fc-spacer { height: calc(var(--safe-bottom, 0px) + var(--space-8)); flex-shrink: 0; }
 
   @media (prefers-reduced-motion: reduce) {
-    .d-ambient { transition: none !important; }
-    .act-sos-on { animation: none !important; }
-    .d-greet, .d-verdict-slot, .d-pulse-slot, .d-family, .d-invite-slot, .d-week-slot, .d-recent, .d-actions {
-      opacity: 1 !important; transform: none !important; transition: none !important; transition-delay: 0ms !important;
+    .fc, .fc-crest, .fc-section, .fc-nav {
+      opacity: 1 !important; transform: none !important;
+      transition: none !important; transition-delay: 0ms !important;
     }
+    .fc-back:active, .fc-action:active { transform: none; }
   }
 </style>

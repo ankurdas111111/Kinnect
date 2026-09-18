@@ -50,32 +50,42 @@
 {/if}
 
 <style>
-  .invite { display: flex; flex-direction: column; gap: var(--space-2); }
+  /* Family Circle "sanctuary note": a soft paper sheet set apart tonally
+     (paper-on-paper, 20px radius), never a bordered card. Inviting is the
+     product's most important quiet action, so it keeps a whole sheet. */
+  .invite {
+    display: flex; flex-direction: column; gap: var(--space-3);
+    padding: var(--space-4);
+    background: var(--surface-2);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-xs);
+  }
   .invite-row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
   .seat { display: inline-flex; }
-  .seat-init { font-size: 13px; font-weight: 800; color: var(--mc, var(--primary-400)); line-height: 1; user-select: none; }
+  .seat-init { font-size: var(--text-sm); font-weight: 600; color: var(--mc, var(--primary-700)); line-height: 1; user-select: none; }
 
   .ghost-seat {
-    width: 44px; height: 44px; border-radius: 50%;
+    width: 44px; height: 44px; border-radius: var(--radius-full);
     display: flex; align-items: center; justify-content: center;
     background: transparent;
-    border: 1.5px dashed var(--border-strong);
+    border: 1.5px dashed var(--outline-variant);
     color: var(--text-tertiary); cursor: pointer;
-    transition: border-color var(--duration-fast, 150ms) var(--ease-out), color var(--duration-fast, 150ms) var(--ease-out), transform var(--duration-fast, 120ms) var(--ease-out);
+    transition: border-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
     -webkit-tap-highlight-color: transparent;
   }
-  .ghost-seat:hover { border-color: var(--primary-400); color: var(--primary-300); }
+  .ghost-seat:hover { border-color: var(--primary-500); color: var(--primary-700); }
   .ghost-seat:active { transform: scale(0.94); }
-  .ghost-seat:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
+  .ghost-seat:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 2px; }
 
   .invite-cta {
-    align-self: flex-start; min-height: 44px; padding: 0 var(--space-3);
+    align-self: flex-start; min-height: 44px; padding: 0 var(--space-1);
     background: none; border: none; cursor: pointer;
-    color: var(--primary-300); font-size: var(--text-xs, 12px); font-weight: 600;
+    color: var(--primary-700); font-family: var(--font-sans);
+    font-size: var(--text-sm); font-weight: 600;
     -webkit-tap-highlight-color: transparent;
   }
-  .invite-cta:hover { color: var(--primary-200); text-decoration: underline; }
-  .invite-cta:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; border-radius: var(--radius-sm, 6px); }
+  .invite-cta:hover { text-decoration: underline; }
+  .invite-cta:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 2px; border-radius: var(--radius-sm); }
 
   @media (prefers-reduced-motion: reduce) {
     .ghost-seat:active { transform: none; }

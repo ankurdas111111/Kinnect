@@ -34,7 +34,10 @@
        space, and the design leads with the full sentence. `showVerdict` now
        only controls the tappable jump-to-Hub strip for hosts that want it. -->
   <header class="fp-head">
-    <p class="fp-family">{familyName}</p>
+    <p class="fp-family">
+      <span class="fp-dot fp-dot-{$familyVerdict.tone}" aria-hidden="true"></span>
+      {familyName}
+    </p>
     <p class="fp-when">{today} · {nowTime}</p>
     <p class="fp-verdict verdict-voice">{$familyVerdict.sentence}</p>
     {#if $familyVerdict.detail}
@@ -65,15 +68,27 @@
     min-height: 0;
   }
 
-  /* Hearth 02c — the sheet answers first */
+  /* Hearth 02c — the sheet answers first, in the Family Circle crest
+     register: eyebrow label with a tone dot, then the frameless serif
+     verdict, then a plain-language detail line. */
   .fp-head { display: flex; flex-direction: column; gap: 2px; }
   .fp-family {
     margin: 0;
-    font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 700;
-    color: var(--text-primary);
+    display: flex; align-items: center; gap: var(--space-2);
+    font-family: var(--font-sans);
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-secondary);
   }
+  .fp-dot {
+    width: 8px; height: 8px; border-radius: var(--radius-full); flex-shrink: 0;
+  }
+  /* Sage settled · ochre needs-a-look · vermilion SOS only (alert = SOS). */
+  .fp-dot-safe    { background: var(--success-500); }
+  .fp-dot-caution { background: var(--warning-500); }
+  .fp-dot-alert   { background: var(--danger-500); }
   .fp-when {
     margin: 0 0 var(--space-2);
     font-size: var(--text-xs);
@@ -82,14 +97,14 @@
   }
   .fp-verdict {
     margin: 0;
-    font-size: var(--text-xl);
-    line-height: 1.2;
+    font-size: var(--text-2xl);
+    line-height: 1.35;
     color: var(--text-primary);
   }
   .fp-detail {
     margin: var(--space-1) 0 0;
-    font-size: var(--text-sm);
-    line-height: 1.45;
+    font-size: var(--text-base);
+    line-height: 1.5;
     color: var(--text-secondary);
   }
 </style>
