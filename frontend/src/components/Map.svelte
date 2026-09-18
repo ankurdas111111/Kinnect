@@ -516,7 +516,7 @@
           prevNavLng = $myLocation.longitude;
         }
 
-        // Add destination marker (red pin with flag)
+        // Add destination marker (ember pin with flag)
         if (destMarker) destMarker.remove();
         const destEl = createDestMarkerEl();
         destMarker = new maplibregl.Marker({ element: destEl, anchor: 'bottom' })
@@ -739,7 +739,7 @@
           map.getSource(srcId).setData(geojson);
         } else {
           map.addSource(srcId, { type: 'geojson', data: geojson });
-          // NOTE: brand-indigo hex literals mirror --primary-500 / --indigo-400 tokens.
+          // NOTE: ember hex literals mirror --primary-500; MapLibre paint needs literals.
           // MapLibre paint needs literal colors (this file does not read CSS vars at runtime).
           map.addLayer({ id: glowId, type: 'line', source: srcId,
             paint: { 'line-color': '#c65d28', 'line-width': 9, 'line-opacity': 0.24, 'line-blur': 4 } });
@@ -772,12 +772,12 @@
           map.getSource('trail-route').setData(geojson);
         } else {
           map.addSource('trail-route', { type: 'geojson', data: geojson });
-          // NOTE: amber hex literals mirror --warning-500 / --warning-400 tokens.
+          // NOTE: ochre hex literals mirror --warning-500 / --warning-400 tokens.
           // Trail breadcrumb — clearer but calm: a touch wider/more opaque than before.
           map.addLayer({ id: 'trail-glow', type: 'line', source: 'trail-route',
             paint: { 'line-color': '#a17a26', 'line-width': 11, 'line-opacity': 0.20, 'line-blur': 4 } });
           map.addLayer({ id: 'trail-line', type: 'line', source: 'trail-route',
-            paint: { 'line-color': '#b8933c', 'line-width': 3.5, 'line-opacity': 0.9, 'line-dasharray': [2.5, 1.5] },
+            paint: { 'line-color': '#b38b39', 'line-width': 3.5, 'line-opacity': 0.9, 'line-dasharray': [2.5, 1.5] },
             layout: { 'line-cap': 'round', 'line-join': 'round' } });
         }
         // Fit to trail bounds
@@ -936,7 +936,7 @@
     transform: rotate(-45deg);
     background: linear-gradient(135deg, var(--indigo-400), var(--indigo-500));
     border: 2.5px solid #fff8f4;
-    box-shadow: 0 4px 18px rgba(99,102,241,0.55), 0 2px 6px rgba(0,0,0,0.25);
+    box-shadow: 0 4px 18px rgba(198,93,40,0.55), 0 2px 6px rgba(0,0,0,0.25);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -948,7 +948,7 @@
   :global(.pending-pin-stem) {
     width: 2px;
     height: 8px;
-    background: rgba(99,102,241,0.5);
+    background: rgba(198,93,40,0.5);
     border-radius: 0 0 2px 2px;
     margin-top: -1px;
   }
@@ -958,7 +958,7 @@
     width: 48px;
     height: 48px;
     border-radius: 50%;
-    background: rgba(99,102,241,0.2);
+    background: rgba(198,93,40,0.2);
     animation: pending-pin-pulse 1.4s ease-out infinite;
     pointer-events: none;
   }
@@ -1016,7 +1016,7 @@
     display: block;
   }
 
-  /* MERIDIAN: Self-marker — indigo ripple ring */
+  /* Self-marker — ember ripple ring */
   :global(.map-pin.pin-self::after) {
     content: '';
     position: absolute;
@@ -1097,7 +1097,7 @@
     -webkit-backdrop-filter: blur(28px) saturate(1.8);
   }
   :global([data-theme="dark"] .maplibregl-popup-content) {
-    background: rgba(12, 12, 24, 0.94);
+    background: var(--glass-bg-strong);
     color: rgba(255, 255, 255, 0.90);
     box-shadow:
       0 12px 40px rgba(0, 0, 0, 0.55),
@@ -1108,7 +1108,7 @@
     border-top-color: white;
   }
   :global([data-theme="dark"] .maplibregl-popup-tip) {
-    border-top-color: rgba(20, 25, 40, 0.92);
+    border-top-color: var(--glass-bg-strong);
   }
   :global(.maplibregl-popup-close-button) {
     font-size: 18px;
@@ -1161,12 +1161,12 @@
   :global(.pu-feat-checkin){ color: #3d7a8c; }
   :global(.pu-rooms) { margin-top: 8px; font-size: 10px; color: var(--popup-text-label, #8a7268); }
   :global(.pu-actions) { display: flex; gap: 8px; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(0,0,0,0.08); }
-  :global(.pu-chat-btn) { display: inline-flex; align-items: center; gap: 5px; padding: 6px 13px; border-radius: 9px; background: rgba(198,93,40,0.10); border: 1px solid rgba(99,102,241,0.22); color: var(--indigo-500); font-size: 12px; font-weight: 600; cursor: pointer; transition: background 120ms; }
-  :global(.pu-chat-btn:hover) { background: rgba(99,102,241,0.18); }
-  :global(.pu-trail-btn) { display: inline-flex; align-items: center; gap: 5px; padding: 6px 13px; border-radius: 9px; background: rgba(161,122,38,0.10); border: 1px solid rgba(245,158,11,0.22); color: var(--warning-600); font-size: 12px; font-weight: 600; cursor: pointer; transition: background 120ms; }
-  :global(.pu-trail-btn:hover) { background: rgba(245,158,11,0.18); }
-  :global([data-theme="dark"] .pu-trail-btn) { background: rgba(197,164,84,0.10); border-color: rgba(252,211,77,0.22); color: var(--warning-300); }
-  :global([data-theme="dark"] .pu-trail-btn:hover) { background: rgba(252,211,77,0.18); }
+  :global(.pu-chat-btn) { display: inline-flex; align-items: center; gap: 5px; padding: 6px 13px; border-radius: 9px; background: rgba(198,93,40,0.10); border: 1px solid rgba(198,93,40,0.22); color: var(--indigo-500); font-size: 12px; font-weight: 600; cursor: pointer; transition: background 120ms; }
+  :global(.pu-chat-btn:hover) { background: rgba(198,93,40,0.18); }
+  :global(.pu-trail-btn) { display: inline-flex; align-items: center; gap: 5px; padding: 6px 13px; border-radius: 9px; background: rgba(161,122,38,0.10); border: 1px solid rgba(161,122,38,0.22); color: var(--warning-600); font-size: 12px; font-weight: 600; cursor: pointer; transition: background 120ms; }
+  :global(.pu-trail-btn:hover) { background: rgba(161,122,38,0.18); }
+  :global([data-theme="dark"] .pu-trail-btn) { background: rgba(197,164,84,0.10); border-color: rgba(197,164,84,0.22); color: var(--warning-300); }
+  :global([data-theme="dark"] .pu-trail-btn:hover) { background: rgba(197,164,84,0.18); }
 
   /* Fix #1 continued: mobile-specific font size bump for popup text */
   @media (max-width: 480px) {
@@ -1299,7 +1299,7 @@
     position: absolute;
     inset: -8px;
     border-radius: 50%;
-    border: 2px solid var(--user-color, var(--blue-500));
+    border: 2px solid var(--user-color, var(--member-1));
     pointer-events: none;
     animation: marker-pulse-ring 2s ease-out infinite;
   }
@@ -1397,7 +1397,7 @@
     opacity: 0.7;
   }
 
-  /* ── Destination marker (createDestMarkerEl) — red pin during nav ──────── */
+  /* ── Destination marker (createDestMarkerEl) — ember pin during nav ────── */
   :global(.dest-marker) {
     display: flex;
     flex-direction: column;
@@ -1407,7 +1407,7 @@
     width: 36px;
     height: 36px;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--danger-500), var(--danger-600));
+    background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
     color: var(--surface-0);
     border: 3px solid var(--surface-0);
     box-shadow: 0 2px 16px color-mix(in oklch, var(--danger-500) 50%, transparent);

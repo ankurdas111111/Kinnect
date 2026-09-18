@@ -185,10 +185,10 @@ export function createPersonMarker(options = {}) {
   if (isSelf) {
     // Diamond — instantly distinguishable as "me"
     el.innerHTML =
-      `<div style="width:40px;height:40px;border-radius:50%;background:rgba(8,8,20,0.92);border:2.5px solid #818cf8;box-shadow:0 0 0 3px rgba(99,102,241,0.14),0 0 20px rgba(99,102,241,0.28);display:flex;align-items:center;justify-content:center;animation:glow-breathe 2.5s ease-in-out infinite;">`
-      + `<svg width="14" height="18" viewBox="0 0 14 18" fill="none"><path d="M7 0L14 7L7 18L0 7Z" fill="#818cf8"/></svg>`
+      `<div style="width:40px;height:40px;border-radius:50%;background:rgba(41,38,35,0.92);border:2.5px solid #e48552;box-shadow:0 0 0 3px rgba(198,93,40,0.14),0 0 20px rgba(198,93,40,0.28);display:flex;align-items:center;justify-content:center;animation:glow-breathe 2.5s ease-in-out infinite;">`
+      + `<svg width="14" height="18" viewBox="0 0 14 18" fill="none"><path d="M7 0L14 7L7 18L0 7Z" fill="#e48552"/></svg>`
       + `</div>`
-      + `<div style="width:2px;height:7px;background:#818cf8;border-radius:0 0 2px 2px;margin:0 auto;opacity:0.6;" aria-hidden="true"></div>`;
+      + `<div style="width:2px;height:7px;background:#e48552;border-radius:0 0 2px 2px;margin:0 auto;opacity:0.6;" aria-hidden="true"></div>`;
     el.setAttribute('role', 'button');
     el.setAttribute('tabindex', '0');
     el.setAttribute('aria-label', 'You — tap to see your location details');
@@ -244,12 +244,12 @@ export function createPersonMarker(options = {}) {
 
   // Moon badge for quiet hours (top-left corner)
   const moonBadge = quietHoursActive && !isSelf && !isSos
-    ? `<div style="position:absolute;top:-4px;left:-4px;width:14px;height:14px;border-radius:50%;background:rgba(99,102,241,0.85);border:1.5px solid rgba(8,8,20,0.9);display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:8px;" title="Quiet Hours active" aria-hidden="true">🌙</div>`
+    ? `<div style="position:absolute;top:-4px;left:-4px;width:14px;height:14px;border-radius:50%;background:rgba(198,93,40,0.85);border:1.5px solid rgba(8,8,20,0.9);display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:8px;" title="Quiet Hours active" aria-hidden="true">🌙</div>`
     : '';
 
   el.innerHTML =
-    `<div style="width:42px;height:42px;border-radius:50%;background:rgba(8,8,20,0.92);border:${ringBorder};box-shadow:${ringGlow};display:flex;align-items:center;justify-content:center;position:relative;opacity:${opacity};${animation}" aria-hidden="true">`
-    + `<span style="font-family:Inter,sans-serif;font-size:13px;font-weight:800;color:${textColor};text-transform:uppercase;letter-spacing:-0.02em;user-select:none;">${escapeAttr(initials)}</span>`
+    `<div style="width:42px;height:42px;border-radius:50%;background:rgba(41,38,35,0.92);border:${ringBorder};box-shadow:${ringGlow};display:flex;align-items:center;justify-content:center;position:relative;opacity:${opacity};${animation}" aria-hidden="true">`
+    + `<span style="font-family:'Work Sans',system-ui,sans-serif;font-size:13px;font-weight:800;color:${textColor};text-transform:uppercase;letter-spacing:-0.02em;user-select:none;">${escapeAttr(initials)}</span>`
     + sosSvg
     + motionBadge
     + moonBadge

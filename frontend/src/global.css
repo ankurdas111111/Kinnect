@@ -8,17 +8,6 @@
 /* ── Color Tokens (Light) ──────────────────────────────────────────────── */
 :root {
   /* Neutral (Slate) */
-  --gray-50:  #f8fafc;
-  --gray-100: #f1f5f9;
-  --gray-200: #e2e8f0;
-  --gray-300: #cbd5e1;
-  --gray-400: #94a3b8;
-  --gray-500: #64748b;
-  --gray-600: #475569;
-  --gray-700: #334155;
-  --gray-800: #1e293b;
-  --gray-900: #0f172a;
-  --gray-950: #020617;
 
   /* Primary (Kinnect Teal — warm, distinctive, family-coded) */
   --primary-50:  #f0f5ff;
@@ -188,7 +177,6 @@
   /* ── Interactive State Colors ─────────────────────────────────────── */
   --primary-hover: var(--primary-600);
   --primary-active: var(--primary-700);
-  --primary-ghost-hover: color-mix(in oklch, var(--primary-500) 8%, transparent);
 
   /* Surface states */
   --surface-hover: rgba(0, 0, 0, 0.04);
@@ -232,8 +220,6 @@
   --map-chip-shadow:   0 2px 12px rgba(0, 0, 0, 0.10);
 
   /* ── Brand / Semantic ─────────────────────────────────────────── */
-  --brand-sos:         #ef4444;
-  --brand-safe:        #10b981;
   --brand-guardian:    oklch(0.70 0.14 310);
 
   /* ── RGB Triplets (for rgba() fallbacks in components) ───────────── */
@@ -246,24 +232,19 @@
   --popup-text-label:   var(--gray-500);   /* field labels */
 
   /* ── Presence Tokens ──────────────────────────────────────────────── */
-  --ring-live:   0 0 0 3px rgba(16, 185, 129, 0.4);
-  --ring-sos:    0 0 0 4px rgba(239, 68, 68, 0.5);
-  --ring-ghost:  0 0 0 3px rgba(156, 163, 175, 0.3);
 
   /* ── Glow Shadows (MERIDIAN) ───────────────────────────────────────── */
   --glow-primary: 0 0 24px color-mix(in oklch, var(--primary-500) 22%, transparent), 0 0 48px color-mix(in oklch, var(--primary-500) 10%, transparent);
 
   /* ── Presence Vocabulary (MERIDIAN SPATIAL) ────────────────────────── */
-  --presence-now:    #10b981;   /* active this second */
+  --presence-now:   var(--success-500);   /* active this second */
   --presence-recent: var(--primary-500);   /* active < 5 min */
-  --presence-away:   #f59e0b;   /* away 5–30 min */
+  --presence-away:  var(--warning-500);   /* away 5–30 min */
   --presence-gone:   #6b7280;   /* offline */
-  --presence-sos:    #ef4444;   /* emergency */
+  --presence-sos:   var(--danger-500);   /* emergency */
 
   /* ── Accent System ─────────────────────────────────────────────────── */
   --accent-signal:   var(--primary-500);
-  --accent-live:     #10b981;
-  --accent-warm:     #f59e0b;
   --accent-guardian: var(--member-2, oklch(0.55 0.12 320)); /* guardian role rides the member wheel's plum — in-palette, distinct from status colors */
   --accent-link:     var(--primary-300);
 
@@ -298,10 +279,7 @@
 
   /* ── Gradient Utilities ─────────────────────────────────────────────── */
   --gradient-primary:   linear-gradient(135deg, var(--primary-500) 0%, var(--primary-700) 100%);
-  --gradient-live:      linear-gradient(135deg, #10b981 0%, #059669 100%);
   --gradient-guardian:  linear-gradient(135deg, var(--accent-guardian) 0%, var(--violet-600) 100%);
-  --gradient-sos:       linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
-  --gradient-warm:      linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
   --gradient-aurora:    linear-gradient(135deg, var(--primary-500) 0%, var(--member-3) 50%, var(--member-1) 100%);
 
   /* ── Card Enhancement ───────────────────────────────────────────────── */
@@ -385,7 +363,6 @@
   --surface-hover: rgba(255, 255, 255, 0.06);
   --surface-active: rgba(255, 255, 255, 0.1);
   --surface-selected: color-mix(in oklch, var(--primary-500) 10%, transparent);
-  --primary-ghost-hover: color-mix(in oklch, var(--primary-400) 12%, transparent);
 
   --shadow-panel: 8px 0 48px rgba(0, 0, 0, 0.50);
   --shadow-panel-right: -8px 0 48px rgba(0, 0, 0, 0.50);
@@ -438,7 +415,6 @@
   --float-shadow-sm:   0 8px 32px rgba(0,0,0,0.45), 0 4px 12px rgba(0,0,0,0.30);
 
   /* Popup text tokens — inverted for dark map popups */
-  --popup-text-heading: var(--gray-50);
   --popup-text-val:     rgba(255, 255, 255, 0.90);
   --popup-text-label:   rgba(255, 255, 255, 0.50);
 }
@@ -471,7 +447,6 @@
     --surface-hover: rgba(255, 255, 255, 0.06);
     --surface-active: rgba(255, 255, 255, 0.10);
     --surface-selected: color-mix(in oklch, var(--primary-500) 10%, transparent);
-    --primary-ghost-hover: color-mix(in oklch, var(--primary-400) 12%, transparent);
 
     --shadow-panel: 8px 0 48px rgba(0, 0, 0, 0.50);
     --shadow-panel-right: -8px 0 48px rgba(0, 0, 0, 0.50);
@@ -514,7 +489,6 @@
     --shadow-3d-active:  0 1px 6px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.06);
 
     /* Popup text tokens — inverted for dark map popups */
-    --popup-text-heading: var(--gray-50);
     --popup-text-val:     rgba(255, 255, 255, 0.90);
     --popup-text-label:   rgba(255, 255, 255, 0.50);
   }
@@ -930,9 +904,6 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
 .font-display { font-family: var(--font-display); }
 
 /* ── Premium presence ring utilities ─────────────────────────────────── */
-.ring-live     { box-shadow: 0 0 0 var(--ring-width-md, 2.5px) var(--color-live),   0 0 0 calc(var(--ring-width-md, 2.5px) + var(--ring-offset, 2px)) rgba(0,0,0,0.6); }
-.ring-sos      { box-shadow: 0 0 0 var(--ring-width-md, 2.5px) var(--danger-500),   0 0 0 calc(var(--ring-width-md, 2.5px) + var(--ring-offset, 2px)) rgba(0,0,0,0.6); }
-.ring-guardian { box-shadow: 0 0 0 var(--ring-width-md, 2.5px) var(--accent-guardian), 0 0 0 calc(var(--ring-width-md, 2.5px) + var(--ring-offset, 2px)) rgba(0,0,0,0.6); }
 .ring-offline  { box-shadow: 0 0 0 2px rgba(107, 114, 128, 0.35); }
 
 /* Value flash on update */
@@ -996,9 +967,6 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
 .card-accented {
   border-left: 3px solid var(--primary-500);
   padding-left: calc(var(--space-4) - 3px);
-}
-.card-live {
-  border-left: 3px solid var(--color-live);
 }
 .card-warning {
   border-left: 3px solid var(--warning-500);
@@ -1097,7 +1065,7 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
 /* Primary */
 .btn-primary {
   color: var(--text-on-primary);
-  background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-700) 100%);
+  background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-600) 100%);
   box-shadow:
     var(--shadow-primary),
     inset 0 1px 0 rgba(255, 255, 255, 0.20),
@@ -1661,24 +1629,8 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
   border-top-color: color-mix(in oklch, var(--primary-500) 45%, transparent);
 }
 
-.card-glow-live {
-  box-shadow: var(--shadow-md), var(--glow-live);
-  border-color: var(--border-glow-live);
-  border-top-color: rgba(16, 185, 129, 0.40);
-}
 
-.card-glow-sos {
-  box-shadow: var(--shadow-md), var(--glow-sos);
-  border-color: var(--border-glow-sos);
-  border-top-color: rgba(239, 68, 68, 0.55);
-  animation: sos-urgent-pulse 2s ease-in-out infinite;
-}
 
-.card-glow-link {
-  box-shadow: var(--shadow-md), var(--glow-link);
-  border-color: rgba(6, 182, 212, 0.22);
-  border-top-color: rgba(6, 182, 212, 0.40);
-}
 
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1698,7 +1650,7 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
 /* Bold section title — more dramatic than default */
 .section-title-bold {
   font-size: var(--text-xl);
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--text-primary);
   line-height: 1.1;
@@ -1707,7 +1659,7 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
 /* Hero metric value — large tabular numbers */
 .hero-value {
   font-size: var(--text-3xl);
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: -0.03em;
   color: var(--text-primary);
   line-height: 1;
@@ -1772,7 +1724,7 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
 /* Presence breathing — live user rings */
 @keyframes presence-breathe {
   0%, 100% {
-    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.28),
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--success-500) 28%, transparent),
                 0 0 12px rgba(16, 185, 129, 0.14);
   }
   50% {
@@ -1784,7 +1736,7 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
 /* Track button live glow pulse */
 @keyframes live-glow-pulse {
   0%, 100% {
-    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18), var(--glow-live);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--success-500) 18%, transparent), var(--glow-live);
   }
   50% {
     box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.08), var(--glow-live);
@@ -1800,7 +1752,7 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
 /* Navbar logo pulse on tracking start */
 @keyframes logo-celebrate {
   0%   { transform: scale(1);    box-shadow: var(--glow-primary); }
-  40%  { transform: scale(1.12); box-shadow: var(--glow-primary), 0 0 32px rgba(99,102,241,0.45); }
+  40%  { transform: scale(1.12); box-shadow: var(--glow-primary), 0 0 32px color-mix(in oklch, var(--primary-500) 45%, transparent); }
   100% { transform: scale(1);    box-shadow: var(--glow-primary); }
 }
 
@@ -1851,7 +1803,7 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
     box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.20), 0 0 10px rgba(16, 185, 129, 0.14);
   }
   50% {
-    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.10), 0 0 20px rgba(16, 185, 129, 0.28);
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.10), 0 0 20px color-mix(in oklch, var(--success-500) 28%, transparent);
   }
 }
 .animate-live-badge {
@@ -1930,7 +1882,7 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
   align-items: center;
   justify-content: center;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: -0.02em;
   color: white;
@@ -2123,7 +2075,7 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
   flex-shrink: 0;
   color: var(--primary-400);
   font-size: var(--text-base);
-  font-weight: 800;
+  font-weight: 700;
   text-transform: uppercase;
 }
 .room-card-meta {
@@ -2185,7 +2137,7 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
   background: color-mix(in oklch, var(--primary-500) 14%, transparent);
   color: var(--primary-400);
   font-size: 8px;
-  font-weight: 800;
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2212,7 +2164,7 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 800;
+  font-weight: 700;
   font-size: var(--text-sm);
   color: var(--primary-400);
   flex-shrink: 0;
@@ -2293,7 +2245,7 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
   transition: background 150ms var(--ease-out), color 150ms var(--ease-out);
 }
 .spatial-subtab.active {
-  background: linear-gradient(135deg, var(--primary-500), var(--primary-700));
+  background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
   color: var(--text-on-primary, #fff);
   /* 3D raised active subtab */
   box-shadow:

@@ -23,7 +23,7 @@
 const WHEEL_SIZE = 4;
 
 const MEMBER_HEX = ['#00a7ba', '#009bdd', '#9e77dc', '#b76ec7']; // raw-color-ok — canvas-safe hex twins; keep in sync with tokens-oklch.css
-export const CANVAS_DANGER = '#ea3c3f'; // raw-color-ok — hex twin of dark --danger-500 for canvas SOS pins
+export const CANVAS_DANGER = '#d4381b'; // raw-color-ok — hex twin of dark --danger-500 for canvas SOS pins
 
 /** Deterministic wheel slot (0-based) from a userId string. */
 function memberIndex(userId) {

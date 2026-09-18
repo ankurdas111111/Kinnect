@@ -172,7 +172,7 @@
   .sos-hold-mark {
     font-family: var(--font-display);
     font-size: var(--text-xs);
-    font-weight: 800;
+    font-weight: 700;
     letter-spacing: 0.18em;
     opacity: 0.9;
   }

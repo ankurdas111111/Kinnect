@@ -309,7 +309,7 @@
     border: 1px solid color-mix(in oklch, var(--danger-500) 40%, transparent);
     color: var(--sf-danger-ink);
     font-size: var(--text-2xs);
-    font-weight: 800;
+    font-weight: 700;
     letter-spacing: 0.03em;
     font-variant-numeric: tabular-nums;
   }
@@ -329,7 +329,7 @@
   .sf-tag {
     flex-shrink: 0;
     font-size: var(--text-2xs);
-    font-weight: 800;
+    font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--text-on-danger);
@@ -388,7 +388,7 @@
   }
   .sf-bt-value {
     font-size: var(--text-3xl);
-    font-weight: 800;
+    font-weight: 700;
     color: var(--sf-danger-ink);
     letter-spacing: -0.04em;
     line-height: 1;

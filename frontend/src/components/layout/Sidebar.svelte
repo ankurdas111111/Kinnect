@@ -239,7 +239,7 @@
     display: inline-flex; align-items: center; justify-content: center;
     background: var(--primary-500); color: var(--text-on-primary);
     border-radius: var(--radius-full, 999px);
-    font-size: 9px; font-weight: 800; line-height: 1;
+    font-size: 9px; font-weight: 700; line-height: 1;
     font-variant-numeric: tabular-nums;
   }
 

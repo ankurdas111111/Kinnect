@@ -7,7 +7,7 @@
    canvas so the family are the only colour on it.
 
    HOW THIS WORKS — READ BEFORE EDITING
-   This file does not restyle components. 115 of 157 frontend files already
+   This file does not restyle components. Most frontend files already
    read the semantic tokens (--text-*, --surface-*, --primary-*, …), so
    Hearth is expressed by REMAPPING those tokens to the design's palette.
    Every component follows for free; component CSS stays untouched.
@@ -41,7 +41,6 @@
   --hairline: oklch(0.325 0.011 67 / 0.12);
   --outline-variant: #ddc1b5;
   --ember:   #c65d28;
-  --ember-light: #f6dfd2;
   --sage:    #477c5d;
   --ochre:   #a17a26;
   --vermilion: #d4381b;
@@ -115,10 +114,18 @@
   --border-subtle:  oklch(0.325 0.011 67 / 0.07);
   --border-strong:  var(--outline-variant);
 
-  /* ── Glass → paper. Hearth has sheets, not glass; keep the token so the
-     39 files reading --glass-* keep working, but resolve it to card. ──── */
+  /* ── Glass → paper. Hearth has sheets, not glass; keep the tokens so
+     components reading --glass-* keep working, resolved to paper. ────── */
   --glass-bg: oklch(1 0 0 / 0.92);
+  --glass-bg-strong: oklch(1 0 0 / 0.95);
   --glass-border: var(--hairline);
+  --glass-border-strong: oklch(0.325 0.011 67 / 0.16);
+  --glass-3d: oklch(1 0 0 / 0.85);
+  --glass-3d-border: var(--hairline);
+  --nav-specular: oklch(1 0 0 / 0.55);
+  --border-highlight: oklch(0.325 0.011 67 / 0.10);
+  --map-chip-bg: oklch(1 0 0 / 0.88);
+  --map-chip-border: oklch(0.325 0.011 67 / 0.10);
 
   /* ── Warm elevation (overrides the neutral-black ramp) ──────────────── */
   --shadow-xs: 0 1px  2px oklch(0.3 0.03 60 / 0.05);
@@ -196,11 +203,9 @@
   --hairline: oklch(0.962 0.007 81 / 0.12);
   --outline-variant: oklch(0.962 0.007 81 / 0.20);
   --ember:   #e48552;
-  --ember-light: oklch(0.35 0.045 48);
   --sage:    oklch(0.65 0.08 157);
   --ochre:   oklch(0.70 0.11 82.5);
   --vermilion: #ff5c3b;
-  --lp-quiet: oklch(0.44 0.010 67);
 
   /* Night map canvas tokens (anchored to the #292623 canvas, warm hue 67) */
   --map-base:   oklch(0.30 0.010 67);
@@ -220,7 +225,10 @@
   --primary-400: oklch(0.67 0.125 48);
   --primary-500: #e48552;
   --primary-600: oklch(0.75 0.135 48);
-  --primary-700: oklch(0.60 0.13  48);
+  /* 700 is the AA small-text step app-wide; at night it must LIGHTEN
+     (5.8:1 on the #292623 canvas), so 600/700 invert direction here —
+     600 is the hover lift, 700 the readable text step. */
+  --primary-700: oklch(0.72 0.13  48);
   --primary-800: oklch(0.52 0.12  48);
   --primary-900: oklch(0.45 0.10  48);
 
@@ -242,8 +250,6 @@
   --danger-700: oklch(0.52 0.17  33);
 
   /* ── Surfaces ────────────────────────────────────────────────────────── */
-  --surface-0: var(--paper);
-  --surface-1: var(--card);
   --surface-2: oklch(0.335 0.010 67);
   --surface-3: oklch(0.295 0.008 67);
   --surface-inset: oklch(0.245 0.008 67);
@@ -251,12 +257,8 @@
   --surface-active: oklch(0.962 0.007 81 / 0.11);
   --surface-selected: color-mix(in oklch, var(--primary-500) 14%, transparent);
   --surface-midnight: oklch(0.245 0.008 67);
-  --primary-ghost-hover: color-mix(in oklch, var(--primary-500) 12%, transparent);
 
   /* ── Ink ─────────────────────────────────────────────────────────────── */
-  --text-primary:   var(--ink);
-  --text-secondary: var(--ink-2);
-  --text-tertiary:  var(--ink-3);
   /* Consumers use --text-inverse ON colored/dark surfaces (SOS banner, toggle
      thumbs) — it stays light at night; flipping it dark would break them. */
   --text-inverse:   oklch(0.99 0.004 80);
@@ -280,7 +282,8 @@
   --map-chip-bg:         oklch(0.30 0.008 67 / 0.88);
   --map-chip-border:     oklch(0.962 0.007 81 / 0.10);
 
-  /* ── Warm-black elevation ────────────────────────────────────────────── */
+  /* ── Night elevation — neutral black, deliberately: it reads cleaner on
+     the warm charcoal than a tinted shadow would. ─────────────────────── */
   --shadow-xs: 0 1px  3px oklch(0 0 0 / 0.35);
   --shadow-sm: 0 2px  8px oklch(0 0 0 / 0.40);
   --shadow-md: 0 4px 14px oklch(0 0 0 / 0.45);
@@ -290,8 +293,6 @@
   --shadow-danger:  0 6px 24px oklch(0.687 0.204 33 / 0.40);
 
   /* ── Status ladder ───────────────────────────────────────────────────── */
-  --status-live:    var(--sage);
-  --status-stale:   var(--ochre);
   --status-offline: oklch(0.55 0.01 60);
   --status-sos:     var(--vermilion);
 
@@ -332,7 +333,9 @@
      in-system hue near the old cyan fallbacks. */
   --info-300: var(--member-3-halo);
   --info-400: var(--member-3);
-  --cyan-500: var(--member-3);
+  --cyan-400: #3d7a8c;   /* the check-in teal Map's popup family uses */
+  --violet-300: var(--member-2-halo);
+  --violet-600: var(--member-2);
 
   --surface-base:      var(--surface-0);
   --surface-primary:   var(--surface-1);
@@ -346,7 +349,6 @@
   --danger-800:     oklch(0.35 0.15 27);
   --danger-500-10:  color-mix(in oklch, var(--danger-500) 10%, transparent);
   --success-500-08: color-mix(in oklch, var(--success-500)  8%, transparent);
-  --success-500-20: color-mix(in oklch, var(--success-500) 20%, transparent);
   --success-500-28: color-mix(in oklch, var(--success-500) 28%, transparent);
   --success-500-30: color-mix(in oklch, var(--success-500) 30%, transparent);
   --warning-500-08: color-mix(in oklch, var(--warning-500)  8%, transparent);
@@ -375,24 +377,13 @@
      re-pinned from the VIGIL emerald/cool-red/cyan values to the Hearth hues.
      This :root loads after global.css, so it wins over the stale definitions
      in both the light root and global.css's bare [data-theme="dark"] block. */
-  --color-live: var(--success-500);
-  --color-rec:  var(--danger-500);
   --glow-live:    0 0 20px color-mix(in oklch, var(--success-500) 28%, transparent), 0 0 40px color-mix(in oklch, var(--success-500) 12%, transparent);
-  --glow-live-sm: 0 0 10px color-mix(in oklch, var(--success-500) 30%, transparent);
-  --glow-live-lg: 0 0 28px color-mix(in oklch, var(--success-500) 40%, transparent), 0 0 56px color-mix(in oklch, var(--success-500) 18%, transparent);
   --glow-sos:     0 0 28px color-mix(in oklch, var(--danger-500) 45%, transparent), 0 0 72px color-mix(in oklch, var(--danger-500) 22%, transparent);
   --glow-sos-sm:  0 0 12px color-mix(in oklch, var(--danger-500) 40%, transparent);
-  --glow-sos-lg:  0 0 32px color-mix(in oklch, var(--danger-500) 55%, transparent), 0 0 80px color-mix(in oklch, var(--danger-500) 28%, transparent);
-  --border-glow-live: color-mix(in oklch, var(--success-500) 28%, transparent);
-  --border-glow-sos:  color-mix(in oklch, var(--danger-500) 42%, transparent);
-  --glow-link: 0 0 24px color-mix(in oklch, var(--member-3) 32%, transparent);
   --skeleton-base:      color-mix(in oklch, var(--text-primary) 7%, transparent);
   --skeleton-highlight: color-mix(in oklch, var(--text-primary) 13%, transparent);
-  /* Light theme never defined --surface-active — consumers fell to transparent. */
+  /* Re-pinned off global.css's pure-black rgba onto warm ink. */
   --surface-active: oklch(0.325 0.011 67 / 0.09);
-  /* WhatsApp brand green retired from the palette; stragglers render ember. */
-  --whatsapp-green: var(--primary-500);
-  --whatsapp-dark:  var(--primary-600);
 
   --font-body: var(--font-sans);
   --dur-fast:   var(--duration-fast);
@@ -403,8 +394,8 @@
   /* Below navbar (2000) so sheets/nav stack over the FAB. */
   --z-fab: 1500;
 
-  /* Map popup ink — the dark block owns night values; light was undefined,
-     which dimmed the SOS confirm headline. */
+  /* Map popup ink — re-pinned onto Hearth ink (global.css's copies are
+     shadowed; this file loads later). */
   --popup-text-heading: var(--ink);
   --popup-text-val:     var(--ink);
   --popup-text-label:   var(--ink-3);

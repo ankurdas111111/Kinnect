@@ -8,15 +8,12 @@
   import MainApp from './pages/MainApp.svelte';
   import Toast from './components/primitives/Toast.svelte';
 
-  // Heavy pages are lazy-loaded so the initial bundle only contains
-  // what is needed for Login, Register, and the main app shell.
+  // Login and MainApp are eager (hot path); every other route lazy-loads.
   const routes = {
     '/': MainApp,
     '/landing': wrap({ asyncComponent: () => import('./pages/Landing.svelte') }),
     '/dashboard': wrap({ asyncComponent: () => import('./pages/FamilyDashboard.svelte') }),
     '/login': Login,
-    // Register grew into a 3-step wizard under Hearth; lazy like the other
-    // heavy pages so the entry ratchet holds. Login stays eager (hot path).
     '/register': wrap({ asyncComponent: () => import('./pages/Register.svelte') }),
     '/monitoring': wrap({ asyncComponent: () => import('./pages/Monitoring.svelte') }),
     '/emergency': wrap({ asyncComponent: () => import('./pages/EmergencyProfile.svelte') }),
@@ -50,18 +47,15 @@
     window.location.hash = '#/login';
   }
 
-  // TECHNIQUE 15: View Transitions API — wrap hash-based SPA navigation so route
+  // View Transitions API — wrap hash-based SPA navigation so route
   // changes feel native. Progressive enhancement: falls back to instant replace on
   // unsupported browsers (Firefox, older Safari). Only fires for hash changes that
   // are actual navigations, not anchor scrolls.
   // We intercept clicks on <a href="#/..."> links at the document level so we catch
   // both Router-managed links and any manual window.location.hash assignments that
   // go through anchor clicks.
+  // Callers sit behind the onMount support guard below, so no fallback here.
   function wrapWithViewTransition(fn) {
-    if (!document.startViewTransition) {
-      fn();
-      return;
-    }
     document.startViewTransition(fn);
   }
 
@@ -112,7 +106,7 @@
     min-height: 44px;
     display: inline-flex;
     align-items: center;
-    background: var(--primary-500, #14b8a6);
+    background: var(--primary-500);
     color: var(--text-on-primary, #ffffff);
     font-family: var(--font-display, system-ui, sans-serif);
     font-size: var(--text-sm, 13px);
@@ -126,7 +120,7 @@
       transform 180ms var(--ease-out, cubic-bezier(0.4, 0, 0.2, 1)),
       opacity 180ms var(--ease-out, cubic-bezier(0.4, 0, 0.2, 1));
     pointer-events: none;
-    box-shadow: 0 4px 16px rgba(20, 184, 166, 0.45);
+    box-shadow: var(--shadow-primary);
   }
 
   .skip-nav:focus {
