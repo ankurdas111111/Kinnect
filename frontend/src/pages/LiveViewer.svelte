@@ -292,7 +292,7 @@
     {#if linkDead}
       <div class="overlay">
         <div class="dead-link-card">
-          <h2 class="dead-link-title">{deadKind === 'ended' ? 'This link has ended' : "We can't reach this link"}</h2>
+          <h2 class="dead-link-title verdict-voice">{deadKind === 'ended' ? 'This link has ended.' : "We can't reach this link."}</h2>
           <p class="dead-link-body">{deadKind === 'ended'
             ? 'Live links stop working when sharing ends or the link expires. Ask for a fresh link if you still need it.'
             : 'It may have ended, or the connection may be down. Try again in a moment, or ask for a fresh link.'}</p>
@@ -302,9 +302,9 @@
     {:else if expired}
       <div class="overlay">
         <div class="card expired-card">
-          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--danger-500)" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-          <h2>Link Expired</h2>
-          <p class="text-sm text-muted">This live share link is no longer active.</p>
+          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--warning-600)" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <h2 class="verdict-voice">This link has expired.</h2>
+          <p class="expired-body">Live links stop on their own when sharing ends. Ask for a fresh link if you still need it.</p>
           <a href="/#/login" class="btn btn-primary" style="margin-top:var(--space-4);">Open Kinnect</a>
           <p class="text-sm text-muted" style="margin-top:var(--space-2);">Don't have an account? <a href="/#/register">Create one</a></p>
         </div>
@@ -384,7 +384,7 @@
     position: absolute;
     inset: 0;
     z-index: 100;
-    background: rgba(0, 0, 0, 0.5); /* raw-color-ok: modal scrim, no scrim token exists yet */
+    background: color-mix(in oklch, var(--ink) 40%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -411,6 +411,7 @@
     box-shadow: var(--shadow-primary);
   }
 
+  /* Expired link is routine, never an emergency — ink verdict, no red. */
   .expired-card {
     max-width: 360px;
     width: 100%;
@@ -419,8 +420,16 @@
   }
 
   .expired-card h2 {
-    color: var(--danger-500);
-    margin-top: var(--space-3);
+    color: var(--text-primary);
+    font-size: var(--text-2xl);
+    margin: var(--space-3) 0 0;
+  }
+
+  .expired-body {
+    margin: var(--space-2) 0 0;
+    font-size: var(--text-base);
+    color: var(--text-secondary);
+    line-height: var(--leading-relaxed);
   }
 
   /* Terminal state — invalid/expired token (liveError). Routine, not an
@@ -442,8 +451,7 @@
 
   .dead-link-title {
     margin: 0;
-    font-family: var(--font-display);
-    font-weight: 700;
+    font-size: var(--text-2xl);
     color: var(--text-primary);
   }
 
@@ -469,8 +477,9 @@
     font-size: var(--text-xs);
     opacity: 0.55;
   }
+  /* Overdue check-in needs a look — ochre, not the SOS red */
   .glass-checkin.overdue {
-    color: var(--danger-400);
+    color: var(--warning-600);
     opacity: 1;
     font-weight: 600;
   }
@@ -487,8 +496,10 @@
     animation: slide-up-in 340ms var(--ease-out) both;
   }
 
+  /* SOS is the one place vermilion is allowed — but the banner sits on a
+     paper card, so the copy is ink and only the SOS cues carry red. */
   .sos-banner {
-    color: var(--text-inverse, white);
+    color: var(--text-primary);
     padding: var(--space-3) var(--space-4);
     display: flex;
     align-items: center;
@@ -515,7 +526,7 @@
 
   .sos-icon {
     flex-shrink: 0;
-    color: var(--danger-400);
+    color: var(--danger-600);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -526,11 +537,11 @@
   }
   .sos-content { flex: 1; min-width: 0; }
   .sos-eyebrow {
-    font-size: 10px;
-    font-weight: 800;
+    font-size: var(--text-2xs);
+    font-weight: 700;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: var(--danger-400);
+    color: var(--danger-600);
     margin-bottom: 2px;
   }
   .sos-text {
@@ -548,21 +559,31 @@
     min-height: 44px;
   }
 
+  /* "Powered by Kinnect" — the visible, non-blocking path into the product.
+     A quiet paper chip so it reads on the warm map in both themes. */
   .live-brand {
     position: absolute;
     bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
     left: 50%;
     transform: translateX(-50%);
     z-index: 50;
-    font-size: 10px;
-    color: color-mix(in oklch, var(--text-inverse, white) 35%, transparent);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: color-mix(in oklch, var(--surface-1) 85%, transparent);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-full);
+    padding: var(--space-1-5) var(--space-3);
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
     text-decoration: none;
-    letter-spacing: 0.06em;
-    opacity: 1;
-    transition: color 0.15s;
+    letter-spacing: 0.04em;
+    transition: color var(--duration-normal) var(--ease-out);
     white-space: nowrap;
   }
-  .live-brand:hover { color: color-mix(in oklch, var(--text-inverse, white) 65%, transparent); }
+  .live-brand:hover { color: var(--text-primary); }
+  .live-brand:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
 
   /* Name card recording header */
   .live-header {
@@ -608,14 +629,14 @@
   }
   .gate-headline {
     margin: var(--space-3) 0 var(--space-2);
-    font-size: var(--text-xl);
-    line-height: 1.25;
+    font-size: var(--text-2xl);
+    line-height: var(--leading-tight);
     color: var(--text-primary);
   }
   .gate-sub {
     margin: 0 0 var(--space-5);
-    font-size: var(--text-sm);
-    line-height: 1.55;
+    font-size: var(--text-base);
+    line-height: var(--leading-relaxed);
     color: var(--text-secondary);
   }
   .gate-label {
@@ -634,33 +655,22 @@
 
   /* ── Member popup ────────────────────────────────────────────────────────
      The viewer previously shipped MapLibre's default white bubble, which read
-     as unbranded on the app's most public surface. Same treatment as the
-     in-app map popup (Map.svelte) so a shared link looks like Kinnect. */
+     as unbranded on the app's most public surface. Warm paper sheet, ink type;
+     the theme tokens carry both day and night — no per-theme overrides. */
   :global(.maplibregl-popup-content) {
-    background: rgba(255, 255, 255, 0.96);
-    color: #1e293b;
-    border-radius: var(--radius-xl, 20px);
-    padding: 14px 16px;
-    font-family: var(--font-sans, system-ui, sans-serif);
-    box-shadow:
-      0 12px 40px rgba(0, 0, 0, 0.22),
-      0 0 0 1px rgba(0, 0, 0, 0.06),
-      inset 0 1px 0 rgba(255, 255, 255, 0.70);
-    backdrop-filter: blur(28px) saturate(1.8);
-    -webkit-backdrop-filter: blur(28px) saturate(1.8);
+    background: var(--glass-bg);
+    color: var(--text-primary);
+    border-radius: var(--radius-lg);
+    padding: var(--space-3-5) var(--space-4);
+    font-family: var(--font-sans);
+    border: 1px solid var(--border-subtle);
+    box-shadow: var(--shadow-lg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
   }
-  :global([data-theme="dark"] .maplibregl-popup-content) {
-    background: var(--glass-bg-strong, rgba(12, 12, 24, 0.94));
-    color: rgba(255, 255, 255, 0.90);
-    box-shadow:
-      0 12px 40px rgba(0, 0, 0, 0.55),
-      0 0 0 1px rgba(255, 255, 255, 0.08),
-      inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  }
-  :global(.maplibregl-popup-tip) { border-top-color: rgba(255, 255, 255, 0.96); }
-  :global([data-theme="dark"] .maplibregl-popup-tip) { border-top-color: var(--glass-bg-strong, rgba(20, 25, 40, 0.92)); }
+  :global(.maplibregl-popup-tip) { border-top-color: var(--glass-bg); }
   :global(.maplibregl-popup-close-button) {
-    color: var(--text-tertiary, rgba(255, 255, 255, 0.5));
+    color: var(--text-tertiary);
     font-size: 18px;
     padding: 2px 8px;
     background: none;
@@ -669,35 +679,34 @@
 
   :global(.lv-pu) { min-width: 168px; }
   :global(.lv-pu-name) {
-    font-family: var(--font-display, system-ui, sans-serif);
-    font-size: 14px;
-    font-weight: 700;
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    font-weight: 600;
     letter-spacing: -0.01em;
-    margin-bottom: 8px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.09);
-  }
-  :global(.maplibregl-popup-content:not([data-theme="dark"] *) .lv-pu-name) {
-    border-bottom-color: rgba(0, 0, 0, 0.08);
+    margin-bottom: var(--space-2);
+    padding-bottom: var(--space-2);
+    border-bottom: 1px solid var(--border-subtle);
   }
   :global(.lv-pu-row) {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
     gap: var(--space-4, 16px);
-    font-size: 12px;
+    font-size: var(--text-xs);
     line-height: 1.9;
+    color: var(--text-secondary);
   }
   :global(.lv-pu-label) {
-    font-size: 10px;
+    font-size: var(--text-2xs);
     font-weight: 600;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    opacity: 0.55;
+    color: var(--text-tertiary);
   }
   :global(.lv-pu-value) {
-    font-family: var(--font-mono, ui-monospace, monospace);
+    font-family: var(--font-sans);
     font-weight: 600;
     font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
   }
 </style>

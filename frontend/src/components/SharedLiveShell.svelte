@@ -8,7 +8,8 @@
    *   • glass bottom-card chrome (glass tier tokens, --glass-shadow) with a
    *     StatusBadge (replaces both bespoke .status-badge / .watch-status-badge
    *     CSS blocks) + SignalBars freshness chip
-   *   • temporal-decay expiry strip (scaleX depletion, green→amber→red crossfade)
+   *   • temporal-decay expiry strip (scaleX depletion, sage→ochre crossfade;
+   *     vermilion is SOS-only, so even "critical" stays ochre)
    *
    * connState is derived by the PARENT via lib/presence.js deriveConnState() and
    * passed in — the shell never re-derives it (single source of truth).
@@ -91,9 +92,9 @@
   let mapContainer = $state();
   let map = null;
 
-  // Temporal-decay color: green while healthy, amber under 25%, red under 10%.
-  // A matching data-attribute drives text/opacity too, so state is never carried
-  // by hue alone.
+  // Temporal-decay color: sage while healthy, ochre under 25%, deep ochre
+  // under 10%. A matching data-attribute drives text/opacity too, so state is
+  // never carried by hue alone.
   let expiryStage = $derived(
     expiryPercent == null ? 'ok'
       : expiryPercent <= 10 ? 'critical'
@@ -303,11 +304,13 @@
       transform 1s linear,
       background var(--duration-slower, 500ms) var(--ease-out);
   }
+  /* Ochre carries the deadline all the way down — vermilion stays
+     reserved for SOS, and an expiring link is not an emergency. */
   .shell-expiry[data-stage='low'] .shell-expiry-fill {
     background: var(--warning-500);
   }
   .shell-expiry[data-stage='critical'] .shell-expiry-fill {
-    background: var(--status-sos);
+    background: var(--warning-700);
   }
 
   @media (max-width: 767px) {

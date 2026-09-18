@@ -822,23 +822,24 @@
 
 <style>
   /* ─────────────────────────────────────────────────────────────
-     Chat-specific design tokens — teal system
+     Chat token bridge — Hearth warm paper.
      Defined on .scp-backdrop so they cascade into all child
      components (SecretChatGate, SecretChatMessage, SecretChatCompose).
      ───────────────────────────────────────────────────────────── */
   .scp-backdrop {
-    --chat-accent:        var(--primary-500, var(--primary-500));
+    --chat-accent:        var(--primary-500);
     --chat-accent-dim:    color-mix(in oklch, var(--primary-500) 18%, transparent);
     --chat-accent-subtle: color-mix(in oklch, var(--primary-500) 8%, transparent);
     --chat-accent-glow:   color-mix(in oklch, var(--primary-500) 28%, transparent);
-    --chat-bg:            #060610;
-    --chat-surface:       #0a0a18;
-    --chat-elevated:      #0f0f20;
-    --chat-border:        rgba(255, 255, 255, 0.07);
+    --chat-bg:            var(--surface-1);
+    --chat-surface:       var(--surface-2);
+    --chat-elevated:      var(--surface-1);
+    --chat-border:        var(--border-subtle);
     --chat-border-accent: color-mix(in oklch, var(--primary-500) 22%, transparent);
   }
 
-  /* ── Panic effects ──────────────────────────────────────────── */
+  /* ── Panic effects — a quick ink wipe to black; no red flash
+     (vermilion is SOS-only, and hiding a screen is not an SOS) ── */
   .scp-glitch {
     position: fixed;
     inset: 0;
@@ -849,20 +850,15 @@
 
   @keyframes scp-glitch {
     0%   { background: transparent; clip-path: inset(0 0 100% 0); }
-    10%  { background: color-mix(in oklch, var(--primary-500) 30%, transparent); clip-path: inset(10% 0 60% 0); transform: translateX(4px); }
-    20%  { background: color-mix(in oklch, var(--danger-400) 20%, transparent); clip-path: inset(40% 0 20% 0); transform: translateX(-3px); }
-    30%  { background: rgba(255,255,255,0.15); clip-path: inset(60% 0 10% 0); transform: translateX(5px); }
-    40%  { background: color-mix(in oklch, var(--primary-500) 20%, transparent); clip-path: inset(0 0 80% 0); transform: translateX(-2px); }
-    50%  { background: rgba(0,0,0,0.9); clip-path: inset(0 0 0 0); transform: translateX(0); }
-    60%  { background: rgba(0,0,0,0.95); clip-path: inset(0 0 0 0); }
-    80%  { background: rgba(0,0,0,0.98); }
-    100% { background: #000; }
+    25%  { background: color-mix(in oklch, var(--ink) 40%, transparent); clip-path: inset(30% 0 40% 0); }
+    50%  { background: color-mix(in oklch, var(--ink) 80%, transparent); clip-path: inset(0 0 0 0); }
+    100% { background: #000; /* raw-color-ok: panic blank must read as a powered-off screen */ }
   }
 
   .scp-panic {
     position: fixed;
     inset: 0;
-    background: #000;
+    background: #000; /* raw-color-ok: panic blank must read as a powered-off screen in both themes */
     z-index: var(--z-topmost, 9000);
     cursor: default;
     animation: scp-panic-on 0.15s var(--ease-out) both;
@@ -873,12 +869,12 @@
     to   { opacity: 1; }
   }
 
-  /* ── Backdrop overlay ───────────────────────────────────────── */
+  /* ── Backdrop overlay — warm ink scrim ──────────────────────── */
   .scp-backdrop {
     position: fixed;
     inset: 0;
     z-index: var(--z-modal, 5000);
-    background: rgba(0, 0, 0, 0.65);
+    background: color-mix(in oklch, var(--ink) 45%, transparent);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     display: flex;
@@ -906,8 +902,8 @@
     display: flex;
     flex-direction: column;
     background: var(--chat-bg);
-    border: 1px solid var(--chat-border-accent);
-    border-radius: var(--radius-xl, 20px);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-card);
     /*
      * overflow:clip REMOVED — on iOS Chrome/Safari, overflow:clip (or overflow:hidden)
      * combined with any compositing hint makes this element a containing block for
@@ -926,10 +922,7 @@
     width: 100%;
     max-width: min(100vw, 440px);
     height: min(86dvh, 660px);
-    box-shadow:
-      0 32px 80px rgba(0, 0, 0, 0.9),
-      0 0 0 1px color-mix(in oklch, var(--primary-500) 8%, transparent),
-      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    box-shadow: var(--shadow-xl);
     position: relative;
     /*
      * will-change:transform REMOVED — it promoted the panel to a compositing layer
@@ -944,19 +937,6 @@
     transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
-  /* Ambient teal mesh — purely decorative, pointer-events:none, z-index:0 */
-  .scp::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background:
-      radial-gradient(ellipse 70% 50% at 15% 0%,   color-mix(in oklch, var(--primary-500) 7%, transparent) 0%, transparent 55%),
-      radial-gradient(ellipse 50% 40% at 85% 100%,  color-mix(in oklch, var(--primary-500) 5%, transparent) 0%, transparent 50%),
-      radial-gradient(ellipse 40% 35% at 50% 50%,   color-mix(in oklch, var(--member-3) 3%, transparent)  0%, transparent 55%);
-    pointer-events: none;
-    border-radius: inherit;
-    z-index: 0;
-  }
   .scp > * { position: relative; z-index: 1; }
 
   @media (max-width: 767px) {
@@ -993,19 +973,19 @@
     display: none;
     width: 40px; height: 4px;
     border-radius: var(--radius-full, 9999px);
-    background: rgba(255, 255, 255, 0.12);
+    background: var(--border-strong);
     margin: 10px auto var(--space-1, 4px);
     flex-shrink: 0;
   }
   @media (max-width: 767px) { .scp-drag-handle { display: block; } }
 
-  /* ── Auto-lock progress bar ──────────────────────────────── */
+  /* ── Auto-lock progress bar — a quiet ember timer ────────── */
   .scp-autolock-bar {
     position: absolute;
     top: 0; left: 0;
     width: 100%;
     height: 2px;
-    background: linear-gradient(90deg, var(--chat-accent) 0%, color-mix(in oklch, var(--member-3) 70%, transparent) 100%);
+    background: var(--primary-500);
     transform-origin: left center;
     transition: transform 1s linear, opacity 0.5s;
     z-index: 10;
@@ -1013,37 +993,35 @@
     pointer-events: none;
   }
 
-  /* ── Header ──────────────────────────────────────────────── */
+  /* ── Header — paper tier above the messages ──────────────── */
   header.scp-header {
     display: flex;
     align-items: center;
     gap: 10px;
     padding: var(--space-3, 12px) var(--space-3, 12px) var(--space-3, 12px) var(--space-4, 16px);
-    background: rgba(255, 255, 255, 0.02);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border-bottom: 1px solid var(--chat-border);
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border-subtle);
     flex-shrink: 0;
     min-height: 60px;
     /* border-radius top corners match panel */
-    border-radius: var(--radius-xl, 20px) var(--radius-xl, 20px) 0 0;
+    border-radius: var(--radius-card) var(--radius-card) 0 0;
   }
 
   @media (max-width: 767px) {
     header.scp-header {
-      border-radius: var(--radius-2xl, 24px) var(--radius-2xl, 24px) 0 0;
+      border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
       padding-top: max(var(--space-3, 12px), env(safe-area-inset-top, 0px));
     }
   }
 
   .scp-header-lock {
-    color: rgba(255, 255, 255, 0.2);
+    color: var(--text-tertiary);
     display: flex;
     align-items: center;
     flex-shrink: 0;
-    transition: color 0.2s;
+    transition: color var(--duration-normal) var(--ease-out);
   }
-  .scp-header-lock--open { color: var(--chat-accent); }
+  .scp-header-lock--open { color: var(--primary-700); }
 
   .scp-header-info { flex: 1; min-width: 0; }
 
@@ -1054,31 +1032,31 @@
   }
 
   .scp-header-name {
-    font-size: var(--text-base, 1rem);
-    font-weight: 700;
-    font-family: var(--font-sans, 'Nunito', sans-serif);
-    color: rgba(255, 255, 255, 0.92);
+    font-size: var(--text-lg, 1.0625rem);
+    font-weight: 600;
+    font-family: var(--font-sans);
+    color: var(--text-primary);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     margin: 0;
-    transition: opacity 0.2s;
+    transition: opacity var(--duration-normal) var(--ease-out);
   }
   .scp-header-name--hidden {
-    opacity: 0.50;
+    opacity: 0.6;
     letter-spacing: 0.15em;
-    color: rgba(255, 255, 255, 0.50);
+    color: var(--text-tertiary);
   }
 
   .scp-unread-badge {
     min-width: 20px; height: 20px;
     padding: 0 var(--space-1-5, 6px);
     border-radius: var(--radius-full, 9999px);
-    background: var(--chat-accent);
-    color: #fff;
+    background: var(--primary-500);
+    color: var(--text-on-primary);
     font-size: var(--text-2xs, 0.6875rem);
     font-weight: 700;
-    font-family: var(--font-sans, 'Nunito', sans-serif);
+    font-family: var(--font-sans);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1095,8 +1073,8 @@
 
   .scp-subtext {
     font-size: var(--text-xs, 0.75rem);
-    font-family: var(--font-sans, 'Nunito', sans-serif);
-    color: rgba(255, 255, 255, 0.52);
+    font-family: var(--font-sans);
+    color: var(--text-secondary);
   }
 
   /* ── Typing indicator (CSS-only dots) ─────────────────────── */
@@ -1110,7 +1088,7 @@
   .typing-dot {
     width: 5px; height: 5px;
     border-radius: var(--radius-full, 9999px);
-    background: var(--chat-accent);
+    background: var(--primary-500);
     animation: typing-bounce 1.4s ease-in-out infinite;
     flex-shrink: 0;
   }
@@ -1126,17 +1104,17 @@
   .scp-presence-dot {
     width: 6px; height: 6px;
     border-radius: var(--radius-full, 9999px);
-    background: rgba(255, 255, 255, 0.35);
+    background: var(--status-offline);
     flex-shrink: 0;
   }
   .scp-presence-dot--active {
-    background: var(--chat-accent);
+    background: var(--primary-500);
     box-shadow: 0 0 0 3px var(--chat-accent-subtle);
     animation: scp-pulse-accent 2.4s ease-in-out infinite;
   }
   .scp-presence-dot--online {
-    background: var(--success-400, var(--success-400));
-    box-shadow: 0 0 0 3px color-mix(in oklch, var(--success-400) 20%, transparent);
+    background: var(--status-live);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--success-500) 20%, transparent);
     animation: scp-pulse-green 2.4s ease-in-out infinite;
   }
 
@@ -1145,8 +1123,8 @@
     50%       { box-shadow: 0 0 0 5px color-mix(in oklch, var(--primary-500) 0%, transparent); }
   }
   @keyframes scp-pulse-green {
-    0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--success-400) 50%, transparent); }
-    50%       { box-shadow: 0 0 0 5px color-mix(in oklch, var(--success-400) 0%, transparent); }
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--success-500) 40%, transparent); }
+    50%       { box-shadow: 0 0 0 5px color-mix(in oklch, var(--success-500) 0%, transparent); }
   }
 
   /* ── Header buttons ──────────────────────────────────────── */
@@ -1157,15 +1135,15 @@
     justify-content: center;
     background: none;
     border: none;
-    color: rgba(255, 255, 255, 0.3);
+    color: var(--text-tertiary);
     cursor: pointer;
-    border-radius: var(--radius-sm2, 8px);
-    transition: background 0.1s, color 0.1s;
+    border-radius: var(--radius-input);
+    transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
     flex-shrink: 0;
     touch-action: manipulation;
   }
-  .scp-icon-btn:hover { background: rgba(255, 255, 255, 0.07); color: rgba(255, 255, 255, 0.75); }
-  .scp-icon-btn:focus-visible { outline: 2px solid var(--chat-accent); outline-offset: 2px; }
+  .scp-icon-btn:hover { background: var(--surface-hover); color: var(--text-primary); }
+  .scp-icon-btn:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 2px; }
 
   .scp-invite-btn {
     display: flex;
@@ -1176,20 +1154,20 @@
     min-height: 44px;
     border-radius: var(--radius-full, 9999px);
     border: 1px solid var(--chat-border-accent);
-    background: var(--chat-accent-subtle);
-    color: var(--chat-accent);
+    background: var(--primary-100);
+    color: var(--primary-700);
     font-size: var(--text-xs, 0.75rem);
     font-weight: 600;
-    font-family: var(--font-sans, 'Nunito', sans-serif);
+    font-family: var(--font-sans);
     cursor: pointer;
     flex-shrink: 0;
     white-space: nowrap;
-    transition: background 0.1s, box-shadow 0.1s;
+    transition: background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
     touch-action: manipulation;
   }
-  .scp-invite-btn:hover { background: var(--chat-accent-dim); box-shadow: 0 0 16px var(--chat-accent-glow); }
-  .scp-invite-btn:focus-visible { outline: 2px solid var(--chat-accent); outline-offset: 2px; }
-  .scp-invite-btn--copied { border-color: color-mix(in oklch, var(--success-400) 40%, transparent); background: color-mix(in oklch, var(--success-400) 8%, transparent); color: var(--success-400, var(--success-400)); }
+  .scp-invite-btn:hover { background: var(--chat-accent-dim); }
+  .scp-invite-btn:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 2px; }
+  .scp-invite-btn--copied { border-color: color-mix(in oklch, var(--success-500) 40%, transparent); background: color-mix(in oklch, var(--success-500) 10%, transparent); color: var(--success-700); }
 
   /* ── Messages area ───────────────────────────────────────── */
   main.scp-msgs {
@@ -1205,7 +1183,7 @@
   }
   main.scp-msgs::-webkit-scrollbar { width: 3px; }
   main.scp-msgs::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--border-strong);
     border-radius: var(--radius-full, 9999px);
   }
 
@@ -1226,7 +1204,7 @@
   .scp-skel-bubble {
     height: 38px; width: 160px;
     border-radius: var(--radius-xl, 20px);
-    background: rgba(255, 255, 255, 0.04);
+    background: color-mix(in oklch, var(--ink) 6%, transparent);
     animation: skel-shimmer 1.6s ease-in-out infinite;
   }
   .scp-skel-bubble--short { width: 100px; }
@@ -1279,15 +1257,15 @@
   .scp-empty-lock-icon {
     width: 52px; height: 52px;
     border-radius: var(--radius-full, 9999px);
-    background: var(--chat-accent-subtle);
+    background: var(--primary-100);
     border: 1px solid var(--chat-border-accent);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--chat-accent);
+    color: var(--primary-700);
     position: relative;
     z-index: 1;
-    box-shadow: 0 0 32px color-mix(in oklch, var(--primary-500) 20%, transparent);
+    box-shadow: var(--shadow-sm);
   }
 
   @keyframes empty-ring-pulse {
@@ -1295,28 +1273,31 @@
     50%       { transform: scale(1.05); opacity: 0.5; }
   }
 
+  /* The empty state speaks one honest sentence — the serif moment. */
   .scp-empty-title {
     margin: 0;
-    font-size: var(--text-base, 1rem);
-    font-weight: 700;
-    font-family: var(--font-sans, 'Nunito', sans-serif);
-    color: rgba(255, 255, 255, 0.8);
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 400;
+    font-size: var(--text-2xl, 1.375rem);
+    line-height: var(--leading-tight, 1.25);
+    color: var(--text-primary);
   }
 
   .scp-empty-sub {
     margin: 0;
-    font-size: var(--text-xs, 0.75rem);
-    font-family: var(--font-sans, 'Nunito', sans-serif);
-    color: rgba(255, 255, 255, 0.28);
+    font-size: var(--text-base, 1rem);
+    font-family: var(--font-sans);
+    color: var(--text-secondary);
     line-height: var(--leading-relaxed, 1.625);
-    max-width: 260px;
+    max-width: 300px;
   }
 
   .scp-empty-cta {
     margin: 0;
-    font-size: var(--text-xs, 0.75rem);
-    font-family: var(--font-sans, 'Nunito', sans-serif);
-    color: var(--chat-accent);
+    font-size: var(--text-sm, 0.875rem);
+    font-family: var(--font-sans);
+    color: var(--primary-700);
     font-weight: 600;
   }
 
@@ -1338,47 +1319,43 @@
     content: '';
     flex: 1;
     height: 1px;
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--border-subtle);
   }
 
   .scp-date-div span {
-    font-size: var(--text-2xs, 0.6875rem);
-    font-family: var(--font-mono, 'JetBrains Mono', monospace);
-    color: rgba(255, 255, 255, 0.3);
+    font-size: var(--text-xs, 0.75rem);
+    font-family: var(--font-sans);
+    color: var(--text-tertiary);
     white-space: nowrap;
     letter-spacing: 0.05em;
     padding: 3px var(--space-2, 8px);
-    background: rgba(6, 6, 16, 0.9);
-    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--radius-full, 9999px);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
   }
 
-  /* ── Scroll-to-bottom FAB ────────────────────────────────── */
+  /* ── Scroll-to-bottom FAB — small paper pebble ───────────── */
   .scp-scroll-fab {
     align-self: flex-end;
     margin: calc(-1 * var(--space-2, 8px)) var(--space-3, 12px) 0;
     position: relative;
     width: 44px; height: 44px;
     border-radius: var(--radius-full, 9999px);
-    border: 1px solid var(--chat-border-accent);
-    background: rgba(6, 6, 16, 0.9);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    color: var(--chat-accent);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6), 0 0 12px var(--chat-accent-glow);
+    border: 1px solid var(--border-default);
+    background: var(--surface-1);
+    color: var(--primary-700);
+    box-shadow: var(--shadow-md);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     touch-action: manipulation;
-    transition: background 0.1s, transform 0.1s, box-shadow 0.1s;
+    transition: background var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
     z-index: 10;
     flex-shrink: 0;
   }
-  .scp-scroll-fab:hover { background: var(--chat-accent-subtle); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6), 0 0 20px var(--chat-accent-glow); }
-  .scp-scroll-fab:focus-visible { outline: 2px solid var(--chat-accent); outline-offset: 2px; }
+  .scp-scroll-fab:hover { background: var(--primary-100); transform: translateY(-2px); }
+  .scp-scroll-fab:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 2px; }
 
   .scp-scroll-fab-badge {
     position: absolute;
@@ -1386,23 +1363,23 @@
     min-width: 18px; height: 18px;
     padding: 0 var(--space-1, 4px);
     border-radius: var(--radius-full, 9999px);
-    background: var(--chat-accent);
-    color: #fff;
+    background: var(--primary-500);
+    color: var(--text-on-primary);
     font-size: 10px;
     font-weight: 700;
-    font-family: var(--font-sans, 'Nunito', sans-serif);
+    font-family: var(--font-sans);
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--shadow-sm);
   }
 
-  /* ── Photo lightbox ──────────────────────────────────────── */
+  /* ── Photo lightbox — warm ink scrim ─────────────────────── */
   .lightbox-backdrop {
     position: fixed;
     inset: 0;
     z-index: calc(var(--z-modal, 5000) + 100);
-    background: rgba(0, 0, 0, 0.88);
+    background: color-mix(in oklch, var(--ink) 92%, transparent);
     backdrop-filter: blur(24px) saturate(0.6);
     -webkit-backdrop-filter: blur(24px) saturate(0.6);
     display: flex;
@@ -1417,7 +1394,7 @@
     max-height: 80dvh;
     border-radius: var(--radius-xl, 20px);
     object-fit: contain;
-    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.8);
+    box-shadow: var(--shadow-xl);
     animation: lightbox-in 0.25s var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
     cursor: default;
   }
@@ -1433,17 +1410,17 @@
     right: var(--space-4, 16px);
     width: 44px; height: 44px;
     border-radius: var(--radius-full, 9999px);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    background: rgba(255, 255, 255, 0.08);
-    color: rgba(255, 255, 255, 0.7);
+    border: 1px solid color-mix(in oklch, var(--text-inverse) 20%, transparent);
+    background: color-mix(in oklch, var(--text-inverse) 10%, transparent);
+    color: var(--text-inverse);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: background 0.1s, color 0.1s;
+    transition: background var(--duration-fast) var(--ease-out);
   }
-  .lightbox-close:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
-  .lightbox-close:focus-visible { outline: 2px solid var(--chat-accent); outline-offset: 2px; }
+  .lightbox-close:hover { background: color-mix(in oklch, var(--text-inverse) 18%, transparent); }
+  .lightbox-close:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 2px; }
 
   .lightbox-hint {
     position: absolute;
@@ -1451,9 +1428,9 @@
     display: flex;
     align-items: center;
     gap: var(--space-1-5, 6px);
-    font-size: 11px;
-    font-family: var(--font-sans, 'Nunito', sans-serif);
-    color: rgba(255, 255, 255, 0.25);
+    font-size: var(--text-xs, 0.75rem);
+    font-family: var(--font-sans);
+    color: color-mix(in oklch, var(--text-inverse) 55%, transparent);
   }
 
   /* ── prefers-reduced-motion ──────────────────────────────── */

@@ -171,7 +171,7 @@
     {#if linkDead}
       <div class="dead-link-overlay">
         <div class="dead-link-card">
-          <h2 class="dead-link-title">{deadKind === 'ended' ? 'This link has ended' : "We can't reach this link"}</h2>
+          <h2 class="dead-link-title verdict-voice">{deadKind === 'ended' ? 'This link has ended.' : "We can't reach this link."}</h2>
           <p class="dead-link-body">{deadKind === 'ended'
             ? 'Watch links stop working when sharing ends or the link expires. Ask for a fresh link if you still need it.'
             : 'It may have ended, or the connection may be down. Try again in a moment, or ask for a fresh link.'}</p>
@@ -186,7 +186,10 @@
       {#if hasInit && watchedName}
         <div class="watch-identity">
           <span class="watch-eyebrow">Watching</span>
-          <h1 class="watch-name">{watchedName}</h1>
+          <h1 class="watch-name verdict-voice">{watchedName}</h1>
+          <!-- Plain words for someone who has never seen Kinnect: who shared
+               this, what they're seeing, and that it ends on its own. -->
+          <p class="watch-sub">{watchedName} is sharing their live location with you — it stops when they stop.</p>
         </div>
         {#if watchedPhone}
           <a href="tel:{watchedPhone}" class="watch-call-btn" aria-label="Call {watchedName}">
@@ -257,7 +260,7 @@
 
   .watch-eyebrow {
     display: block;
-    font-size: 10px;
+    font-size: var(--text-2xs);
     font-weight: 700;
     letter-spacing: 0.12em;
     text-transform: uppercase;
@@ -265,38 +268,61 @@
     margin-bottom: 2px;
   }
 
+  /* The page title — the name, in the serif register */
   .watch-name {
-    font-size: clamp(1.5rem, 2.4vw, 2rem);
-    font-weight: 900;
-    letter-spacing: -0.03em;
+    font-size: clamp(1.375rem, 2.4vw, 1.75rem);
+    letter-spacing: -0.01em;
     margin: 0;
-    line-height: 1.1;
+    line-height: 1.15;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
-  /* Tap-to-call — green pill button in the watch header */
+  .watch-sub {
+    margin: 2px 0 0;
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
+    opacity: 0.75;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Tap-to-call — the primary action, so it carries the ember */
   .watch-call-btn {
     display: inline-flex;
     align-items: center;
     gap: 5px;
     min-height: 44px;
-    padding: 7px 16px;
-    background: var(--success-600);
-    color: var(--text-inverse, white);
+    padding: var(--space-2) var(--space-4);
+    background: var(--primary-500);
+    color: var(--text-on-primary);
     border-radius: var(--radius-full);
-    font-size: 13px;
-    font-weight: 700;
+    font-size: var(--text-sm);
+    font-weight: 600;
     text-decoration: none;
     white-space: nowrap;
     flex-shrink: 0;
-    box-shadow: var(--glow-live-sm);
-    transition: background 150ms, box-shadow 150ms;
+    box-shadow: var(--shadow-primary);
+    transition: background var(--duration-normal) var(--ease-out);
   }
   .watch-call-btn:hover {
-    background: var(--success-700);
-    box-shadow: var(--glow-live);
+    background: var(--primary-600);
+  }
+  .watch-call-btn:focus-visible {
+    outline: 2px solid var(--primary-400);
+    outline-offset: 2px;
+  }
+  /* On the vermilion SOS header an ember pill would vanish — flip to a
+     light pill so the lifeline action is the clearest thing on screen. */
+  :global(.shell-header.sos-state) .watch-call-btn {
+    background: var(--text-inverse);
+    color: var(--danger-600);
+    box-shadow: var(--shadow-md);
+  }
+  :global(.shell-header.sos-state) .watch-call-btn:hover {
+    background: color-mix(in oklch, var(--text-inverse) 92%, transparent);
   }
 
   .watch-sos-badge {
@@ -361,25 +387,26 @@
     gap: 6px;
   }
 
+  /* Vermilion allowed here: this dock only exists during an active SOS. */
   .narrative-eyebrow {
-    font-size: 10px;
-    font-weight: 800;
+    font-size: var(--text-2xs);
+    font-weight: 700;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: var(--danger-400);
+    color: var(--danger-600);
   }
 
   .narrative-row {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 12px;
+    font-size: var(--text-sm);
     color: var(--text-secondary);
     font-weight: 500;
   }
 
   .narrative-row.trigger {
-    color: var(--warning-500);
+    color: var(--warning-600);
     font-weight: 600;
   }
 
@@ -398,7 +425,7 @@
     position: absolute;
     inset: 0;
     z-index: 100;
-    background: rgba(0, 0, 0, 0.5); /* raw-color-ok: modal scrim, no scrim token exists yet */
+    background: color-mix(in oklch, var(--ink) 40%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -423,8 +450,7 @@
 
   .dead-link-title {
     margin: 0;
-    font-family: var(--font-display);
-    font-weight: 700;
+    font-size: var(--text-2xl);
     color: var(--text-primary);
   }
 

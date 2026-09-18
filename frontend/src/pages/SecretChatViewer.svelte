@@ -438,15 +438,18 @@
 <!-- ── Root container ─────────────────────────────────────────────── -->
 <div
   class="scv"
-  class:scv--nocyber={state !== 'messages'}
   bind:this={rootEl}
 >
 
-  <!-- ── Loading ──────────────────────────────────────────────────── -->
+  <!-- ── Loading — quiet message-shaped skeletons, not a spinner ──── -->
   {#if state === 'loading'}
     <div class="scv-center" role="status" aria-busy="true" aria-label="Loading">
-      <div class="scv-spinner" aria-hidden="true"></div>
-      <p class="scv-loading-text">Loading…</p>
+      <div class="scv-skel" aria-hidden="true">
+        <div class="scv-skel-row scv-skel-row--their"><div class="scv-skel-bubble scv-skel-bubble--long"></div></div>
+        <div class="scv-skel-row scv-skel-row--own"><div class="scv-skel-bubble scv-skel-bubble--short"></div></div>
+        <div class="scv-skel-row scv-skel-row--their"><div class="scv-skel-bubble"></div></div>
+      </div>
+      <p class="scv-loading-text">Opening this note…</p>
     </div>
 
   <!-- ── Error ────────────────────────────────────────────────────── -->
@@ -480,8 +483,8 @@
         </div>
 
         <div class="scv-gate-text">
-          <h1 class="scv-gate-title">Sign in to Kinnect</h1>
-          <p class="scv-gate-sub">You need an account to read this note.</p>
+          <h1 class="scv-gate-title verdict-voice">Someone sent you a private note.</h1>
+          <p class="scv-gate-sub">Sign in to Kinnect to open it. It stays sealed until you enter the PIN they gave you — Kinnect can't read it.</p>
         </div>
 
         <form class="scv-login-form" on:submit|preventDefault={doLogin} novalidate>
@@ -535,8 +538,8 @@
         </form>
 
         <p class="scv-gate-footer" aria-hidden="true">
-          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          End-to-end encrypted note
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Sealed end-to-end — unlocked only on your screen
         </p>
       </div>
     </div>
@@ -716,22 +719,23 @@
 </div>
 
 <style>
-  /* ── Chat accent token system — cascade into SecretChatGate / Message ── */
+  /* ── Chat token bridge — Hearth warm paper, cascades into
+     SecretChatGate / SecretChatMessage / SecretChatCompose ── */
   :root {
-    /* Accent cluster — derived from global --primary-* so rebrand flows through */
+    /* Accent cluster — derived from global --primary-* (the ember) */
     --scv-accent:        var(--primary-500);
     --scv-accent-dim:    color-mix(in oklch, var(--primary-500) 18%, transparent);
     --scv-accent-subtle: color-mix(in oklch, var(--primary-500)  8%, transparent);
     --scv-accent-glow:   color-mix(in oklch, var(--primary-500) 28%, transparent);
     --scv-border-accent: color-mix(in oklch, var(--primary-500) 22%, transparent);
 
-    /* Vault surfaces — intentionally darker than the app shell (privacy affect).
-       color-mix toward black keeps values derived, not hardcoded. /* raw-color-ok */
-    --scv-bg:       color-mix(in oklch, var(--surface-0) 60%, black);
-    --scv-surface:  color-mix(in oklch, var(--surface-0) 75%, black);
-    --scv-elevated: color-mix(in oklch, var(--surface-0) 90%, black);
+    /* Privacy is carried by copy and the lock, not by a darkened room —
+       the note reads on the same warm paper as the rest of Kinnect. */
+    --scv-bg:       var(--surface-0);
+    --scv-surface:  var(--surface-2);
+    --scv-elevated: var(--surface-1);
 
-    --scv-border:        rgba(255, 255, 255, 0.07);
+    --scv-border:        var(--border-subtle);
     /* Keyboard offset — updated by VisualViewport listener */
     --keyboard-offset: 0px;
   }
@@ -749,7 +753,7 @@
     align-items: center;
     justify-content: center;
     background: var(--scv-bg);
-    font-family: var(--font-sans, 'Nunito', sans-serif);
+    font-family: var(--font-sans);
     position: relative;
     /* NO overflow:hidden — creates containing block for position:fixed on iOS */
 
@@ -765,52 +769,6 @@
     --chat-elevated:      var(--scv-elevated);
   }
 
-  /* Ambient accent mesh — only in messages state; suppressed at data-fx=minimal */
-  .scv::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background:
-      radial-gradient(ellipse 65% 50% at 20% 10%,  color-mix(in oklch, var(--primary-500)  7%, transparent) 0%, transparent 55%),
-      radial-gradient(ellipse 50% 40% at 80% 90%,  color-mix(in oklch, var(--primary-500)  5%, transparent) 0%, transparent 50%),
-      radial-gradient(ellipse 40% 35% at 60% 45%,  color-mix(in oklch, var(--primary-400)  4%, transparent) 0%, transparent 55%);
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  /* Hex grid texture — only in messages state; suppressed at data-fx=minimal */
-  .scv::after {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image:
-      repeating-linear-gradient(
-        0deg, transparent, transparent 28px,
-        color-mix(in oklch, var(--primary-500) 1.8%, transparent) 28px,
-        color-mix(in oklch, var(--primary-500) 1.8%, transparent) 29px
-      ),
-      repeating-linear-gradient(
-        60deg, transparent, transparent 28px,
-        color-mix(in oklch, var(--primary-500) 1.2%, transparent) 28px,
-        color-mix(in oklch, var(--primary-500) 1.2%, transparent) 29px
-      );
-    pointer-events: none;
-    z-index: 0;
-    animation: scv-hex-drift 24s linear infinite;
-  }
-
-  @keyframes scv-hex-drift {
-    from { background-position: 0 0, 0 0; }
-    to   { background-position: 0 56px, 48px 0; }
-  }
-
-  .scv--nocyber::before,
-  .scv--nocyber::after { display: none; }
-
-  /* data-fx=minimal: flatten ambient decoration to solid vault bg */
-  :global([data-fx="minimal"]) .scv::before,
-  :global([data-fx="minimal"]) .scv::after { display: none; }
-
   .scv > * { position: relative; z-index: 1; }
 
   /* ── Loading / Error center ──────────────────────────────────────── */
@@ -823,20 +781,35 @@
     padding: var(--space-8, 32px);
   }
 
-  .scv-spinner {
-    width: 32px;
-    height: 32px;
-    border-radius: var(--radius-full, 9999px);
-    border: 2px solid rgba(255, 255, 255, 0.12);
-    border-top-color: rgba(255, 255, 255, 0.55);
-    animation: scv-spin 0.8s linear infinite;
+  /* Message-shaped skeleton rows (GPU-cheap opacity shimmer) */
+  .scv-skel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2, 8px);
+    width: min(78vw, 300px);
+  }
+  .scv-skel-row { display: flex; }
+  .scv-skel-row--own   { justify-content: flex-end; }
+  .scv-skel-row--their { justify-content: flex-start; }
+  .scv-skel-bubble {
+    height: 38px; width: 160px;
+    border-radius: var(--radius-xl, 20px);
+    background: color-mix(in oklch, var(--ink) 6%, transparent);
+    animation: scv-skel-shimmer 1.6s ease-in-out infinite;
+  }
+  .scv-skel-bubble--short { width: 100px; }
+  .scv-skel-bubble--long  { width: 220px; max-width: 100%; }
+
+  @keyframes scv-skel-shimmer {
+    0%, 100% { opacity: 0.5; }
+    50%       { opacity: 1;   }
   }
 
   .scv-loading-text {
     margin: 0;
-    font-size: var(--text-sm, 0.875rem);
-    color: rgba(255, 255, 255, 0.4);
-    font-family: var(--font-sans, 'Nunito', sans-serif);
+    font-size: var(--text-base, 1rem);
+    color: var(--text-secondary);
+    font-family: var(--font-sans);
   }
 
   .scv-status-icon {
@@ -848,29 +821,29 @@
     justify-content: center;
   }
 
+  /* Expired / invalid link is routine, not an emergency — ochre, not red. */
   .scv-status-icon--error {
-    background: color-mix(in oklch, var(--danger-400) 8%, transparent);
-    border: 1px solid color-mix(in oklch, var(--danger-400) 22%, transparent);
-    color: var(--danger-400);
-    box-shadow: 0 0 24px color-mix(in oklch, var(--danger-400) 12%, transparent);
+    background: color-mix(in oklch, var(--warning-500) 12%, transparent);
+    border: 1px solid color-mix(in oklch, var(--warning-500) 30%, transparent);
+    color: var(--warning-700);
   }
 
   .scv-err-msg {
     margin: 0;
-    font-size: var(--text-base, 1rem);
-    font-weight: 700;
-    color: rgba(255, 255, 255, 0.80);
-    max-width: 280px;
-    font-family: var(--font-sans, 'Nunito', sans-serif);
+    font-size: var(--text-lg, 1.0625rem);
+    font-weight: 600;
+    color: var(--text-primary);
+    max-width: 300px;
+    font-family: var(--font-sans);
   }
 
   .scv-err-action {
     margin: 0;
-    font-size: var(--text-xs, 0.75rem);
-    color: rgba(255, 255, 255, 0.35);
-    max-width: 260px;
+    font-size: var(--text-base, 1rem);
+    color: var(--text-secondary);
+    max-width: 300px;
     line-height: var(--leading-relaxed, 1.625);
-    font-family: var(--font-sans, 'Nunito', sans-serif);
+    font-family: var(--font-sans);
   }
 
   /* ── Login wrapper ───────────────────────────────────────────────── */
@@ -883,8 +856,6 @@
     justify-content: center;
     padding: var(--space-8, 32px) var(--space-4, 16px);
     box-sizing: border-box;
-    /* Login is not vault content — the forced-dark --scv-bg (meant for the
-       PIN gate / messages) read as a disabled scrim here. Un-dim it. */
     background: var(--surface-0);
   }
 
@@ -896,46 +867,27 @@
     width: 100%;
     max-width: 340px;
     text-align: center;
-    animation: scv-gate-in 0.4s var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
+    animation: scv-gate-in 0.3s var(--ease-out) both;
   }
 
   @keyframes scv-gate-in {
-    from { opacity: 0; transform: translateY(20px) scale(0.96); }
-    to   { opacity: 1; transform: translateY(0) scale(1); }
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
 
-  /* Login icon */
+  /* Login pebble — quiet ember presence */
   .scv-gate-icon {
     width: 88px;
     height: 88px;
     border-radius: var(--radius-full, 9999px);
-    background: var(--scv-accent-subtle);
+    background: var(--primary-100);
     border: 1px solid var(--scv-border-accent);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--scv-accent);
-    box-shadow:
-      0 0 0 12px color-mix(in oklch, var(--primary-500)  4%, transparent),
-      0 0 0 24px color-mix(in oklch, var(--primary-500)  2%, transparent),
-      0 0 48px   color-mix(in oklch, var(--primary-500) 18%, transparent);
-    animation: scv-icon-breathe 5s ease-in-out infinite;
+    color: var(--primary-700);
+    box-shadow: var(--shadow-sm);
     flex-shrink: 0;
-  }
-
-  @keyframes scv-icon-breathe {
-    0%, 100% {
-      box-shadow:
-        0 0 0 12px color-mix(in oklch, var(--primary-500)  4%, transparent),
-        0 0 0 24px color-mix(in oklch, var(--primary-500)  2%, transparent),
-        0 0 48px   color-mix(in oklch, var(--primary-500) 18%, transparent);
-    }
-    50% {
-      box-shadow:
-        0 0 0 18px color-mix(in oklch, var(--primary-500)  3%, transparent),
-        0 0 0 34px color-mix(in oklch, var(--primary-500)  1%, transparent),
-        0 0 72px   color-mix(in oklch, var(--primary-500) 28%, transparent);
-    }
   }
 
   .scv-gate-text {
@@ -944,21 +896,20 @@
     gap: var(--space-2, 8px);
   }
 
+  /* Serif verdict headline — the one editorial moment on this screen */
   .scv-gate-title {
     margin: 0;
-    font-size: var(--text-xl, 1.125rem);
-    font-weight: 700;
+    font-size: var(--text-2xl, 1.375rem);
+    line-height: var(--leading-tight, 1.25);
     color: var(--text-primary);
-    letter-spacing: -0.01em;
-    font-family: var(--font-sans, 'Nunito', sans-serif);
   }
 
   .scv-gate-sub {
     margin: 0;
-    font-size: var(--text-xs, 0.75rem);
+    font-size: var(--text-base, 1rem);
     color: var(--text-secondary);
     line-height: var(--leading-relaxed, 1.625);
-    font-family: var(--font-sans, 'Nunito', sans-serif);
+    font-family: var(--font-sans);
   }
 
   /* ── Login form ──────────────────────────────────────────────────── */
@@ -979,24 +930,26 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--text-secondary);
+    text-align: left;
   }
 
+  /* Warm inset fields, ember focus ring */
   .scv-input {
     width: 100%;
     box-sizing: border-box;
     min-height: 52px;
-    padding: 0 var(--space-4, 16px);
-    background: var(--surface-3);
-    border: 1px solid var(--scv-border-accent);
-    border-radius: var(--radius-lg, 14px);
+    padding: var(--space-3-5, 14px) var(--space-4, 16px);
+    background: var(--surface-inset);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-input);
     color: var(--text-primary);
     /* 16px — iOS minimum to prevent auto-zoom on focus */
     font-size: 16px;
-    font-family: var(--font-sans, 'Nunito', sans-serif);
+    font-family: var(--font-sans);
     font-weight: 500;
     caret-color: var(--scv-accent);
     outline: none;
-    transition: border-color 0.15s, box-shadow 0.15s;
+    transition: border-color var(--duration-normal) var(--ease-out), box-shadow var(--duration-normal) var(--ease-out);
     -webkit-appearance: none;
     appearance: none;
   }
@@ -1005,42 +958,43 @@
 
   .scv-input:focus {
     border-color: var(--scv-accent);
-    box-shadow: 0 0 0 3px var(--scv-accent-subtle);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary-500) 16%, transparent);
   }
 
   .scv-input:disabled { opacity: 0.5; }
 
+  /* A wrong password needs a look, not an alarm — ochre. */
   .scv-field-err {
     margin: 0;
-    font-size: var(--text-xs, 0.75rem);
-    color: var(--danger-400);
+    font-size: var(--text-sm, 0.875rem);
+    color: var(--warning-700);
     font-weight: 500;
     text-align: left;
-    font-family: var(--font-sans, 'Nunito', sans-serif);
+    font-family: var(--font-sans);
   }
 
-  /* ── CTA button ──────────────────────────────────────────────────── */
+  /* ── CTA button — quiet until ready, then the one ember ──────────── */
   .scv-cta-btn {
     width: 100%;
-    padding: var(--space-4, 16px);
-    border-radius: var(--radius-lg, 14px);
+    padding: var(--space-3-5, 14px) var(--space-4, 16px);
+    border-radius: var(--radius-button);
     border: 1px solid var(--border-default);
     background: var(--surface-2);
     color: var(--text-tertiary);
     font-size: var(--text-base, 1rem);
-    font-weight: 700;
-    font-family: var(--font-sans, 'Nunito', sans-serif);
+    font-weight: 600;
+    font-family: var(--font-sans);
     cursor: pointer;
     min-height: 52px;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: var(--space-2, 8px);
-    transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.1s, box-shadow 0.2s;
+    transition: background var(--duration-normal) var(--ease-out), color var(--duration-normal) var(--ease-out), border-color var(--duration-normal) var(--ease-out), transform var(--duration-fast) var(--ease-out);
     touch-action: manipulation;
   }
 
-  .scv-cta-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .scv-cta-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
   .scv-cta-btn:focus-visible {
     outline: 2px solid var(--scv-accent);
@@ -1048,24 +1002,23 @@
   }
 
   .scv-cta-btn--active {
-    background: linear-gradient(135deg, var(--primary-400) 0%, var(--primary-600) 100%);
-    color: #fff; /* raw-color-ok — white text on primary gradient, always passes contrast */
+    background: var(--primary-500);
+    color: var(--text-on-primary);
     border-color: transparent;
-    box-shadow: 0 4px 22px color-mix(in oklch, var(--primary-500) 42%, transparent);
+    box-shadow: var(--shadow-primary);
   }
 
   .scv-cta-btn--active:hover:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow: 0 6px 30px color-mix(in oklch, var(--primary-500) 58%, transparent);
+    background: var(--primary-600);
   }
 
-  .scv-cta-btn--active:active:not(:disabled) { transform: scale(0.97); }
+  .scv-cta-btn--active:active:not(:disabled) { transform: scale(0.98); }
 
   .scv-btn-ring {
     width: 16px;
     height: 16px;
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-top-color: #fff;
+    border: 2px solid color-mix(in oklch, currentColor 30%, transparent);
+    border-top-color: currentColor;
     border-radius: var(--radius-full, 9999px);
     animation: scv-spin 0.7s linear infinite;
     flex-shrink: 0;
@@ -1075,12 +1028,13 @@
     display: flex;
     align-items: center;
     gap: var(--space-1-5, 6px);
-    font-size: var(--text-2xs, 0.6875rem);
-    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: var(--text-xs, 0.75rem);
+    font-family: var(--font-sans);
     color: var(--text-tertiary);
-    letter-spacing: 0.03em;
+    letter-spacing: 0.02em;
     margin: 0;
   }
+  .scv-gate-footer svg { color: var(--primary-700); flex-shrink: 0; }
 
   /* ── Gate outer — full-height flex column for SecretChatGate ────── */
   .scv-gate-outer {
@@ -1109,7 +1063,7 @@
     to   { opacity: 1; transform: translateY(0); }
   }
 
-  /* ── Header ─────────────────────────────────────────────────────── */
+  /* ── Header — paper tier above the messages ─────────────────────── */
   header.scv-header {
     display: flex;
     align-items: center;
@@ -1120,14 +1074,10 @@
       var(--space-3, 12px)
       var(--space-3, 12px)
       var(--space-3, 12px);
-    background: color-mix(in oklch, var(--scv-bg) 92%, transparent);
-    backdrop-filter: blur(20px) saturate(1.4);
-    -webkit-backdrop-filter: blur(20px) saturate(1.4);
-    border-bottom: 1px solid var(--scv-border);
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border-subtle);
     flex-shrink: 0;
     min-height: 60px;
-    /* Subtle top highlight */
-    box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.04);
   }
 
   .scv-header-btn {
@@ -1137,61 +1087,59 @@
     min-width: 44px;
     min-height: 44px;
     padding: 0 var(--space-2, 8px);
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: var(--radius-sm2, 8px);
+    background: var(--surface-1);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-input);
     cursor: pointer;
-    color: rgba(255, 255, 255, 0.55);
-    font-size: var(--text-xs, 0.75rem);
-    font-family: var(--font-sans, 'Nunito', sans-serif);
+    color: var(--text-secondary);
+    font-size: var(--text-sm, 0.875rem);
+    font-family: var(--font-sans);
     font-weight: 600;
     flex-shrink: 0;
-    transition: color 0.12s, background 0.12s, border-color 0.12s;
+    transition: color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);
     touch-action: manipulation;
   }
 
   .scv-header-btn:hover {
-    color: rgba(255, 255, 255, 0.85);
-    background: rgba(255, 255, 255, 0.09);
-    border-color: rgba(255, 255, 255, 0.14);
+    color: var(--text-primary);
+    background: var(--surface-hover);
   }
 
   .scv-header-btn:focus-visible { outline: 2px solid var(--scv-accent); outline-offset: 2px; }
 
   .scv-header-btn-label {
-    font-size: var(--text-xs, 0.75rem);
+    font-size: var(--text-sm, 0.875rem);
     font-weight: 600;
-    font-family: var(--font-sans, 'Nunito', sans-serif);
+    font-family: var(--font-sans);
   }
 
-  /* Panic / Hide Screen button — amber pill, immediately findable */
+  /* Hide Screen — a privacy action, carried in ochre (never red) */
   .scv-panic-btn {
     display: flex;
     align-items: center;
     gap: var(--space-1-5, 6px);
     min-height: 44px;
     padding: 0 var(--space-3, 12px);
-    background: color-mix(in oklch, var(--warning-400) 10%, transparent);
-    border: 1px solid color-mix(in oklch, var(--warning-400) 25%, transparent);
+    background: color-mix(in oklch, var(--warning-500) 12%, transparent);
+    border: 1px solid color-mix(in oklch, var(--warning-500) 28%, transparent);
     border-radius: var(--radius-full, 9999px);
     cursor: pointer;
-    color: var(--warning-400);
-    font-size: var(--text-xs, 0.75rem);
-    font-family: var(--font-sans, 'Nunito', sans-serif);
-    font-weight: 700;
+    color: var(--warning-700);
+    font-size: var(--text-sm, 0.875rem);
+    font-family: var(--font-sans);
+    font-weight: 600;
     flex-shrink: 0;
     white-space: nowrap;
-    transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
+    transition: background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
     touch-action: manipulation;
   }
 
   .scv-panic-btn:hover {
-    background: color-mix(in oklch, var(--warning-400) 20%, transparent);
-    border-color: color-mix(in oklch, var(--warning-400) 45%, transparent);
-    box-shadow: 0 0 16px color-mix(in oklch, var(--warning-400) 20%, transparent);
+    background: color-mix(in oklch, var(--warning-500) 20%, transparent);
+    border-color: color-mix(in oklch, var(--warning-500) 45%, transparent);
   }
 
-  .scv-panic-btn:focus-visible { outline: 2px solid var(--warning-400); outline-offset: 2px; }
+  .scv-panic-btn:focus-visible { outline: 2px solid var(--warning-500); outline-offset: 2px; }
 
   .scv-header-center {
     flex: 1;
@@ -1220,8 +1168,8 @@
 
   .scv-header-label {
     font-size: var(--text-xs, 0.75rem);
-    font-family: var(--font-mono, 'JetBrains Mono', monospace);
-    color: rgba(255, 255, 255, 0.32);
+    font-family: var(--font-sans);
+    color: var(--text-tertiary);
     letter-spacing: 0.04em;
     white-space: nowrap;
     overflow: hidden;
@@ -1245,7 +1193,7 @@
 
   main.scv-msgs::-webkit-scrollbar { width: 3px; }
   main.scv-msgs::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--border-strong);
     border-radius: var(--radius-full, 9999px);
   }
 
@@ -1259,37 +1207,37 @@
     gap: var(--space-3, 12px);
     padding: var(--space-10, 40px) 0;
     text-align: center;
-    animation: scv-gate-in 0.4s var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
+    animation: scv-gate-in 0.3s var(--ease-out) both;
   }
 
   .scv-empty-icon {
     width: 72px;
     height: 72px;
     border-radius: var(--radius-full, 9999px);
-    background: var(--scv-accent-subtle);
+    background: var(--primary-100);
     border: 1px solid var(--scv-border-accent);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--scv-accent);
-    box-shadow: 0 0 32px var(--scv-accent-dim);
+    color: var(--primary-700);
+    box-shadow: var(--shadow-sm);
   }
 
   .scv-empty-title {
     margin: 0;
-    font-size: var(--text-base, 1rem);
-    font-weight: 700;
-    color: rgba(255, 255, 255, 0.75);
-    font-family: var(--font-sans, 'Nunito', sans-serif);
+    font-size: var(--text-lg, 1.0625rem);
+    font-weight: 600;
+    color: var(--text-primary);
+    font-family: var(--font-sans);
   }
 
   .scv-empty-sub {
     margin: 0;
-    font-size: var(--text-xs, 0.75rem);
-    color: rgba(255, 255, 255, 0.28);
+    font-size: var(--text-base, 1rem);
+    color: var(--text-secondary);
     line-height: var(--leading-relaxed, 1.625);
-    max-width: 240px;
-    font-family: var(--font-sans, 'Nunito', sans-serif);
+    max-width: 280px;
+    font-family: var(--font-sans);
   }
 
   /* ── Date divider ─────────────────────────────────────────────────── */
@@ -1310,21 +1258,19 @@
     content: '';
     flex: 1;
     height: 1px;
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--border-subtle);
   }
 
   .scv-date-div span {
-    font-size: var(--text-2xs, 0.6875rem);
-    font-family: var(--font-mono, 'JetBrains Mono', monospace);
-    color: rgba(255, 255, 255, 0.3);
+    font-size: var(--text-xs, 0.75rem);
+    font-family: var(--font-sans);
+    color: var(--text-tertiary);
     white-space: nowrap;
     letter-spacing: 0.05em;
     padding: 3px var(--space-2, 8px);
-    background: color-mix(in oklch, var(--scv-bg) 92%, transparent);
-    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--radius-full, 9999px);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
   }
 
   /* ── Own message rows ─────────────────────────────────────────────── */
@@ -1348,9 +1294,9 @@
   .scv-bubble {
     padding: var(--space-2-5, 10px) var(--space-3-5, 14px);
     border-radius: var(--radius-xl, 20px);
-    font-size: var(--text-sm, 0.875rem);
+    font-size: var(--text-base, 1rem);
     line-height: var(--leading-relaxed, 1.625);
-    font-family: var(--font-sans, 'Nunito', sans-serif);
+    font-family: var(--font-sans);
   }
 
   /* iMessage-style grouping radius */
@@ -1361,28 +1307,25 @@
     border-bottom-right-radius: var(--radius-sm, 6px);
   }
 
+  /* Own bubble — ember-tinted paper */
   .scv-bubble--own {
     display: flex;
     align-items: center;
     gap: var(--space-2, 8px);
-    background: linear-gradient(
-      135deg,
-      color-mix(in oklch, var(--primary-500) 14%, transparent) 0%,
-      color-mix(in oklch, var(--primary-500)  8%, transparent) 100%
-    );
-    border: 1px solid var(--scv-border-accent);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 2px 8px rgba(0, 0, 0, 0.25);
+    background: var(--primary-100);
+    border: 1px solid color-mix(in oklch, var(--primary-500) 20%, transparent);
+    box-shadow: var(--shadow-xs);
     max-width: 100%;
     overflow: hidden;
   }
 
-  .scv-body { margin: 0; color: rgba(255, 255, 255, 0.92); }
+  .scv-body { margin: 0; color: var(--text-primary); }
 
   .scv-cipher-text {
-    font-family: var(--font-mono, 'JetBrains Mono', monospace);
-    font-size: var(--text-2xs, 0.6875rem);
+    font-family: var(--font-sans);
+    font-size: var(--text-xs, 0.75rem);
     letter-spacing: 0.04em;
-    color: color-mix(in oklch, var(--primary-500) 55%, transparent);
+    color: color-mix(in oklch, var(--primary-700) 70%, transparent);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1392,7 +1335,7 @@
   }
 
   .scv-lock-icon {
-    color: color-mix(in oklch, var(--primary-500) 45%, transparent);
+    color: var(--primary-700);
     flex-shrink: 0;
     display: flex;
     align-items: center;
@@ -1415,9 +1358,9 @@
   }
 
   .scv-time {
-    font-size: var(--text-2xs, 0.6875rem);
-    font-family: var(--font-mono, 'JetBrains Mono', monospace);
-    color: rgba(255, 255, 255, 0.25);
+    font-size: var(--text-xs, 0.75rem);
+    font-family: var(--font-sans);
+    color: var(--text-tertiary);
     font-variant-numeric: tabular-nums;
     padding: 0 2px;
   }
@@ -1426,51 +1369,48 @@
     display: flex;
     align-items: center;
     gap: var(--space-1-5, 6px);
-    font-size: var(--text-xs, 0.75rem);
-    font-family: var(--font-sans, 'Nunito', sans-serif);
-    color: var(--success-400);
+    font-size: var(--text-sm, 0.875rem);
+    font-family: var(--font-sans);
+    color: var(--success-700);
     align-self: center;
     margin-top: var(--space-1, 4px);
   }
 
-  /* ── Scroll FAB ───────────────────────────────────────────────────── */
+  /* ── Scroll FAB — small paper pebble ─────────────────────────────── */
   .scv-scroll-fab {
     align-self: flex-end;
     margin: calc(-1 * var(--space-2, 8px)) var(--space-3, 12px) 0;
     width: 44px;
     height: 44px;
     border-radius: var(--radius-full, 9999px);
-    border: 1px solid var(--scv-border-accent);
-    background: color-mix(in oklch, var(--scv-bg) 92%, transparent);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    color: var(--scv-accent);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6), 0 0 12px var(--scv-accent-glow);
+    border: 1px solid var(--border-default);
+    background: var(--surface-1);
+    color: var(--primary-700);
+    box-shadow: var(--shadow-md);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     touch-action: manipulation;
-    transition: background 0.1s, transform 0.1s, box-shadow 0.1s;
+    transition: background var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
     z-index: 10;
     flex-shrink: 0;
     position: relative;
   }
 
   .scv-scroll-fab:hover {
-    background: var(--scv-accent-subtle);
+    background: var(--primary-100);
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6), 0 0 20px var(--scv-accent-glow);
   }
 
   .scv-scroll-fab:focus-visible { outline: 2px solid var(--scv-accent); outline-offset: 2px; }
 
-  /* ── Photo lightbox ───────────────────────────────────────────────── */
+  /* ── Photo lightbox — warm ink scrim ─────────────────────────────── */
   .scv-lightbox {
     position: fixed;
     inset: 0;
     z-index: calc(var(--z-topmost, 9000) - 1);
-    background: rgba(0, 0, 0, 0.92);
+    background: color-mix(in oklch, var(--ink) 92%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1483,7 +1423,7 @@
     max-height: 85dvh;
     border-radius: var(--radius-lg, 14px);
     object-fit: contain;
-    box-shadow: 0 16px 64px rgba(0, 0, 0, 0.8);
+    box-shadow: var(--shadow-xl);
     animation: scv-lightbox-in 0.22s var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
     cursor: default;
   }
@@ -1500,28 +1440,28 @@
     width: 44px;
     height: 44px;
     border-radius: var(--radius-full, 9999px);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    background: rgba(0, 0, 0, 0.65);
-    color: rgba(255, 255, 255, 0.75);
+    border: 1px solid color-mix(in oklch, var(--text-inverse) 20%, transparent);
+    background: color-mix(in oklch, var(--text-inverse) 10%, transparent);
+    color: var(--text-inverse);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     touch-action: manipulation;
-    transition: background 0.1s, color 0.1s;
+    transition: background var(--duration-fast) var(--ease-out);
   }
 
-  .scv-lightbox-close:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
+  .scv-lightbox-close:hover { background: color-mix(in oklch, var(--text-inverse) 18%, transparent); }
   .scv-lightbox-close:focus-visible { outline: 2px solid var(--scv-accent); outline-offset: 2px; }
 
   /* ── Panic overlay ────────────────────────────────────────────────── */
   .scv-panic {
     position: fixed;
     inset: 0;
-    background: #000;
+    background: #000; /* raw-color-ok: panic blank must read as a powered-off screen in both themes */
     z-index: var(--z-topmost, 9000);
     cursor: default;
-    animation: scv-panic-on 0.15s ease-out both;
+    animation: scv-panic-on 0.15s var(--ease-out) both;
   }
 
   @keyframes scv-panic-on {
@@ -1533,18 +1473,15 @@
 
   /* ── prefers-reduced-motion ───────────────────────────────────────── */
   @media (prefers-reduced-motion: reduce) {
-    .scv::before, .scv::after { animation: none; }
     .scv-gate-content { animation: none; }
-    .scv-gate-icon { animation: none; }
     .scv-header-status-dot { animation: none; }
     .scv-msg { animation: none; }
     .scv-empty { animation: none; }
-    .scv-spinner, .scv-btn-ring { animation: none; }
+    .scv-skel-bubble, .scv-btn-ring { animation: none; }
     .scv-panic { animation: none; }
     .scv-view { animation: none; }
     .scv-lightbox-img { animation: none; }
     .scv-cta-btn { transition: none; }
-    .scv-cta-btn--active:hover { transform: none; }
     .scv-scroll-fab:hover { transform: none; }
   }
 </style>

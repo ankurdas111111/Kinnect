@@ -322,31 +322,27 @@
 />
 
 <style>
-  /* ── Compose footer — Liquid-glass surface (.fx-glass) ─────────── */
+  /* ── Compose footer — warm paper sheet (.fx-glass resolves to the
+     hearth paper tiers via tokens; no local re-tinting needed) ───── */
   footer.scc-compose {
-    /* Scope the shared glass border tokens to the chat's teal theme so the
-       frosted panel provided by .fx-glass stays on-brand instead of adopting
-       the app-wide violet edge. Background / blur / shadow come from .fx-glass. */
-    --glass-border:        var(--chat-border, rgba(255, 255, 255, 0.07));
-    --glass-border-strong: var(--chat-border-accent, color-mix(in oklch, var(--primary-500) 22%, transparent));
     /* Consume keyboard-offset CSS var set by parent's VisualViewport listener.
        This moves the compose bar up by the keyboard height on iOS Chrome/Safari
        without changing the stacking context (no translateY on parent). */
     padding:
-      var(--space-2-5, 10px)
-      var(--space-4, 16px)
-      max(var(--space-4, 16px), env(safe-area-inset-bottom, 0px));
-    border-top: 1px solid var(--chat-border, rgba(255,255,255,0.07));
+      var(--space-2-5)
+      var(--space-4)
+      max(var(--space-4), env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--border-subtle);
     display: flex;
     flex-direction: column;
-    gap: var(--space-1-5, 6px);
+    gap: var(--space-1-5);
     flex-shrink: 0;
   }
 
   .scc-compose-inner {
     display: flex;
     align-items: flex-end;
-    gap: var(--space-1-5, 6px);
+    gap: var(--space-1-5);
   }
 
   /* ── Icon buttons ─────────────────────────────────────────────── */
@@ -354,45 +350,46 @@
     width: 44px; height: 44px;
     display: flex; align-items: center; justify-content: center;
     background: none; border: none;
-    color: rgba(255, 255, 255, 0.32);
+    color: var(--text-tertiary);
     cursor: pointer;
-    border-radius: var(--radius-sm2, 8px);
+    border-radius: var(--radius-input);
     flex-shrink: 0;
-    transition: color 0.12s, background 0.12s;
+    transition: color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);
     touch-action: manipulation;
   }
-  .scc-icon-btn:hover { color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.06); }
-  .scc-icon-btn:focus-visible { outline: 2px solid var(--chat-accent, var(--primary-500)); outline-offset: 2px; }
-  .scc-icon-btn:disabled { opacity: 0.22; cursor: not-allowed; }
-  .scc-icon-btn--panic { color: rgba(255,255,255,0.30); }
-  .scc-icon-btn--panic:hover { color: var(--danger-400, var(--danger-400)); background: color-mix(in oklch, var(--danger-400) 7%, transparent); }
+  .scc-icon-btn:hover { color: var(--text-primary); background: var(--surface-hover); }
+  .scc-icon-btn:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 2px; }
+  .scc-icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  /* Hide-screen is a privacy action, not an emergency — ochre, never red. */
+  .scc-icon-btn--panic { color: var(--text-tertiary); }
+  .scc-icon-btn--panic:hover { color: var(--warning-700); background: color-mix(in oklch, var(--warning-500) 10%, transparent); }
   .scc-icon-btn--loading { cursor: wait; }
-  .scc-icon-btn--active { color: var(--chat-accent, var(--primary-500)); background: var(--chat-accent-subtle, color-mix(in oklch, var(--primary-500) 8%, transparent)); }
+  .scc-icon-btn--active { color: var(--primary-700); background: var(--primary-100); }
 
   .scc-mini-spinner {
     width: 15px; height: 15px;
-    border: 2px solid rgba(255,255,255,0.15);
-    border-top-color: var(--chat-accent, var(--primary-500));
-    border-radius: var(--radius-full, 9999px);
+    border: 2px solid var(--border-default);
+    border-top-color: var(--primary-500);
+    border-radius: var(--radius-full);
     animation: scc-spin 0.7s linear infinite;
   }
 
-  /* ── Compose textarea ─────────────────────────────────────────── */
+  /* ── Compose textarea — warm inset well, ember focus ring ─────── */
   .scc-compose-text {
     flex: 1;
     resize: none;
-    padding: var(--space-2-5, 10px) var(--space-3, 12px);
-    border-radius: var(--radius-lg, 14px);
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    background: rgba(255, 255, 255, 0.05);
-    color: rgba(255, 255, 255, 0.92);
+    padding: var(--space-2-5) var(--space-3);
+    border-radius: var(--radius-input);
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-inset);
+    color: var(--text-primary);
     /* 16px unconditionally — iOS checks at pointerdown before media queries fire.
        Below 16px iOS Safari auto-zooms the viewport on focus, which is a poor UX. */
     font-size: 16px;
-    line-height: var(--leading-relaxed, 1.625);
+    line-height: var(--leading-relaxed);
     outline: none;
-    font-family: var(--font-sans, 'Nunito', sans-serif);
-    transition: border-color 0.12s, box-shadow 0.12s;
+    font-family: var(--font-sans);
+    transition: border-color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
     -webkit-appearance: none;
     /* Browsers without field-sizing (older iOS Safari): JS autoResize() handles growth */
     max-height: 120px;
@@ -413,105 +410,106 @@
     }
   }
   .scc-compose-text:focus {
-    border-color: var(--chat-border-accent, color-mix(in oklch, var(--primary-500) 22%, transparent));
-    box-shadow: 0 0 0 3px var(--chat-accent-subtle, color-mix(in oklch, var(--primary-500) 8%, transparent));
+    border-color: var(--primary-500);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary-500) 14%, transparent);
   }
-  .scc-compose-text::placeholder { color: rgba(255,255,255,0.32); }
+  .scc-compose-text::placeholder { color: var(--text-tertiary); }
 
-  /* ── Send button ──────────────────────────────────────────────── */
+  /* ── Send button — the one ember on this row ──────────────────── */
   .scc-send-btn {
     width: 44px; height: 44px;
-    border-radius: var(--radius-lg, 14px);
+    border-radius: var(--radius-input);
     border: none;
-    background: rgba(255, 255, 255, 0.06);
-    color: rgba(255, 255, 255, 0.25);
+    background: var(--surface-inset);
+    color: var(--text-tertiary);
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
-    transition: transform 0.1s, box-shadow 0.2s, background 0.2s, color 0.2s;
+    transition: transform var(--duration-fast) var(--ease-out), background var(--duration-normal) var(--ease-out), color var(--duration-normal) var(--ease-out);
     touch-action: manipulation;
   }
   .scc-send-btn--active {
-    background: linear-gradient(135deg, var(--primary-400, var(--primary-400)) 0%, var(--primary-600, var(--primary-600)) 100%);
-    color: #fff;
-    box-shadow: 0 2px 12px color-mix(in oklch, var(--primary-500) 40%, transparent);
+    background: var(--primary-500);
+    color: var(--text-on-primary);
+    box-shadow: var(--shadow-primary);
   }
-  .scc-send-btn--active:hover { transform: scale(1.06); box-shadow: 0 4px 20px color-mix(in oklch, var(--primary-500) 60%, transparent); }
+  .scc-send-btn--active:hover { background: var(--primary-600); }
   .scc-send-btn--active:active { transform: scale(0.93); }
-  .scc-send-btn:disabled { opacity: 0.28; cursor: not-allowed; box-shadow: none; }
-  .scc-send-btn:focus-visible { outline: 2px solid var(--chat-accent, var(--primary-500)); outline-offset: 2px; }
+  .scc-send-btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+  .scc-send-btn:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 2px; }
 
   .scc-send-ring {
     width: 16px; height: 16px;
-    border: 2px solid rgba(255, 255, 255, 0.25);
-    border-top-color: #fff;
-    border-radius: var(--radius-full, 9999px);
+    border: 2px solid color-mix(in oklch, currentColor 30%, transparent);
+    border-top-color: currentColor;
+    border-radius: var(--radius-full);
     animation: scc-spin 0.7s linear infinite;
   }
 
-  /* ── Attach menu ──────────────────────────────────────────────── */
+  /* ── Attach menu — small paper sheet ──────────────────────────── */
   .scc-attach-wrap { position: relative; }
 
   .scc-attach-menu {
     position: absolute;
-    bottom: calc(100% + var(--space-1-5, 6px));
+    bottom: calc(100% + var(--space-1-5));
     left: 50%;
     transform: translateX(-50%);
-    background: var(--chat-elevated, #0f0f20);
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    border-radius: var(--radius-lg, 14px);
-    padding: var(--space-1, 4px);
+    background: var(--surface-1);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-button);
+    padding: var(--space-1);
     display: flex;
     flex-direction: column;
     gap: 2px;
     min-width: 168px;
-    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.75);
-    animation: scc-pop 0.15s var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
+    box-shadow: var(--shadow-lg);
+    animation: scc-pop 0.15s var(--ease-spring) both;
     z-index: 20;
   }
 
   .scc-attach-item {
     display: flex; align-items: center;
-    gap: var(--space-2, 8px);
-    padding: var(--space-2-5, 10px) var(--space-3, 12px);
+    gap: var(--space-2);
+    padding: var(--space-2-5) var(--space-3);
     background: none; border: none;
-    border-radius: var(--radius-sm2, 8px);
-    color: rgba(255, 255, 255, 0.8);
-    font-size: var(--text-xs, 0.75rem);
+    border-radius: var(--radius-input);
+    color: var(--text-primary);
+    font-size: var(--text-sm);
     font-weight: 500;
-    font-family: var(--font-sans, 'Nunito', sans-serif);
+    font-family: var(--font-sans);
     cursor: pointer;
     white-space: nowrap;
     min-height: 44px;
-    transition: background 0.1s, color 0.1s;
+    transition: background var(--duration-fast) var(--ease-out);
   }
-  .scc-attach-item:hover { background: rgba(255,255,255,0.07); color: #fff; }
-  .scc-attach-item:focus-visible { outline: 2px solid var(--chat-accent, var(--primary-500)); outline-offset: 2px; }
+  .scc-attach-item:hover { background: var(--surface-hover); }
+  .scc-attach-item:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 2px; }
 
   /* ── Meta row ─────────────────────────────────────────────────── */
   .scc-compose-meta {
     display: flex; align-items: center; justify-content: space-between;
   }
 
-  /* Encryption trust cue — accent-tinted lock keeps E2E status clearly visible */
+  /* Encryption trust cue — quiet ink line, ember lock */
   .scc-compose-hint {
     display: flex; align-items: center;
-    gap: var(--space-1-5, 6px);
+    gap: var(--space-1-5);
     margin: 0;
-    font-size: var(--text-2xs, 0.6875rem);
-    font-family: var(--font-sans, 'Nunito', sans-serif);
-    color: rgba(255, 255, 255, 0.4);
+    font-size: var(--text-xs);
+    font-family: var(--font-sans);
+    color: var(--text-tertiary);
   }
-  .scc-compose-hint svg { color: var(--chat-accent, var(--primary-500)); }
+  .scc-compose-hint svg { color: var(--primary-700); }
 
   .scc-char-count {
-    font-size: var(--text-2xs, 0.6875rem);
-    font-family: var(--font-mono, 'JetBrains Mono', monospace);
-    color: rgba(255, 255, 255, 0.3);
+    font-size: var(--text-xs);
+    font-family: var(--font-sans);
+    color: var(--text-tertiary);
     font-variant-numeric: tabular-nums;
-    transition: color 0.2s;
+    transition: color var(--duration-normal) var(--ease-out);
   }
-  .scc-char-count--warn { color: var(--danger-400, var(--danger-400)); }
+  /* Running out of room needs a look, not an alarm — ochre. */
+  .scc-char-count--warn { color: var(--warning-700); font-weight: 600; }
 
   /* ── Screen-reader only ───────────────────────────────────────── */
   .scc-sr {
@@ -531,7 +529,7 @@
   @media (prefers-reduced-motion: reduce) {
     .scc-mini-spinner { animation: none; }
     .scc-send-ring    { animation: none; }
-    .scc-send-btn--active:hover { transform: none; }
+    .scc-send-btn--active:active { transform: none; }
     .scc-attach-menu { animation: none; }
   }
 </style>

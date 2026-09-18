@@ -369,9 +369,9 @@
   .bubble {
     padding: var(--space-2-5, 10px) var(--space-3-5, 14px);
     border-radius: var(--radius-xl, 20px);
-    font-size: var(--text-sm, 0.875rem);
+    font-size: var(--text-base, 1rem);
     line-height: var(--leading-relaxed, 1.625);
-    font-family: var(--font-sans, 'Nunito', sans-serif);
+    font-family: var(--font-sans);
   }
 
   /* iMessage-style grouping — squash the corner closest to the group */
@@ -386,27 +386,23 @@
   .bubble--their.bubble--grp-mid,
   .bubble--locked.bubble--grp-mid   { border-top-left-radius: var(--radius-sm, 6px); border-bottom-left-radius: var(--radius-sm, 6px); }
 
-  /* ── Own bubble — token-styled teal glass (sent + encrypted) ──── */
+  /* ── Own bubble — ember-tinted paper (sent + encrypted) ───────── */
   .bubble--own {
     display: flex;
     align-items: center;
     gap: var(--space-2, 8px);
-    background: linear-gradient(
-      135deg,
-      var(--primary-500-12) 0%,
-      var(--primary-500-08) 100%
-    );
-    border: 1px solid var(--chat-border-accent, color-mix(in oklch, var(--primary-500) 22%, transparent));
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 2px 8px rgba(0, 0, 0, 0.25);
+    background: var(--primary-100);
+    border: 1px solid color-mix(in oklch, var(--primary-500) 20%, transparent);
+    box-shadow: var(--shadow-xs);
     max-width: 100%;
     overflow: hidden;
   }
 
   .cipher-text {
-    font-family: var(--font-mono, 'JetBrains Mono', monospace);
-    font-size: var(--text-2xs, 0.6875rem);
+    font-family: var(--font-sans);
+    font-size: var(--text-xs, 0.75rem);
     letter-spacing: 0.04em;
-    color: color-mix(in oklch, var(--primary-500) 55%, transparent);
+    color: color-mix(in oklch, var(--primary-700) 70%, transparent);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -415,22 +411,22 @@
     user-select: none;
   }
 
-  /* Lock glyph — prominent trust cue on every sent (encrypted) bubble */
+  /* Lock glyph — quiet trust cue on every sent (encrypted) bubble */
   .lock-icon {
-    color: var(--chat-accent, var(--primary-500));
+    color: var(--primary-700);
     opacity: 0.9;
     flex-shrink: 0;
     display: flex;
     align-items: center;
   }
 
-  /* ── Their (decrypted) bubble ────────────────────────────────── */
+  /* ── Their (decrypted) bubble — quiet paper tier ─────────────── */
   .bubble--their {
-    background: rgba(255, 255, 255, 0.07);
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    color: rgba(255, 255, 255, 0.92);
+    background: var(--surface-inset);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
     word-break: break-word;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 4px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--shadow-xs);
   }
 
   .bubble--decrypted {
@@ -456,22 +452,22 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.3);
+    background: color-mix(in oklch, var(--ink) 6%, transparent);
     border: none;
     cursor: pointer;
-    color: rgba(255, 255, 255, 0.35);
-    border-radius: var(--radius-sm2, 8px);
-    transition: color 0.1s, background 0.1s;
+    color: var(--text-tertiary);
+    border-radius: var(--radius-input);
+    transition: color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);
     touch-action: manipulation;
   }
 
   .relock-btn:hover {
-    color: var(--chat-accent, var(--primary-500));
-    background: var(--chat-accent-dim, color-mix(in oklch, var(--primary-500) 18%, transparent));
+    color: var(--primary-700);
+    background: var(--primary-100);
   }
 
   .relock-btn:focus-visible {
-    outline: 2px solid var(--chat-accent, var(--primary-500));
+    outline: 2px solid var(--primary-500);
     outline-offset: 1px;
   }
 
@@ -495,44 +491,44 @@
     display: block;
   }
 
-  /* ── Locked bubble ───────────────────────────────────────────── */
+  /* ── Locked bubble — dashed quiet paper, tap to open ─────────── */
   .bubble--locked {
     display: flex;
     align-items: center;
     gap: var(--space-2, 8px);
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px dashed rgba(255, 255, 255, 0.12);
-    color: rgba(255, 255, 255, 0.3);
-    font-size: var(--text-xs, 0.75rem);
-    font-family: var(--font-sans, 'Nunito', sans-serif);
+    background: var(--surface-2);
+    border: 1px dashed var(--border-strong);
+    color: var(--text-tertiary);
+    font-size: var(--text-sm, 0.875rem);
+    font-family: var(--font-sans);
     cursor: pointer;
     min-height: 44px;
-    transition: background 0.1s, border-color 0.1s;
+    transition: background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
     position: relative;
     touch-action: manipulation;
     overflow: hidden;
   }
 
   .bubble--locked:hover {
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.2);
+    background: var(--surface-inset);
+    border-color: var(--ink-3);
   }
 
   .bubble--locked:focus-visible {
-    outline: 2px solid var(--chat-accent, var(--primary-500));
+    outline: 2px solid var(--primary-500);
     outline-offset: 2px;
   }
 
   .bubble--locked-active {
-    border-color: var(--chat-border-accent, color-mix(in oklch, var(--primary-500) 22%, transparent));
-    background: var(--chat-accent-subtle, color-mix(in oklch, var(--primary-500) 8%, transparent));
+    border-color: color-mix(in oklch, var(--primary-500) 30%, transparent);
+    background: var(--primary-100);
     border-style: solid;
   }
 
-  /* Encrypted lock glyph stays a clear, accent-tinted trust cue while locked */
+  /* Encrypted lock glyph stays a clear, ember-tinted trust cue while locked */
   .locked-lock,
   .locked-photo-label svg {
-    color: var(--chat-accent, var(--primary-500));
+    color: var(--primary-700);
     opacity: 0.8;
     flex-shrink: 0;
   }
@@ -561,9 +557,9 @@
     position: absolute;
     inset: 0;
     background:
-      radial-gradient(ellipse 60% 50% at 30% 40%, color-mix(in oklch, var(--primary-500) 15%, transparent) 0%, transparent 60%),
-      radial-gradient(ellipse 40% 55% at 70% 60%, color-mix(in oklch, var(--member-3) 10%, transparent) 0%, transparent 55%),
-      linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(0, 0, 0, 0.3) 100%);
+      radial-gradient(ellipse 60% 50% at 30% 40%, color-mix(in oklch, var(--primary-500) 18%, transparent) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 55% at 70% 60%, color-mix(in oklch, var(--warning-500) 12%, transparent) 0%, transparent 55%),
+      linear-gradient(135deg, var(--surface-2) 0%, var(--surface-inset) 100%);
     filter: blur(10px);
   }
 
@@ -573,7 +569,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--text-tertiary);
   }
 
   .locked-photo-label {
@@ -581,20 +577,20 @@
     align-items: center;
     gap: var(--space-1-5, 6px);
     padding: var(--space-2, 8px) var(--space-3, 12px);
-    font-size: var(--text-2xs, 0.6875rem);
-    font-family: var(--font-sans, 'Nunito', sans-serif);
-    color: rgba(255, 255, 255, 0.35);
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: var(--text-xs, 0.75rem);
+    font-family: var(--font-sans);
+    color: var(--text-secondary);
+    border-top: 1px solid var(--border-subtle);
     width: 100%;
     box-sizing: border-box;
     flex-shrink: 0;
   }
 
   .cipher-preview {
-    font-family: var(--font-mono, 'JetBrains Mono', monospace);
-    font-size: var(--text-2xs, 0.6875rem);
+    font-family: var(--font-sans);
+    font-size: var(--text-xs, 0.75rem);
     letter-spacing: 0.04em;
-    color: rgba(255, 255, 255, 0.28);
+    color: var(--text-tertiary);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -603,27 +599,27 @@
     user-select: none;
   }
 
-  /* ── Unread indicators ───────────────────────────────────────── */
+  /* ── Unread indicators — ember, the sign of life ─────────────── */
   .unread-pulse {
     width: 8px;
     height: 8px;
     border-radius: var(--radius-full, 9999px);
-    background: var(--chat-accent, var(--primary-500));
-    box-shadow: 0 0 0 0 var(--chat-accent-glow, color-mix(in oklch, var(--primary-500) 28%, transparent));
+    background: var(--primary-500);
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--primary-500) 28%, transparent);
     animation: pulse-accent 1.8s ease-in-out infinite;
     flex-shrink: 0;
   }
 
   @keyframes pulse-accent {
-    0%, 100% { box-shadow: 0 0 0 0 var(--chat-accent-glow, color-mix(in oklch, var(--primary-500) 28%, transparent)); }
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--primary-500) 28%, transparent); }
     50%       { box-shadow: 0 0 0 5px color-mix(in oklch, var(--primary-500) 0%, transparent); }
   }
 
   .msg-ago {
     margin-left: auto;
-    font-size: var(--text-2xs, 0.6875rem);
-    font-family: var(--font-mono, 'JetBrains Mono', monospace);
-    color: rgba(255, 255, 255, 0.22);
+    font-size: var(--text-xs, 0.75rem);
+    font-family: var(--font-sans);
+    color: var(--text-tertiary);
     white-space: nowrap;
     flex-shrink: 0;
   }
@@ -641,14 +637,14 @@
   .meta--their { justify-content: flex-start; }
 
   .msg-time {
-    font-size: var(--text-2xs, 0.6875rem);
-    font-family: var(--font-mono, 'JetBrains Mono', monospace);
-    color: rgba(255, 255, 255, 0.25);
+    font-size: var(--text-xs, 0.75rem);
+    font-family: var(--font-sans);
+    color: var(--text-tertiary);
     font-variant-numeric: tabular-nums;
   }
 
   .msg-time--unread {
-    color: var(--chat-accent, var(--primary-500));
+    color: var(--primary-700);
     font-weight: 600;
   }
 
@@ -656,8 +652,7 @@
     width: 6px;
     height: 6px;
     border-radius: var(--radius-full, 9999px);
-    background: var(--chat-accent, var(--primary-500));
-    box-shadow: 0 0 5px var(--chat-accent-glow, color-mix(in oklch, var(--primary-500) 28%, transparent));
+    background: var(--primary-500);
     flex-shrink: 0;
   }
 
@@ -665,27 +660,27 @@
   .tick {
     display: flex;
     align-items: center;
-    color: rgba(255, 255, 255, 0.28);
-    transition: color 0.3s;
+    color: var(--text-tertiary);
+    transition: color var(--duration-slow) var(--ease-out);
   }
 
-  .tick--seen { color: var(--chat-accent, var(--primary-500)); }
+  .tick--seen { color: var(--primary-700); }
 
   .tick--pulse {
     animation: tick-seen-pulse 0.6s var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1));
   }
 
   @keyframes tick-seen-pulse {
-    0%   { color: rgba(255, 255, 255, 0.28); transform: scale(1); }
-    40%  { color: var(--warning-400); transform: scale(1.4); }
-    100% { color: var(--chat-accent, var(--primary-500)); transform: scale(1); }
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.4); }
+    100% { transform: scale(1); }
   }
 
-  /* ── Countdown bar ───────────────────────────────────────────── */
+  /* ── Countdown bar — a quiet deadline, ochre-free until it acts ── */
   .countdown {
-    font-size: var(--text-2xs, 0.6875rem);
-    font-family: var(--font-mono, 'JetBrains Mono', monospace);
-    color: var(--chat-accent, var(--primary-500));
+    font-size: var(--text-xs, 0.75rem);
+    font-family: var(--font-sans);
+    color: var(--primary-700);
     font-variant-numeric: tabular-nums;
     display: flex;
     align-items: center;
@@ -697,7 +692,7 @@
     width: 40px;
     height: 2px;
     border-radius: var(--radius-full, 9999px);
-    background: rgba(255, 255, 255, 0.12);
+    background: var(--border-default);
     position: relative;
     overflow: hidden;
   }
@@ -707,7 +702,7 @@
     position: absolute;
     inset: 0;
     right: calc(100% - var(--pct, 100%));
-    background: var(--chat-accent, var(--primary-500));
+    background: var(--primary-500);
     border-radius: var(--radius-full, 9999px);
     transition: right 1s linear;
   }
@@ -729,35 +724,34 @@
   /* Always show at reduced opacity on touch devices */
   @media (hover: none) { .msg-actions { opacity: 0.4; } }
 
+  /* Destructive ≠ vermilion (reserved for SOS). Ochre carries "pause and
+     look" weight for message deletion. */
   .delete-btn {
     display: flex;
     align-items: center;
     gap: var(--space-1, 4px);
     padding: var(--space-1, 4px) var(--space-2, 8px);
-    border-radius: var(--radius-sm2, 8px);
+    border-radius: var(--radius-input);
     border: none;
     background: transparent;
-    color: rgba(255, 255, 255, 0.22);
-    font-size: var(--text-2xs, 0.6875rem);
-    font-family: var(--font-sans, 'Nunito', sans-serif);
+    color: var(--text-tertiary);
+    font-size: var(--text-xs, 0.75rem);
+    font-family: var(--font-sans);
     cursor: pointer;
-    transition: color 0.1s, background 0.1s;
+    transition: color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);
     touch-action: manipulation;
     min-height: 44px;
   }
 
-  .delete-btn:hover { color: var(--danger-400, var(--danger-400)); background: color-mix(in oklch, var(--danger-400) 8%, transparent); }
-  .delete-btn--confirm { color: var(--danger-400, var(--danger-400)); background: color-mix(in oklch, var(--danger-400) 12%, transparent); }
-  .delete-btn:focus-visible { outline: 2px solid var(--danger-400, var(--danger-400)); outline-offset: 2px; }
+  .delete-btn:hover { color: var(--warning-700); background: color-mix(in oklch, var(--warning-500) 10%, transparent); }
+  .delete-btn--confirm { color: var(--warning-700); background: color-mix(in oklch, var(--warning-500) 16%, transparent); font-weight: 600; }
+  .delete-btn:focus-visible { outline: 2px solid var(--warning-500); outline-offset: 2px; }
 
-  /* ── Pending / failed bubble states ─────────────────────────── */
+  /* ── Pending / failed bubble states — a failed send needs a look,
+     not an alarm: ochre, never vermilion ─────────────────────── */
   .bubble--pending {
     opacity: 0.55;
-    background: linear-gradient(
-      135deg,
-      color-mix(in oklch, var(--primary-500) 8%, transparent) 0%,
-      color-mix(in oklch, var(--primary-500) 4%, transparent) 100%
-    );
+    background: color-mix(in oklch, var(--primary-500) 6%, transparent);
     border-color: color-mix(in oklch, var(--primary-500) 14%, transparent);
     animation: pending-pulse 1.4s ease-in-out infinite;
   }
@@ -768,34 +762,30 @@
   }
 
   .bubble--failed {
-    background: linear-gradient(
-      135deg,
-      color-mix(in oklch, var(--danger-400) 12%, transparent) 0%,
-      color-mix(in oklch, var(--danger-400) 6%, transparent) 100%
-    );
-    border-color: color-mix(in oklch, var(--danger-400) 30%, transparent);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 2px 8px color-mix(in oklch, var(--danger-400) 12%, transparent);
+    background: color-mix(in oklch, var(--warning-500) 10%, transparent);
+    border-color: color-mix(in oklch, var(--warning-500) 30%, transparent);
+    box-shadow: var(--shadow-xs);
   }
 
   .cipher-text--pending {
-    color: color-mix(in oklch, var(--primary-500) 35%, transparent);
+    color: color-mix(in oklch, var(--primary-700) 45%, transparent);
     letter-spacing: 0.18em;
   }
 
   .cipher-text--failed {
-    color: color-mix(in oklch, var(--danger-400) 50%, transparent);
+    color: var(--warning-700);
     letter-spacing: 0.18em;
   }
 
   .status-icon {
-    color: color-mix(in oklch, var(--primary-500) 40%, transparent);
+    color: color-mix(in oklch, var(--primary-700) 55%, transparent);
     flex-shrink: 0;
     display: flex;
     align-items: center;
   }
 
   .status-icon--failed {
-    color: color-mix(in oklch, var(--danger-400) 70%, transparent);
+    color: var(--warning-700);
   }
 
   /* Retry row — appears below the failed bubble */
@@ -810,26 +800,26 @@
     align-items: center;
     gap: var(--space-1, 4px);
     padding: var(--space-1, 4px) var(--space-2, 8px);
-    border-radius: var(--radius-sm2, 8px);
-    border: 1px solid color-mix(in oklch, var(--danger-400) 30%, transparent);
-    background: color-mix(in oklch, var(--danger-400) 6%, transparent);
-    color: color-mix(in oklch, var(--danger-400) 80%, transparent);
-    font-size: var(--text-2xs, 0.6875rem);
-    font-family: var(--font-sans, 'Nunito', sans-serif);
+    border-radius: var(--radius-input);
+    border: 1px solid color-mix(in oklch, var(--warning-500) 30%, transparent);
+    background: color-mix(in oklch, var(--warning-500) 8%, transparent);
+    color: var(--warning-700);
+    font-size: var(--text-xs, 0.75rem);
+    font-weight: 600;
+    font-family: var(--font-sans);
     cursor: pointer;
-    transition: color 0.1s, background 0.1s, border-color 0.1s;
+    transition: color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
     touch-action: manipulation;
     min-height: 44px;
   }
 
   .retry-btn:hover {
-    color: var(--danger-400);
-    background: color-mix(in oklch, var(--danger-400) 12%, transparent);
-    border-color: color-mix(in oklch, var(--danger-400) 50%, transparent);
+    background: color-mix(in oklch, var(--warning-500) 16%, transparent);
+    border-color: color-mix(in oklch, var(--warning-500) 50%, transparent);
   }
 
   .retry-btn:focus-visible {
-    outline: 2px solid var(--danger-400);
+    outline: 2px solid var(--warning-500);
     outline-offset: 2px;
   }
 
