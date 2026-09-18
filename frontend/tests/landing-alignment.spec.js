@@ -157,9 +157,32 @@ for (const vp of VIEWPORTS) {
         document.getElementById('circle')?.scrollIntoView({ behavior: 'auto' });
       });
       await page.waitForTimeout(150);
-      const box = await page.locator('header.lp-nav').boundingBox();
-      expect(box).not.toBeNull();
-      expect(Math.abs(box.y), 'nav must remain at the top edge').toBeLessThanOrEqual(1);
+      const probe = await page.evaluate(() => {
+        const nav = document.querySelector('header.lp-nav');
+        if (!nav) return null;
+        const cs = getComputedStyle(nav);
+        const atTop = document.elementFromPoint(Math.floor(window.innerWidth / 2), 8);
+        return {
+          y: nav.getBoundingClientRect().y,
+          position: cs.position,
+          top: cs.top,
+          transform: cs.transform,
+          scrollY: window.scrollY,
+          navCoversTop: !!atTop && (nav === atTop || nav.contains(atTop)),
+        };
+      });
+      expect(probe).not.toBeNull();
+      expect(probe.scrollY, 'the page must actually have scrolled').toBeGreaterThan(0);
+      expect(probe.position).toBe('sticky');
+      expect(probe.top).toBe('0px');
+      expect(probe.transform).toBe('none');
+      expect(probe.navCoversTop, 'nav must be the element painted at the top edge').toBe(true);
+      // Under Playwright's touch emulation, scrollIntoView can pan the VISUAL
+      // viewport a few px inside the layout viewport (visualViewport.offsetTop
+      // was 6 on the iPhone projects), which shifts client rects even though
+      // the sticky element is correctly pinned to the layout viewport — the
+      // computed top/position/paint checks above carry the real guarantee.
+      expect(Math.abs(probe.y), 'nav must hug the top edge').toBeLessThanOrEqual(8);
     });
 
     test('screenshot — hero', async ({ page }) => {
