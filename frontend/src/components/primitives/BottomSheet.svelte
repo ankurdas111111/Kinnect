@@ -232,7 +232,7 @@
     position: fixed;
     inset: 0;
     z-index: calc(var(--z-panel) - 1);
-    background: rgba(0, 0, 0, 0.48);
+    background: color-mix(in oklch, var(--ink) 40%, transparent);
     opacity: 0;
     transition: opacity var(--duration-normal) var(--ease-out);
     touch-action: none;
@@ -252,18 +252,15 @@
     height: 90vh;
     height: 90dvh;
     z-index: var(--z-panel);
-    /* nav-tier liquid glass: daypart-warmed material + specular top edge */
+    /* Hearth: a warm paper sheet — daypart warmth layers over solid paper,
+       no glass blur. 24px top corners per the design's sheet register. */
     background:
       linear-gradient(var(--amb-warmth), var(--amb-warmth)),
-      var(--glass-nav-bg);
-    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
-    border: 1px solid var(--glass-nav-border);
+      var(--surface-1);
+    border-radius: var(--radius-sheet, 24px) var(--radius-sheet, 24px) 0 0;
+    border: 1px solid var(--border-default);
     border-bottom: none;
-    box-shadow:
-      var(--elevation-5),
-      var(--glass-nav-highlight);
-    backdrop-filter: var(--glass-nav-blur);
-    -webkit-backdrop-filter: var(--glass-nav-blur);
+    box-shadow: var(--sh-up);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -274,17 +271,15 @@
     /* NOTE: position:fixed declared above — do not add position:relative here */
   }
 
-  /* Tone-aware top-edge light — --glass-edge-light resolves through
-     --nav-tone-accent, so the line reads brand-calm normally and warms to
-     warning/danger with the family verdict. One 500ms opacity-only ease
-     on tone entry comes free from the shared token crossfade pattern. */
+  /* Tone-aware top edge — reads --nav-tone-accent so the hairline stays
+     calm normally and warms to caution/alert with the family verdict.
+     Quiet hairline, no glow: the tone indirection is the point, not the shine. */
   .sheet::before {
     content: '';
     position: absolute;
     top: 0; left: 15%; right: 15%;
-    height: 1px;
-    background: var(--glass-edge-light);
-    box-shadow: 0 0 8px color-mix(in oklch, var(--nav-tone-accent) 40%, transparent);
+    height: 2px;
+    background: color-mix(in oklch, var(--nav-tone-accent) 45%, transparent);
     border-radius: 0 0 2px 2px;
     pointer-events: none;
     z-index: 2;
@@ -307,19 +302,8 @@
   .sheet-handle {
     width: 48px;
     height: 6px;
-    background: var(--gray-300);
+    background: var(--outline-variant);
     border-radius: 999px;
-    /* 3D raised handle */
-    box-shadow:
-      0 1px 3px rgba(0, 0, 0, 0.12),
-      inset 0 1px 0 rgba(255, 255, 255, 0.25);
-  }
-
-  :global([data-theme="dark"]) .sheet-handle {
-    background: rgba(255, 255, 255, 0.25);
-    box-shadow:
-      0 1px 3px rgba(0, 0, 0, 0.30),
-      inset 0 1px 0 rgba(255, 255, 255, 0.10);
   }
 
   .sheet-close {

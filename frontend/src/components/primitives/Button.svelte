@@ -215,47 +215,30 @@
   .btn-lg.icon-only  { width: 48px; }
   .btn-xl.icon-only  { width: 56px; }
 
-  /* ── PRIMARY ──────────────────────────────────────────────────────────── */
+  /* ── PRIMARY — flat ember fill, the one accent ────────────────────────── */
   .btn-primary {
-    background: linear-gradient(160deg,
-      var(--primary-400) 0%,
-      var(--primary-600) 55%,
-      var(--primary-700) 100%
-    );
-    color: #fff;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    box-shadow:
-      0 6px 20px color-mix(in oklch, var(--primary-500) 38%, transparent),
-      0 2px 6px  color-mix(in oklch, var(--primary-500) 22%, transparent),
-      inset 0 1px 0 rgba(255, 255, 255, 0.22),
-      inset 0 -2px 6px rgba(0, 0, 0, 0.14);
+    background: var(--primary-500);
+    color: var(--text-on-primary);
+    border: 1px solid transparent;
+    box-shadow: var(--shadow-sm);
   }
 
   .btn-primary:hover:not(:disabled) {
-    box-shadow:
-      0 10px 32px color-mix(in oklch, var(--primary-500) 52%, transparent),
-      0 4px 12px  color-mix(in oklch, var(--primary-500) 30%, transparent),
-      inset 0 1px 0 rgba(255, 255, 255, 0.26),
-      inset 0 -2px 6px rgba(0, 0, 0, 0.12);
-    filter: brightness(1.06);
+    background: var(--primary-600);
+    box-shadow: var(--shadow-md);
   }
 
-  /* ── SECONDARY ────────────────────────────────────────────────────────── */
+  /* ── SECONDARY — paper with a soft ink outline ────────────────────────── */
   .btn-secondary {
-    background: var(--surface-2, rgba(255,255,255,0.10));
+    background: var(--surface-1);
     color: var(--text-primary);
     border: 1px solid var(--border-default);
-    box-shadow:
-      0 2px 8px rgba(0, 0, 0, 0.08),
-      inset 0 1px 0 rgba(255, 255, 255, 0.10);
+    box-shadow: var(--shadow-xs);
   }
 
   .btn-secondary:hover:not(:disabled) {
-    background: var(--surface-hover, rgba(255,255,255,0.14));
+    background: var(--surface-hover);
     border-color: var(--border-strong);
-    box-shadow:
-      0 4px 16px rgba(0, 0, 0, 0.14),
-      inset 0 1px 0 rgba(255, 255, 255, 0.14);
   }
 
   /* ── GHOST ────────────────────────────────────────────────────────────── */
@@ -266,63 +249,40 @@
   }
 
   .btn-ghost:hover:not(:disabled) {
-    background: var(--surface-hover, rgba(255,255,255,0.07));
+    background: var(--surface-hover);
     color: var(--text-primary);
     border-color: var(--border-subtle);
   }
 
-  /* ── DANGER ───────────────────────────────────────────────────────────── */
+  /* ── DANGER — destructive is ink + outline, never vermilion.
+     Vermilion belongs to SOS surfaces alone; the label carries the meaning. */
   .btn-danger {
-    background: linear-gradient(135deg, var(--danger-500) 0%, var(--danger-600) 100%);
-    color: #fff;
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    box-shadow:
-      0 6px 20px color-mix(in oklch, var(--danger-500) 32%, transparent),
-      inset 0 1px 0 rgba(255, 255, 255, 0.18),
-      inset 0 -2px 6px rgba(0, 0, 0, 0.15);
+    background: transparent;
+    color: var(--text-primary);
+    border: 1.5px solid var(--border-strong);
   }
 
   .btn-danger:hover:not(:disabled) {
-    box-shadow:
-      0 8px 28px color-mix(in oklch, var(--danger-500) 46%, transparent),
-      inset 0 1px 0 rgba(255, 255, 255, 0.22),
-      inset 0 -2px 6px rgba(0, 0, 0, 0.12);
-    filter: brightness(1.06);
+    background: var(--surface-hover);
+    border-color: var(--ink-3);
   }
 
-  /* ── SUCCESS ──────────────────────────────────────────────────────────── */
+  /* ── SUCCESS — flat sage ──────────────────────────────────────────────── */
   .btn-success {
-    background: linear-gradient(135deg, var(--success-500) 0%, var(--success-600) 100%);
-    color: #fff;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    box-shadow:
-      0 6px 20px color-mix(in oklch, var(--success-500) 36%, transparent),
-      inset 0 1px 0 rgba(255, 255, 255, 0.20),
-      inset 0 -2px 6px rgba(0, 0, 0, 0.12);
+    background: var(--success-500);
+    color: var(--text-inverse);
+    border: 1px solid transparent;
+    box-shadow: var(--shadow-sm);
   }
 
   .btn-success:hover:not(:disabled) {
-    filter: brightness(1.08);
-    box-shadow: 0 8px 28px color-mix(in oklch, var(--success-500) 48%, transparent);
+    background: var(--success-600);
   }
 
-  /* ── Shimmer sweep (hover) ────────────────────────────────────────────── */
+  /* ── Shimmer layer retired on paper — kept as an inert element so the
+     markup contract stays identical. ─────────────────────────────────── */
   .btn-shimmer {
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-      105deg,
-      transparent   15%,
-      rgba(255,255,255,0.16) 50%,
-      transparent   85%
-    );
-    transform: translateX(-100%);
-    transition: transform 420ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1));
-    pointer-events: none;
-  }
-
-  .btn:not(.btn-ghost):not(.btn-secondary):hover .btn-shimmer {
-    transform: translateX(100%);
+    display: none;
   }
 
   /* ── Ripple layer ─────────────────────────────────────────────────────── */
@@ -340,7 +300,7 @@
     width: 160px;
     height: 160px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.22);
+    background: oklch(0.99 0.004 80 / 0.22);
     animation: btn-ripple-expand 580ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) forwards;
     pointer-events: none;
   }

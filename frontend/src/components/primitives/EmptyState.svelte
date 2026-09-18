@@ -50,26 +50,26 @@
     height: 64px;
     border-radius: var(--radius-full, 9999px);
     color: var(--text-primary);
-    background: var(--surface-inset, rgba(255, 255, 255, 0.05));
-    box-shadow: inset 0 1px 0 var(--border-highlight, rgba(255, 255, 255, 0.12));
+    background: var(--surface-inset);
     animation: empty-breathe 4s var(--ease-in-out, ease-in-out) infinite;
   }
   .empty-icon :global(svg) { width: 28px; height: 28px; }
 
-  .tone-primary { background: var(--primary-500-12); box-shadow: var(--glow-primary-sm); }
-  .tone-danger  { background: var(--danger-500-12);  box-shadow: var(--glow-sos-sm); }
+  .tone-primary { background: var(--primary-100); color: var(--primary-700); }
+  /* "danger" empty states are error notices, not SOS — deep ochre. */
+  .tone-danger  { background: color-mix(in oklch, var(--warning-500) 12%, transparent); color: var(--warning-700); }
 
   .empty-title {
     margin: 0;
     font-family: var(--font-display);
     font-size: var(--text-lg, 1.125rem);
-    font-weight: 700;
+    font-weight: 600;
     color: var(--text-primary);
   }
 
   .empty-body {
     margin: 0;
-    font-size: var(--text-sm, 0.875rem);
+    font-size: var(--text-base, 1rem);
     line-height: 1.5;
     color: var(--text-secondary);
   }

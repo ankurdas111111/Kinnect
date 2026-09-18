@@ -140,7 +140,7 @@
     position: fixed;
     inset: 0;
     z-index: calc(var(--z-modal) - 1);
-    background: rgba(0, 0, 0, 0.55);
+    background: color-mix(in oklch, var(--ink) 48%, transparent);
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
     animation: backdrop-in 200ms var(--ease-out) both;
@@ -158,13 +158,11 @@
     left: 0;
     right: 0;
     z-index: var(--z-modal);
-    background: var(--glass-bg-strong);
-    backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
-    border-top: 1px solid var(--glass-border-strong);
+    background: var(--surface-1);
+    border-top: 1px solid var(--border-default);
     border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
     padding-bottom: calc(var(--space-6) + var(--safe-bottom, 0px));
-    box-shadow: 0 -24px 64px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--glass-border);
+    box-shadow: var(--sh-up);
     animation: panel-up 320ms var(--ease-spring) both;
     /* 3D card depth */
     transform-style: preserve-3d;
@@ -187,7 +185,7 @@
       right: auto;
       transform: translate(-50%, -50%);
       border-radius: var(--radius-2xl);
-      border: 1px solid var(--glass-border-strong);
+      border: 1px solid var(--border-strong);
       max-width: min(92vw, 560px);
       width: 100%;
       max-height: min(85dvh, 44rem);
@@ -321,7 +319,7 @@
     position: relative;
     /* 3D depth */
     transform-style: preserve-3d;
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
+    box-shadow: inset 0 0 0 1px var(--border-subtle);
   }
 
   .swatch-bg {
@@ -353,14 +351,14 @@
     left: 10px;
     width: 62%;
     height: 22px;
-    background: color-mix(in srgb, var(--sw-bg, var(--surface-0)) 78%, white);
+    background: color-mix(in srgb, var(--sw-bg, var(--surface-0)) 78%, oklch(0.99 0.004 80));
     border: 1px solid color-mix(in srgb, var(--sw-accent, var(--primary-500)) 20%, transparent);
     border-radius: 5px;
     display: flex;
     align-items: center;
     gap: 5px;
     padding: 0 5px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.30);
+    box-shadow: var(--shadow-sm);
   }
 
   .swatch-dot {
@@ -426,11 +424,11 @@
     height: 18px;
     border-radius: var(--radius-full);
     background: var(--sw-accent, var(--primary-500));
-    color: #fff;
+    color: var(--text-inverse);
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 0 8px color-mix(in srgb, var(--sw-accent, var(--primary-500)) 55%, transparent);
+    box-shadow: var(--shadow-xs);
     animation: check-pop 200ms var(--ease-spring) both;
   }
 

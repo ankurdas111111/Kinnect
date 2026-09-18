@@ -55,8 +55,9 @@
     flex-shrink: 0;
     transition: background 400ms var(--ease-out);
   }
+  /* Signal decay is telemetry, not an emergency — sage → ochre → deep ochre */
   .dot-green  { background: var(--success-500); }
   .dot-amber  { background: var(--warning-500); }
-  .dot-red    { background: var(--danger-500); }
+  .dot-red    { background: var(--warning-700); }
   .dot-empty  { background: var(--border-default); }
 </style>

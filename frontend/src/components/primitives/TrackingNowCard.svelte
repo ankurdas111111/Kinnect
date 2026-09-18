@@ -77,19 +77,13 @@
 </TiltCard>
 
 <style>
+  /* Hearth: warm paper card, no glass. */
   .now-card {
-    background: var(--glass-3d, rgba(255,255,255,0.65));
-    border: 1px solid var(--glass-3d-border, #e2e8f0);
-    border-top-color: rgba(255, 255, 255, 0.25);
+    background: var(--surface-1);
+    border: 1px solid var(--border-default);
     border-radius: 20px;
     padding: 14px;
-    /* 3D floating card with depth */
-    box-shadow:
-      var(--elevation-3, 0 10px 28px rgba(15, 23, 42, 0.08)),
-      inset 0 1px 0 rgba(255, 255, 255, 0.18),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.05);
-    backdrop-filter: var(--glass-3d-blur, blur(24px) saturate(2.0));
-    -webkit-backdrop-filter: var(--glass-3d-blur, blur(24px) saturate(2.0));
+    box-shadow: var(--shadow-sm);
     margin-bottom: 12px;
     transform-style: preserve-3d;
   }
@@ -109,7 +103,7 @@
   p {
     margin: 2px 0 0;
     font-size: 12px;
-    color: var(--text-secondary, #64748b);
+    color: var(--text-secondary);
   }
 
   .toggle {
@@ -117,8 +111,10 @@
     min-height: 44px;
   }
 
+  /* Stopping a share is a calm act, not an emergency — sage, never red. */
   .toggle.live {
-    background: var(--danger-500, var(--danger-500));
+    background: var(--success-600);
+    color: var(--text-inverse);
   }
 
   .stats {
@@ -129,17 +125,13 @@
   }
 
   .stat {
-    background: var(--surface-inset, rgba(15, 23, 42, 0.04));
+    background: var(--surface-inset);
     border-radius: 12px;
     padding: 10px;
     display: flex;
     flex-direction: column;
     gap: 2px;
-    /* 3D inset stat cell */
-    border: 1px solid var(--border-subtle, rgba(0,0,0,0.04));
-    box-shadow:
-      inset 0 2px 4px rgba(0, 0, 0, 0.04),
-      0 1px 0 rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-subtle);
   }
 
   .stat.wide {
@@ -148,7 +140,7 @@
 
   .stat span {
     font-size: 11px;
-    color: var(--text-secondary, #64748b);
+    color: var(--text-secondary);
   }
 
   .stat strong {
@@ -169,7 +161,7 @@
 
   .meta {
     font-size: 11px;
-    color: var(--text-secondary, #64748b);
+    color: var(--text-secondary);
     margin-left: auto;
   }
 

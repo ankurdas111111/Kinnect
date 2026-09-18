@@ -150,68 +150,45 @@
 {/if}
 
 <style>
+  /* Hearth: an ink veil over the paper room — warm, never pure black. */
   .modal-backdrop {
     position: fixed;
     inset: 0;
     z-index: var(--z-modal, 5000);
-    background: rgba(0, 0, 0, 0.62);
+    background: color-mix(in oklch, var(--ink) 52%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
     padding: var(--space-4);
-    backdrop-filter: blur(8px) saturate(1.4);
-    -webkit-backdrop-filter: blur(8px) saturate(1.4);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
     overscroll-behavior: none;
   }
 
   /* An urgent modal is an SOS. It outranks EVERYTHING, including the
      first-run onboarding overlay at --z-topmost, which was covering "someone
      needs help" with "Give your family a name" for any new user. */
+  /* Urgent = SOS: the veil warms toward vermilion — the one red in the app. */
   .modal-backdrop.urgent {
     z-index: calc(var(--z-topmost, 9000) + 10);
     background: color-mix(in oklch, var(--danger-700) 22%, transparent);
-    backdrop-filter: blur(10px) saturate(1.6);
-    -webkit-backdrop-filter: blur(10px) saturate(1.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
   }
 
-  /* 3D spring entrance — rises from depth plane */
+  /* Warm paper sheet — spring entrance kept (modal-3d-arrive). */
   .modal-card {
-    background: var(--glass-3d, rgba(15, 15, 30, 0.85));
-    border: 1px solid var(--glass-3d-border, rgba(255,255,255,0.10));
-    border-top-color: rgba(255,255,255,0.16);
+    background: var(--surface-1);
+    border: 1px solid var(--border-default);
     border-radius: var(--radius-xl);
-    box-shadow:
-      var(--elevation-4),
-      var(--glass-3d-inner),
-      0 0 0 1px rgba(255,255,255,0.04);
-    backdrop-filter: var(--glass-3d-blur, blur(28px) saturate(1.8));
-    -webkit-backdrop-filter: var(--glass-3d-blur, blur(28px) saturate(1.8));
+    box-shadow: var(--shadow-xl);
     overflow-y: auto;
     max-height: min(85dvh, 40rem);
     display: flex;
     flex-direction: column;
-    /* 3D spring entrance animation */
     animation: modal-3d-arrive 480ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
     transform-style: preserve-3d;
     position: relative;
-  }
-
-  /* Subtle top-edge glow line */
-  .modal-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 10%; right: 10%;
-    height: 1px;
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      rgba(20, 184, 166, 0.70) 35%,
-      rgba(16, 185, 129, 0.60) 65%,
-      transparent 100%
-    );
-    box-shadow: 0 0 8px rgba(20, 184, 166, 0.40);
-    border-radius: 0 0 2px 2px;
-    pointer-events: none;
   }
 
   .modal-card.sm { width: min(90vw, 340px); max-width: 100%; }
@@ -219,33 +196,19 @@
   .modal-card.lg { width: min(90vw, 560px); max-width: 100%; }
 
   .modal-card.urgent {
-    border-color: rgba(239, 68, 68, 0.40);
-    border-top-color: rgba(239, 68, 68, 0.55);
-    animation: modal-3d-arrive 480ms cubic-bezier(0.34, 1.56, 0.64, 1) both,
-               urgent-glow-pulse 2.2s ease-in-out 500ms infinite;
+    border-color: color-mix(in oklch, var(--danger-500) 40%, transparent);
+    box-shadow: var(--shadow-xl), var(--shadow-danger);
   }
 
+  /* SOS top edge — quiet vermilion hairline, no neon sweep. */
   .modal-card.urgent::before {
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      rgba(239, 68, 68, 0.80) 35%,
-      rgba(239, 68, 68, 0.65) 65%,
-      transparent 100%
-    );
-    box-shadow: 0 0 12px rgba(239, 68, 68, 0.55);
-  }
-
-  @keyframes urgent-glow-pulse {
-    0%, 100% {
-      box-shadow: var(--elevation-4), var(--glass-3d-inner), 0 0 0 1px rgba(239,68,68,0.25);
-    }
-    50% {
-      box-shadow: var(--elevation-4), var(--glass-3d-inner),
-                  0 0 0 1px rgba(239,68,68,0.45),
-                  0 0 24px rgba(239,68,68,0.22),
-                  0 0 48px rgba(239,68,68,0.10);
-    }
+    content: '';
+    position: absolute;
+    top: 0; left: 10%; right: 10%;
+    height: 2px;
+    background: var(--danger-500);
+    border-radius: 0 0 2px 2px;
+    pointer-events: none;
   }
 
   .modal-header {
@@ -258,14 +221,14 @@
   .modal-title {
     font-family: var(--font-display);
     font-size: var(--text-xl);
-    font-weight: 700;
+    font-weight: 600;
     color: var(--text-primary);
-    letter-spacing: -0.02em;
+    letter-spacing: -0.01em;
     margin: 0;
   }
 
   .modal-title.urgent {
-    color: var(--danger-400);
+    color: var(--danger-600);
   }
 
   .modal-close {
@@ -314,7 +277,7 @@
     }
     .modal-card.urgent {
       animation: none;
-      box-shadow: var(--elevation-4), 0 0 0 2px var(--danger-500);
+      box-shadow: var(--shadow-xl), 0 0 0 2px var(--danger-500);
     }
   }
 </style>

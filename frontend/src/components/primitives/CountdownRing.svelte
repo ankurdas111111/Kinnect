@@ -46,7 +46,9 @@
   let remaining = $state(Math.max(0, deadline - Date.now()));
   let expired   = $state(false);
 
-  // Threshold classes (> 25% green, ≤ 25% amber, ≤ 10% red) — CONTRACTS.md §9
+  // Threshold classes (> 25% sage, ≤ 25% ochre, ≤ 10% deep ochre) —
+  // CONTRACTS.md §9. A deadline drawing close is "needs a look", never
+  // vermilion: red is reserved for actual SOS states, not countdowns.
   const thresholdClass = $derived.by(() => {
     const frac = total > 0 ? remaining / total : 0;
     if (frac <= 0.10) return 'ring-danger';
@@ -121,7 +123,7 @@
     {/if}
   </div>
 
-  <!-- Danger glow pulse — opacity-only, GPU safe, class fx-ambient -->
+  <!-- Final-stretch pulse — opacity-only, GPU safe, class fx-ambient -->
   {#if thresholdClass === 'ring-danger'}
     <div class="danger-glow fx-ambient" aria-hidden="true"></div>
   {/if}
@@ -142,10 +144,10 @@
     transition: background 600ms var(--ease-out, ease);
   }
 
-  /* Threshold color tokens — CONTRACTS.md §9 */
+  /* Threshold color tokens — sage → ochre → deep ochre (no vermilion) */
   .ring-ok     { background: conic-gradient(from -90deg, var(--status-live)  var(--pct), var(--surface-inset) 0); }
   .ring-warn   { background: conic-gradient(from -90deg, var(--warning-500)  var(--pct), var(--surface-inset) 0); }
-  .ring-danger { background: conic-gradient(from -90deg, var(--danger-500)   var(--pct), var(--surface-inset) 0); }
+  .ring-danger { background: conic-gradient(from -90deg, var(--warning-700)  var(--pct), var(--surface-inset) 0); }
 
   /* ── Inner track (donut hole) ────────────────────────────────────────────── */
   .ring-inner {
@@ -168,13 +170,13 @@
     margin: var(--space-2) 0;
   }
 
-  /* Monospace numeric value — CONTRACTS.md §9 */
+  /* Tabular numeric value — CONTRACTS.md §9 */
   .ring-value {
-    font-family: var(--font-mono);
+    font-family: var(--font-sans);
     font-size: clamp(1.375rem, 6vw, 1.875rem);
-    font-weight: 900;
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.01em;
     line-height: 1.05;
     text-align: center;
     /* Color transition on value (text only, not the ring) — one crossfade per threshold */
@@ -182,25 +184,24 @@
   }
 
   /* Threshold text colors — paired with numeric to satisfy "never color alone" */
-  .ring-ok-text     { color: var(--status-live); }
-  .ring-warn-text   { color: var(--warning-500); }
-  .ring-danger-text { color: var(--danger-500); }
+  .ring-ok-text     { color: var(--success-600); }
+  .ring-warn-text   { color: var(--warning-600); }
+  .ring-danger-text { color: var(--warning-700); }
 
   .ring-caption {
-    font-size: var(--text-2xs);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
+    font-size: 12px;
+    letter-spacing: 0.02em;
     color: var(--text-tertiary);
   }
 
-  /* ── Danger glow pulse — opacity only (GPU), class fx-ambient ───────────── */
+  /* ── Final-stretch pulse — opacity only (GPU), class fx-ambient ─────────── */
   .danger-glow {
     position: absolute;
     inset: -8px;
     border-radius: 50%;
     /* Box-shadow only paints once per frame during the opacity keyframe —
        acceptable; this is NOT a box-shadow transition on a loop */
-    box-shadow: 0 0 30px 4px color-mix(in oklch, var(--danger-500) 20%, transparent);
+    box-shadow: 0 0 30px 4px color-mix(in oklch, var(--warning-500) 22%, transparent);
     pointer-events: none;
     animation: ring-glow 1.4s var(--ease-in-out, ease-in-out) infinite;
   }

@@ -104,7 +104,8 @@
     }
   }
 
-  /* 2026 premium toast — glass surface + neon accent + spring entrance */
+  /* Hearth toast — quiet paper slip with one tinted edge. No glass, no neon.
+     Error is NOT red: vermilion belongs to SOS alone; the words carry it. */
   .toast {
     cursor: grab;
     user-select: none;
@@ -114,76 +115,26 @@
     gap: var(--space-3);
     padding: var(--space-3) var(--space-4);
     border-radius: var(--radius-lg);
-    /* Deep glass with richer backdrop */
-    background: var(--glass-bg-strong, rgba(9, 10, 22, 0.95));
-    border: 1px solid var(--glass-3d-border, rgba(255,255,255,0.10));
-    border-top-color: rgba(255,255,255,0.14);
-    box-shadow:
-      var(--elevation-4),
-      inset 0 1px 0 rgba(255, 255, 255, 0.08),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.18);
-    backdrop-filter: blur(28px) saturate(1.9);
-    -webkit-backdrop-filter: blur(28px) saturate(1.9);
-    font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 500;
+    background: var(--surface-1);
+    border: 1px solid var(--border-default);
+    box-shadow: var(--shadow-lg);
+    font-family: var(--font-sans);
+    font-size: var(--text-base, 16px);
+    font-weight: 400;
     color: var(--text-primary);
     pointer-events: auto;
     position: relative;
     overflow: hidden;
-    /* Neon left accent bar */
     border-left: 3px solid transparent;
-    /* 2026 spring entrance */
     animation: toast-spring-in 360ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
   }
 
-  /* Shimmer sweep on new toast */
-  .toast::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-      105deg,
-      transparent 20%,
-      rgba(255,255,255,0.07) 45%,
-      rgba(255,255,255,0.05) 55%,
-      transparent 80%
-    );
-    transform: translateX(-120%);
-    pointer-events: none;
-    animation: holo-travel 1.8s ease-out 200ms both;
-    border-radius: inherit;
-  }
-
-  /* Type-specific neon left accent + glow */
-  .toast-info {
-    border-left-color: var(--primary-500);
-    box-shadow:
-      var(--elevation-4),
-      inset 0 1px 0 rgba(255,255,255,0.08),
-      -2px 0 12px color-mix(in oklch, var(--primary-500) 25%, transparent);
-  }
-  .toast-success {
-    border-left-color: var(--success-500);
-    box-shadow:
-      var(--elevation-4),
-      inset 0 1px 0 rgba(255,255,255,0.08),
-      -2px 0 14px color-mix(in oklch, var(--success-500) 30%, transparent);
-  }
-  .toast-error {
-    border-left-color: var(--danger-500);
-    box-shadow:
-      var(--elevation-4),
-      inset 0 1px 0 rgba(255,255,255,0.08),
-      -2px 0 14px color-mix(in oklch, var(--danger-500) 32%, transparent);
-  }
-  .toast-warning {
-    border-left-color: var(--warning-500);
-    box-shadow:
-      var(--elevation-4),
-      inset 0 1px 0 rgba(255,255,255,0.08),
-      -2px 0 12px color-mix(in oklch, var(--warning-500) 28%, transparent);
-  }
+  /* Type accents — ember for info, sage for success, ochre for warning,
+     ink for errors (explicit copy, never a red flare). */
+  .toast-info    { border-left-color: var(--primary-500); }
+  .toast-success { border-left-color: var(--success-500); }
+  .toast-error   { border-left-color: var(--ink); }
+  .toast-warning { border-left-color: var(--warning-500); }
 
   .toast-icon {
     flex-shrink: 0;
@@ -192,28 +143,24 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-full, 9999px);
   }
 
   .toast-info .toast-icon    {
-    background: color-mix(in oklch, var(--primary-500) 16%, transparent);
-    color: var(--primary-400);
-    box-shadow: 0 0 8px color-mix(in oklch, var(--primary-500) 20%, transparent);
+    background: var(--primary-100);
+    color: var(--primary-700);
   }
   .toast-success .toast-icon {
-    background: color-mix(in oklch, var(--success-500) 16%, transparent);
-    color: var(--success-400);
-    box-shadow: 0 0 8px color-mix(in oklch, var(--success-500) 22%, transparent);
+    background: color-mix(in oklch, var(--success-500) 14%, transparent);
+    color: var(--success-600);
   }
   .toast-error .toast-icon   {
-    background: color-mix(in oklch, var(--danger-500) 16%, transparent);
-    color: var(--danger-400);
-    box-shadow: 0 0 8px color-mix(in oklch, var(--danger-500) 24%, transparent);
+    background: var(--surface-inset);
+    color: var(--text-primary);
   }
   .toast-warning .toast-icon {
-    background: color-mix(in oklch, var(--warning-500) 16%, transparent);
-    color: var(--warning-400);
-    box-shadow: 0 0 8px color-mix(in oklch, var(--warning-500) 20%, transparent);
+    background: color-mix(in oklch, var(--warning-500) 14%, transparent);
+    color: var(--warning-600);
   }
 
   .toast-message {
@@ -245,7 +192,7 @@
     background: var(--surface-hover);
   }
 
-  /* Neon progress bar at bottom */
+  /* Quiet time-remaining line (transform-only) */
   .toast-progress {
     position: absolute;
     bottom: 0;
@@ -257,22 +204,10 @@
     border-radius: 0 0 var(--radius-lg) 0;
   }
 
-  .toast-info .toast-progress    {
-    background: linear-gradient(90deg, var(--primary-500), var(--primary-400));
-    box-shadow: 0 0 4px color-mix(in oklch, var(--primary-500) 50%, transparent);
-  }
-  .toast-success .toast-progress {
-    background: linear-gradient(90deg, var(--success-500), var(--success-400));
-    box-shadow: 0 0 4px color-mix(in oklch, var(--success-500) 50%, transparent);
-  }
-  .toast-error .toast-progress   {
-    background: linear-gradient(90deg, var(--danger-500), var(--danger-400));
-    box-shadow: 0 0 4px color-mix(in oklch, var(--danger-500) 50%, transparent);
-  }
-  .toast-warning .toast-progress {
-    background: linear-gradient(90deg, var(--warning-500), var(--warning-400));
-    box-shadow: 0 0 4px color-mix(in oklch, var(--warning-500) 50%, transparent);
-  }
+  .toast-info .toast-progress    { background: var(--primary-500); }
+  .toast-success .toast-progress { background: var(--success-500); }
+  .toast-error .toast-progress   { background: var(--ink-3); }
+  .toast-warning .toast-progress { background: var(--warning-500); }
 
   @keyframes toast-progress {
     from { transform: scaleX(1); }
@@ -281,9 +216,6 @@
 
   @media (prefers-reduced-motion: reduce) {
     .toast {
-      animation: none;
-    }
-    .toast::after {
       animation: none;
     }
   }

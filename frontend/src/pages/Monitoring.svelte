@@ -132,6 +132,13 @@
 		warning: 'Degraded',
 		error: 'Down',
 	};
+	// Plain-words verdict for the crest — the one sentence that answers
+	// "is the backend okay?" before any numbers.
+	const healthSentenceMap = {
+		ok: 'The backend is healthy.',
+		warning: 'The backend is degraded — worth a look.',
+		error: 'The backend is down.',
+	};
 
 	// Token-based status classes (map to .status-* styles below) — no Tailwind
 	const getStatusColor = (status) => {
@@ -180,12 +187,13 @@
 
 	<header class="header">
 		<div class="header-lead">
-			<div class="title-row">
-				<span class="title-icon" aria-hidden="true">
-					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l3-4 3 2 4-6"/></svg>
-				</span>
-				<h1 class="title">Backend Monitoring</h1>
-			</div>
+			<h1 class="title verdict-voice">
+				{#if $healthData}
+					{healthSentenceMap[$healthData.status] || 'Backend health'}
+				{:else}
+					Backend health
+				{/if}
+			</h1>
 			<div class="last-update">
 				<span
 					class="refresh-indicator"
@@ -420,11 +428,15 @@
 </div>
 
 <style>
+	/* Hearth: internal diagnostics on quiet paper — one narrow column,
+	   sentences before numbers. */
 	.dashboard {
-		background: var(--bg-base, #0a0a14); /* raw-color-ok — bg-base fallback */
+		background: var(--surface-0);
 		color: var(--text-primary);
 		font-family: var(--font-sans);
 		min-height: 100vh;
+		max-width: 640px;
+		margin: 0 auto;
 		padding: calc(var(--safe-top, env(safe-area-inset-top, 0px)) + var(--space-5)) var(--space-5)
 			calc(var(--space-6) + var(--safe-bottom, env(safe-area-inset-bottom, 0px)));
 	}
@@ -450,22 +462,11 @@
 		border-bottom: 1px solid var(--border-default);
 	}
 
-	.title-row { display: flex; align-items: center; gap: var(--space-2); }
-	.title-icon {
-		display: grid; place-items: center;
-		width: 36px; height: 36px;
-		border-radius: var(--radius-md, 10px);
-		background: var(--primary-500-12);
-		color: var(--primary-400);
-	}
-	.title-icon :global(svg) { width: 20px; height: 20px; }
-
+	/* Serif verdict crest — one honest sentence, then the details */
 	.title {
 		margin: 0;
-		font-family: var(--font-display);
-		font-size: var(--text-xl, 22px);
-		font-weight: 700;
-		letter-spacing: -0.02em;
+		font-size: 24px;
+		line-height: 1.4;
 		color: var(--text-primary);
 	}
 
@@ -495,8 +496,8 @@
 		width: 36px; height: 36px;
 		flex-shrink: 0;
 		border-radius: var(--radius-md, 10px);
-		background: var(--primary-500-12);
-		color: var(--primary-400);
+		background: var(--primary-100);
+		color: var(--primary-700);
 	}
 	.metric-icon :global(svg) { width: 19px; height: 19px; }
 
@@ -506,12 +507,12 @@
 		gap: 2px;
 		margin-bottom: var(--space-3);
 	}
+	/* Readings, not KPIs: calm weight, modest size */
 	.metric-hero-value {
-		font-family: var(--font-display);
-		font-size: var(--text-2xl, 28px);
-		font-weight: 800;
-		line-height: 1.05;
-		letter-spacing: -0.02em;
+		font-family: var(--font-sans);
+		font-size: var(--text-xl, 20px);
+		font-weight: 600;
+		line-height: 1.2;
 		color: var(--text-primary);
 		font-variant-numeric: tabular-nums;
 	}
@@ -547,10 +548,11 @@
 		font-variant-numeric: tabular-nums;
 	}
 
-	/* Status colors — token driven (replaces Tailwind text-*-600) */
-	.status-ok      { color: var(--success-500); }
-	.status-error   { color: var(--danger-500); }
-	.status-warning { color: var(--warning-500); }
+	/* Status colors — sage / ochre only. Vermilion belongs to family SOS,
+	   not server health; "Down" is carried by the word itself. */
+	.status-ok      { color: var(--success-600); }
+	.status-error   { color: var(--warning-700); font-weight: 700; }
+	.status-warning { color: var(--warning-600); }
 
 	/* ── Stale chip ─────────────────────────────────────────────────── */
 	.stale-chip {
@@ -589,18 +591,18 @@
 	.metric-num { color: var(--text-primary); font-weight: 700; font-variant-numeric: tabular-nums; }
 	.metric-table tbody tr:hover { background: var(--surface-hover); }
 
-	/* ── Error banner ───────────────────────────────────────────────── */
+	/* ── Error banner — ochre notice, not a red alarm ───────────────── */
 	.error-message {
 		display: flex;
 		align-items: center;
 		gap: var(--space-2);
-		background: var(--danger-500-12);
-		border: 1px solid var(--danger-500-20);
+		background: color-mix(in oklch, var(--warning-500) 10%, transparent);
+		border: 1px solid color-mix(in oklch, var(--warning-500) 26%, transparent);
 		border-radius: var(--radius-md, 10px);
 		padding: var(--space-3) var(--space-4);
 		margin-bottom: var(--space-5);
-		color: var(--danger-500);
-		font-size: var(--text-sm, 13px);
+		color: var(--warning-700);
+		font-size: var(--text-base, 16px);
 	}
 	.error-message :global(svg) { flex-shrink: 0; }
 
@@ -617,7 +619,7 @@
 		height: 100%;
 		width: 100%;
 		transform-origin: left center;
-		background: linear-gradient(90deg, var(--success-500), var(--primary-500));
+		background: var(--primary-500);
 		border-radius: var(--radius-full, 999px);
 		transition: transform 300ms var(--ease-out, cubic-bezier(0.16,1,0.3,1));
 	}
@@ -628,7 +630,6 @@
 		width: 8px; height: 8px;
 		background: var(--success-500);
 		border-radius: 50%;
-		box-shadow: var(--glow-success-sm, 0 0 8px color-mix(in oklch, var(--success-500) 20%, transparent));
 		animation: pulse 2s infinite;
 	}
 	/* Stale state: amber dot, no pulse */
@@ -646,30 +647,26 @@
 		min-height: 44px;
 		padding: 0 var(--space-5);
 		border-radius: var(--radius-md, 10px);
-		background: var(--primary-500-12);
-		color: var(--primary-400);
-		font-size: var(--text-sm, 13px);
+		background: var(--surface-1);
+		color: var(--primary-700);
+		font-size: var(--text-sm, 14px);
 		font-weight: 600;
-		border: 1px solid var(--primary-500-20);
+		border: 1.5px solid color-mix(in oklch, var(--primary-500) 45%, transparent);
 		cursor: pointer;
 		transition: background var(--duration-fast, 120ms) var(--ease-out, cubic-bezier(0.4,0,0.2,1));
 		touch-action: manipulation;
 	}
-	.retry-btn:hover { background: var(--primary-500-20); }
+	.retry-btn:hover { background: var(--primary-50); }
 	.retry-btn:active { transform: scale(0.97); }
 
-	/* ── Bento grid ─────────────────────────────────────────────────── */
-	:global(.bento-grid) {
+	/* ── One-column flow — sections stacked like paragraphs, not a bento.
+	   Scoped to this page so the shared .bento-grid (tokens-fx.css) is
+	   untouched elsewhere. ── */
+	.dashboard :global(.bento-grid) {
 		display: grid;
-		grid-template-columns: repeat(var(--bento-cols, 3), 1fr);
+		grid-template-columns: 1fr;
 		gap: var(--space-4);
 		margin-bottom: var(--space-4);
-	}
-
-	@media (max-width: 900px) {
-		:global(.bento-grid) {
-			grid-template-columns: 1fr;
-		}
 	}
 
 	@keyframes pulse {

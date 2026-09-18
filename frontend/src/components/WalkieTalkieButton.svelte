@@ -96,19 +96,19 @@
   }
 
   .call-bar.calling {
-    background: var(--bg-secondary, rgba(255,255,255,0.06));
-    border: 1px solid var(--border-subtle, rgba(255,255,255,0.1));
+    background: var(--surface-3);
+    border: 1px solid var(--border-subtle);
   }
 
   .call-bar.connected {
-    background: color-mix(in oklch, var(--primary-500) 10%, transparent);
+    background: var(--primary-100);
     border: 1px solid color-mix(in oklch, var(--primary-500) 30%, transparent);
   }
 
   .call-label {
     flex: 1;
-    font-size: var(--text-sm, 13px);
-    color: var(--text-secondary, rgba(255,255,255,0.6));
+    font-size: var(--text-sm, 14px);
+    color: var(--text-secondary);
   }
 
   /* Animated dots for "Calling..." */
@@ -133,38 +133,38 @@
     gap: var(--space-2, 8px);
     min-height: 44px;
     padding: var(--space-2, 8px) var(--space-4, 16px);
-    background: var(--brand-primary, var(--primary-500));
+    background: var(--primary-500);
     color: var(--text-on-primary);
     border: none;
-    border-radius: var(--radius-md, 8px);
-    font-size: var(--text-sm, 13px);
+    border-radius: var(--radius-md, 10px);
+    font-size: var(--text-sm, 14px);
     font-weight: 600;
     cursor: pointer;
     transition: background 120ms, box-shadow 120ms;
   }
 
   .btn-ptt:active {
-    background: var(--brand-primary-dark, var(--primary-600));
+    background: var(--primary-600);
     box-shadow: 0 0 0 4px color-mix(in oklch, var(--primary-500) 35%, transparent);
   }
 
-  /* ── Cancel / End button ──────────────────────────────────────── */
+  /* ── Cancel / End button — ending a chat is calm, not destructive-red ── */
   .btn-cancel {
     min-width: 48px;
     min-height: 44px;
     padding: var(--space-2, 8px) var(--space-3, 12px);
-    background: color-mix(in oklch, var(--danger-500) 15%, transparent);
-    color: var(--status-danger, var(--danger-500));
-    border: 1px solid color-mix(in oklch, var(--danger-500) 30%, transparent);
-    border-radius: var(--radius-md, 8px);
-    font-size: var(--text-sm, 13px);
+    background: transparent;
+    color: var(--text-primary);
+    border: 1.5px solid var(--border-strong);
+    border-radius: var(--radius-md, 10px);
+    font-size: var(--text-sm, 14px);
     font-weight: 600;
     cursor: pointer;
     transition: background 120ms;
   }
 
   .btn-cancel:hover {
-    background: color-mix(in oklch, var(--danger-500) 25%, transparent);
+    background: var(--surface-hover);
   }
 
   /* ── Idle Talk button (fits inside card-actions row) ─────────── */

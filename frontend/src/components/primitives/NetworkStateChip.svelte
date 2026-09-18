@@ -59,31 +59,17 @@
     gap: 6px;
     padding: 6px 10px;
     border-radius: 999px;
-    background: rgba(16, 185, 129, 0.14);
-    border: 1px solid rgba(16, 185, 129, 0.3);
-    color: var(--success-700, #047857);
+    background: color-mix(in oklch, var(--success-500) 12%, transparent);
+    border: 1px solid color-mix(in oklch, var(--success-500) 28%, transparent);
+    color: var(--success-700);
     font-size: 11px;
     font-weight: 600;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
   }
 
   .network-chip.offline {
-    background: rgba(245, 158, 11, 0.14);
-    border-color: rgba(245, 158, 11, 0.32);
-    color: var(--warning-700, #b45309);
-  }
-
-  :global([data-theme="dark"]) .network-chip {
-    background: color-mix(in oklch, var(--success-500) 18%, transparent);
-    border-color: color-mix(in oklch, var(--success-400) 35%, transparent);
-    color: var(--success-400, #34d399);
-  }
-
-  :global([data-theme="dark"]) .network-chip.offline {
-    background: color-mix(in oklch, var(--warning-500) 18%, transparent);
-    border-color: color-mix(in oklch, var(--warning-400) 35%, transparent);
-    color: var(--warning-400, #fbbf24);
+    background: color-mix(in oklch, var(--warning-500) 12%, transparent);
+    border-color: color-mix(in oklch, var(--warning-500) 28%, transparent);
+    color: var(--warning-700);
   }
 
   .dot {

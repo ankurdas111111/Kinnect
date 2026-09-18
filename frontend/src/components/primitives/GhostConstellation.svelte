@@ -96,9 +96,9 @@
   .gc-avatar {
     position: absolute; inset: 0; display: grid; place-items: center;
     border-radius: var(--radius-full, 9999px);
-    background: var(--primary-500-12); color: var(--text-primary);
-    font-family: var(--font-display); font-size: var(--text-sm); font-weight: 700;
-    box-shadow: var(--glow-primary-sm), inset 0 0 0 2px color-mix(in oklch, var(--primary-400) 55%, transparent);
+    background: var(--primary-100); color: var(--text-primary);
+    font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 600;
+    box-shadow: inset 0 0 0 2px color-mix(in oklch, var(--primary-500) 45%, transparent);
   }
 
   /* Materialize: a member joined while this was on screen — ghosts yield.
@@ -111,10 +111,10 @@
   .gc-cta {
     display: inline-flex; align-items: center; gap: var(--space-1-5);
     min-height: 44px; padding: var(--space-2-5) var(--space-4);
-    background: linear-gradient(135deg, var(--primary-500), var(--primary-700));
+    background: var(--primary-500);
     color: var(--text-on-primary); border: none; border-radius: var(--radius-lg);
-    font-family: var(--font-display); font-size: var(--text-sm); font-weight: 700;
-    cursor: pointer; box-shadow: var(--glow-primary-sm);
+    font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 600;
+    cursor: pointer; box-shadow: var(--shadow-sm);
     transition: transform var(--duration-fast) var(--ease-spring);
     -webkit-tap-highlight-color: transparent;
   }

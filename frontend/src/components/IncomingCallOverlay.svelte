@@ -50,7 +50,7 @@
   .backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.4);
+    background: color-mix(in oklch, var(--ink) 40%, transparent);
     /* Was z:999 = same as BottomSheet backdrop (--z-panel - 1).
        Incoming call must appear above the bottom sheet, so use overlay tier. */
     z-index: calc(var(--z-overlay, 3000) - 1);
@@ -66,9 +66,10 @@
     z-index: var(--z-overlay, 3000);
     padding: var(--space-6, 24px) var(--space-5, 20px);
     padding-bottom: max(var(--space-6, 24px), env(safe-area-inset-bottom));
-    background: var(--bg-card, #1e2435);
-    border-top: 1px solid var(--border-subtle, rgba(255,255,255,0.1));
-    border-radius: var(--radius-xl, 16px) var(--radius-xl, 16px) 0 0;
+    background: var(--surface-1);
+    border-top: 1px solid var(--border-default);
+    border-radius: var(--radius-sheet, 24px) var(--radius-sheet, 24px) 0 0;
+    box-shadow: var(--sh-up);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -89,10 +90,10 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: color-mix(in oklch, var(--primary-500) 15%, transparent);
+    background: var(--primary-100);
     border: 2px solid color-mix(in oklch, var(--primary-500) 40%, transparent);
     border-radius: 50%;
-    color: var(--brand-primary, var(--primary-500));
+    color: var(--primary-700);
   }
 
   .ring-pulse {
@@ -115,17 +116,19 @@
 
   .call-label {
     margin: 0;
-    font-size: var(--text-xs, 11px);
-    color: var(--text-tertiary, rgba(255,255,255,0.45));
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
+    font-size: 13px;
+    color: var(--text-tertiary);
+    letter-spacing: 0.02em;
   }
 
+  /* The name is the moment — serif register via the global verdict class */
   .caller-name {
     margin: var(--space-1, 4px) 0 0;
-    font-size: var(--text-lg, 18px);
-    font-weight: 600;
-    color: var(--text-primary, #f8fafc);
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 22px;
+    font-weight: 400;
+    color: var(--text-primary);
   }
 
   /* ── Action buttons ─────────────────────────────────────────── */
@@ -140,28 +143,29 @@
     flex: 1;
     min-height: 48px;
     border: none;
-    border-radius: var(--radius-md, 8px);
-    font-size: var(--text-sm, 13px);
+    border-radius: var(--radius-md, 10px);
+    font-size: var(--text-base, 16px);
     font-weight: 600;
     cursor: pointer;
     transition: background 120ms, box-shadow 120ms;
   }
 
+  /* Declining a call is a quiet choice, not an emergency — ink outline. */
   .btn-decline {
-    background: color-mix(in oklch, var(--danger-500) 15%, transparent);
-    color: var(--status-danger, var(--danger-500));
-    border: 1px solid color-mix(in oklch, var(--danger-500) 30%, transparent);
+    background: transparent;
+    color: var(--text-primary);
+    border: 1.5px solid var(--border-strong);
   }
 
-  .btn-decline:hover { background: color-mix(in oklch, var(--danger-500) 25%, transparent); }
+  .btn-decline:hover { background: var(--surface-hover); }
 
   .btn-accept {
-    background: var(--brand-primary, var(--primary-500));
-    color: #fff;
-    box-shadow: 0 4px 16px color-mix(in oklch, var(--primary-500) 35%, transparent);
+    background: var(--primary-500);
+    color: var(--text-on-primary);
+    box-shadow: var(--shadow-sm);
   }
 
-  .btn-accept:hover { background: var(--brand-primary-dark, var(--primary-600)); }
+  .btn-accept:hover { background: var(--primary-600); }
 
   @media (prefers-reduced-motion: reduce) {
     .call-sheet { animation: none; }

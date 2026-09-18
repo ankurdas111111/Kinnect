@@ -131,6 +131,8 @@
 </aside>
 
 <style>
+  /* Hearth: the sidebar is a warm paper sheet — daypart warmth over solid
+     paper, hairline edge, no glass blur. */
   .sidebar {
     display: none;
     flex-direction: column;
@@ -138,11 +140,9 @@
     min-height: 0;
     background:
       linear-gradient(var(--amb-warmth), var(--amb-warmth)),
-      var(--glass-nav-bg);
-    backdrop-filter: var(--glass-nav-blur);
-    -webkit-backdrop-filter: var(--glass-nav-blur);
+      var(--surface-1);
     border-right: 1px solid var(--border-default);
-    box-shadow: var(--shadow-panel);
+    box-shadow: var(--shadow-md);
     overflow: hidden;
     position: relative;
     width: var(--sidebar-width);

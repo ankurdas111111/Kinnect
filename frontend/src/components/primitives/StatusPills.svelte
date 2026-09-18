@@ -55,36 +55,22 @@
     white-space: nowrap;
     padding: 6px 10px;
     border-radius: 999px;
-    background: var(--surface-inset, rgba(15, 23, 42, 0.10));
-    border: 1px solid var(--border-subtle, rgba(15, 23, 42, 0.15));
+    background: var(--surface-inset);
+    border: 1px solid var(--border-subtle);
     color: var(--text-secondary);
     font-size: 11px;
     font-weight: 600;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
   }
 
   .pill.ok {
-    background: rgba(16, 185, 129, 0.14);
-    border-color: rgba(16, 185, 129, 0.3);
-    color: var(--success-700, #047857);
+    background: color-mix(in oklch, var(--success-500) 12%, transparent);
+    border-color: color-mix(in oklch, var(--success-500) 28%, transparent);
+    color: var(--success-700);
   }
 
   .pill.warn {
-    background: rgba(245, 158, 11, 0.14);
-    border-color: rgba(245, 158, 11, 0.32);
-    color: var(--warning-700, #b45309);
-  }
-
-  :global([data-theme="dark"]) .pill.ok {
-    background: color-mix(in oklch, var(--success-500) 18%, transparent);
-    border-color: color-mix(in oklch, var(--success-400) 35%, transparent);
-    color: var(--success-400, #34d399);
-  }
-
-  :global([data-theme="dark"]) .pill.warn {
-    background: color-mix(in oklch, var(--warning-500) 18%, transparent);
-    border-color: color-mix(in oklch, var(--warning-400) 35%, transparent);
-    color: var(--warning-400, #fbbf24);
+    background: color-mix(in oklch, var(--warning-500) 12%, transparent);
+    border-color: color-mix(in oklch, var(--warning-500) 28%, transparent);
+    color: var(--warning-700);
   }
 </style>

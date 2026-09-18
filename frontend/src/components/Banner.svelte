@@ -63,7 +63,7 @@
     background: var(--danger-600);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    color: var(--text-inverse, #fff);
+    color: var(--text-inverse);
     border: 1px solid color-mix(in oklch, var(--danger-500) 60%, transparent);
     animation: banner-in-top 0.3s var(--ease-out), sos-urgent-pulse 1.5s ease infinite;
   }

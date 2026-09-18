@@ -264,14 +264,11 @@
     position: fixed;
     z-index: var(--z-topmost, 9000);
     width: 300px;
-    /* Teal-tinted dark surface — matches SecretChatPanel token system */
-    background: #0a0a18;
-    border: 1px solid color-mix(in oklch, var(--primary-500) 12%, transparent);
+    /* Hearth: paper tray */
+    background: var(--surface-1);
+    border: 1px solid var(--border-default);
     border-radius: var(--radius-xl, 20px);
-    box-shadow:
-      0 16px 48px rgba(0, 0, 0, 0.75),
-      0 0 0 1px color-mix(in oklch, var(--primary-500) 6%, transparent),
-      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    box-shadow: var(--shadow-xl);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -281,7 +278,7 @@
 
   .sp-tabs {
     display: flex;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid var(--border-subtle);
     flex-shrink: 0;
     overflow-x: auto;
     scrollbar-width: none;
@@ -293,7 +290,7 @@
     padding: 0 var(--space-2-5, 10px);
     background: none;
     border: none;
-    color: rgba(255, 255, 255, 0.32);
+    color: var(--text-tertiary);
     font-size: var(--text-xs, 0.75rem);
     font-weight: 500;
     cursor: pointer;
@@ -309,16 +306,16 @@
     align-items: center;
   }
   .sp-tab:hover {
-    color: rgba(255, 255, 255, 0.65);
-    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-secondary);
+    background: var(--surface-hover);
   }
-  /* Teal active state — replaces purple var(--primary-400) */
+  /* Ember active state */
   .sp-tab--active {
-    color: var(--primary-500, var(--primary-500));
-    border-bottom-color: var(--primary-500, var(--primary-500));
+    color: var(--primary-700);
+    border-bottom-color: var(--primary-500);
   }
   .sp-tab:focus-visible {
-    outline: 2px solid var(--primary-500, var(--primary-500));
+    outline: 2px solid var(--primary-500);
     outline-offset: -2px;
   }
 
@@ -333,7 +330,7 @@
   }
   .sp-grid::-webkit-scrollbar { width: 3px; }
   .sp-grid::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.07);
+    background: var(--border-default);
     border-radius: var(--radius-full, 9999px);
   }
 
@@ -355,16 +352,15 @@
     min-height: 44px;
   }
   .sp-sticker-btn:hover {
-    background: rgba(255, 255, 255, 0.07);
+    background: var(--surface-hover);
     transform: scale(1.12);
   }
-  /* Teal active press — replaces purple color-mix(in oklch, var(--primary-400) 18%, transparent) */
   .sp-sticker-btn:active {
     background: color-mix(in oklch, var(--primary-500) 16%, transparent);
     transform: scale(0.95);
   }
   .sp-sticker-btn:focus-visible {
-    outline: 2px solid var(--primary-500, var(--primary-500));
+    outline: 2px solid var(--primary-500);
     outline-offset: 2px;
   }
 

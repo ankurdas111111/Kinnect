@@ -112,12 +112,13 @@
         <div class="onboarding-step" role="tabpanel" aria-label="Step 1: Enable location">
           <div class="brand-icon" aria-hidden="true">
             <svg width="40" height="48" viewBox="0 0 20 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M10 1C5.029 1 1 5.029 1 10c0 6.938 8.25 13.1 9 14.1.75-1 9-7.162 9-14.1C19 5.029 14.971 1 10 1z" fill="white" fill-opacity="0.95"/>
-              <path d="M7 7v6M7 10l3.5-3M7 10l3.5 3" stroke="rgba(255,255,255,0.90)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M10 1C5.029 1 1 5.029 1 10c0 6.938 8.25 13.1 9 14.1.75-1 9-7.162 9-14.1C19 5.029 14.971 1 10 1z" fill="var(--text-on-primary)" fill-opacity="0.95"/>
+              <path d="M7 7v6M7 10l3.5-3M7 10l3.5 3" stroke="var(--primary-500)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </div>
-          <h2 class="onboarding-title">Welcome to Kinnect</h2>
-          <p class="onboarding-desc">Kinnect lets your family see where you are in real time. To get started, we need your location — it's only shared with people you invite.</p>
+          <h2 class="onboarding-title verdict-voice">Welcome to Kinnect</h2>
+          <!-- Earn the permission with one plain sentence before asking. -->
+          <p class="onboarding-desc">Kinnect only works if the people you love can see where you are — so the next step asks for your location.</p>
           <div class="privacy-note">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
             Your location is private. Only your family can see it.
@@ -132,7 +133,7 @@
       {:else if step === 2}
         <!-- Step 2 (Hearth 03a): name the family — the room IS the family -->
         <div class="onboarding-step" role="tabpanel" aria-label="Step 2: Name your family">
-          <h2 class="onboarding-title">Give your family a name</h2>
+          <h2 class="onboarding-title verdict-voice">Give your family a name</h2>
           <p class="onboarding-desc">This is what everyone sees at the top of the map — "The Sharmas", "Home", whatever feels right.</p>
 
           <div class="input-row">
@@ -162,7 +163,7 @@
       {:else}
         <!-- Step 3: Add first person -->
         <div class="onboarding-step" role="tabpanel" aria-label="Step 3: Add a contact">
-          <h2 class="onboarding-title">Connect with family</h2>
+          <h2 class="onboarding-title verdict-voice">Connect with family</h2>
           <p class="onboarding-desc">Send your code to a family member, or type in theirs to start sharing locations.</p>
 
           <!-- Your share code -->
@@ -213,12 +214,13 @@
 {/if}
 
 <style>
+  /* Ink veil over the room — warm, not black */
   .onboarding-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.45);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    background: color-mix(in oklch, var(--ink) 45%, transparent);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
     z-index: var(--z-topmost, 9000);
     display: flex;
     align-items: center;
@@ -227,35 +229,21 @@
     animation: fade-in 0.2s ease;
   }
 
+  /* Warm paper sheet — no glass, no flip theatrics */
   .onboarding-card {
-    background: var(--glass-3d, rgba(255,255,255,0.65));
-    backdrop-filter: var(--glass-3d-blur, blur(24px) saturate(2.0));
-    -webkit-backdrop-filter: var(--glass-3d-blur, blur(24px) saturate(2.0));
-    border: 1px solid var(--glass-3d-border, rgba(255,255,255,0.30));
-    border-top-color: rgba(255, 255, 255, 0.35);
-    /* 3D floating card with deep depth */
-    box-shadow:
-      0 32px 80px rgba(0,0,0,0.25),
-      0 12px 24px rgba(0,0,0,0.15),
-      0 4px 8px rgba(0,0,0,0.10),
-      inset 0 1px 0 rgba(255, 255, 255, 0.20),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.05);
+    background: var(--surface-1);
+    border: 1px solid var(--border-default);
+    box-shadow: var(--shadow-xl);
     border-radius: 24px;
     /* Viewport-proportional: 22.5rem (360px, previous fixed max) is the floor
        so mobile renders identically; grows with 32vw and caps at 32rem. */
     width: min(92vw, clamp(22.5rem, 32vw, 32rem));
     padding: clamp(28px, 2.2vw, 40px) clamp(24px, 1.9vw, 36px);
-    /* 3D flip entrance */
-    animation: card-3d-flip-in 500ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation: card-in 320ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: var(--space-4);
-    transform-style: preserve-3d;
-  }
-
-  :global([data-theme="dark"]) .onboarding-card {
-    background: var(--glass-bg-strong, rgba(20,27,58,0.96));
   }
 
   .step-indicators {
@@ -267,15 +255,14 @@
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: var(--border-default, #d1d5db);
+    background: var(--border-default);
     transition: width 0.25s cubic-bezier(0.34,1.56,0.64,1), border-radius 0.25s, background 0.2s;
   }
 
   .step-dot.active {
     width: 20px;
     border-radius: 3px;
-    background: linear-gradient(135deg, var(--primary-500), var(--primary-700));
-    box-shadow: 0 2px 8px color-mix(in oklch, var(--primary-500) 30%, transparent);
+    background: var(--primary-500);
   }
 
   .onboarding-step {
@@ -290,35 +277,25 @@
   .brand-icon {
     width: clamp(76px, 5.5vw, 88px);
     height: clamp(76px, 5.5vw, 88px);
-    /* Canonical mark — ember squircle, matches Login.svelte's .auth-brand-logo */
-    background: linear-gradient(135deg, var(--primary-400) 0%, var(--primary-600) 50%, var(--primary-800) 100%);
+    /* Canonical mark — white pin on a flat ember squircle (same mark the
+       auth screens carry; keep the two in step if the mark ever changes). */
+    background: var(--primary-500);
     border-radius: 22px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-top-color: rgba(255, 255, 255, 0.30);
-    /* 3D floating icon */
-    box-shadow:
-      0 8px 28px color-mix(in oklch, var(--primary-500) 40%, transparent),
-      0 2px 8px color-mix(in oklch, var(--primary-500) 22%, transparent),
-      inset 0 2px 4px rgba(255, 255, 255, 0.25),
-      inset 0 -2px 4px rgba(0, 0, 0, 0.15);
-    transform-style: preserve-3d;
-    animation: float-3d 6s ease-in-out infinite;
+    box-shadow: var(--shadow-md);
   }
 
+  /* Serif register (verdict-voice supplies the italic) */
   .onboarding-title {
-    font-family: var(--font-display);
     font-size: clamp(22px, 1.6vw, 27px);
-    font-weight: 800;
     color: var(--text-primary);
     margin: 0;
-    letter-spacing: -0.02em;
   }
 
   .onboarding-desc {
-    font-size: clamp(14px, 1vw, 16px);
+    font-size: 16px;
     color: var(--text-secondary);
     line-height: 1.55;
     margin: 0;
@@ -329,10 +306,10 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    font-family: var(--font-display);
+    font-family: var(--font-sans);
     font-size: clamp(12px, 0.85vw, 13px);
     font-weight: 500;
-    color: var(--text-tertiary);
+    color: var(--text-secondary);
     background: var(--surface-3);
     border: 1px solid var(--border-default);
     border-radius: 10px;
@@ -349,26 +326,23 @@
 
   .btn-primary-full {
     width: 100%;
+    min-height: 48px;
     padding: 15px;
     border-radius: 14px;
-    background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-700) 100%);
-    color: white;
-    font-family: var(--font-display);
+    background: var(--primary-500);
+    color: var(--text-on-primary);
+    font-family: var(--font-sans);
     font-size: 16px;
-    font-weight: 800;
+    font-weight: 600;
     border: none;
     cursor: pointer;
-    box-shadow:
-      0 4px 20px color-mix(in oklch, var(--primary-500) 45%, transparent),
-      inset 0 1px 0 rgba(255, 255, 255, 0.20);
-    transition: transform 140ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 150ms var(--ease-out);
+    box-shadow: var(--shadow-sm);
+    transition: transform 140ms cubic-bezier(0.34, 1.56, 0.64, 1), background 150ms var(--ease-out);
     letter-spacing: -0.01em;
   }
 
   .btn-primary-full:hover {
-    box-shadow:
-      0 6px 28px color-mix(in oklch, var(--primary-500) 55%, transparent),
-      inset 0 1px 0 rgba(255, 255, 255, 0.20);
+    background: var(--primary-600);
   }
 
   .btn-primary-full:active {
@@ -379,11 +353,12 @@
     background: none;
     border: none;
     cursor: pointer;
-    color: var(--text-tertiary);
-    font-family: var(--font-display);
+    color: var(--text-secondary);
+    font-family: var(--font-sans);
     font-size: 14px;
-    font-weight: 600;
-    padding: 6px 12px;
+    font-weight: 500;
+    padding: 10px 12px;
+    min-height: 44px;
     border-radius: 8px;
     transition: color 0.15s, background 0.15s;
   }
@@ -402,10 +377,9 @@
   }
 
   .code-label {
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.02em;
     color: var(--text-tertiary);
   }
 
@@ -414,22 +388,19 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    background: var(--surface-secondary, #f3f4f6);
+    background: var(--surface-3);
     border-radius: 10px;
     padding: 10px 12px;
     border: 1px solid var(--border-default);
   }
 
-  :global([data-theme="dark"]) .code-display {
-    background: rgba(255,255,255,0.06);
-  }
-
   .code-value {
-    font-family: ui-monospace, 'Cascadia Code', 'JetBrains Mono', monospace;
+    font-family: var(--font-sans);
+    font-variant-numeric: tabular-nums;
     font-size: clamp(18px, 1.2vw, 21px);
-    font-weight: 800;
+    font-weight: 600;
     letter-spacing: 0.12em;
-    color: var(--primary-600);
+    color: var(--primary-700);
     flex: 1;
     text-align: center;
   }
@@ -446,7 +417,7 @@
     transition: color 0.15s;
   }
 
-  .copy-btn:hover { color: var(--primary-500); }
+  .copy-btn:hover { color: var(--primary-700); }
 
   .copy-btn:disabled { opacity: 0.4; cursor: default; }
 
@@ -459,21 +430,17 @@
 
   .code-input {
     flex: 1;
-    padding: 10px 12px;
+    padding: 12px;
+    min-height: 44px;
     border-radius: 10px;
     border: 1.5px solid var(--border-default);
-    background: var(--surface-primary, white);
-    font-size: 15px;
-    font-weight: 600;
+    background: var(--surface-1);
+    font-size: 16px;
+    font-weight: 500;
     letter-spacing: 0.08em;
     color: var(--text-primary);
     outline: none;
     transition: border-color 0.15s;
-  }
-
-  :global([data-theme="dark"]) .code-input {
-    background: rgba(255,255,255,0.06);
-    color: var(--text-primary);
   }
 
   .code-input:focus {
@@ -489,11 +456,12 @@
 
   .add-btn {
     padding: 10px 18px;
+    min-height: 44px;
     border-radius: 10px;
     background: var(--primary-500);
-    color: white;
+    color: var(--text-on-primary);
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 600;
     border: none;
     cursor: pointer;
     transition: background 0.15s, transform 0.1s;
@@ -508,24 +476,25 @@
   .add-btn:active:not(:disabled) { transform: scale(0.95); }
   .add-btn:disabled { opacity: 0.35; cursor: default; pointer-events: none; }
 
+  /* A wrong code is a form mistake, not an emergency — ochre words. */
   .add-error {
-    font-size: 12px;
-    color: var(--danger-500, #ef4444);
+    font-size: 13px;
+    color: var(--warning-700);
     align-self: flex-start;
   }
 
   .add-success {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--success-500, #22c55e);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--success-600);
   }
 
   .mini-spinner {
     display: inline-block;
     width: 14px;
     height: 14px;
-    border: 2px solid rgba(255,255,255,0.3);
-    border-top-color: white;
+    border: 2px solid color-mix(in oklch, var(--text-on-primary) 30%, transparent);
+    border-top-color: var(--text-on-primary);
     border-radius: 50%;
     animation: spin 0.6s linear infinite;
   }

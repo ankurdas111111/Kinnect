@@ -14,12 +14,14 @@
   const PAD = 10;
   const TOOLTIP_W = 304;
 
+  // Member-wheel + status hues only — vermilion stays reserved for live SOS,
+  // never a feature bullet.
   const features = [
     { color: 'var(--primary-500)', label: 'Live Map',          desc: 'Everyone, real time'       },
     { color: 'var(--success-500)', label: 'Activity Feed',     desc: 'What\'s been happening'    },
     { color: 'var(--warning-500)', label: 'Route History',     desc: 'Replay recent journeys'    },
-    { color: 'var(--danger-500)', label: 'Emergency Profile', desc: 'Critical info, always ready' },
-    { color: 'var(--member-4)', label: 'Check-ins',         desc: 'Scheduled safety pings'    },
+    { color: 'var(--member-2)',    label: 'Emergency Profile', desc: 'Critical info, always ready' },
+    { color: 'var(--member-4)',    label: 'Check-ins',         desc: 'Scheduled safety pings'    },
   ];
 
   onMount(() => {
@@ -104,7 +106,7 @@
       <ul class="hs-features" aria-label="Features available in Hub">
         {#each features as f}
           <li class="hs-feat">
-            <span class="hs-dot" style="background:{f.color}; box-shadow:0 0 7px {f.color}90;" aria-hidden="true"></span>
+            <span class="hs-dot" style="background:{f.color};" aria-hidden="true"></span>
             <span class="hs-feat-name">{f.label}</span>
             <span class="hs-feat-desc">{f.desc}</span>
           </li>
@@ -127,7 +129,8 @@
     /* No background — the hole's box-shadow creates the vignette */
   }
 
-  /* The spotlight "hole": its box-shadow IS the vignette, the element itself stays transparent */
+  /* The spotlight "hole": its box-shadow IS the vignette — a deep ink veil,
+     not blue-black. */
   .hs-hole {
     position: absolute;
     border-radius: 22px;
@@ -136,7 +139,7 @@
        opacity-only pulse (box-shadow keyframes repainted the full
        9999px vignette every frame — GPU-rule violation). */
     box-shadow:
-      0 0 0 9999px rgba(4, 3, 14, 0.93),
+      0 0 0 9999px color-mix(in oklch, var(--ink) 90%, transparent),
       0 0 0 2px  color-mix(in oklch, var(--warning-400) 78%, transparent),
       0 0 0 5px  color-mix(in oklch, var(--warning-400) 12%, transparent);
   }
@@ -167,54 +170,46 @@
     pointer-events: none;
   }
 
-  /* Tooltip card */
+  /* Tooltip card — a lit sheet of paper inside the dimmed room */
   .hs-card {
     position: absolute;
-    background: rgba(9, 7, 22, 0.97);
-    border: 1px solid color-mix(in oklch, var(--warning-400) 20%, transparent);
+    background: var(--surface-1);
+    border: 1px solid var(--border-default);
     border-radius: 18px;
     padding: 0 20px 20px;
     overflow: hidden;
-    backdrop-filter: blur(28px);
-    -webkit-backdrop-filter: blur(28px);
-    box-shadow:
-      0 28px 64px rgba(0, 0, 0, 0.65),
-      0 0 0 1px color-mix(in oklch, var(--warning-400) 6%, transparent),
-      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    box-shadow: var(--shadow-xl);
     cursor: default;
   }
 
-  /* Amber top accent stripe */
+  /* Ochre top accent stripe — the "look here" cue */
   .hs-accent-bar {
     height: 3px;
     margin: 0 -20px 18px;
-    background: linear-gradient(90deg, var(--warning-500) 0%, var(--warning-600) 60%, transparent 100%);
+    background: var(--warning-500);
     opacity: 0.85;
   }
 
   .hs-eyebrow {
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--warning-500);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--warning-700);
     margin: 0 0 7px;
-    font-family: var(--font-display, system-ui);
+    font-family: var(--font-sans);
   }
 
+  /* .hs-headline picks up the serif italic from the global verdict-voice list */
   .hs-headline {
-    font-size: 19px;
-    font-weight: 800;
-    color: #fff;
+    font-size: 20px;
+    color: var(--text-primary);
     margin: 0 0 6px;
-    font-family: var(--font-display, system-ui);
-    line-height: 1.18;
-    letter-spacing: -0.025em;
+    line-height: 1.25;
   }
 
   .hs-sub {
-    font-size: 12.5px;
-    color: rgba(255, 255, 255, 0.45);
+    font-size: 14px;
+    color: var(--text-secondary);
     margin: 0 0 16px;
     line-height: 1.55;
   }
@@ -227,7 +222,7 @@
     display: flex;
     flex-direction: column;
     gap: 7px;
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    border-top: 1px solid var(--border-subtle);
     padding-top: 14px;
   }
 
@@ -246,15 +241,15 @@
   }
 
   .hs-feat-name {
-    font-size: 12px;
-    font-weight: 700;
-    color: rgba(255, 255, 255, 0.88);
-    font-family: var(--font-display, system-ui);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-family: var(--font-sans);
   }
 
   .hs-feat-desc {
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.35);
+    font-size: 12px;
+    color: var(--text-tertiary);
     text-align: right;
   }
 
@@ -263,49 +258,49 @@
     display: flex;
     gap: 8px;
     align-items: center;
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    border-top: 1px solid var(--border-subtle);
     padding-top: 16px;
   }
 
   .hs-btn-primary {
     flex: 1;
-    height: 38px;
+    min-height: 44px;
     border-radius: 11px;
-    background: linear-gradient(135deg, var(--warning-500) 0%, var(--warning-600) 100%);
-    color: #0d0a02;
-    font-size: 13px;
-    font-weight: 800;
-    font-family: var(--font-display, system-ui);
+    background: var(--primary-500);
+    color: var(--text-on-primary);
+    font-size: 14px;
+    font-weight: 600;
+    font-family: var(--font-sans);
     border: none;
     cursor: pointer;
     letter-spacing: -0.01em;
-    transition: transform 0.12s, box-shadow 0.15s;
-    box-shadow: 0 4px 18px color-mix(in oklch, var(--warning-500) 38%, transparent), 0 0 0 1px color-mix(in oklch, var(--warning-500) 30%, transparent);
+    transition: transform 0.12s, background 0.15s;
+    box-shadow: var(--shadow-sm);
   }
 
   .hs-btn-primary:hover {
     transform: translateY(-1px);
-    box-shadow: 0 7px 22px color-mix(in oklch, var(--warning-500) 52%, transparent), 0 0 0 1px color-mix(in oklch, var(--warning-500) 40%, transparent);
+    background: var(--primary-600);
   }
 
   .hs-btn-primary:active { transform: scale(0.96); transition-duration: 60ms; }
 
   .hs-btn-ghost {
     padding: 0 14px;
-    height: 38px;
+    min-height: 44px;
     border-radius: 11px;
     background: transparent;
-    color: rgba(255, 255, 255, 0.38);
-    font-size: 12px;
-    font-weight: 600;
-    border: 1px solid rgba(255, 255, 255, 0.09);
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 500;
+    border: 1px solid var(--border-default);
     cursor: pointer;
     white-space: nowrap;
     transition: color 0.15s, border-color 0.15s;
   }
 
   .hs-btn-ghost:hover {
-    color: rgba(255, 255, 255, 0.65);
-    border-color: rgba(255, 255, 255, 0.18);
+    color: var(--text-primary);
+    border-color: var(--border-strong);
   }
 </style>

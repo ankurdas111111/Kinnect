@@ -76,14 +76,14 @@
     min-width: 0;
   }
 
-  /* Value — RoutePlayback .stat-val recipe verbatim, CONTRACTS.md §10 */
+  /* Value — a calm reading, not a KPI shout. CONTRACTS.md §10 */
   .stat-val {
     margin: 0;
-    font-family: var(--font-display);
+    font-family: var(--font-sans);
     font-size: var(--text-lg);
-    font-weight: 800;
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.01em;
     color: var(--text-primary);
     line-height: 1.1;
     /* 300ms opacity crossfade on value changes — no movement, CONTRACTS.md §10 */
@@ -93,18 +93,17 @@
   /* Unit suffix: smaller, tertiary, baseline-aligned via inline */
   .stat-unit {
     font-size: var(--text-xs);
-    font-weight: 700;
+    font-weight: 500;
     color: var(--text-tertiary);
     margin-left: 2px;
   }
 
-  /* Micro uppercase label */
+  /* Quiet sentence-case label */
   .stat-lbl {
     margin: 0;
-    font-size: var(--text-2xs);
+    font-size: 12px;
     color: var(--text-tertiary);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.02em;
   }
 
   /* No hover/tilt/loops — CONTRACTS.md §10 */

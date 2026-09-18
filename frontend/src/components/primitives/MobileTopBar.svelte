@@ -44,7 +44,7 @@
   <div class="bar-main">
     <div class="title-wrap">
       <div class="title-row">
-        <h1>{title}</h1>
+        <h1 class="verdict-voice">{title}</h1>
         <!-- Connection warning — surfaces the existing isOnline prop, calm amber -->
         {#if !isOnline}
           <span class="conn-warning" role="status" aria-live="polite">
@@ -81,6 +81,7 @@
 </header>
 
 <style>
+  /* Hearth: warm paper bar with a hairline — no glass blur. */
   .mobile-top-bar {
     position: fixed;
     left: 0;
@@ -88,16 +89,9 @@
     top: 0;
     z-index: calc(var(--z-navbar) + 1);
     padding: calc(var(--safe-top, 0px) + 8px) 12px 8px;
-    /* Liquid-glass surface — theme-aware translucent + blur */
-    background: var(--glass-bg);
-    backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
-    border-bottom: 1px solid var(--glass-border);
-    box-shadow: var(--glass-shadow);
-  }
-
-  :global([data-theme="dark"]) .mobile-top-bar {
-    border-bottom-color: var(--glass-border);
+    background: var(--surface-0);
+    border-bottom: 1px solid var(--border-default);
+    box-shadow: var(--shadow-xs);
   }
 
   .bar-main {
@@ -114,17 +108,19 @@
     gap: var(--space-2);
   }
 
+  /* Screen title speaks in the serif register (.verdict-voice supplies
+     Newsreader italic); the sub-line stays functional sans. */
   .title-wrap h1 {
     margin: 0;
     font-size: var(--text-xl);
     line-height: 1.2;
-    letter-spacing: 0.01em;
+    color: var(--text-primary);
   }
 
   .title-wrap p {
     margin: 2px 0 0;
     font-size: 12px;
-    color: var(--text-secondary, #64748b);
+    color: var(--text-secondary);
   }
 
   /* Offline / connection warning — calm amber, not alarming */
@@ -180,7 +176,7 @@
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
-    box-shadow: var(--elevation-1, 0 2px 8px rgba(0,0,0,0.08));
+    box-shadow: var(--shadow-xs);
     transition: background var(--duration-fast) var(--ease-out), transform 100ms ease;
   }
 
@@ -204,6 +200,7 @@
     background: color-mix(in oklch, var(--primary-500) 16%, transparent);
   }
 
+  /* Pending requests, not an emergency — ochre, never vermilion. */
   .dot {
     position: absolute;
     top: 8px;
@@ -211,7 +208,7 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: var(--danger-500, #ef4444);
+    background: var(--warning-500);
     border: 2px solid var(--surface-2);
   }
 

@@ -150,7 +150,7 @@
     <div
       class="card-shine"
       aria-hidden="true"
-      style="background: radial-gradient(circle at {sx}% {sy}%, rgba(255,255,255,0.11) 0%, transparent 55%);"
+      style="background: radial-gradient(circle at {sx}% {sy}%, oklch(0.99 0.004 80 / 0.10) 0%, transparent 55%);"
     ></div>
   {/if}
 
@@ -179,37 +179,24 @@
   .pad-md   { padding: var(--space-4) var(--space-5); }
   .pad-lg   { padding: var(--space-6) var(--space-8); }
 
-  /* ── Variants ─────────────────────────────────────────────────────────── */
+  /* ── Variants — every tier is warm paper; 'glass' maps to paper too so
+     existing callers keep working without a re-render of their look. ────── */
   .card-default {
-    background: var(--surface-1, rgba(15, 15, 30, 0.72));
+    background: var(--surface-1);
     border: 1px solid var(--border-default);
-    box-shadow:
-      0 4px 16px rgba(0, 0, 0, 0.18),
-      0 1px 4px  rgba(0, 0, 0, 0.12),
-      inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    box-shadow: var(--shadow-sm);
   }
 
   .card-elevated {
-    background: var(--surface-2, rgba(18, 18, 36, 0.85));
+    background: var(--surface-1);
     border: 1px solid var(--border-default);
-    border-top-color: rgba(255, 255, 255, 0.10);
-    box-shadow:
-      0 8px 32px rgba(0, 0, 0, 0.28),
-      0 2px 8px  rgba(0, 0, 0, 0.18),
-      inset 0 1px 0 rgba(255, 255, 255, 0.09),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.15);
+    box-shadow: var(--shadow-md);
   }
 
   .card-glass {
-    background: var(--glass-bg, rgba(15, 15, 30, 0.60));
-    backdrop-filter: var(--glass-blur, blur(24px) saturate(1.8));
-    -webkit-backdrop-filter: var(--glass-blur, blur(24px) saturate(1.8));
-    border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.10));
-    border-top-color: var(--glass-border-strong, rgba(255, 255, 255, 0.18));
-    box-shadow: var(--glass-shadow,
-      0 8px 32px rgba(0, 0, 0, 0.28),
-      0 0 0 1px rgba(255, 255, 255, 0.04)
-    );
+    background: var(--surface-1);
+    border: 1px solid var(--border-default);
+    box-shadow: var(--shadow-sm);
   }
 
   .card-outlined {
@@ -219,13 +206,13 @@
 
   .card-outlined:hover {
     border-color: var(--border-strong);
-    background: var(--surface-hover, rgba(255,255,255,0.04));
+    background: var(--surface-hover);
   }
 
   .card-solid {
-    background: var(--surface-2, rgba(18, 18, 36, 0.92));
+    background: var(--surface-3);
     border: 1px solid var(--border-strong);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.20);
+    box-shadow: var(--shadow-xs);
   }
 
   /* ── Hover lift (TECHNIQUE 14: layered shadow depth + translateY) ─────── */
@@ -240,30 +227,11 @@
 
   .card-default.hover-lift:hover,
   .card-elevated.hover-lift:hover,
+  .card-glass.hover-lift:hover,
   .card-solid.hover-lift:hover {
-    /* TECHNIQUE 14: translateY(-2px) + layered shadow system */
     transform: translateY(-2px);
-    box-shadow:
-      0 4px 8px  rgba(0, 0, 0, 0.10),
-      0 8px 24px rgba(0, 0, 0, 0.18),
-      0 16px 48px rgba(0, 0, 0, 0.14),
-      0 0 0 1px rgba(255, 255, 255, 0.05),
-      inset 0 1px 0 rgba(255, 255, 255, 0.10);
-    filter: brightness(1.04);
-  }
-
-  .card-glass.hover-lift:hover {
-    /* TECHNIQUE 14: glass variant — stronger depth + Liquid Glass 2.0 */
-    transform: translateY(-2px);
-    box-shadow:
-      0 4px 8px  rgba(0, 0, 0, 0.14),
-      0 8px 24px rgba(0, 0, 0, 0.22),
-      0 20px 56px rgba(0, 0, 0, 0.28),
-      0 0 0 1px rgba(255, 255, 255, 0.06);
-    filter: brightness(1.06);
-    border-color: var(--glass-border-strong, rgba(255, 255, 255, 0.22));
-    backdrop-filter: blur(32px) saturate(180%) brightness(1.08);
-    -webkit-backdrop-filter: blur(32px) saturate(180%) brightness(1.08);
+    box-shadow: var(--shadow-md);
+    border-color: var(--border-strong);
   }
 
   /* ── Clickable ────────────────────────────────────────────────────────── */
@@ -281,11 +249,12 @@
     will-change: transform;
   }
 
-  /* ── Glow variants ────────────────────────────────────────────────────── */
-  .card.glow-primary { box-shadow: var(--glow-primary, 0 0 24px color-mix(in oklch, var(--primary-500) 38%, transparent)), 0 4px 16px rgba(0,0,0,0.20); }
-  .card.glow-success { box-shadow: 0 0 24px color-mix(in oklch, var(--success-500) 38%, transparent), 0 4px 16px rgba(0,0,0,0.20); }
-  .card.glow-danger  { box-shadow: var(--glow-sos, 0 0 24px color-mix(in oklch, var(--danger-500) 42%, transparent)), 0 4px 16px rgba(0,0,0,0.20); }
-  .card.glow-warning { box-shadow: 0 0 24px color-mix(in oklch, var(--warning-500) 38%, transparent), 0 4px 16px rgba(0,0,0,0.20); }
+  /* ── Glow variants — Hearth keeps these as quiet border tints, not neon.
+     Vermilion appears only where callers pass glow="danger" for real SOS. */
+  .card.glow-primary { border-color: color-mix(in oklch, var(--primary-500) 35%, transparent); }
+  .card.glow-success { border-color: color-mix(in oklch, var(--success-500) 40%, transparent); }
+  .card.glow-danger  { border-color: color-mix(in oklch, var(--danger-500) 45%, transparent); box-shadow: var(--shadow-sm), var(--shadow-danger); }
+  .card.glow-warning { border-color: color-mix(in oklch, var(--warning-500) 45%, transparent); }
 
   /* ── Shine layer ──────────────────────────────────────────────────────── */
   .card-shine {
@@ -298,28 +267,23 @@
     opacity: 0.9;
   }
 
-  /* ── Edge accent line ─────────────────────────────────────────────────── */
+  /* ── Edge accent line — silent on paper; only tinted glow cards show a
+     restrained top edge (kept as an element for callers that target it). */
   .card-edge-line {
     position: absolute;
     top: 0;
     left: 12%;
     right: 12%;
-    height: 1px;
-    background: var(--glass-edge-light, linear-gradient(
-      90deg,
-      transparent 0%,
-      color-mix(in oklch, var(--primary-500) 55%, transparent) 30%,
-      color-mix(in oklch, var(--primary-500) 55%, transparent) 70%,
-      transparent 100%
-    ));
-    box-shadow: 0 0 6px var(--primary-500-30, color-mix(in oklch, var(--primary-500) 30%, transparent));
+    height: 2px;
+    background: transparent;
     pointer-events: none;
     border-radius: 0 0 2px 2px;
   }
 
-  .card.glow-danger  .card-edge-line { background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--danger-500) 55%, transparent), transparent); }
-  .card.glow-success .card-edge-line { background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--success-500) 55%, transparent), transparent); }
-  .card.glow-warning .card-edge-line { background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--warning-500) 55%, transparent), transparent); }
+  .card.glow-danger  .card-edge-line { background: color-mix(in oklch, var(--danger-500) 55%, transparent); }
+  .card.glow-success .card-edge-line { background: color-mix(in oklch, var(--success-500) 45%, transparent); }
+  .card.glow-warning .card-edge-line { background: color-mix(in oklch, var(--warning-500) 45%, transparent); }
+  .card.glow-primary .card-edge-line { background: color-mix(in oklch, var(--primary-500) 45%, transparent); }
 
   /* ── Reduced motion ───────────────────────────────────────────────────── */
   @media (prefers-reduced-motion: reduce) {

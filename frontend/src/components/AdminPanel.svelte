@@ -202,7 +202,8 @@
 {/if}
 
 <style>
-  /* MERIDIAN: Amber card for auto-SOS section */
+  /* Hearth: quiet ochre tint marks the auto-SOS rules apart — utilitarian
+     paper, no red anywhere on a settings surface. */
   .auto-sos-card {
     background: color-mix(in oklch, var(--warning-500) 7%, transparent);
     border: 1px solid color-mix(in oklch, var(--warning-500) 22%, transparent);
@@ -215,11 +216,10 @@
     display: flex;
     align-items: center;
     gap: 5px;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.10em;
-    text-transform: uppercase;
-    color: var(--warning-600, var(--warning-600));
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    color: var(--warning-700);
     margin-bottom: var(--space-2);
   }
 </style>

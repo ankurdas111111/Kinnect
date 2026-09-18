@@ -64,11 +64,9 @@
     font-weight: 600;
     letter-spacing: 0.01em;
     font-variant-numeric: tabular-nums;
-    background: var(--glass-bg, rgba(255,255,255,0.85));
-    backdrop-filter: var(--glass-blur-sm, blur(12px) saturate(1.4));
-    -webkit-backdrop-filter: var(--glass-blur-sm, blur(12px) saturate(1.4));
-    border: 1px solid var(--glass-border, rgba(15,23,42,0.10));
-    box-shadow: var(--map-chip-shadow, 0 2px 8px rgba(0,0,0,0.08));
+    background: var(--surface-1);
+    border: 1px solid var(--border-default);
+    box-shadow: var(--shadow-xs);
     color: var(--text-secondary);
     transition: color 0.2s, background 0.2s;
     white-space: nowrap;
@@ -86,15 +84,15 @@
     line-height: 1;
   }
 
-  /* States */
-  .live { color: var(--status-live, #22c55e); }
+  /* States — "old" is a stale signal, not an emergency: deep ochre, not red. */
+  .live { color: var(--status-live); }
   .live .dot { animation: pulse-live 2s ease-in-out infinite; }
 
-  .stale { color: var(--status-stale, var(--warning-500)); }
+  .stale { color: var(--status-stale); }
 
-  .old { color: var(--danger-500, var(--danger-500)); }
+  .old { color: var(--warning-700); }
 
-  .offline { color: var(--status-offline, #94a3b8); }
+  .offline { color: var(--status-offline); }
   .offline .dot { opacity: 0.5; }
 
   .sos { color: var(--status-sos, var(--danger-500)); }

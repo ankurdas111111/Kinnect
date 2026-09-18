@@ -38,7 +38,7 @@
     display: block;
     position: relative;
     overflow: hidden;
-    background: var(--surface-inset, rgba(255, 255, 255, 0.05));
+    background: var(--surface-inset);
     border-radius: var(--radius-md, 10px);
   }
 
@@ -53,7 +53,7 @@
     background: linear-gradient(
       90deg,
       transparent 0%,
-      color-mix(in oklch, var(--text-primary, #fff) 8%, transparent) 50%,
+      color-mix(in oklch, var(--text-primary) 8%, transparent) 50%,
       transparent 100%
     );
     animation: sk-shimmer 1.4s var(--ease-in-out, ease-in-out) infinite;

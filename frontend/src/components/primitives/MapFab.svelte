@@ -123,80 +123,47 @@
     100% { transform: scale(1); }
   }
 
-  /* Primary FAB — 56px, blue gradient */
+  /* Primary FAB — 56px ember pebble. Sharing yourself is presence, not
+     alarm: the active state settles to sage ("live"), never red. */
   .fab--primary {
     width: 56px;
     height: 56px;
-    background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-700) 100%);
-    color: var(--text-on-primary, #fff);
-    box-shadow:
-      0 4px 20px rgba(37, 99, 235, 0.50),
-      0 0 0 1px rgba(59, 130, 246, 0.20);
+    background: var(--primary-500);
+    color: var(--text-on-primary);
+    box-shadow: var(--shadow-primary);
   }
 
   .fab--primary:hover {
     transform: scale(1.05);
-    box-shadow:
-      0 6px 28px rgba(37, 99, 235, 0.65),
-      0 0 0 1px rgba(59, 130, 246, 0.30);
+    background: var(--primary-600);
   }
 
-  /* Tracking active — red breathing */
+  /* Tracking active — sage, quietly live. No breathing shadow loop. */
   .fab--primary.tracking {
-    background: linear-gradient(135deg, var(--danger-500, #ef4444) 0%, var(--danger-700, #b91c1c) 100%);
-    box-shadow:
-      0 4px 20px rgba(239, 68, 68, 0.55),
-      0 0 0 1px rgba(239, 68, 68, 0.25);
-    animation: track-breathe 3s ease-in-out infinite;
+    background: var(--success-600);
+    color: var(--text-inverse);
+    box-shadow: var(--shadow-md), 0 0 0 4px color-mix(in oklch, var(--success-500) 18%, transparent);
   }
 
-  @keyframes track-breathe {
-    0%, 100% {
-      box-shadow: 0 4px 20px rgba(239,68,68,0.55), 0 0 0 1px rgba(239,68,68,0.25);
-    }
-    50% {
-      box-shadow: 0 4px 32px rgba(239,68,68,0.85), 0 0 0 6px rgba(239,68,68,0.12);
-    }
-  }
-
-  /* Secondary FABs — 44px glass */
+  /* Secondary FABs — 44px paper chips */
   .fab--secondary {
     width: 44px;
     height: 44px;
-    background: var(--glass-bg, rgba(255,255,255,0.85));
-    backdrop-filter: var(--glass-blur-sm, blur(12px) saturate(1.4));
-    -webkit-backdrop-filter: var(--glass-blur-sm, blur(12px) saturate(1.4));
+    background: var(--surface-1);
     color: var(--text-secondary);
-    box-shadow: var(--map-chip-shadow, 0 2px 12px rgba(0,0,0,0.10)), 0 0 0 1px var(--glass-border, rgba(15,23,42,0.10));
+    box-shadow: var(--shadow-sm), 0 0 0 1px var(--border-default);
   }
 
   .fab--secondary:hover {
     transform: scale(1.08);
-    color: var(--primary-500);
-    background: var(--glass-bg-strong, rgba(255,255,255,0.95));
+    color: var(--primary-700);
+    background: var(--surface-2);
   }
 
   .fab--secondary.follow-active {
-    color: var(--primary-500);
-    background: rgba(37, 99, 235, 0.10);
-    box-shadow: 0 2px 12px rgba(37, 99, 235, 0.25), 0 0 0 1px rgba(59, 130, 246, 0.30);
-  }
-
-  :global([data-theme="dark"]) .fab--secondary {
-    background: var(--map-chip-bg, rgba(30, 41, 59, 0.85));
-    box-shadow: 0 2px 12px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.08);
-    color: var(--text-secondary);
-  }
-
-  :global([data-theme="dark"]) .fab--secondary:hover {
-    background: var(--surface-2, rgba(30, 41, 59, 0.95));
-    color: var(--primary-400);
-  }
-
-  :global([data-theme="dark"]) .fab--secondary.follow-active {
-    background: color-mix(in oklch, var(--primary-500) 18%, transparent);
-    box-shadow: 0 2px 12px color-mix(in oklch, var(--primary-500) 30%, transparent), 0 0 0 1px color-mix(in oklch, var(--primary-400) 35%, transparent);
-    color: var(--primary-400);
+    color: var(--primary-700);
+    background: var(--primary-100);
+    box-shadow: var(--shadow-sm), 0 0 0 1px color-mix(in oklch, var(--primary-500) 35%, transparent);
   }
 
   @media (prefers-reduced-motion: reduce) {

@@ -182,7 +182,7 @@
     width: 18px;
     height: 18px;
     border-radius: var(--radius-full);
-    background: var(--text-inverse, #fff);
+    background: var(--text-inverse);
     box-shadow: var(--shadow-sm);
     /* Knob travel: translateX 220ms spring — CONTRACTS.md §8 */
     transition: transform 220ms var(--ease-spring);

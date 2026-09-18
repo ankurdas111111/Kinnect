@@ -84,20 +84,15 @@
     width: 48px;
     height: 48px;
     border-radius: var(--radius-full);
-    background: linear-gradient(135deg, color-mix(in oklch, var(--success-500) 95%, transparent) 0%, color-mix(in oklch, var(--success-600) 95%, transparent) 100%);
+    background: var(--success-600);
     border: 1.5px solid color-mix(in oklch, var(--success-500) 55%, transparent);
-    color: white;
+    color: var(--text-inverse);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     touch-action: none;
-    /* 3D raised button */
-    box-shadow:
-      0 6px 20px color-mix(in oklch, var(--success-500) 40%, transparent),
-      0 2px 6px color-mix(in oklch, var(--success-500) 25%, transparent),
-      inset 0 2px 4px rgba(255, 255, 255, 0.18),
-      inset 0 -2px 4px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--shadow-md);
     transform-style: preserve-3d;
     transition:
       transform var(--duration-3d, 250ms) cubic-bezier(0.34, 1.56, 0.64, 1),
@@ -117,22 +112,21 @@
 
   .pulse-fab:active {
     transform: perspective(600px) translateZ(-6px) scale(0.88);
-    box-shadow:
-      0 1px 6px color-mix(in oklch, var(--success-500) 30%, transparent),
-      inset 0 3px 6px rgba(0, 0, 0, 0.20);
+    box-shadow: var(--shadow-xs);
   }
 
   .pulse-fab.feedback-ok {
     background: var(--success-500);
-    box-shadow: 0 0 28px color-mix(in oklch, var(--success-500) 65%, transparent);
+    box-shadow: var(--shadow-md);
   }
 
   .pulse-fab.feedback-callme {
-    background: color-mix(in oklch, var(--warning-500) 95%, transparent);
+    background: var(--warning-500);
     border-color: color-mix(in oklch, var(--warning-500) 50%, transparent);
-    box-shadow: 0 0 28px color-mix(in oklch, var(--warning-500) 55%, transparent);
+    box-shadow: var(--shadow-md);
   }
 
+  /* Inverse ink slip — readable on any map underneath */
   .pulse-label {
     position: absolute;
     left: calc(100% + 8px);
@@ -141,8 +135,8 @@
     white-space: nowrap;
     font-size: 11px;
     font-weight: 700;
-    background: rgba(8, 8, 16, 0.88);
-    color: white;
+    background: var(--ink);
+    color: var(--text-inverse);
     padding: 4px 9px;
     border-radius: var(--radius-full);
     pointer-events: none;

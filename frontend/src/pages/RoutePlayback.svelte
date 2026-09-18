@@ -12,7 +12,6 @@
   import { prefersReducedMotion } from '../lib/deviceCapability.js';
   import { haptics } from '../lib/haptics.js';
   import Skeleton from '../components/primitives/Skeleton.svelte';
-  import StatCard from '../components/primitives/StatCard.svelte';
   import EmptyState from '../components/primitives/EmptyState.svelte';
   import PlaybackControls from '../components/primitives/PlaybackControls.svelte';
 
@@ -278,7 +277,7 @@
       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
     </button>
     <div class="rp-title-group">
-      <h1 class="rp-title">Route Replay</h1>
+      <h1 class="rp-title verdict-voice">Route Replay</h1>
       {#if displayName}<span class="rp-sub">{displayName}</span>{/if}
     </div>
     <!-- Window selector — only meaningful once a person is selected -->
@@ -341,24 +340,10 @@
   <!-- Controls panel -->
   {#if !loading && !error && points.length > 0}
     <div class="controls-panel" transition:fly={panelMotion}>
-      <!-- Stats bento -->
-      <div class="stats-bento bento-grid" style="--bento-cols: 3;" role="region" aria-label="Route statistics">
-        <StatCard label="Distance" value={totalDistKm} unit="km" tint="primary">
-          {#snippet icon()}
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg>
-          {/snippet}
-        </StatCard>
-        <StatCard label="Duration" value={durationMin} unit="min" tint="primary">
-          {#snippet icon()}
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
-          {/snippet}
-        </StatCard>
-        <StatCard label="Points" value={totalPoints} tint="neutral">
-          {#snippet icon()}
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
-          {/snippet}
-        </StatCard>
-      </div>
+      <!-- Route facts as one quiet line — sparse numbers, no KPI tiles -->
+      <p class="route-facts" role="region" aria-label="Route statistics">
+        {#if displayName}<span class="route-facts-name">{displayName}</span> · {/if}{totalDistKm}&nbsp;km · {durationMin}&nbsp;min · {totalPoints}&nbsp;points
+      </p>
 
       <!-- Scrubber + transport — shared primitive in local-playback mode -->
       <PlaybackControls
@@ -388,15 +373,13 @@
     overflow: hidden;
   }
 
-  /* ── Header ─────────────────────────────────────────────────────────────── */
+  /* ── Header — paper bar, no glass ───────────────────────────────────────── */
   .rp-header {
     display: flex;
     align-items: center;
     gap: var(--space-2-5);
     padding: calc(var(--safe-top) + var(--space-2-5)) var(--space-3-5) var(--space-2-5);
-    background: var(--glass-bg-strong);
-    backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
+    background: var(--surface-0);
     border-bottom: 1px solid var(--border-subtle);
     z-index: 100;
     flex-shrink: 0;
@@ -429,17 +412,16 @@
 
   .rp-title-group { flex: 1; min-width: 0; }
 
+  /* Screen title — serif register (verdict-voice supplies the italic) */
   .rp-title {
     margin: 0;
-    font-family: var(--font-display);
-    font-size: var(--text-2xl);
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    line-height: 1.15;
+    font-size: 22px;
+    line-height: 1.2;
+    color: var(--text-primary);
   }
 
   .rp-sub {
-    font-size: var(--text-xs);
+    font-size: var(--text-sm);
     color: var(--text-tertiary);
     display: block;
     white-space: nowrap;
@@ -458,10 +440,10 @@
     padding: var(--space-1) var(--space-2-5);
     min-height: 44px;
     border-radius: var(--radius-full);
-    font-family: var(--font-display);
-    font-size: var(--text-xs);
-    font-weight: 600;
-    background: var(--surface-hover);
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    background: var(--surface-1);
     border: 1px solid var(--border-default);
     color: var(--text-secondary);
     cursor: pointer;
@@ -470,11 +452,11 @@
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
   }
-  .window-pill:hover { background: var(--surface-active); }
+  .window-pill:hover { background: var(--surface-hover); }
   .window-pill.active {
-    background: var(--primary-500-20);
-    border-color: var(--primary-500-30);
-    color: var(--primary-400);
+    background: var(--primary-100);
+    border-color: color-mix(in oklch, var(--primary-500) 35%, transparent);
+    color: var(--primary-700);
   }
   .window-pill:focus-visible {
     outline: 2px solid var(--primary-500);
@@ -495,11 +477,12 @@
     width: 18px;
     height: 18px;
     background: var(--surface-0);
-    border: 3px solid var(--primary-400);
+    border: 3px solid var(--primary-500);
     border-radius: 50%;
-    box-shadow: 0 0 12px var(--dot-glow, var(--primary-400)), var(--shadow-sm);
+    box-shadow: var(--shadow-md);
   }
 
+  /* Warm paper scrim over the map while loading / empty / errored */
   .map-overlay {
     position: absolute;
     inset: 0;
@@ -508,9 +491,7 @@
     align-items: center;
     justify-content: center;
     gap: var(--space-3);
-    background: var(--glass-bg-strong);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    background: color-mix(in oklch, var(--surface-0) 88%, transparent);
     z-index: 10;
     color: var(--text-secondary);
     padding: var(--space-8);
@@ -538,8 +519,8 @@
     border-radius: var(--radius-full);
     background: var(--surface-1);
     border: 1.5px solid color-mix(in oklch, var(--primary-500) 45%, transparent);
-    color: var(--primary-600);
-    font-family: var(--font-display);
+    color: var(--primary-700);
+    font-family: var(--font-sans);
     font-size: var(--text-sm);
     font-weight: 600;
     cursor: pointer;
@@ -553,12 +534,12 @@
     outline-offset: 2px;
   }
 
-  /* ── Controls panel ──────────────────────────────────────────────────────── */
+  /* ── Controls panel — a paper control bar rising off the map ────────────── */
   .controls-panel {
-    background: var(--glass-bg-strong);
-    backdrop-filter: blur(32px) saturate(1.8);
-    -webkit-backdrop-filter: blur(32px) saturate(1.8);
-    border-top: 1px solid var(--border-subtle);
+    background: var(--surface-1);
+    border-top: 1px solid var(--border-default);
+    border-radius: var(--radius-sheet, 24px) var(--radius-sheet, 24px) 0 0;
+    box-shadow: var(--sh-up);
     padding: var(--space-3-5) var(--space-4) calc(var(--space-3-5) + var(--safe-bottom));
     display: flex;
     flex-direction: column;
@@ -566,9 +547,18 @@
     flex-shrink: 0;
   }
 
-  /* ── Stats bento ─────────────────────────────────────────────────────────── */
-  .stats-bento {
-    --bento-gap: var(--space-2-5);
+  /* ── Route facts — one sparse aligned line ("2.3 km · 45 min") ──────────── */
+  .route-facts {
+    margin: 0;
+    font-size: 16px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+  }
+  .route-facts-name {
+    color: var(--text-primary);
+    font-weight: 500;
   }
 
   /* PlaybackControls owns its own internal padding; strip the panel's default so

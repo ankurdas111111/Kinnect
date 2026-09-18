@@ -48,8 +48,8 @@
     height: 6px;
     border-radius: 50%;
     background: var(--th-accent, var(--primary-500));
-    border: 1.5px solid var(--surface-0, #080810);
-    box-shadow: 0 0 4px var(--th-accent, var(--primary-500));
+    border: 1.5px solid var(--surface-0);
+    box-shadow: var(--shadow-xs);
     pointer-events: none;
     transition: background 300ms var(--ease-out), box-shadow 300ms var(--ease-out);
   }

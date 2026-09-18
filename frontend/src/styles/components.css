@@ -16,22 +16,21 @@
 
 .panel-left {
   left: 0;
-  border-right: 1px solid var(--glass-3d-border);
-  box-shadow: var(--elevation-3);
+  border-right: 1px solid var(--border-default);
+  box-shadow: var(--shadow-lg);
   animation: panel-3d-arrive 350ms var(--ease-3d-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
 }
 
 .panel-right {
   right: 0;
-  border-left: 1px solid var(--glass-3d-border);
-  box-shadow: var(--elevation-3);
+  border-left: 1px solid var(--border-default);
+  box-shadow: var(--shadow-lg);
   animation-name: slideInRight;
 }
 
+/* Hearth: panels are warm paper sheets — no glass blur. */
 .panel-base {
-  background: var(--glass-3d);
-  backdrop-filter: var(--glass-3d-blur);
-  -webkit-backdrop-filter: var(--glass-3d-blur);
+  background: var(--surface-1);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -47,13 +46,12 @@
   min-height: 52px;
 }
 
-/* Display font for panel headings — more premium than Inter */
 .panel-header h3 {
   font-family: var(--font-display);
   font-size: var(--text-lg);
-  font-weight: 700;
+  font-weight: 600;
   margin: 0;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.01em;
   color: var(--text-primary);
 }
 
@@ -219,10 +217,6 @@
   background: var(--surface-inset);
   border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
-  /* 3D inset track */
-  box-shadow:
-    inset 0 2px 4px rgba(0, 0, 0, 0.06),
-    0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .tab {
@@ -252,13 +246,9 @@
 }
 
 .tab.active {
-  background: linear-gradient(135deg, var(--primary-500), var(--primary-700));
-  color: var(--text-on-primary, #fff);
-  box-shadow:
-    0 4px 14px rgba(20, 184, 166, 0.35),
-    0 1px 4px rgba(20, 184, 166, 0.20),
-    inset 0 1px 0 rgba(255, 255, 255, 0.20),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.12);
+  background: var(--surface-1);
+  color: var(--primary-700);
+  box-shadow: var(--shadow-xs);
 }
 
 
@@ -291,7 +281,7 @@
   color: var(--text-tertiary);
 }
 
-/* Gradient icon container */
+/* Quiet ember-tint icon container */
 .empty-state-icon {
   width: 64px;
   height: 64px;
@@ -299,13 +289,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, rgba(20,184,166,0.16) 0%, rgba(13,148,136,0.10) 100%);
-  border: 1px solid rgba(20, 184, 166, 0.22);
-  border-top-color: rgba(20, 184, 166, 0.35);
-  color: var(--primary-400);
-  box-shadow:
-    0 4px 16px rgba(20, 184, 166, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  background: var(--primary-100);
+  border: 1px solid var(--border-default);
+  color: var(--primary-700);
   flex-shrink: 0;
 }
 
@@ -326,7 +312,7 @@
 .empty-state h4, .empty-state-title {
   font-family: var(--font-display);
   font-size: var(--text-base);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text-primary);
   margin: 0;
   letter-spacing: -0.01em;
@@ -384,11 +370,11 @@
 }
 
 
-/* ── Inline danger button ────────────────────────────────────────────── */
+/* ── Inline destructive button — ink + underline, never vermilion ─────── */
 .btn-inline-danger {
   background: none;
   border: none;
-  color: var(--danger-500);
+  color: var(--text-primary);
   cursor: pointer;
   font-size: var(--text-2xs);
   font-weight: 600;

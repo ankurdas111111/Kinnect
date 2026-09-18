@@ -71,7 +71,7 @@
     const onAdded = async (data) => {
       contactName = data?.displayName || 'contact';
       await crossfadeTo('success');
-      message = `${contactName} added to your contacts!`;
+      message = `${contactName} is in your circle now.`;
       haptics.confirm?.();
       cleanup();
       // Redirect to main app after showing success
@@ -143,14 +143,14 @@
     <!-- Kinnect logo -->
     <div class="add-contact-logo" aria-hidden="true">
       <svg width="28" height="34" viewBox="0 0 20 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M10 1C5.029 1 1 5.029 1 10c0 6.938 8.25 13.1 9 14.1.75-1 9-7.162 9-14.1C19 5.029 14.971 1 10 1z" fill="white" fill-opacity="0.95"/>
-        <path d="M7 7v6M7 10l3.5-3M7 10l3.5 3" stroke="rgba(255,255,255,0.90)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M10 1C5.029 1 1 5.029 1 10c0 6.938 8.25 13.1 9 14.1.75-1 9-7.162 9-14.1C19 5.029 14.971 1 10 1z" fill="var(--text-on-primary)" fill-opacity="0.95"/>
+        <path d="M7 7v6M7 10l3.5-3M7 10l3.5 3" stroke="var(--primary-500)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     </div>
 
     <div class="state-layer" class:faded={!visible} aria-live="polite" aria-atomic="true">
       {#if status === 'loading' || status === 'adding'}
-        <h2>Adding contact…</h2>
+        <h2 class="verdict-voice">Joining their circle…</h2>
         <div class="add-contact-skeleton" aria-hidden="true">
           <Skeleton variant="title" width="55%" />
           <Skeleton variant="text" count={2} />
@@ -161,16 +161,16 @@
         <div class="add-contact-icon success" aria-hidden="true">
           <svg class="check-icon" xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         </div>
-        <h2>{message}</h2>
-        <p class="add-contact-sub">Redirecting to Kinnect…</p>
+        <h2 class="verdict-voice">{message}</h2>
+        <p class="add-contact-sub">Taking you back to the map…</p>
         <a href="#/" class="add-contact-btn tactile" aria-label="Go to Kinnect now">Open Kinnect</a>
 
       {:else if status === 'login-required'}
         <div class="add-contact-icon info" aria-hidden="true">
           <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
         </div>
-        <h2>Sign in to add contact</h2>
-        <p class="add-contact-sub">You need to be logged in to add <span class="code-chip">{code}</span> as a contact.</p>
+        <h2 class="verdict-voice">Sign in to join them</h2>
+        <p class="add-contact-sub">Sign in first, and we'll add <span class="code-chip">{code}</span> to your circle.</p>
         <p class="add-contact-sub">Redirecting to login in 3 seconds…</p>
         <!-- Screen-reader affordance: primary CTA so they don't have to wait for redirect -->
         <a href="#/login" class="add-contact-btn tactile">Sign in now</a>
@@ -179,7 +179,7 @@
         <div class="add-contact-icon error" aria-hidden="true">
           <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
         </div>
-        <h2>Couldn't add contact</h2>
+        <h2 class="verdict-voice">That didn't work</h2>
         <p class="add-contact-sub">{message}</p>
         <div class="btn-row">
           <button class="add-contact-btn tactile" onclick={handleTryAgain} type="button">Try again</button>
@@ -212,11 +212,9 @@
      min-height anchors the layout across all four state transitions (zero CLS).
   ────────────────────────────────────────────────────────────────────────── */
   .add-contact-card {
-    background: var(--glass-panel-bg);
-    backdrop-filter: var(--glass-panel-blur);
-    -webkit-backdrop-filter: var(--glass-panel-blur);
-    border: 1px solid var(--glass-panel-border);
-    box-shadow: var(--glass-panel-shadow);
+    background: var(--surface-1);
+    border: 1px solid var(--border-default);
+    box-shadow: var(--shadow-lg);
     border-radius: var(--radius-xl);
     padding: var(--space-8) var(--space-6);
     max-width: 380px;
@@ -264,8 +262,8 @@
     width: 56px;
     height: 56px;
     border-radius: 16px;
-    /* Canonical mark — white pin on ember squircle, matches Login.svelte */
-    background: linear-gradient(135deg, var(--primary-400) 0%, var(--primary-600) 50%, var(--primary-800) 100%);
+    /* Canonical mark — white pin on a flat ember squircle */
+    background: var(--primary-500);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -273,17 +271,16 @@
     flex-shrink: 0;
   }
 
+  /* The moment speaks in the serif register (verdict-voice on the h2) */
   .add-contact-card h2 {
-    font-family: var(--font-display, var(--font-sans));
-    font-size: var(--text-lg);
-    font-weight: 700;
+    font-size: 22px;
     color: var(--text-primary);
     margin: 0;
     line-height: 1.3;
   }
 
   .add-contact-sub {
-    font-size: var(--text-sm);
+    font-size: var(--text-base);
     color: var(--text-secondary);
     margin: 0;
     line-height: 1.5;
@@ -293,16 +290,17 @@
   .code-chip {
     display: inline-flex;
     align-items: center;
-    background: var(--primary-500-12, var(--surface-inset));
-    border: 1px solid var(--primary-500-30, var(--border-default));
+    background: var(--primary-100);
+    border: 1px solid color-mix(in oklch, var(--primary-500) 30%, transparent);
     padding: 2px 10px;
     border-radius: var(--radius-full, 9999px);
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-sans);
     font-size: var(--text-sm);
     font-weight: 600;
     letter-spacing: 0.08em;
-    color: var(--text-primary);
+    color: var(--primary-700);
     vertical-align: baseline;
+    font-variant-numeric: tabular-nums;
   }
 
   /* Skeleton block for the loading / adding state. */
@@ -327,9 +325,9 @@
   }
 
   .add-contact-icon.success {
-    background: var(--status-live, var(--success-500));
-    color: white;
-    box-shadow: 0 0 0 0 var(--ring-color-live, var(--status-live, var(--success-500)));
+    background: var(--success-500);
+    color: var(--text-inverse);
+    box-shadow: 0 0 0 0 var(--status-live);
     animation: success-ring-pulse 300ms var(--ease-out, cubic-bezier(0.4,0,0.2,1)) both;
   }
 
@@ -348,8 +346,8 @@
 
   .add-contact-icon.info {
     background: var(--primary-500);
-    color: white;
-    box-shadow: var(--shadow-primary, 0 4px 14px oklch(0.55 0.18 275 / 0.30));
+    color: var(--text-on-primary);
+    box-shadow: var(--shadow-sm);
   }
 
   /* Button row: "Try again" (primary) + "Open Kinnect" (ghost) on error state */
@@ -366,14 +364,14 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 44px;
+    min-height: 48px;
     min-width: 44px;
     padding: var(--space-2) var(--space-5);
     background: var(--primary-500);
-    color: white;
+    color: var(--text-on-primary);
     border: none;
     border-radius: var(--radius-lg);
-    font-size: var(--text-sm);
+    font-size: var(--text-base);
     font-weight: 600;
     text-decoration: none;
     margin-top: var(--space-2);
@@ -427,9 +425,9 @@
      One 300ms pulse then settles. Deliberately not looping.
   ────────────────────────────────────────────────────────────────────────── */
   @keyframes success-ring-pulse {
-    0%   { box-shadow: 0 0 0 0   color-mix(in oklch, var(--ring-color-live, var(--status-live)) 60%, transparent); }
-    60%  { box-shadow: 0 0 0 12px color-mix(in oklch, var(--ring-color-live, var(--status-live)) 20%, transparent); }
-    100% { box-shadow: 0 0 0 0   color-mix(in oklch, var(--ring-color-live, var(--status-live))  0%, transparent); }
+    0%   { box-shadow: 0 0 0 0    color-mix(in oklch, var(--status-live) 60%, transparent); }
+    60%  { box-shadow: 0 0 0 12px color-mix(in oklch, var(--status-live) 20%, transparent); }
+    100% { box-shadow: 0 0 0 0    color-mix(in oklch, var(--status-live)  0%, transparent); }
   }
 
   @media (prefers-reduced-motion: reduce) {

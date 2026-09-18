@@ -106,7 +106,7 @@ disabled   — opt-out on low-power devices or when not needed
     <div
       class="tilt-shine"
       aria-hidden="true"
-      style="background: radial-gradient(circle at {sx}% {sy}%, rgba(255,255,255,0.13) 0%, transparent 58%);"
+      style="background: radial-gradient(circle at {sx}% {sy}%, oklch(0.99 0.004 80 / 0.10) 0%, transparent 58%);"
     ></div>
   {/if}
   {@render children?.()}
@@ -121,10 +121,8 @@ disabled   — opt-out on low-power devices or when not needed
     transition: box-shadow 0.3s ease, filter 0.3s ease;
   }
   .tilt-root:hover {
-    /* Elevate on hover for depth feel */
-    box-shadow:
-      0 16px 48px rgba(0, 0, 0, 0.14),
-      0 6px 16px rgba(0, 0, 0, 0.08);
+    /* Elevate on hover for depth feel — warm shadow tokens */
+    box-shadow: var(--shadow-lg);
   }
   .tilt-root.disabled {
     transform: none !important;

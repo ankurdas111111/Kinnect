@@ -179,43 +179,37 @@
   .field.disabled { opacity: 0.5; pointer-events: none; }
 
   /* ── Inner container ──────────────────────────────────────────────────── */
+  /* Warm ink-tinted field, understated ember focus ring — no clinical inset. */
   .field-inner {
     position: relative;
     display: flex;
     align-items: center;
-    background: var(--surface-3, rgba(15, 23, 42, 0.06));
+    background: var(--surface-3);
     border: 1.5px solid var(--border-default);
     border-radius: var(--radius-md, 8px);
     transition:
       border-color  200ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)),
       box-shadow    200ms var(--ease-out),
       background    200ms var(--ease-out);
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.08);
   }
 
   /* ── States ───────────────────────────────────────────────────────────── */
   .field-inner.state-focused {
-    border-color: var(--primary-400);
-    background: var(--surface-3, color-mix(in oklch, var(--primary-500) 4%, transparent));
-    box-shadow:
-      0 0 0 3px color-mix(in oklch, var(--primary-500) 18%, transparent),
-      0 0 0 6px color-mix(in oklch, var(--primary-500) 6%, transparent),
-      inset 0 2px 4px rgba(0, 0, 0, 0.06);
+    border-color: var(--primary-500);
+    background: var(--surface-1);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary-500) 18%, transparent);
   }
 
+  /* Form mistakes speak in ochre — vermilion stays reserved for SOS. */
   .field-inner.state-error {
-    border-color: var(--danger-500);
-    box-shadow:
-      0 0 0 3px color-mix(in oklch, var(--danger-500) 14%, transparent),
-      inset 0 2px 4px color-mix(in oklch, var(--danger-500) 6%, transparent);
+    border-color: var(--warning-600);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--warning-500) 16%, transparent);
     animation: field-shake 0.38s var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1));
   }
 
   .field-inner.state-success {
     border-color: var(--success-500);
-    box-shadow:
-      0 0 0 3px color-mix(in oklch, var(--success-500) 14%, transparent),
-      inset 0 2px 4px color-mix(in oklch, var(--success-500) 4%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--success-500) 14%, transparent);
   }
 
   @keyframes field-shake {
@@ -297,7 +291,7 @@
     font-weight: 600;
   }
 
-  .state-error .field-label.floated   { color: var(--danger-400); }
+  .state-error .field-label.floated   { color: var(--warning-700); }
   .state-success .field-label.floated { color: var(--success-500); }
 
   /* ── Adornments ───────────────────────────────────────────────────────── */
@@ -311,7 +305,7 @@
   }
 
   .state-focused .field-adornment   { color: var(--primary-400); }
-  .state-error .field-adornment     { color: var(--danger-400); }
+  .state-error .field-adornment     { color: var(--warning-700); }
   .state-success .field-adornment   { color: var(--success-500); }
 
   .field-prefix {
@@ -348,8 +342,9 @@
   }
 
   .state-focused .field-focus-ring { transform: scaleX(1); }
+  /* Form mistakes are ochre — vermilion is SOS-only */
   .state-error   .field-focus-ring {
-    background: linear-gradient(90deg, transparent, var(--danger-500), transparent);
+    background: linear-gradient(90deg, transparent, var(--warning-600), transparent);
     transform: scaleX(1);
   }
   .state-success .field-focus-ring {
@@ -369,8 +364,9 @@
     animation: field-hint-appear 180ms var(--ease-out) both;
   }
 
+  /* Error words in deep ochre — legible, honest, not alarming */
   .field-hint.field-error {
-    color: var(--danger-400);
+    color: var(--warning-700);
   }
 
   .field-hint svg {

@@ -99,36 +99,33 @@
     z-index: var(--z-topmost, 9000);
     border-radius: var(--radius-xl, 20px);
     overflow: hidden;
-    box-shadow:
-      0 16px 48px rgba(0, 0, 0, 0.75),
-      0 0 0 1px color-mix(in oklch, var(--primary-500) 12%, transparent),
-      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    box-shadow: var(--shadow-xl), 0 0 0 1px var(--border-default);
     animation: ep-pop var(--duration-normal, 200ms) var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
   }
 
-  /* Override emoji-picker-element CSS variables to match teal dark theme */
+  /* Override emoji-picker-element CSS variables — Hearth paper, theme-aware */
   .ep-wrap :global(emoji-picker) {
-    --background:               #0a0a18;
-    --border-color:             rgba(255, 255, 255, 0.07);
+    --background:               var(--surface-1);
+    --border-color:             var(--border-subtle);
     --border-size:              1px;
     --button-active-background: color-mix(in oklch, var(--primary-500) 18%, transparent);
-    --button-hover-background:  rgba(255, 255, 255, 0.07);
+    --button-hover-background:  var(--surface-hover);
     --category-emoji-padding:   4px;
     --category-emoji-size:      1.6rem;
-    --category-font-color:      rgba(255, 255, 255, 0.35);
+    --category-font-color:      var(--text-tertiary);
     --category-font-size:       0.7rem;
     --emoji-padding:            5px;
     --emoji-size:               1.5rem;
     --indicator-color:          var(--primary-500);
     --indicator-height:         2px;
-    --input-border-color:       rgba(255, 255, 255, 0.10);
+    --input-border-color:       var(--border-default);
     --input-border-radius:      var(--radius-md, 10px);
     --input-border-size:        1px;
-    --input-font-color:         rgba(255, 255, 255, 0.90);
+    --input-font-color:         var(--text-primary);
     --input-font-size:          14px;
     --input-line-height:        1.5;
     --input-padding:            8px 12px;
-    --input-placeholder-color:  rgba(255, 255, 255, 0.28);
+    --input-placeholder-color:  var(--text-tertiary);
     --num-columns:              8;
     --outline-color:            color-mix(in oklch, var(--primary-500) 45%, transparent);
     --outline-size:             2px;

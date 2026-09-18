@@ -11,7 +11,6 @@
   import { connectivityStore } from '../lib/stores/connectivity.js';
   import { deriveConnState, formatAge } from '../lib/presence.js';
   import { allowMotion } from '../lib/stores/effects.js';
-  import Card from '../components/primitives/Card.svelte';
   import EmptyState from '../components/primitives/EmptyState.svelte';
   import StatusBadge from '../components/primitives/StatusBadge.svelte';
   import AvatarRing from '../components/primitives/AvatarRing.svelte';
@@ -42,6 +41,29 @@
   let filtered = $derived(activeFilter === 'all'
     ? $activityEvents
     : $activityEvents.filter(e => TYPE_FILTER_MAP[e.type] === activeFilter));
+
+  // ── Day groupings — "Today", "Yesterday", then real dates ─────────────────
+  function dayLabel(ts) {
+    const d = new Date(ts);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const same = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    if (same(d, today)) return 'Today';
+    if (same(d, yesterday)) return 'Yesterday';
+    return d.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
+  }
+
+  let grouped = $derived((() => {
+    const groups = [];
+    for (const ev of filtered) {
+      const label = dayLabel(ev.ts);
+      const last = groups[groups.length - 1];
+      if (last && last.label === label) last.events.push(ev);
+      else groups.push({ label, events: [ev] });
+    }
+    return groups;
+  })());
 
   // ── Relative time — delegates to presence.js formatAge ──────────────────────
   function relTime(ts) {
@@ -97,7 +119,7 @@
     </button>
 
     <div class="act-title-group">
-      <h1 class="act-title">Activity</h1>
+      <h1 class="act-title verdict-voice">Activity</h1>
       <!-- StatusBadge driven by real socket connection state.
            announce=false: badge transitions must NOT pollute the feed's aria-live region. -->
       <StatusBadge state={connState} announce={false} />
@@ -146,19 +168,14 @@
         </EmptyState>
       </div>
     {:else}
-      {#each filtered as ev (ev.id)}
-        {@const isDanger = ev.type === 'sos_start'}
-        {@const isMuted = ev.type === 'offline'}
-        <div
-          class="feed-item"
-          in:fly={$allowMotion ? { y: -18, duration: 240, easing: cubicOut } : { duration: 0 }}
-        >
-          <Card
-            variant="glass"
-            padding="none"
-            hover={false}
-            noise={false}
-            glow={isDanger ? 'danger' : null}
+      {#each grouped as group (group.label)}
+        <h2 class="day-label">{group.label}</h2>
+        {#each group.events as ev (ev.id)}
+          {@const isDanger = ev.type === 'sos_start'}
+          {@const isMuted = ev.type === 'offline'}
+          <div
+            class="feed-item"
+            in:fly={$allowMotion ? { y: -18, duration: 240, easing: cubicOut } : { duration: 0 }}
           >
             <div
               class="feed-inner feed-{ev.type}"
@@ -190,41 +207,43 @@
                 {/if}
               </div>
 
-              <!-- Body -->
+              <!-- Body — the sentence first; a whisper of a label only when
+                   the words alone can't carry the weight (SOS). -->
               <div class="feed-body">
+                <p class="feed-msg">{ev.message}</p>
                 <div class="feed-meta-row">
                   <span class="feed-tag feed-tag-{ev.type}">
-                    {#if ev.type === 'position'}Online
-                    {:else if ev.type === 'offline'}Offline
-                    {:else if ev.type === 'sos_start'}SOS Alert
-                    {:else if ev.type === 'sos_end'}SOS Resolved
-                    {:else if ev.type === 'contact'}Contact
-                    {:else}System{/if}
+                    {#if ev.type === 'position'}online
+                    {:else if ev.type === 'offline'}offline
+                    {:else if ev.type === 'sos_start'}SOS
+                    {:else if ev.type === 'sos_end'}SOS resolved
+                    {:else if ev.type === 'contact'}contact
+                    {:else}note{/if}
                   </span>
                   <time class="feed-ts" datetime={new Date(ev.ts).toISOString()}>{relTime(ev.ts)}</time>
                 </div>
-                <p class="feed-msg">{ev.message}</p>
               </div>
             </div>
-          </Card>
-        </div>
+          </div>
+        {/each}
       {/each}
     {/if}
   </main>
 </div>
 
 <style>
+  /* Hearth: what happened, told as sentences on warm paper. */
   .activity-page {
     display: flex;
     flex-direction: column;
     height: 100dvh;
     overflow: hidden;
-    background: var(--bg-base, #0a0a14);
+    background: var(--surface-0);
     color: var(--text-primary);
     font-family: var(--font-sans);
   }
 
-  /* Header */
+  /* Header — paper bar with a hairline, no glass */
   .act-header {
     position: sticky;
     top: 0;
@@ -233,9 +252,7 @@
     align-items: center;
     gap: var(--space-3);
     padding: calc(var(--safe-top) + var(--space-3)) var(--space-4) var(--space-3);
-    background: var(--glass-bg, rgba(5, 5, 18, 0.92));
-    backdrop-filter: var(--glass-3d-blur);
-    -webkit-backdrop-filter: var(--glass-3d-blur);
+    background: var(--surface-0);
     border-bottom: 1px solid var(--border-default);
     flex-shrink: 0;
   }
@@ -246,7 +263,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--surface-inset, rgba(255,255,255,0.06));
+    background: var(--surface-1);
     border: 1px solid var(--border-default);
     border-radius: 50%;
     color: var(--text-primary);
@@ -255,7 +272,7 @@
     transition: background 150ms, transform 100ms;
     -webkit-tap-highlight-color: transparent;
   }
-  .icon-btn:hover { background: var(--surface-hover, rgba(255,255,255,0.11)); }
+  .icon-btn:hover { background: var(--surface-hover); }
   .icon-btn:active { transform: scale(0.88); transition-duration: 60ms; }
   .icon-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
   /* Clear feed is a secondary action — toned down from the primary back button */
@@ -263,12 +280,11 @@
 
   .act-title-group { flex: 1; display: flex; align-items: center; gap: var(--space-2); }
 
+  /* Screen title — the serif register (verdict-voice supplies the italic) */
   .act-title {
     margin: 0;
-    font-family: var(--font-display);
-    font-size: var(--text-xl, 20px);
-    font-weight: 700;
-    letter-spacing: -0.02em;
+    font-size: 22px;
+    color: var(--text-primary);
   }
 
   /* Filter chips */
@@ -286,57 +302,63 @@
     min-height: 44px;
     padding: 6px 16px;
     border-radius: 999px;
-    font-size: 13px;
-    font-weight: 600;
-    font-family: var(--font-display);
-    background: var(--surface-inset, rgba(255,255,255,0.05));
+    font-size: 14px;
+    font-weight: 500;
+    font-family: var(--font-sans);
+    background: var(--surface-1);
     border: 1px solid var(--border-default);
     color: var(--text-secondary);
     cursor: pointer;
     white-space: nowrap;
     flex-shrink: 0;
-    transition: background 150ms, color 150ms, border-color 150ms, box-shadow 150ms;
+    transition: background 150ms, color 150ms, border-color 150ms;
     -webkit-tap-highlight-color: transparent;
   }
-  .filter-chip:hover { background: var(--surface-hover, rgba(255,255,255,0.09)); color: var(--text-primary); }
+  .filter-chip:hover { background: var(--surface-hover); color: var(--text-primary); }
   .filter-chip.active {
     background: var(--primary-500);
     border-color: transparent;
     color: var(--text-on-primary);
-    font-weight: 600;
   }
 
-  /* Feed */
+  /* Feed — a single column of quiet rows, one hairline between days */
   .feed {
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
     padding: var(--space-1) var(--space-4) calc(var(--space-6) + var(--safe-bottom));
     overflow-y: auto;
+    max-width: 640px;
+    width: 100%;
+    margin: 0 auto;
   }
 
-  .feed-item { will-change: transform, opacity; }
+  .day-label {
+    margin: var(--space-5) 0 var(--space-1);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--text-tertiary);
+  }
+  .day-label:first-child { margin-top: var(--space-3); }
 
-  /* Feed card inner (Card primitive supplies the glass surface + edge line) */
+  .feed-item { will-change: transform, opacity; }
+  .feed-item + .feed-item .feed-inner { border-top: 1px solid var(--border-subtle); }
+
+  /* Quiet row — no cards, no color-coded rails; whitespace does the work */
   .feed-inner {
     display: flex;
     gap: var(--space-3);
-    padding: var(--space-3);
-    border-left: 3px solid var(--primary-500);
+    padding: var(--space-3) var(--space-1);
+    border-radius: var(--radius-md, 10px);
     transition: opacity 200ms var(--ease-out, cubic-bezier(0.16,1,0.3,1));
   }
-  .feed-offline   .feed-avatar,
-  .feed-offline { border-left-color: var(--border-strong, rgba(255,255,255,0.18)); }
-  .feed-sos_start { border-left-color: var(--danger-500); }
-  .feed-sos_end   { border-left-color: var(--success-500); }
-  .feed-self      { border-left-color: var(--border-strong, rgba(255,255,255,0.14)); }
-  .feed-contact   { border-left-color: var(--primary-500); }
 
-  /* Danger events carry extra visual weight: tint + roomier padding */
+  /* SOS is the one event allowed to interrupt the quiet */
   .feed-inner.is-danger {
-    background: var(--danger-500-12);
-    padding: var(--space-4) var(--space-3);
+    background: color-mix(in oklch, var(--danger-500) 8%, transparent);
+    padding: var(--space-3);
   }
 
   /* Offline events de-emphasised, not hidden */
@@ -349,8 +371,8 @@
     width: 44px; height: 44px;
     border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    font-family: var(--font-display);
-    font-weight: 700;
+    font-family: var(--font-sans);
+    font-weight: 600;
     font-size: 16px;
     /* Inline box-shadow removed — AvatarRing supplies the ring via --ring-color-* tokens */
     transition: transform 180ms var(--ease-out, cubic-bezier(0.16,1,0.3,1));
@@ -364,15 +386,15 @@
     width: 44px; height: 44px;
     border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    background: var(--primary-500-12);
-    color: var(--primary-400);
+    background: var(--primary-100);
+    color: var(--primary-700);
     transition: transform 180ms var(--ease-out, cubic-bezier(0.16,1,0.3,1));
   }
   @media (hover: hover) and (pointer: fine) {
     .feed-inner:hover .feed-icon { transform: scale(1.08); }
   }
-  .feed-icon-self    { background: var(--surface-inset, rgba(255,255,255,0.06)); color: var(--text-tertiary); }
-  .feed-icon-contact { background: var(--primary-500-12); color: var(--primary-400); }
+  .feed-icon-self    { background: var(--surface-inset); color: var(--text-tertiary); }
+  .feed-icon-contact { background: var(--primary-100); color: var(--primary-700); }
 
   .feed-body {
     flex: 1;
@@ -386,40 +408,37 @@
   .feed-meta-row {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: var(--space-2);
   }
 
+  /* Whisper label — plain lowercase words, no log-style uppercase */
   .feed-tag {
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: var(--primary-400);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-tertiary);
   }
-  .feed-tag-offline   { color: var(--text-tertiary); }
-  .feed-tag-sos_start { color: var(--danger-500); }
-  .feed-tag-sos_end   { color: var(--success-500); }
-  .feed-tag-self      { color: var(--text-tertiary); }
+  .feed-tag-sos_start { color: var(--danger-600); font-weight: 600; }
+  .feed-tag-sos_end   { color: var(--success-600); }
 
   .feed-ts {
-    font-size: 11px;
+    font-size: 13px;
     color: var(--text-tertiary);
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
   }
+  .feed-ts::before { content: '·'; margin-right: var(--space-2); color: var(--text-tertiary); }
 
+  /* The sentence is the row — 16px ink */
   .feed-msg {
     margin: 0;
-    font-size: 14px;
-    line-height: 1.45;
-    color: var(--text-secondary);
-  }
-  /* Danger message reads louder */
-  .feed-inner.is-danger .feed-msg {
-    font-size: 15px;
-    font-weight: 600;
+    font-size: 16px;
+    line-height: 1.5;
     color: var(--text-primary);
+  }
+  /* An SOS sentence reads with weight, not volume */
+  .feed-inner.is-danger .feed-msg {
+    font-weight: 600;
+    color: var(--danger-600);
   }
 
   /* Empty state wrapper (EmptyState primitive supplies the content) */
@@ -439,10 +458,10 @@
     border-radius: var(--radius-full, 9999px);
     font-size: var(--text-sm);
     font-weight: 600;
-    font-family: var(--font-display);
+    font-family: var(--font-sans);
     background: var(--surface-1);
     border: 1.5px solid color-mix(in oklch, var(--primary-500) 45%, transparent);
-    color: var(--primary-600);
+    color: var(--primary-700);
     cursor: pointer;
     transition: background 150ms;
     -webkit-tap-highlight-color: transparent;

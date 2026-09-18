@@ -314,17 +314,12 @@
 {/if}
 
 <style>
+  /* Hearth: warm paper card; the member's own hue tints only the border. */
   .person-card {
     animation: depth-card-arrive 380ms var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
-    background: var(--glass-3d);
-    backdrop-filter: var(--glass-3d-blur);
-    -webkit-backdrop-filter: var(--glass-3d-blur);
-    border: 1px solid var(--user-color-light, var(--glass-3d-border));
-    border-top-color: var(--glass-3d-border);
-    box-shadow:
-      var(--shadow-lg),
-      0 12px 40px var(--user-color-light, transparent),
-      var(--glass-3d-inner);
+    background: var(--surface-1);
+    border: 1px solid var(--user-color-light, var(--border-default));
+    box-shadow: var(--shadow-lg);
     border-radius: var(--radius-xl, 20px);
     overflow: hidden;
     isolation: isolate;
@@ -335,11 +330,10 @@
       transform var(--duration-3d, 250ms) var(--ease-spring);
   }
 
-  /* ── Inline emergency card — danger-glow region ────────────────────────── */
+  /* ── Inline emergency card — active SOS: the one vermilion region ──────── */
   .ec-card {
     background: var(--danger-500-12);
     border-bottom: 1px solid var(--danger-500-20);
-    box-shadow: inset 0 0 0 1px var(--danger-500-12), var(--glow-sos);
   }
 
   /* MASSIVE blood type — centered, high contrast, the first thing you see */
@@ -362,12 +356,11 @@
   }
   .ec-blood-val {
     font-size: var(--text-3xl);
-    font-weight: 900;
+    font-weight: 700;
     color: var(--danger-600);
-    letter-spacing: -0.04em;
+    letter-spacing: -0.02em;
     line-height: 1;
     font-variant-numeric: tabular-nums;
-    text-shadow: 0 1px 2px var(--danger-500-20);
   }
 
   /* Risk chips — full text, wrapping, colored by severity */
@@ -490,12 +483,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow:
-      inset 0 2px 4px color-mix(in oklch, white 15%, transparent),
-      inset 0 -2px 4px color-mix(in oklch, black 10%, transparent);
-    transition:
-      box-shadow var(--duration-normal) var(--ease-out),
-      transform var(--duration-normal) var(--ease-spring);
+    transition: transform var(--duration-normal) var(--ease-spring);
   }
 
   .avatar-initials {
@@ -548,11 +536,11 @@
     display: inline-flex;
     align-items: center;
     gap: var(--space-1);
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 600;
-    color: var(--primary-500);
-    background: var(--primary-500-08);
-    border: 1px solid var(--primary-500-12);
+    color: var(--primary-700);
+    background: var(--primary-100);
+    border: 1px solid color-mix(in oklch, var(--primary-500) 20%, transparent);
     border-radius: var(--radius-full, 9999px);
     padding: 2px 7px;
     line-height: 1.3;
@@ -587,12 +575,9 @@
     align-items: center;
     gap: var(--space-2-5);
     padding: var(--space-2-5) var(--space-3);
-    background: var(--surface-1);
+    background: var(--surface-2);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-lg, 14px);
-    box-shadow:
-      inset 0 1px 2px color-mix(in oklch, black 3%, transparent),
-      0 1px 0 color-mix(in oklch, white 6%, transparent);
     min-height: 44px;
   }
 
@@ -614,30 +599,18 @@
     min-width: 0;
   }
 
-  /* Per-type tints — --primary-500-08/-12 pattern */
-  .stat--coord {
-    background: var(--primary-500-08);
-  }
-  .stat--coord .stat-icon {
-    background: var(--primary-500-12);
-    color: var(--primary-500);
+  /* Quiet readings — one shared paper tier; only the small icon carries hue */
+  .stat--coord .stat-icon,
+  .stat--distance .stat-icon {
+    background: var(--primary-100);
+    color: var(--primary-700);
   }
   .stat--accuracy .stat-icon {
     background: color-mix(in oklch, var(--warning-500) 12%, transparent);
     color: var(--warning-600);
   }
-  .stat--distance {
-    background: var(--primary-500-08);
-  }
-  .stat--distance .stat-icon {
-    background: var(--primary-500-12);
-    color: var(--primary-500);
-  }
-  .stat--speed {
-    background: var(--success-500-12);
-  }
   .stat--speed .stat-icon {
-    background: var(--success-500-20);
+    background: var(--success-500-12);
     color: var(--success-600);
   }
 

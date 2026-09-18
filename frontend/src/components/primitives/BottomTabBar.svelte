@@ -3,12 +3,12 @@
   import { haptics } from '../../lib/haptics.js';
 
   /**
-   * BottomTabBar — floating liquid-glass pill (2026 nav).
+   * BottomTabBar — floating warm-paper pill (Hearth nav).
    *
-   * Material: --glass-nav-* tier (tokens-fx.css) — blur + specular top edge +
-   * one lift shadow; near-opaque flat under data-fx="minimal". Emotional layer:
-   * the active indicator + active ink read --nav-tone-* (verdict tone), and the
-   * bar surface carries --amb-warmth (daypart temperature).
+   * Material: solid paper (--surface-1) with one warm lift shadow — no glass
+   * blur. Emotional layer: the active indicator + active ink read
+   * --nav-tone-* (verdict tone), and the bar surface carries --amb-warmth
+   * (daypart temperature).
    *
    * Motion: ONE spring slide on the indicator (transform-only, GPU) + a
    * one-shot settle on the tapped icon. No infinite loops — decoration that
@@ -182,7 +182,7 @@
 </div>
 
 <style>
-  /* ── Floating liquid-glass pill ─────────────────────────────────────────── */
+  /* ── Floating warm-paper pill ───────────────────────────────────────────── */
   .bottom-tabs {
     position: relative;
     display: flex;
@@ -193,15 +193,13 @@
     margin-inline: auto;
     padding: var(--space-1);
     border-radius: var(--radius-full, 999px);
-    /* nav tier: daypart-warmed glass + specular top edge + one lift shadow.
-       --amb-warmth layers the time-of-day temperature over the material. */
+    /* Hearth: a floating paper pill — daypart warmth over solid paper,
+       one warm lift shadow, no glass blur. */
     background:
       linear-gradient(var(--amb-warmth), var(--amb-warmth)),
-      var(--glass-nav-bg);
-    border: 1px solid var(--glass-nav-border);
-    box-shadow: var(--glass-nav-shadow), var(--shadow-3d-float);
-    backdrop-filter: var(--glass-nav-blur);
-    -webkit-backdrop-filter: var(--glass-nav-blur);
+      var(--surface-1);
+    border: 1px solid var(--border-default);
+    box-shadow: var(--sh);
     z-index: var(--z-navbar);
     pointer-events: auto;
   }
@@ -234,7 +232,6 @@
     border-radius: var(--radius-full, 999px);
     background: color-mix(in oklch, var(--nav-tone-accent) 14%, transparent);
     border: 1px solid color-mix(in oklch, var(--nav-tone-accent) 35%, transparent);
-    box-shadow: inset 0 1px 0 var(--nav-specular);
     transform: translateX(calc(var(--tab-index, 0) * 100%));
     transition: transform var(--duration-3d, 250ms) var(--ease-spring);
     pointer-events: none;
@@ -333,13 +330,13 @@
     right: -3px;
     width: 10px;
     height: 10px;
-    background: var(--success-400);
+    background: var(--success-500);
     border-radius: 50%;
-    border: 2px solid var(--surface-0);
-    box-shadow: var(--glow-live-sm);
+    border: 2px solid var(--surface-1);
     animation: dot-appear 200ms var(--ease-spring) both;
   }
 
+  /* Vermilion dot = SOS only (helpBadge.active / familyBadge.urgent). */
   .tab-dot {
     position: absolute;
     top: -3px;
@@ -348,8 +345,7 @@
     height: 8px;
     background: var(--danger-500);
     border-radius: 50%;
-    border: 2px solid var(--surface-0);
-    box-shadow: var(--glow-sos-sm, var(--glow-sos));
+    border: 2px solid var(--surface-1);
     animation: dot-appear 200ms var(--ease-spring) both;
   }
   .tab-dot.tone-caution {
@@ -370,10 +366,10 @@
     justify-content: center;
     background: var(--primary-500);
     color: var(--text-on-primary);
-    border: 2px solid var(--surface-0);
+    border: 2px solid var(--surface-1);
     border-radius: var(--radius-full, 999px);
     font-size: 9px;
-    font-weight: 800;
+    font-weight: 700;
     line-height: 1;
     font-variant-numeric: tabular-nums;
     animation: dot-appear 200ms var(--ease-spring) both;

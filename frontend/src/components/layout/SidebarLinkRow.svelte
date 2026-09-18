@@ -44,7 +44,7 @@
     min-height: 44px;
     padding: 0 var(--space-3);
     background: var(--surface-1);
-    border: 1px solid var(--border-default, var(--glass-border));
+    border: 1px solid var(--border-default);
     border-radius: var(--radius-md, 12px);
     color: var(--text-secondary);
     font-family: var(--font-display);
@@ -59,7 +59,7 @@
   .link-btn:hover {
     background: var(--surface-hover);
     color: var(--text-primary);
-    border-color: var(--glass-border-strong);
+    border-color: var(--border-strong);
   }
   .link-btn:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
 </style>

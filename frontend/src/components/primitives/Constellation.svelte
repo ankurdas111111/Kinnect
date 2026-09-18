@@ -150,7 +150,7 @@
     transition: transform var(--duration-normal) var(--ease-spring),
                 opacity var(--duration-normal) var(--ease-out);
   }
-  .cst-core { fill: var(--surface-0, #fff); }
+  .cst-core { fill: var(--surface-0); }
   .cst-node[data-state='unlit'] .cst-pin { opacity: 0.4; }
   .cst-node[data-state='live'] .cst-halo,
   .cst-node[data-state='igniting'] .cst-halo { opacity: 1; }

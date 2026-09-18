@@ -206,13 +206,14 @@
     pointer-events: none;
   }
 
-  /* GPU-only progress: transform scaleX on the fill child — CONTRACTS.md §11 */
+  /* GPU-only progress: transform scaleX on the fill child — CONTRACTS.md §11.
+     Solid ember fill — one accent, no gradient. */
   .scrubber-fill {
     position: absolute;
     inset: 0;
     transform-origin: left center;
     transform: scaleX(var(--frac, 0));
-    background: linear-gradient(90deg, var(--primary-600), var(--primary-400));
+    background: var(--primary-500);
     border-radius: inherit;
     transition: transform 120ms var(--ease-out);
   }
@@ -244,7 +245,7 @@
     width: var(--space-5);
     height: var(--space-5);
     border-radius: var(--radius-full);
-    background: var(--text-inverse, white);
+    background: var(--text-inverse);
     border: 2.5px solid var(--primary-500);
     box-shadow: var(--shadow-sm);
     cursor: pointer;
@@ -259,7 +260,7 @@
     width: var(--space-5);
     height: var(--space-5);
     border-radius: var(--radius-full);
-    background: var(--text-inverse, white);
+    background: var(--text-inverse);
     border: 2.5px solid var(--primary-500);
     box-shadow: var(--shadow-sm);
     cursor: pointer;
@@ -282,23 +283,23 @@
     min-height: 44px;
     padding: var(--space-2-5) var(--space-4);
     border-radius: var(--radius-lg);
-    background: linear-gradient(135deg, var(--primary-500), var(--primary-700));
+    background: var(--primary-500);
     border: none;
-    color: var(--text-inverse);
+    color: var(--text-on-primary);
     font-family: var(--font-display);
     font-size: var(--text-base);
-    font-weight: 700;
+    font-weight: 600;
     cursor: pointer;
     transition: transform var(--duration-fast) var(--ease-spring),
                 box-shadow var(--duration-normal) var(--ease-out),
                 background var(--duration-normal) var(--ease-out);
-    box-shadow: var(--shadow-primary);
+    box-shadow: var(--shadow-sm);
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
   }
 
   .play-btn:hover {
-    box-shadow: var(--shadow-primary), var(--glow-primary, none);
+    background: var(--primary-600);
   }
 
   .play-btn:active {
@@ -352,7 +353,6 @@
   @media (prefers-reduced-motion: reduce) {
     .scrubber-fill { transition: none; }
     .scrubber::-webkit-slider-thumb:hover { transform: none; }
-    .play-btn:hover  { box-shadow: var(--shadow-primary); }
     .play-btn:active { transform: none; }
   }
 </style>

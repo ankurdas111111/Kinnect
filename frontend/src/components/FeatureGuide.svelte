@@ -183,7 +183,7 @@
           <span class="guide-tab-badge">{pages[currentPage].tab} tab</span>
         </div>
 
-        <h2 class="guide-title">{pages[currentPage].title}</h2>
+        <h2 class="guide-title verdict-voice">{pages[currentPage].title}</h2>
         <p class="guide-desc">{pages[currentPage].desc}</p>
 
         <div class="guide-steps">
@@ -230,9 +230,9 @@
     position: fixed;
     inset: 0;
     z-index: var(--z-topmost, 9000);
-    background: rgba(0, 0, 0, 0.65);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    background: color-mix(in oklch, var(--ink) 52%, transparent);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -245,14 +245,14 @@
    * and settles at 34rem (544px) on large screens.
    */
   .guide-card {
-    background: var(--surface-raised, #1a1a2e);
+    background: var(--surface-1);
     border: 1px solid var(--border-default);
     border-radius: 24px;
     width: min(92vw, clamp(25rem, 34vw, 34rem));
     max-height: 85vh;
     overflow-y: auto;
     padding: clamp(20px, 1.8vw, 32px);
-    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.40);
+    box-shadow: var(--shadow-xl);
     position: relative;
   }
 
@@ -264,27 +264,27 @@
   }
 
   .guide-badge {
-    font-family: var(--font-display);
-    font-size: var(--text-2xs, 10px);
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--primary-400);
-    background: color-mix(in oklch, var(--primary-500) 12%, transparent);
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--primary-700);
+    background: var(--primary-100);
     border: 1px solid color-mix(in oklch, var(--primary-500) 25%, transparent);
     padding: 3px 10px;
     border-radius: 99px;
   }
 
   .guide-skip {
-    font-family: var(--font-display);
-    font-size: var(--text-xs);
-    font-weight: 700;
-    color: var(--text-tertiary);
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--text-secondary);
     background: none;
     border: none;
     cursor: pointer;
-    padding: 4px 8px;
+    padding: 10px 12px;
+    min-height: 44px;
     border-radius: 6px;
     transition: color 150ms;
   }
@@ -308,37 +308,34 @@
     width: clamp(56px, 4vw, 68px);
     height: clamp(56px, 4vw, 68px);
     border-radius: 16px;
-    background: linear-gradient(135deg, color-mix(in oklch, var(--primary-500) 15%, transparent), color-mix(in oklch, var(--primary-500) 10%, transparent));
+    background: var(--primary-100);
     border: 1px solid color-mix(in oklch, var(--primary-500) 25%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--primary-400);
+    color: var(--primary-700);
   }
 
   .guide-tab-badge {
-    font-family: var(--font-display);
-    font-size: var(--text-2xs, 10px);
-    font-weight: 700;
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 500;
     color: var(--text-tertiary);
     background: var(--surface-inset);
     padding: 2px 10px;
     border-radius: 99px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.02em;
   }
 
+  /* Serif register (verdict-voice supplies the italic) */
   .guide-title {
-    font-family: var(--font-display);
-    font-size: clamp(var(--text-xl, 20px), 1.4vw, 26px);
-    font-weight: 800;
+    font-size: clamp(22px, 1.4vw, 26px);
     color: var(--text-primary);
     margin: 0 0 6px;
-    letter-spacing: -0.02em;
   }
 
   .guide-desc {
-    font-size: clamp(var(--text-sm, 13px), 1vw, 15px);
+    font-size: 16px;
     color: var(--text-secondary);
     margin: 0 0 16px;
     line-height: 1.5;
@@ -367,10 +364,10 @@
     height: 22px;
     border-radius: 50%;
     background: var(--primary-500);
-    color: white;
-    font-family: var(--font-display);
-    font-size: var(--text-2xs, 10px);
-    font-weight: 800;
+    color: var(--text-on-primary);
+    font-family: var(--font-sans);
+    font-size: 11px;
+    font-weight: 600;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -379,9 +376,9 @@
   }
 
   .guide-step-text {
-    font-size: clamp(var(--text-sm, 13px), 0.95vw, 15px);
+    font-size: 15px;
     color: var(--text-primary);
-    line-height: 1.4;
+    line-height: 1.45;
   }
 
   /* Footer */
@@ -421,9 +418,10 @@
   .guide-nav-btn {
     flex: 1;
     padding: 12px;
-    font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 700;
+    min-height: 48px;
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    font-weight: 600;
     border-radius: var(--radius-lg, 12px);
     cursor: pointer;
     transition: background 150ms, transform 120ms;
@@ -432,7 +430,7 @@
   .guide-nav-btn:active { transform: scale(0.97); }
 
   .guide-prev {
-    background: var(--surface-inset);
+    background: var(--surface-1);
     color: var(--text-secondary);
     border: 1px solid var(--border-default);
   }
@@ -440,7 +438,7 @@
 
   .guide-next {
     background: var(--primary-500);
-    color: white;
+    color: var(--text-on-primary);
   }
   .guide-next:hover { background: var(--primary-600); }
 
@@ -448,8 +446,8 @@
     position: absolute;
     bottom: 20px;
     right: 20px;
-    font-family: var(--font-mono, monospace);
-    font-size: var(--text-2xs, 10px);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
     color: var(--text-tertiary);
   }
 

@@ -215,8 +215,8 @@
       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 5-7 7 7 7"/></svg>
     </button>
     <div class="header-title-block">
-      <h1 class="page-title">Check-in</h1>
-      <span class="page-subtitle">Auto-safety pulse</span>
+      <h1 class="page-title verdict-voice">Check-in</h1>
+      <span class="page-subtitle">A promise to check in, on your schedule</span>
     </div>
     {#if enabled}
       <span class="header-badge-wrap" in:fade={{ duration: 200 }}>
@@ -439,18 +439,16 @@
     gap: 1px;
   }
 
+  /* Screen title — serif register (verdict-voice supplies the italic) */
   .page-title {
-    font-family: var(--font-display);
-    font-size: var(--text-xl);
-    font-weight: 800;
+    font-size: 22px;
     color: var(--text-primary);
     margin: 0;
     line-height: 1.2;
-    letter-spacing: -0.02em;
   }
 
   .page-subtitle {
-    font-size: var(--text-xs);
+    font-size: var(--text-sm);
     color: var(--text-tertiary);
   }
 
@@ -470,11 +468,11 @@
     margin: 0 auto;
   }
 
-  /* ── Countdown card ──────────────────────────────────────────────────────── */
+  /* ── Countdown card — a quiet paper promise, not a compliance meter ─────── */
   .countdown-card {
     position: relative;
-    background: linear-gradient(135deg, var(--primary-500-12) 0%, var(--primary-500-08) 100%);
-    border: 1px solid var(--primary-500-20);
+    background: var(--surface-1);
+    border: 1px solid var(--border-default);
     border-radius: var(--radius-2xl, 20px);
     padding: var(--space-5, 20px) var(--space-4);
     display: flex;
@@ -482,21 +480,23 @@
     align-items: center;
     gap: var(--space-2);
     text-align: center;
+    box-shadow: var(--shadow-sm);
     transition: border-color 300ms var(--ease-out), background 300ms var(--ease-out);
   }
 
+  /* Past the deadline but inside the grace window — ochre, never vermilion.
+     Vermilion is reserved for the actual missed-check-in escalation. */
   .countdown-card-urgent {
-    border-color: var(--danger-500-20);
-    background: linear-gradient(135deg, var(--danger-500-12) 0%, var(--danger-500-20) 100%);
+    border-color: color-mix(in oklch, var(--warning-500) 35%, transparent);
+    background: color-mix(in oklch, var(--warning-500) 8%, var(--surface-1));
   }
 
   .countdown-heading {
-    font-family: var(--font-display);
-    font-size: var(--text-xs);
-    font-weight: 700;
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 600;
     color: var(--text-tertiary);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.02em;
   }
 
   /* ── Idle ring (no first check-in yet) — static, no conic sweep ──────────── */
@@ -526,11 +526,11 @@
   /* Center readout inside the shared CountdownRing children slot + idle ring.
      (CountdownRing renders our children in the parent scope.) */
   .ring-value {
-    font-family: var(--font-mono);
+    font-family: var(--font-sans);
     font-size: clamp(1.375rem, 6vw, 1.875rem);
-    font-weight: 900;
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.01em;
     line-height: 1.05;
     text-align: center;
     padding: 0 var(--space-2);
@@ -538,15 +538,16 @@
   }
 
   .ring-caption {
-    font-size: var(--text-2xs, 10px);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
+    font-size: 12px;
+    letter-spacing: 0.02em;
     color: var(--text-tertiary);
   }
 
-  .countdown-ok   { color: var(--primary-400); }
-  .countdown-soon { color: var(--warning-500); }
-  .countdown-due  { color: var(--danger-500); animation: pulse-due 1s ease-in-out infinite; }
+  /* Deadline ladder: settled ember → approaching ochre → overdue deep ochre.
+     No red — a due check-in is still a promise, not an emergency. */
+  .countdown-ok   { color: var(--primary-700); }
+  .countdown-soon { color: var(--warning-600); }
+  .countdown-due  { color: var(--warning-700); animation: pulse-due 1s ease-in-out infinite; }
 
   @keyframes pulse-due {
     0%, 100% { opacity: 1; }
@@ -564,26 +565,26 @@
 
   .imok-btn {
     margin-top: var(--space-2);
-    min-height: 44px;
+    min-height: 48px;
     display: inline-flex;
     align-items: center;
     gap: var(--space-2);
     padding: 10px 28px;
-    background: var(--primary-600);
-    color: var(--text-inverse, white);
+    background: var(--primary-500);
+    color: var(--text-on-primary);
     border: none;
     border-radius: var(--radius-full);
-    font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 700;
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    font-weight: 600;
     cursor: pointer;
-    box-shadow: var(--glow-primary), 0 2px 8px var(--shadow-color, rgba(0,0,0,0.25));
+    box-shadow: var(--shadow-sm);
     transition: transform 150ms var(--ease-spring), box-shadow 200ms var(--ease-out), background 150ms;
   }
   .imok-btn:hover {
-    background: var(--primary-500);
+    background: var(--primary-600);
     transform: translateY(-1px) scale(1.03);
-    box-shadow: var(--glow-primary), 0 4px 14px var(--shadow-color, rgba(0,0,0,0.3));
+    box-shadow: var(--shadow-md);
   }
   .imok-btn:active { transform: scale(0.97); }
 
@@ -626,23 +627,23 @@
   }
 
   .settings-label {
-    font-family: var(--font-display);
+    font-family: var(--font-sans);
     font-size: var(--text-base);
-    font-weight: 800;
+    font-weight: 600;
     letter-spacing: -0.01em;
     color: var(--text-primary);
   }
 
   .settings-hint {
-    font-size: var(--text-xs);
-    color: var(--text-tertiary);
-    line-height: 1.45;
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    line-height: 1.5;
   }
 
   .section-heading {
-    font-family: var(--font-display);
+    font-family: var(--font-sans);
     font-size: var(--text-base);
-    font-weight: 800;
+    font-weight: 600;
     letter-spacing: -0.01em;
     color: var(--text-primary);
   }
@@ -657,15 +658,15 @@
   .pill-btn {
     padding: 5px 14px;
     min-height: 44px;
-    font-family: var(--font-display);
-    font-size: var(--text-xs);
-    font-weight: 600;
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    font-weight: 500;
     border: 1px solid var(--border-default);
     border-radius: var(--radius-full);
     background: var(--surface-2);
     color: var(--text-secondary);
     cursor: pointer;
-    transition: background 120ms, color 120ms, box-shadow 150ms;
+    transition: background 120ms, color 120ms;
     min-width: 44px;
     text-align: center;
   }
@@ -674,72 +675,73 @@
     background: var(--primary-500);
     color: var(--text-on-primary);
     border-color: var(--primary-500);
-    box-shadow: var(--glow-primary);
   }
   .pill-btn:disabled { cursor: not-allowed; }
 
   /* ── Save button ─────────────────────────────────────────────────────────── */
   .save-btn {
     width: 100%;
-    min-height: 44px;
+    min-height: 48px;
     padding: 14px;
-    background: var(--primary-600);
-    color: var(--text-inverse, white);
+    background: var(--primary-500);
+    color: var(--text-on-primary);
     border: none;
     border-radius: var(--radius-xl);
-    font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 700;
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    font-weight: 600;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: var(--space-2);
-    box-shadow: var(--glow-primary);
+    box-shadow: var(--shadow-sm);
     transition: background 150ms, transform 150ms var(--ease-spring), opacity 200ms;
   }
-  .save-btn:hover { background: var(--primary-500); transform: translateY(-1px); }
+  .save-btn:hover { background: var(--primary-600); transform: translateY(-1px); }
   .save-btn:active { transform: scale(0.98); }
   .save-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 
-  /* Retry variant — danger-tinted so the failed save reads at a glance */
+  /* Retry variant — ink outline; the words say what happened, no red */
   .save-btn-retry {
-    background: var(--danger-600, var(--danger-500));
+    background: var(--surface-1);
+    color: var(--text-primary);
+    border: 1.5px solid var(--border-strong);
     box-shadow: none;
   }
-  .save-btn-retry:hover { background: var(--danger-500); }
+  .save-btn-retry:hover { background: var(--surface-hover); }
 
   .save-error {
     margin: 0 0 var(--space-2);
-    font-size: var(--text-xs);
+    font-size: var(--text-sm);
     font-weight: 600;
-    color: var(--danger-400);
+    color: var(--warning-700);
     text-align: center;
     line-height: 1.4;
   }
 
   /* Empty-state CTA — matches pill/save action weight */
   .empty-cta {
-    min-height: 44px;
+    min-height: 48px;
     padding: var(--space-2) var(--space-5);
-    background: var(--primary-600);
-    color: var(--text-inverse, white);
+    background: var(--primary-500);
+    color: var(--text-on-primary);
     border: none;
     border-radius: var(--radius-full);
-    font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 700;
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    font-weight: 600;
     cursor: pointer;
-    box-shadow: var(--glow-primary);
+    box-shadow: var(--shadow-sm);
     transition: background 150ms var(--ease-out);
   }
-  .empty-cta:hover { background: var(--primary-500); }
+  .empty-cta:hover { background: var(--primary-600); }
 
   .saving-spinner {
     width: 14px;
     height: 14px;
-    border: 2px solid var(--primary-500-30);
-    border-top-color: var(--text-inverse, white);
+    border: 2px solid color-mix(in oklch, var(--text-on-primary) 35%, transparent);
+    border-top-color: var(--text-on-primary);
     border-radius: 50%;
     animation: spin 0.7s linear infinite;
     flex-shrink: 0;
@@ -759,12 +761,11 @@
   }
 
   .how-title {
-    font-family: var(--font-display);
-    font-size: var(--text-xs);
-    font-weight: 700;
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 600;
     color: var(--text-tertiary);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.02em;
   }
 
   .how-list {
@@ -773,7 +774,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-1-5, 6px);
-    font-size: var(--text-sm);
+    font-size: var(--text-base);
     color: var(--text-secondary);
     line-height: 1.55;
   }
@@ -803,7 +804,7 @@
     border-radius: var(--radius-sm);
     transition: color 120ms, background 120ms;
   }
-  .clear-log-btn:hover { color: var(--danger-400); background: var(--danger-500-12); }
+  .clear-log-btn:hover { color: var(--text-primary); background: var(--surface-hover); }
 
   .log-list {
     display: flex;
