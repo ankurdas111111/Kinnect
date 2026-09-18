@@ -18,6 +18,18 @@
   function chipList(value) {
     return (value || '').split(/[,\n;]+/).map(s => s.trim()).filter(Boolean);
   }
+
+  let hasAnyData = $derived(!!(
+    card?.bloodType ||
+    card?.allergies?.trim() ||
+    card?.medications?.trim() ||
+    card?.conditions?.trim() ||
+    card?.emergencyContacts?.length ||
+    hasMedField(card, 'emergencyName', 'emergencyPhone') ||
+    hasMedField(card, 'doctorName', 'doctorPhone') ||
+    card?.language?.trim() ||
+    card?.responderNotes?.trim()
+  ));
 </script>
 
         <div class="med-card-wrap">
@@ -37,7 +49,7 @@
                     <line x1="8"  y1="12" x2="16" y2="12"/>
                   </svg>
                 </span>
-                <span class="med-card-title">Medical Card</span>
+                <span class="med-card-title">Responder medical card</span>
                 <span class="med-card-chevron" class:open={open} aria-hidden="true">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="6 9 12 15 18 9"/>
@@ -189,6 +201,12 @@
                     </div>
                   {/if}
 
+                  {#if !hasAnyData}
+                    <div class="med-row med-empty">
+                      <span class="med-empty-text">No medical details have been shared.</span>
+                    </div>
+                  {/if}
+
                 </div>
               {/if}
             </div>
@@ -198,8 +216,16 @@
 <style>
   .med-card-wrap {
     width: 100%;
-    max-width: 380px;
     margin-top: var(--space-1);
+  }
+
+  /* Paper container tier + token-true vermilion glow (the Card's own
+     --glow-sos fallback predates the Hearth palette). */
+  .med-card-wrap :global(.card.card-glass.glow-danger) {
+    background: var(--surface-2);
+    border: 1px solid color-mix(in oklch, var(--danger-500) 25%, transparent);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-danger);
   }
 
   .med-card {
@@ -213,17 +239,17 @@
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    padding: var(--space-2-5) var(--space-3-5);
-    min-height: 44px;
+    padding: var(--space-3) var(--space-3-5);
+    min-height: 48px;
     background: transparent;
     border: none;
     cursor: pointer;
     text-align: left;
     transition: background var(--duration-fast) var(--ease-out);
   }
-  .med-card-header:hover { background: var(--danger-500-12); }
+  .med-card-header:hover { background: var(--surface-hover); }
   .med-card-header:focus-visible {
-    outline: 2px solid var(--danger-400);
+    outline: 2px solid var(--danger-500);
     outline-offset: -2px;
   }
 
@@ -237,22 +263,22 @@
     background: var(--danger-500-12);
     color: var(--danger-500);
     flex-shrink: 0;
-    box-shadow: 0 0 8px color-mix(in oklch, var(--danger-500) 25%, transparent);
   }
 
   .med-card-title {
     flex: 1;
-    font-family: var(--font-display);
-    font-size: var(--text-2xs);
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
     font-weight: 700;
     color: var(--danger-600);
-    letter-spacing: 0.06em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
   }
+  :global([data-theme="dark"]) .med-card-title { color: var(--danger-300); }
 
   /* Chevron — spring affordance (transform-only, reduced-motion safe) */
   .med-card-chevron {
-    color: var(--danger-400);
+    color: var(--text-tertiary);
     display: flex;
     align-items: center;
     transition: transform var(--duration-normal) var(--ease-spring);
@@ -265,27 +291,21 @@
     display: flex;
     flex-direction: column;
     gap: 1px;
-    background: var(--danger-500-12);
-    border-top: 1px solid color-mix(in oklch, var(--danger-500) 15%, transparent);
+    background: var(--border-subtle);
+    border-top: 1px solid var(--border-subtle);
     max-height: calc(100dvh - 160px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
 
-  /* med-row: dark-first surface — uses surface token so light theme overrides naturally */
+  /* Rows are quiet paper tiers separated by hairline gaps — tonal
+     separation, no borders inside borders. */
   .med-row {
     display: flex;
     align-items: flex-start;
-    gap: var(--space-2);
-    padding: 9px 14px;
-    /* Token-aware: var(--surface-1) resolves to a dark surface in dark mode,
-       and a light surface in [data-theme="light"] — no hardcoded white */
-    background: var(--surface-1, rgba(15, 23, 42, 0.70));
-    backdrop-filter: blur(8px);
-  }
-
-  :global([data-theme="light"]) .med-row {
-    background: rgba(255, 255, 255, 0.92);
+    gap: var(--space-2-5);
+    padding: var(--space-2-5) var(--space-3-5);
+    background: var(--surface-1);
   }
 
   /* Blood type — extra-large, high-contrast, centered (most critical field) */
@@ -296,40 +316,36 @@
     gap: var(--space-1);
     text-align: center;
     padding: var(--space-3) var(--space-3-5);
-    background: var(--danger-500-12);
   }
   .med-blood-label {
-    font-family: var(--font-display);
+    font-family: var(--font-sans);
     font-size: var(--text-2xs);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: var(--danger-400);
+    color: var(--text-secondary);
   }
   .med-blood-value {
-    font-family: var(--font-display);
+    font-family: var(--font-sans);
     font-size: var(--text-4xl);
-    font-weight: 800;
+    font-weight: 700;
     color: var(--danger-500);
     line-height: 1;
-    font-variant-numeric: tabular-nums;
     letter-spacing: -0.02em;
-    text-shadow: 0 0 18px color-mix(in oklch, var(--danger-500) 35%, transparent);
   }
 
-  /* Allergies — red highlight */
+  /* Allergies — vermilion-tinted paper */
   .med-row-alert {
-    background: color-mix(in oklch, var(--danger-500) 7%, transparent);
+    background: color-mix(in oklch, var(--danger-500) 7%, var(--surface-1));
   }
   .med-row-alert .med-field-label { color: var(--danger-600); }
-
-  /* Contact rows — empty rule kept for selector specificity */
-  .med-row-contact {}
+  :global([data-theme="dark"]) .med-row-alert .med-field-label { color: var(--danger-300); }
+  .med-row-alert .med-field-icon { color: var(--danger-500); }
 
   .med-field-icon {
     flex-shrink: 0;
-    color: var(--danger-400);
-    margin-top: 2px;
+    color: var(--text-tertiary);
+    margin-top: 4px;
     display: flex;
     align-items: center;
   }
@@ -343,19 +359,20 @@
   }
 
   .med-field-label {
-    font-family: var(--font-display);
+    font-family: var(--font-sans);
     font-size: var(--text-2xs);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.07em;
-    color: var(--text-tertiary);
+    color: var(--text-secondary);
   }
 
   .med-field-value {
-    font-size: var(--text-sm);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
     font-weight: 500;
     color: var(--text-primary);
-    line-height: 1.4;
+    line-height: 1.45;
     word-break: break-word;
   }
 
@@ -367,38 +384,56 @@
   }
   .med-chip {
     display: inline-block;
-    font-family: var(--font-display);
-    font-size: var(--text-xs);
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
     font-weight: 600;
     padding: var(--space-1) var(--space-2-5);
     border-radius: var(--radius-full);
-    line-height: 1.3;
+    line-height: 1.35;
     /* no truncation — long entries wrap within the chip */
     word-break: break-word;
     white-space: normal;
   }
   .med-chip-danger {
     background: var(--danger-500-12);
-    color: var(--danger-300);
+    color: var(--danger-600);
     border: 1px solid var(--danger-500-20);
   }
+  :global([data-theme="dark"]) .med-chip-danger { color: var(--danger-300); }
   .med-chip-warning {
-    background: color-mix(in oklch, var(--warning-500) 14%, transparent);
-    color: var(--warning-500);
-    border: 1px solid color-mix(in oklch, var(--warning-500) 28%, transparent);
+    background: var(--warning-500-12);
+    color: var(--warning-600);
+    border: 1px solid var(--warning-500-30);
   }
+  :global([data-theme="dark"]) .med-chip-warning { color: var(--warning-400); }
   .med-chip-neutral {
-    background: var(--surface-2, rgba(255, 255, 255, 0.06));
+    background: var(--surface-3);
     color: var(--text-secondary);
     border: 1px solid var(--border-default);
   }
 
   .med-phone-link {
-    color: var(--primary-500);
+    color: var(--primary-700);
     text-decoration: none;
     font-weight: 600;
   }
+  :global([data-theme="dark"]) .med-phone-link { color: var(--primary-500); }
   .med-phone-link:hover { text-decoration: underline; }
   .med-relation { opacity: 0.75; font-weight: 400; }
-  .med-address  { opacity: 0.7; font-size: 0.8em; }
+  .med-address  { opacity: 0.7; font-size: 0.85em; }
+
+  /* Empty state — a quiet human sentence, no scolding */
+  .med-empty { justify-content: center; }
+  .med-empty-text {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: var(--text-base);
+    color: var(--text-secondary);
+    padding: var(--space-1) 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .med-card-chevron { transition: none; }
+    .med-card-chevron.open { transform: rotate(180deg); }
+  }
 </style>
