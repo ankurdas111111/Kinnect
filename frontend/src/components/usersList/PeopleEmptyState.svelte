@@ -42,7 +42,7 @@
 {/if}
 
 <style>
-  /* CTA button in the solo empty state */
+  /* CTA button in the solo empty state — filled ember primary (Hearth) */
   .empty-cta {
     display: inline-flex;
     align-items: center;
@@ -50,19 +50,19 @@
     margin-top: var(--space-3);
     padding: var(--space-2-5) var(--space-4);
     min-height: 44px;
-    background: linear-gradient(135deg, var(--primary-500, #14b8a6), var(--primary-700, #0f766e));
-    color: var(--text-on-primary, #fff);
+    background: var(--primary-500);
+    color: var(--text-on-primary);
     border: none;
-    border-radius: var(--radius-lg);
-    font-family: var(--font-display);
+    border-radius: var(--radius-md);
+    font-family: var(--font-sans);
     font-size: var(--text-sm);
-    font-weight: 700;
+    font-weight: 600;
     cursor: pointer;
-    box-shadow: 0 4px 14px rgba(20, 184, 166, 0.30);
-    transition: transform var(--duration-fast) var(--ease-spring), box-shadow var(--duration-fast);
+    box-shadow: var(--shadow-primary);
+    transition: transform var(--duration-fast) var(--ease-spring), box-shadow var(--duration-fast) var(--ease-out);
     -webkit-tap-highlight-color: transparent;
   }
-  .empty-cta:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(20, 184, 166, 0.40); }
+  .empty-cta:hover { transform: translateY(-1px); background: var(--primary-600); }
   .empty-cta:active { transform: scale(0.97); }
 
   @media (prefers-reduced-motion: reduce) {

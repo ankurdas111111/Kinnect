@@ -89,13 +89,11 @@
 {/if}
 
 <style>
-  /* ── Quick actions sheet (long-press) ───────────────────────────────────── */
+  /* ── Quick actions sheet (long-press) — warm paper, not glass ──────────── */
   .qa-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.45);
-    backdrop-filter: blur(3px);
-    -webkit-backdrop-filter: blur(3px);
+    background: color-mix(in oklch, var(--ink) 40%, transparent);
     /* Was z:5400 hardcoded. Using --z-modal so sheet layer is tokenized. */
     z-index: var(--z-modal, 5000);
     touch-action: none;
@@ -108,48 +106,43 @@
     bottom: 0;
     /* Was z:5401 hardcoded. Using --z-modal + 1 to sit above its backdrop. */
     z-index: calc(var(--z-modal, 5000) + 1);
-    /* TECHNIQUE 6: Liquid Glass 2.0 — stronger blur + saturation + brightness */
-    background: var(--surface-2, rgba(12, 12, 28, 0.88));
-    backdrop-filter: blur(32px) saturate(180%) brightness(1.06);
-    -webkit-backdrop-filter: blur(32px) saturate(180%) brightness(1.06);
-    border-top: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 20px 20px 0 0;
-    box-shadow:
-      0 -8px 48px rgba(0, 0, 0, 0.40),
-      0 -1px 0 rgba(255, 255, 255, 0.10),
-      inset 0 1px 0 rgba(255, 255, 255, 0.08),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.10);
-    padding: 8px 16px calc(24px + env(safe-area-inset-bottom, 0px));
+    background: var(--card);
+    border-top: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+    box-shadow: var(--sh-up);
+    padding: var(--space-2) var(--space-4);
+    /* Gesture-bar safe bottom margin */
+    padding-bottom: max(var(--space-6), env(safe-area-inset-bottom));
     will-change: transform;
   }
 
   .qa-handle {
-    width: 40px;
-    height: 5px;
-    background: var(--gray-400, rgba(255,255,255,0.22));
-    border-radius: 999px;
-    margin: 4px auto 16px;
+    width: 36px;
+    height: 4px;
+    background: var(--border-strong);
+    border-radius: var(--radius-full);
+    margin: var(--space-1) auto var(--space-4);
   }
 
   .qa-user-header {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 0 4px 16px;
-    border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.07));
-    margin-bottom: 8px;
+    gap: var(--space-3);
+    padding: 0 var(--space-1) var(--space-4);
+    border-bottom: 1px solid var(--border-subtle);
+    margin-bottom: var(--space-2);
   }
 
   .qa-avatar {
     width: 48px;
     height: 48px;
-    border-radius: 50%;
+    border-radius: var(--radius-full);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: var(--font-display);
+    font-family: var(--font-sans);
     font-weight: 700;
-    font-size: 1.125rem;
+    font-size: var(--text-xl);
     flex-shrink: 0;
     position: relative;
   }
@@ -171,7 +164,7 @@
   }
 
   .qa-user-name {
-    font-family: var(--font-display);
+    font-family: var(--font-sans);
     font-size: var(--text-base, 16px);
     font-weight: 700;
     color: var(--text-primary);
@@ -181,48 +174,49 @@
   }
 
   .qa-user-status {
-    font-size: var(--text-xs, 12px);
-    color: var(--success-500, var(--success-500));
+    font-size: var(--text-xs);
+    color: var(--success-600);
     font-weight: 600;
   }
 
   .qa-status-offline { color: var(--text-tertiary); }
-  .qa-status-sos { color: var(--danger-500, var(--danger-500)); }
+  .qa-status-sos { color: var(--danger-500); }
 
   .qa-actions {
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    margin-bottom: 8px;
+    gap: var(--space-1);
+    margin-bottom: var(--space-2);
   }
 
   .qa-action-btn {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: var(--space-3-5);
     width: 100%;
-    padding: 14px 16px;
+    min-height: 44px;
+    padding: var(--space-3-5) var(--space-4);
     background: none;
     border: none;
     cursor: pointer;
     color: var(--text-primary);
     font-family: var(--font-sans);
-    font-size: var(--text-base, 16px);
+    font-size: var(--text-base);
     font-weight: 500;
     text-align: left;
-    border-radius: var(--radius-lg, 12px);
-    transition: background var(--duration-fast, 120ms) var(--ease-out);
+    border-radius: var(--radius-md);
+    transition: background var(--duration-fast) var(--ease-out);
     -webkit-tap-highlight-color: transparent;
   }
 
   .qa-action-btn:hover {
-    background: var(--surface-hover, rgba(255,255,255,0.06));
+    background: var(--surface-hover);
   }
 
   .qa-action-btn:active {
-    background: var(--surface-active, rgba(255,255,255,0.10));
+    background: var(--surface-active, var(--surface-hover));
     transform: scale(0.98);
-    transition-duration: 60ms;
+    transition-duration: var(--duration-fast);
   }
 
   .qa-action-btn:disabled {
@@ -230,35 +224,36 @@
     cursor: not-allowed;
   }
 
+  /* Ember-tinted pebble icon — the single accent, quiet strength */
   .qa-action-icon {
     width: 40px;
     height: 40px;
-    border-radius: 50%;
-    background: color-mix(in oklch, var(--primary-500) 14%, transparent);
-    border: 1px solid color-mix(in oklch, var(--primary-500) 22%, transparent);
+    border-radius: var(--radius-full);
+    background: color-mix(in oklch, var(--primary-500) 12%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--primary-400, var(--primary-400));
+    color: var(--primary-700);
     flex-shrink: 0;
   }
 
   .qa-cancel-btn {
     display: block;
     width: 100%;
-    padding: 15px;
-    background: var(--surface-inset, rgba(255,255,255,0.04));
-    border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
-    border-radius: var(--radius-lg, 12px);
+    min-height: 44px;
+    padding: var(--space-3-5);
+    background: var(--surface-inset);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
     color: var(--text-secondary);
     font-family: var(--font-sans);
-    font-size: var(--text-base, 16px);
+    font-size: var(--text-base);
     font-weight: 600;
     cursor: pointer;
     text-align: center;
     transition: background var(--duration-fast) var(--ease-out);
     -webkit-tap-highlight-color: transparent;
-    margin-top: 4px;
+    margin-top: var(--space-1);
   }
 
   .qa-cancel-btn:hover { background: var(--surface-hover); }

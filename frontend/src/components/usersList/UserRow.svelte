@@ -29,15 +29,15 @@
 
   const dispatch = createEventDispatcher();
 
-  // Single presence signal — drives the leading dot and the hover/focus accent.
-  // SOS > offline > online.
+  // Single presence signal — drives the trailing dot and the hover/focus accent.
+  // SOS > offline > online. Hearth ladder: live = sage, offline = quiet stone.
   let presence = $derived(
     user.sos?.active ? 'sos' : user.online === false ? 'gone' : 'recent'
   );
   let accentVar = $derived(
-    presence === 'sos' ? 'var(--presence-sos)'
-      : presence === 'gone' ? 'var(--presence-gone)'
-      : 'var(--presence-recent)'
+    presence === 'sos' ? 'var(--status-sos)'
+      : presence === 'gone' ? 'var(--status-offline)'
+      : 'var(--status-live)'
   );
 
   // Stagger index: cap at 5 so the 6th+ row shares the same delay (spec: cap at 6 items).
@@ -136,16 +136,20 @@
   <UserAvatar {user} />
   <div class="user-meta">
     <div class="user-name-row">
-      <span class="presence-dot presence-{presence}" aria-hidden="true"></span>
       <strong class="user-name">{user.displayName || 'User'}</strong>
+      <span class="presence-dot presence-{presence}" aria-hidden="true"></span>
       <UserBadges {user} />
     </div>
-    <UserSubline {user} />
-    {#if (user.formattedTime || user.lastUpdate) && user.online !== false}
-      <div class="user-updated font-tabular">
-        {user.formattedTime || formatTimestamp(user.lastUpdate)}
-      </div>
-    {/if}
+    <!-- One quiet sentence: how they're doing · when we last heard -->
+    <div class="user-sentence">
+      <UserSubline {user} />
+      {#if (user.formattedTime || user.lastUpdate) && user.online !== false}
+        <span class="sentence-sep" aria-hidden="true">·</span>
+        <span class="user-updated font-tabular">
+          {user.formattedTime || formatTimestamp(user.lastUpdate)}
+        </span>
+      {/if}
+    </div>
   </div>
   <div class="user-actions">
     {#if user.batteryPct != null}
@@ -162,7 +166,7 @@
       </span>
     {/if}
     {#if isAdmin}
-      <button class="btn btn-danger btn-sm" onclick={stopPropagation(() => dispatch('delete', user))} disabled={deletingUser === user.socketId}>×</button>
+      <button class="user-remove-btn" aria-label="Remove {user.displayName || 'user'}" onclick={stopPropagation(() => dispatch('delete', user))} disabled={deletingUser === user.socketId}>×</button>
     {/if}
     <!-- Right affordance — signals the row opens details / locates on map -->
     <span class="row-chevron" aria-hidden="true">
@@ -172,13 +176,16 @@
 </div>
 
 <style>
-  /* ── User item — no borders, use spacing + hover bg ───────────────────── */
+  /* ── Continuous quiet paper row — whitespace + hairline, no card chrome ── */
   .user-item {
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    padding: var(--space-2-5) var(--space-4);
+    padding: var(--space-3) var(--space-4);
     min-height: 76px;
+    /* Fill the VirtualList slot so the hairline sits on the slot boundary. */
+    height: 100%;
+    border-bottom: 1px solid var(--border-subtle);
   }
 
   /*
@@ -196,8 +203,9 @@
   .user-item-btn {
     width: 100%;
     background: none;
-    border: none;
-    border-bottom: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
     cursor: pointer;
     text-align: left;
     color: inherit;
@@ -205,8 +213,7 @@
     border-radius: 0;
     transition:
       background var(--duration-fast) var(--ease-out),
-      box-shadow var(--duration-fast) var(--ease-out),
-      transform var(--duration-fast) var(--ease-spring);
+      box-shadow var(--duration-fast) var(--ease-out);
     -webkit-tap-highlight-color: transparent;
     position: relative;
   }
@@ -216,53 +223,31 @@
   }
 
   .user-item-btn:active {
-    background: var(--surface-active);
-    transform: scale(0.97) translateZ(-2px);
-    transition-duration: 60ms;
+    background: var(--surface-active, var(--surface-hover));
   }
 
   /* Presence-colored left accent on hover/focus (SOS keeps its permanent accent) */
   .user-item-btn:not(.user-sos):hover,
   .user-item-btn:not(.user-sos):focus-visible {
-    box-shadow: inset 3px 0 0 var(--row-accent, var(--presence-recent));
+    box-shadow: inset 3px 0 0 var(--row-accent, var(--status-live));
   }
 
   /* Keyboard focus ring */
   .user-item-btn:focus-visible {
-    outline: 2px solid var(--primary-400);
+    outline: 2px solid var(--primary-500);
     outline-offset: -2px;
   }
 
-  /* Avatar lift on row hover */
-  .user-item-btn:hover :global(.user-avatar) {
-    transform: scale(1.08) translateZ(4px);
-    filter: brightness(1.12);
-  }
-
   /*
-   * SOS row — urgent red accent + gradient sweep.
-   * color-mix replaces hardcoded rgba to stay lint-clean.
+   * SOS row — vermilion is reserved for crisis, and this IS one: a received
+   * distress state. Flat warm tint + steady accent bar; no gradient noise.
    */
   .user-sos {
-    background:
-      linear-gradient(
-        90deg,
-        color-mix(in srgb, var(--danger-500) 14%, transparent) 0%,
-        color-mix(in srgb, var(--danger-500) 6%,  transparent) 40%,
-        transparent 80%
-      ),
-      color-mix(in srgb, var(--danger-500) 10%, transparent);
+    background: color-mix(in oklch, var(--danger-500) 8%, transparent);
     box-shadow: inset 3px 0 0 var(--danger-500);
   }
   .user-sos:hover {
-    background:
-      linear-gradient(
-        90deg,
-        color-mix(in srgb, var(--danger-500) 20%, transparent) 0%,
-        color-mix(in srgb, var(--danger-500) 10%, transparent) 40%,
-        transparent 80%
-      ),
-      color-mix(in srgb, var(--danger-500) 12%, transparent);
+    background: color-mix(in oklch, var(--danger-500) 12%, transparent);
   }
 
   /* ── Meta ──────────────────────────────────────────────────────────────── */
@@ -271,33 +256,32 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--space-0-5);
   }
 
   .user-name-row {
     display: flex;
     align-items: center;
-    gap: var(--space-1-5);
+    gap: var(--space-2);
     min-width: 0;
     overflow: hidden;
   }
 
-  /* Leading presence dot — one glanceable status cue on the primary line */
+  /* Trailing presence dot — one glanceable cue beside the name (Hearth ladder:
+     sage = settled/live, ochre-free here; offline = quiet stone; SOS = vermilion). */
   .presence-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
+    width: 6px;
+    height: 6px;
+    border-radius: var(--radius-full);
     flex-shrink: 0;
-    background: var(--presence-gone);
+    background: var(--status-offline);
   }
-  .presence-recent { background: var(--presence-recent); }
-  .presence-now    { background: var(--presence-now); }
-  .presence-away   { background: var(--presence-away); }
-  .presence-gone   { background: var(--presence-gone); }
-  .presence-sos    { background: var(--presence-sos); }
+  .presence-recent { background: var(--status-live); }
+  .presence-gone   { background: var(--status-offline); }
+  .presence-sos    { background: var(--status-sos); }
 
   .user-name {
-    font-family: var(--font-display);
+    font-family: var(--font-sans);
     font-size: var(--text-base);
     font-weight: 600;
     letter-spacing: -0.01em;
@@ -305,16 +289,33 @@
     overflow: hidden;
     text-overflow: ellipsis;
     color: var(--text-primary);
-    line-height: 1.25;
+    line-height: var(--leading-tight);
   }
 
-  /* Timestamp — tertiary, compact */
+  /* Sentence line — subline + soft timestamp share one 16px reading line */
+  .user-sentence {
+    display: flex;
+    align-items: baseline;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .sentence-sep {
+    color: var(--text-tertiary);
+    opacity: 0.7;
+    margin: 0 var(--space-1);
+    flex-shrink: 0;
+  }
+
+  /* Timestamp — soft, inside the sentence, never a separate metric line */
   .user-updated {
-    font-size: var(--text-xs);
+    font-size: var(--text-sm);
     color: var(--text-tertiary);
     letter-spacing: 0.01em;
     font-variant-numeric: tabular-nums;
     font-feature-settings: 'tnum' 1;
+    flex-shrink: 0;
   }
 
   /* ── Actions column ─────────────────────────────────────────────────────── */
@@ -325,35 +326,35 @@
     flex-shrink: 0;
   }
 
-  /* Chevron affordance */
+  /* Chevron affordance — outline ink, warms to ember on intent */
   .row-chevron {
-    color: var(--text-quaternary, var(--text-tertiary));
+    color: var(--text-tertiary);
     display: flex;
     align-items: center;
-    opacity: 0.5;
+    opacity: 0.6;
     transition: color var(--duration-fast) var(--ease-out),
-                transform var(--duration-fast) var(--ease-spring),
+                transform var(--duration-fast) var(--ease-out),
                 opacity var(--duration-fast) var(--ease-out);
   }
   .user-item-btn:hover .row-chevron,
   .user-item-btn:focus-visible .row-chevron {
-    color: var(--primary-400);
+    color: var(--primary-700);
     opacity: 1;
     transform: translateX(2px);
   }
 
   /*
-   * Battery chip — icon + percentage.
-   * color-mix() replaces hardcoded rgba to stay lint-clean.
+   * Battery chip — kept, but quiet: no battery shame. Low = ochre ("needs a
+   * look"), never vermilion; healthy states stay near-silent.
    */
   .bat-chip {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
-    font-family: var(--font-display);
-    font-size: 0.6875rem; /* 11px */
-    font-weight: 700;
-    padding: 3px 6px;
+    gap: var(--space-0-5);
+    font-family: var(--font-sans);
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    padding: var(--space-0-5) var(--space-1-5);
     border-radius: var(--radius-full);
     background: var(--surface-inset);
     color: var(--text-tertiary);
@@ -362,17 +363,44 @@
     font-feature-settings: 'tnum' 1;
   }
   .bat-low {
-    color: var(--danger-400);
-    background: color-mix(in srgb, var(--danger-500) 12%, transparent);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--danger-500) 20%, transparent);
+    color: var(--warning-700);
+    background: color-mix(in oklch, var(--warning-500) 14%, transparent);
   }
   .bat-ok {
-    color: var(--warning-500);
-    background: color-mix(in srgb, var(--warning-500) 12%, transparent);
+    color: var(--text-secondary);
+    background: var(--surface-inset);
   }
   .bat-good {
-    color: var(--success-500);
-    background: color-mix(in srgb, var(--success-500) 10%, transparent);
+    color: var(--success-700);
+    background: color-mix(in oklch, var(--success-500) 10%, transparent);
+  }
+
+  /* Admin remove — destructive but never vermilion (banned outside SOS).
+     Quiet stone button that darkens on intent; 44px target. */
+  .user-remove-btn {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-full);
+    background: var(--surface-inset);
+    color: var(--text-secondary);
+    font-family: var(--font-sans);
+    font-size: var(--text-lg);
+    line-height: 1;
+    cursor: pointer;
+    transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .user-remove-btn:hover {
+    background: color-mix(in oklch, var(--warning-500) 14%, transparent);
+    color: var(--warning-700);
+  }
+  .user-remove-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
 
   @media (prefers-reduced-motion: reduce) {

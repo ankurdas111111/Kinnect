@@ -1077,8 +1077,12 @@
         />
       {/if}
 
-      <!-- Persistent emergency float card — appears above SOS FAB when a network member has active SOS + medical data -->
-      <SosFloat />
+      <!-- Persistent emergency float card — appears above SOS FAB when a network
+           member has active SOS + medical data. The dock only POSITIONS the
+           card's fixed container (CSS below); SosFloat itself is untouched. -->
+      <div class="sos-float-dock">
+        <SosFloat />
+      </div>
 
       <!-- Particle burst confirmation — fires once when user sends their own SOS -->
       <SosParticleBurst active={sosParticleBurstActive} on:done={() => sosParticleBurstActive = false} />
@@ -1104,9 +1108,10 @@
           : 'Send SOS — press and hold for two seconds to send immediately, or tap to confirm'}
       >
         {#if $mySosActive}
-          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         {:else}
           <span class="sos-text">SOS</span>
+          <span class="sos-hold-hint" aria-hidden="true">HOLD</span>
         {/if}
       </button>
 
@@ -1141,7 +1146,7 @@
         <div class="sos-confirm-backdrop" bind:this={sosConfirmEl} onclick={self(() => sosConfirmOpen = false)} onkeydown={(e) => { if (e.key === 'Escape') sosConfirmOpen = false; }} role="dialog" aria-modal="true" aria-labelledby="sos-confirm-title" tabindex="-1">
           <div class="sos-confirm-card-spatial">
             <div class="sos-icon-ring">
-              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--danger-500, #ef4444)" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--danger-500)" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             </div>
             <h3 id="sos-confirm-title" class="sos-confirm-title">Send an SOS to your family?</h3>
             <p class="sos-confirm-desc">Everyone connected to you will be notified right away. They'll see your live location until you're safe.</p>
@@ -1158,7 +1163,7 @@
         <div class="battery-prompt-backdrop" bind:this={batteryPromptEl} onclick={self(() => batteryPromptOpen = false)} onkeydown={(e) => { if (e.key === 'Escape') batteryPromptOpen = false; }} role="dialog" aria-modal="true" aria-labelledby="battery-prompt-title" tabindex="-1">
           <div class="battery-prompt-card">
             <div class="battery-prompt-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--warning-400, #f59e0b)" stroke-width="2"><rect x="2" y="7" width="16" height="10" rx="2"/><path d="M22 11v2"/><path d="M6 11v2"/><path d="M10 11v2"/></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--warning-500)" stroke-width="2"><rect x="2" y="7" width="16" height="10" rx="2"/><path d="M22 11v2"/><path d="M6 11v2"/><path d="M10 11v2"/></svg>
             </div>
             <h3 id="battery-prompt-title" class="battery-prompt-title">Allow Background Access</h3>
             {#if BATTERY_INSTRUCTIONS[batteryManufacturer].steps}
@@ -1232,13 +1237,13 @@
   .page-nav-row {
     display: flex;
     flex-shrink: 0;
-    gap: 8px;
-    margin-bottom: 12px;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
-    padding-bottom: 2px;
+    padding-bottom: var(--space-0-5);
   }
   .page-nav-row::-webkit-scrollbar { display: none; }
 
@@ -1249,15 +1254,15 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    padding: 8px 12px;
+    gap: var(--space-1-5);
+    padding: var(--space-2) var(--space-3);
     min-height: 44px;
-    border-radius: var(--radius-full, 999px);
-    background: var(--surface-1, rgba(255, 255, 255, 0.06));
-    border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.10));
+    border-radius: var(--radius-full);
+    background: var(--surface-1);
+    border: 1px solid var(--border-subtle);
     color: var(--text-secondary);
-    font-family: var(--font-display);
-    font-size: var(--text-xs, 12px);
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
     font-weight: 600;
     white-space: nowrap;
     cursor: pointer;
@@ -1266,9 +1271,9 @@
     -webkit-tap-highlight-color: transparent;
   }
   .page-nav-btn:hover {
-    background: var(--primary-50, rgba(99, 102, 241, 0.14));
-    border-color: var(--primary-200, rgba(99, 102, 241, 0.30));
-    color: var(--primary-300);
+    background: color-mix(in oklch, var(--primary-500) 10%, transparent);
+    border-color: color-mix(in oklch, var(--primary-500) 30%, transparent);
+    color: var(--primary-700);
   }
   .page-nav-btn:active {
     transform: scale(0.93);
@@ -1277,8 +1282,8 @@
 
   .safety-quick-actions {
     display: flex;
-    gap: 8px;
-    margin-bottom: 10px;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2-5);
     flex-wrap: wrap;
   }
 
@@ -1286,54 +1291,55 @@
     min-height: 44px;
   }
 
-  /* ── SOS FAB — 3D physical button ─────────────────────────────────────── */
+  /* ── SOS pebble — the ONE vermilion object (Hearth). 64px oversized hold
+     target, flat crisis red, warm glow; "SOS / HOLD" stacked like the
+     reference. Position never moves: panic muscle-memory needs ONE spot. ── */
+  .sos-fab,
+  .sos-float-dock {
+    /* Single source for the pebble's diameter — the float dock stacks on it. */
+    --sos-fab-size: 64px;
+  }
   .sos-fab {
     position: fixed;
-    bottom: var(--space-4);
+    /* Gesture-bar safe bottom margin on notchless + notched devices alike */
+    bottom: max(var(--space-4), var(--safe-bottom, 0px));
     left: var(--space-4);
-    width: 52px;
-    height: 52px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--danger-500, #ef4444) 0%, var(--danger-700, #b91c1c) 100%);
-    color: white;
-    border: 3px solid rgba(255,255,255,0.85);
+    width: var(--sos-fab-size);
+    height: var(--sos-fab-size);
+    border-radius: var(--radius-full);
+    background: var(--danger-500);
+    color: var(--text-inverse);
+    border: none;
     cursor: pointer;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    /* 3D raised emergency button */
-    box-shadow:
-      0 6px 20px rgba(220, 38, 38, 0.50),
-      0 2px 6px rgba(220, 38, 38, 0.35),
-      inset 0 2px 4px rgba(255, 255, 255, 0.20),
-      inset 0 -3px 6px rgba(0, 0, 0, 0.20);
+    gap: var(--space-0-5);
+    box-shadow: var(--shadow-danger);
     z-index: calc(var(--z-panel, 100) + 2);
-    transform-style: preserve-3d;
     /* GPU-only dock lift: --fab-dock-offset drives translateY; `bottom` is static.
        Animating `bottom` would trigger layout; transform runs on the compositor. */
     transform: translateY(calc(-1 * var(--fab-dock-offset, 0px)));
     transition:
       transform var(--duration-slow) var(--ease-out),
-      box-shadow var(--duration-3d) var(--ease-3d-out),
+      box-shadow var(--duration-normal) var(--ease-out),
       background var(--duration-normal) var(--ease-out);
     isolation: isolate;
   }
   .sos-fab:hover {
-    /* Preserve dock lift while applying 3D press-up: dock offset first, then 3D layer */
-    transform: translateY(calc(-1 * var(--fab-dock-offset, 0px))) perspective(600px) translateY(-3px) translateZ(6px) scale(1.08);
+    transform: translateY(calc(-1 * var(--fab-dock-offset, 0px))) scale(1.05);
     box-shadow:
-      0 10px 32px rgba(220, 38, 38, 0.60),
-      0 4px 10px rgba(220, 38, 38, 0.40),
-      0 0 0 4px rgba(220, 38, 38, 0.15),
-      inset 0 2px 4px rgba(255, 255, 255, 0.22),
-      inset 0 -3px 6px rgba(0, 0, 0, 0.18);
+      var(--shadow-danger),
+      0 0 0 4px color-mix(in oklch, var(--danger-500) 14%, transparent);
   }
   .sos-fab:active {
-    /* Preserve dock lift while applying 3D press-down */
-    transform: translateY(calc(-1 * var(--fab-dock-offset, 0px))) perspective(600px) translateZ(-6px) scale(0.92);
-    box-shadow:
-      0 1px 6px rgba(220, 38, 38, 0.40),
-      inset 0 3px 8px rgba(0, 0, 0, 0.25);
+    transform: translateY(calc(-1 * var(--fab-dock-offset, 0px))) scale(0.92);
+    transition-duration: var(--duration-fast);
+  }
+  .sos-fab:focus-visible {
+    outline: 3px solid color-mix(in oklch, var(--danger-500) 50%, transparent);
+    outline-offset: 3px;
   }
   /* Held: swell + sit above the hold overlay so the button stays visible
      while the ring counts down. Transform/opacity only. */
@@ -1346,24 +1352,35 @@
   }
   @media (prefers-reduced-motion: reduce) {
     .sos-fab.holding { transform: translateY(calc(-1 * var(--fab-dock-offset, 0px))); }
+    .sos-fab:hover,
+    .sos-fab:active { transform: translateY(calc(-1 * var(--fab-dock-offset, 0px))); }
   }
 
   .sos-fab .sos-text {
-    font-size: 14px;
-    font-weight: 900;
-    letter-spacing: 1px;
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    font-weight: 700;
+    letter-spacing: 0.08em;
     line-height: 1;
   }
+  .sos-fab .sos-hold-hint {
+    font-family: var(--font-sans);
+    font-size: var(--text-2xs);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    opacity: 0.9;
+  }
   .sos-fab.active {
-    background: var(--danger-800, #991b1b);
+    background: var(--danger-600);
   }
   /* Ripple ring via pseudo-element — uses transform+opacity (composited, no paint) */
   .sos-fab::after {
     content: '';
     position: absolute;
     inset: 0;
-    border-radius: 50%;
-    background: rgba(239, 68, 68, 0.5);
+    border-radius: var(--radius-full);
+    background: color-mix(in oklch, var(--danger-500) 50%, transparent);
     transform: scale(1);
     opacity: 0;
     pointer-events: none;
@@ -1393,6 +1410,30 @@
     left: calc(var(--sidebar-tablet, 320px) + var(--space-4));
   }
   :global(.app-layout.sidebar-closed:not(.mobile)) .sos-fab {
+    left: calc(var(--sidebar-collapsed, 56px) + var(--space-4));
+  }
+
+  /* ── SosFloat dock — positions the emergency card's fixed container so it
+     stacks cleanly above the 64px SOS pebble. CSS-only: SosFloat's internals
+     are owned elsewhere and untouched. ─────────────────────────────────── */
+  .sos-float-dock :global(.sf) {
+    left: var(--space-4);
+    bottom: calc(var(--sos-fab-size) + var(--space-3) + max(var(--space-4), var(--safe-bottom, 0px)));
+  }
+  @media (max-width: 767px) {
+    .sos-float-dock :global(.sf) {
+      /* Above the mobile tab bar + the docked pebble */
+      bottom: calc(var(--bottom-tab-height, 56px) + var(--safe-bottom, 0px) + var(--space-4) + var(--sos-fab-size) + var(--space-3));
+    }
+  }
+  /* Follow the pebble clear of the desktop/tablet sidebar */
+  :global(.app-layout.sidebar-open:not(.mobile)) .sos-float-dock :global(.sf) {
+    left: calc(var(--sidebar-width, 400px) + var(--space-4));
+  }
+  :global(.app-layout.tablet.sidebar-open) .sos-float-dock :global(.sf) {
+    left: calc(var(--sidebar-tablet, 320px) + var(--space-4));
+  }
+  :global(.app-layout.sidebar-closed:not(.mobile)) .sos-float-dock :global(.sf) {
     left: calc(var(--sidebar-collapsed, 56px) + var(--space-4));
   }
 
@@ -1444,7 +1485,7 @@
   .sos-confirm-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.65);
+    background: color-mix(in oklch, var(--ink) 50%, transparent);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     z-index: calc(var(--z-panel, 100) + 10);
@@ -1457,31 +1498,31 @@
   }
   /* sos-confirm-card-spatial, .sos-icon-ring styles are in global.css */
   .sos-confirm-title {
-    font-size: var(--text-xl, 20px);
-    font-weight: 800;
-    color: var(--text-primary, white);
-    margin: 0 0 8px;
+    font-size: var(--text-xl);
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 var(--space-2);
     letter-spacing: -0.02em;
   }
   .sos-confirm-desc {
-    font-size: var(--text-sm, 13px);
-    color: var(--text-secondary, rgba(255, 255, 255, 0.65));
-    line-height: 1.55;
-    margin: 0 0 var(--space-6, 24px);
+    font-size: var(--text-base);
+    color: var(--text-secondary);
+    line-height: var(--leading-relaxed);
+    margin: 0 0 var(--space-6);
   }
   .sos-confirm-actions {
     display: flex;
-    gap: 10px;
+    gap: var(--space-2-5);
     justify-content: center;
   }
   /* Card is Hearth paper now — the old white-on-dark ghost was invisible. */
   .sos-cancel-btn {
     flex: 1;
     min-height: 44px;
-    padding: 11px 16px;
-    border-radius: var(--radius-lg);
+    padding: var(--space-2-5) var(--space-4);
+    border-radius: var(--radius-md);
     font-weight: 600;
-    font-size: 14px;
+    font-size: var(--text-sm);
     background: var(--surface-3);
     color: var(--text-primary);
     border: 1px solid var(--border-strong);
@@ -1493,25 +1534,26 @@
   .sos-send-btn:focus-visible,
   .battery-allow-btn:focus-visible,
   .battery-skip-btn:focus-visible {
-    outline: 3px solid var(--primary-400, #818cf8);
+    outline: 3px solid var(--primary-500);
     outline-offset: 2px;
   }
+  /* Vermilion belongs here: this button IS the SOS affordance. */
   .sos-send-btn {
     flex: 1;
     min-height: 44px;
-    padding: 11px 16px;
-    border-radius: var(--radius-lg);
-    font-weight: 800;
-    font-size: 14px;
+    padding: var(--space-2-5) var(--space-4);
+    border-radius: var(--radius-md);
+    font-weight: 700;
+    font-size: var(--text-sm);
     letter-spacing: 0.01em;
-    background: var(--danger-600, #dc2626);
-    color: var(--text-on-danger, white);
+    background: var(--danger-500);
+    color: var(--text-inverse);
     border: none;
     cursor: pointer;
-    box-shadow: 0 4px 16px rgba(220, 38, 38, 0.50);
+    box-shadow: var(--shadow-danger);
     transition: background var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
   }
-  .sos-send-btn:hover { background: var(--danger-500, #ef4444); box-shadow: 0 6px 24px rgba(239, 68, 68, 0.55); }
+  .sos-send-btn:hover { background: var(--danger-600); }
   @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 
   /* Screen-reader-only utility — visually hidden but in the accessibility tree */
@@ -1555,7 +1597,7 @@
   .battery-prompt-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.65);
+    background: color-mix(in oklch, var(--ink) 50%, transparent);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     z-index: calc(var(--z-panel, 100) + 10);
@@ -1567,86 +1609,89 @@
     animation: fade-in var(--duration-normal) var(--ease-out);
   }
   .battery-prompt-card {
-    background: var(--surface-2, #1a1a2e);
-    border: 1px solid rgba(245, 158, 11, 0.25);
-    border-radius: var(--radius-xl, 20px);
-    padding: var(--space-7, 28px) var(--space-6, 24px) var(--space-6, 24px);
+    background: var(--card);
+    border: 1px solid color-mix(in oklch, var(--warning-500) 25%, transparent);
+    border-radius: var(--radius-xl);
+    padding: var(--space-7) var(--space-6) var(--space-6);
     max-width: 340px;
     width: 100%;
     text-align: center;
-    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+    box-shadow: var(--shadow-xl);
   }
   .battery-prompt-icon {
     width: 60px;
     height: 60px;
-    border-radius: 50%;
-    background: rgba(245, 158, 11, 0.12);
-    border: 1px solid rgba(245, 158, 11, 0.25);
+    border-radius: var(--radius-full);
+    background: color-mix(in oklch, var(--warning-500) 12%, transparent);
+    border: 1px solid color-mix(in oklch, var(--warning-500) 25%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 0 auto 16px;
+    margin: 0 auto var(--space-4);
   }
   .battery-prompt-title {
-    font-size: var(--text-lg, 18px);
-    font-weight: 800;
-    color: var(--text-primary, white);
-    margin: 0 0 var(--space-2, 8px);
+    font-size: var(--text-lg);
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 var(--space-2);
     letter-spacing: -0.02em;
   }
   .battery-prompt-desc {
-    font-size: var(--text-sm, 13px);
-    color: var(--text-secondary, rgba(255, 255, 255, 0.60));
-    line-height: 1.55;
-    margin: 0 0 var(--space-6, 24px);
+    font-size: var(--text-base);
+    color: var(--text-secondary);
+    line-height: var(--leading-relaxed);
+    margin: 0 0 var(--space-6);
   }
   .battery-prompt-brand {
-    font-size: var(--text-2xs, 11px);
+    font-size: var(--text-2xs);
     font-weight: 700;
-    color: var(--warning-400, #f59e0b);
+    color: var(--warning-700);
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    margin: 0 0 10px;
+    margin: 0 0 var(--space-2-5);
   }
   .battery-steps-list {
     text-align: left;
-    font-size: var(--text-sm, 13px);
-    color: var(--text-secondary, rgba(255, 255, 255, 0.75));
-    line-height: 1.6;
-    margin: 0 0 24px;
-    padding-left: 20px;
+    font-size: var(--text-base);
+    color: var(--text-secondary);
+    line-height: var(--leading-relaxed);
+    margin: 0 0 var(--space-6);
+    padding-left: var(--space-5);
   }
   .battery-steps-list li {
-    margin-bottom: 4px;
+    margin-bottom: var(--space-1);
   }
   .battery-prompt-actions {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--space-2);
   }
+  /* Ochre carries "worth doing" — never an alarm */
   .battery-allow-btn {
-    padding: 12px 16px;
-    border-radius: var(--radius-lg);
+    min-height: 44px;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
     font-weight: 700;
-    font-size: 14px;
-    background: var(--warning-400, #f59e0b);
-    color: var(--bg-base, #0a0a15);
+    font-size: var(--text-sm);
+    background: var(--warning-600);
+    color: var(--text-inverse);
     border: none;
     cursor: pointer;
     transition: background var(--duration-fast) var(--ease-out);
   }
-  .battery-allow-btn:hover { background: var(--warning-300, #fbbf24); }
+  .battery-allow-btn:hover { background: var(--warning-500); }
   .battery-skip-btn {
-    padding: 10px 16px;
-    border-radius: var(--radius-lg);
+    min-height: 44px;
+    padding: var(--space-2-5) var(--space-4);
+    border-radius: var(--radius-md);
     font-weight: 500;
-    font-size: 13px;
+    font-size: var(--text-sm);
     background: transparent;
-    color: var(--text-tertiary, rgba(255, 255, 255, 0.45));
+    color: var(--text-tertiary);
     border: none;
     cursor: pointer;
   }
-  .battery-skip-btn:hover { color: var(--text-secondary, rgba(255, 255, 255, 0.70)); }
+  .battery-skip-btn:hover { color: var(--text-secondary); }
 
   /* ── Place search overlay on map ─────────────────────────────────── */
   /* Fix #3: wrapper changed from pointer-events:auto to pointer-events:none

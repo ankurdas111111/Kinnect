@@ -24,13 +24,6 @@
     return 'Low';
   }
 
-  function getAccuracyClass(acc) {
-    if (acc == null) return '';
-    if (acc <= 15) return 'acc-high';
-    if (acc <= 50) return 'acc-good';
-    return 'acc-low';
-  }
-
   // Freshness age for offline state — uses canonical formatAge from presence.js
   // (replaces the local onlineStatus helper; same vocabulary as FreshnessChip).
   let offlineAge = $derived.by(() => {
@@ -43,131 +36,77 @@
   });
 </script>
 
-<div class="user-sub">
+<!-- Hearth calm row: one plain sentence about how they're doing.
+     Every signal is kept (activity, distance, GPS accuracy, ETA, offline age)
+     but spoken as quiet body text instead of a chip stack. -->
+<span class="user-sub">
   {#if user.online !== false}
     {#if user.latitude == null || user.longitude == null}
       <!-- Connected but not sharing location -->
-      <span class="location-off-label">
-        <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="1" y1="1" x2="23" y2="23"/><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke-dasharray="3 3"/></svg>
-        Location off
-      </span>
+      <span class="sub-muted">Location off for now</span>
     {:else}
       {@const actStatus = computeActivityStatus(user)}
-      {#if $myLocation}
-        <span class="distance-label">{formatDistance(calculateDistance($myLocation.latitude, $myLocation.longitude, user.latitude, user.longitude)) || 'Near'}</span>
-      {/if}
       {#if actStatus && actStatus.label !== 'Offline'}
-        {#if $myLocation}<span class="sep">·</span>{/if}
-        <span class="activity-badge" style:color={actStatus.color} aria-label="{actStatus.label}">
-          <span class="activity-badge-dot" style:background={actStatus.dotColor} aria-hidden="true"></span>
-          {actStatus.label}
-        </span>
+        <span class="sub-lead">{actStatus.label}</span>
+      {/if}
+      {#if $myLocation}
+        {#if actStatus && actStatus.label !== 'Offline'}<span class="sep" aria-hidden="true">·</span>{/if}
+        <span class="sub-piece">{formatDistance(calculateDistance($myLocation.latitude, $myLocation.longitude, user.latitude, user.longitude)) || 'Near'} away</span>
       {/if}
       {#if user.accuracy != null}
-        <span class="sep">·</span>
-        <span class="acc-dot {getAccuracyClass(user.accuracy)}" aria-hidden="true"></span>
-        <span class="acc-label {getAccuracyClass(user.accuracy)}" aria-label="GPS accuracy: {getAccuracyLabel(user.accuracy)}">{getAccuracyLabel(user.accuracy)}</span>
+        <span class="sep" aria-hidden="true">·</span>
+        <span class="sub-quiet" aria-label="GPS accuracy: {getAccuracyLabel(user.accuracy)}">GPS {getAccuracyLabel(user.accuracy)}</span>
       {/if}
       {#if user.userId && $arrivalProjections.has(user.userId)}
         {@const proj = $arrivalProjections.get(user.userId)}
         {#if proj?.etaSeconds && proj?.placeName}
-          <span class="sep">·</span>
-          <span class="eta-chip" title="Heading to {proj.placeName}">
-            <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="5 12 12 5 19 12"/><polyline points="5 19 12 12 19 19"/></svg>
-            {proj.placeName} {formatEta(proj.etaSeconds)}
-          </span>
+          <span class="sep" aria-hidden="true">·</span>
+          <span class="sub-eta" title="Heading to {proj.placeName}">{proj.placeName} {formatEta(proj.etaSeconds)}</span>
         {/if}
       {/if}
     {/if}
   {:else}
-    <!-- Offline — freshness age via canonical presence.js formatAge -->
-    <span class="offline-label">{offlineAge}</span>
+    <!-- Offline — last-known freshness age, never blank -->
+    <span class="sub-muted">{offlineAge}</span>
   {/if}
-</div>
+</span>
 
 <style>
-  /* Sub-row — distance leads; activity / GPS / ETA demoted to a lighter tier. */
+  /* One continuous 16px sentence in the functional register. */
   .user-sub {
-    display: flex;
-    align-items: baseline;
-    gap: 4px;
-    font-size: var(--text-xs);
-    color: var(--text-tertiary);
-    flex-wrap: nowrap;
+    display: inline;
+    min-width: 0;
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: var(--leading-normal);
+    color: var(--text-secondary);
     overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  /* Distance — dominant secondary value */
-  .distance-label {
-    font-size: var(--text-sm);
-    font-weight: 700;
-    color: var(--text-primary);
-    letter-spacing: -0.01em;
-    flex-shrink: 0;
-  }
-
-  .sep { color: var(--text-tertiary); opacity: 0.6; flex-shrink: 0; }
-
-  .offline-label {
-    color: var(--text-tertiary);
-    font-style: italic;
-    font-size: var(--text-xs);
-  }
-
-  .location-off-label {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    font-size: var(--text-xs);
-    color: var(--text-tertiary);
-    opacity: 0.65;
-  }
-
-  /* Activity status badge — demoted weight, keeps semantic color */
-  .activity-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: var(--text-xs, 11px);
+  .sub-lead {
+    color: var(--text-secondary);
     font-weight: 500;
   }
 
-  .activity-badge-dot {
-    display: inline-block;
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    flex-shrink: 0;
+  .sub-piece { color: var(--text-secondary); }
+
+  .sep {
+    color: var(--text-tertiary);
+    opacity: 0.7;
+    margin: 0 var(--space-0-5);
   }
 
-  /* GPS accuracy — dot + label (least prominent) */
-  .acc-dot {
-    display: inline-block;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-  .acc-label { font-weight: 500; font-size: var(--text-xs); opacity: 0.9; }
-  .acc-high  { color: var(--success-500); }
-  .acc-high.acc-dot { background: var(--success-500); }
-  .acc-good  { color: var(--warning-500); }
-  .acc-good.acc-dot { background: var(--warning-500); }
-  .acc-low   { color: var(--danger-400); }
-  .acc-low.acc-dot { background: var(--danger-400); }
+  .sub-quiet { color: var(--text-tertiary); }
 
-  /* ETA chip */
-  .eta-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    font-size: var(--text-xs);
-    font-weight: 600;
-    color: var(--warning-600, var(--warning-600));
+  .sub-muted { color: var(--text-tertiary); }
+
+  /* ETA — a passive schedule cue rides the ochre register (small text uses
+     the darker warning step for AA on paper). */
+  .sub-eta {
+    color: var(--warning-600);
+    font-weight: 500;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 120px;
   }
-  :global([data-theme="dark"]) .eta-chip { color: var(--warning-300, var(--warning-300)); }
 </style>

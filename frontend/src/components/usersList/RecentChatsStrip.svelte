@@ -72,7 +72,7 @@
   }
 
   .recent-label {
-    font-family: var(--font-display);
+    font-family: var(--font-sans);
     font-size: var(--text-2xs);
     font-weight: 700;
     color: var(--text-tertiary);
@@ -114,39 +114,35 @@
     position: relative;
     width: 38px;
     height: 38px;
-    border-radius: 50%;
+    border-radius: var(--radius-full);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 15px;
+    font-size: var(--text-sm);
     font-weight: 700;
-    font-family: var(--font-display);
-    border: 2px solid rgba(255,255,255,0.08);
-    transition: border-color 120ms;
-  }
-
-  :global([data-theme="light"]) .recent-avatar {
-    border-color: rgba(0,0,0,0.06);
+    font-family: var(--font-sans);
+    border: 2px solid var(--border-subtle);
+    transition: border-color var(--duration-fast) var(--ease-out);
   }
 
   .recent-avatar-btn:hover .recent-avatar {
     border-color: color-mix(in oklch, var(--primary-500) 40%, transparent);
   }
 
+  /* Unread — ember attention, never vermilion (badges don't wear red) */
   .recent-unread {
     position: absolute;
     top: -1px;
     right: -1px;
     width: 9px;
     height: 9px;
-    background: var(--danger-500);
-    border-radius: 50%;
-    border: 2px solid var(--surface-base);
-    box-shadow: 0 0 4px color-mix(in oklch, var(--danger-500) 50%, transparent);
+    background: var(--primary-500);
+    border-radius: var(--radius-full);
+    border: 2px solid var(--card);
   }
 
   .recent-name {
-    font-size: 10px;
+    font-size: var(--text-2xs);
     font-weight: 600;
     color: var(--text-secondary);
     max-width: 44px;

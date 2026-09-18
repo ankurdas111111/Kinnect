@@ -63,7 +63,7 @@
       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 1.892.402 3.13 1.5 4.5L12 22l6.5-7.5c1.098-1.37 1.5-2.608 1.5-4.5a8 8 0 0 0-8-8z"/></svg>
     </div>
     <div class="navbar-brand">
-      <span class="navbar-title">Kinnect</span>
+      <span class="navbar-title verdict-voice">Kinnect</span>
       {#if isTracking}
         <span class="navbar-context-live"><span class="context-dot"></span>Live</span>
       {:else if ghostMode}
@@ -130,26 +130,22 @@
 </nav>
 
 <style>
+  /* ── Top strip — warm paper anchor, quiet round controls (Hearth) ─────── */
   .navbar {
-    height: var(--navbar-height);
+    /* Bar keeps its 56px content row; a notch inset grows the bar, never
+       squeezes the controls (safe-top is 0 in desktop browsers). */
+    height: calc(var(--navbar-height) + var(--safe-top, 0px));
     display: flex;
     align-items: center;
     padding: 0 var(--space-4);
-    /* 3D glass surface with depth */
-    background: var(--glass-3d);
-    backdrop-filter: var(--glass-3d-blur);
-    -webkit-backdrop-filter: var(--glass-3d-blur);
-    border-bottom: 1px solid var(--glass-3d-border);
-    border-top: 1px solid rgba(255, 255, 255, 0.15);
-    box-shadow:
-      var(--elevation-2),
-      inset 0 1px 0 rgba(255, 255, 255, 0.12),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.05);
+    padding-top: var(--safe-top, 0px);
+    background: var(--paper-warm);
+    border-bottom: 1px solid var(--border-subtle);
+    box-shadow: var(--shadow-xs);
     z-index: var(--z-navbar);
     position: relative;
     flex-shrink: 0;
     gap: var(--space-2);
-    transform-style: preserve-3d;
   }
 
   .navbar-left {
@@ -159,35 +155,29 @@
     flex-shrink: 0;
   }
 
-  /* Dashboard / Hub shortcut button */
+  /* Dashboard / Hub shortcut — quiet ember capsule */
   .nav-dashboard-btn {
-    height: 30px;
-    padding: 0 10px 0 8px;
-    border-radius: 20px;
-    /* VIGIL primary tokens (was stale pre-rebrand indigo hexes, which also
-       broke Dawn contrast). Static by design — calm by default; tone
-       variants below carry any urgency. */
-    background: color-mix(in oklch, var(--primary-500) 13%, transparent);
-    border: 1px solid color-mix(in oklch, var(--primary-500) 32%, transparent);
-    color: var(--primary-400);
+    min-height: 44px;
+    padding: 0 var(--space-3) 0 var(--space-2-5);
+    border-radius: var(--radius-full);
+    background: color-mix(in oklch, var(--primary-500) 10%, transparent);
+    border: 1px solid color-mix(in oklch, var(--primary-500) 25%, transparent);
+    color: var(--primary-700);
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-1);
     cursor: pointer;
     flex-shrink: 0;
-    transition: background 0.15s ease, color 0.15s ease, transform 0.12s ease, box-shadow 0.2s ease;
+    transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
   }
   .nav-dashboard-btn:hover {
-    background: color-mix(in oklch, var(--primary-500) 24%, transparent);
-    color: var(--primary-300);
-    transform: scale(1.04);
-    box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary-500) 18%, transparent);
+    background: color-mix(in oklch, var(--primary-500) 18%, transparent);
   }
-  .nav-dashboard-btn:active { transform: scale(0.94); animation: none; }
+  .nav-dashboard-btn:active { transform: scale(0.96); animation: none; }
   .nav-dashboard-label {
-    font-family: var(--font-display);
-    font-size: 11px;
-    font-weight: 800;
+    font-family: var(--font-sans);
+    font-size: var(--text-2xs);
+    font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
   }
@@ -197,68 +187,61 @@
     animation: none;
     background: color-mix(in oklch, var(--warning-500) 12%, transparent);
     border-color: color-mix(in oklch, var(--warning-500) 40%, transparent);
-    color: var(--warning-400);
+    color: var(--warning-700);
   }
   .nav-dashboard-btn.tone-alert {
     animation: none;
     background: color-mix(in oklch, var(--danger-500) 12%, transparent);
     border-color: color-mix(in oklch, var(--danger-500) 45%, transparent);
-    color: var(--danger-400);
+    color: var(--danger-600);
   }
 
-  /* Notification badge */
+  /* Notification badge — ochre "worth a look"; vermilion only when the count
+     is riding an active SOS (urgent). */
   .hub-badge {
-    min-width: 16px;
-    height: 16px;
-    border-radius: 8px;
-    padding: 0 4px;
-    font-size: 9px;
-    font-weight: 800;
-    color: #fff;
-    background: #f59e0b;
+    min-width: 18px;
+    height: 18px;
+    border-radius: var(--radius-full);
+    padding: 0 var(--space-1);
+    font-size: var(--text-2xs);
+    font-weight: 700;
+    color: var(--text-inverse);
+    background: var(--status-stale);
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
     line-height: 1;
-    font-family: var(--font-display, system-ui);
-    border: 1.5px solid rgba(0, 0, 0, 0.55);
+    font-family: var(--font-sans);
+    border: 1.5px solid var(--paper-warm);
     letter-spacing: 0;
   }
   .hub-badge.hub-badge-urgent {
-    background: #ef4444;
+    background: var(--danger-500);
     animation: badge-urgent-pulse 1.6s ease-in-out infinite;
   }
   @keyframes badge-urgent-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
-    50%       { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0); }
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--danger-500) 40%, transparent); }
+    50%       { box-shadow: 0 0 0 4px color-mix(in oklch, var(--danger-500) 0%, transparent); }
   }
 
-  /* Circular gradient logo — 3D sphere-like */
+  /* Ember pebble logo — one warm circle, no gradients */
   .navbar-logo {
     width: 34px;
     height: 34px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--primary-400), var(--primary-600), var(--accent-guardian));
+    border-radius: var(--radius-full);
+    background: var(--primary-500);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
+    color: var(--text-on-primary);
     flex-shrink: 0;
-    /* 3D sphere effect with layered shadows */
-    box-shadow:
-      var(--glow-primary),
-      0 4px 12px rgba(99, 102, 241, 0.40),
-      inset 0 2px 4px rgba(255, 255, 255, 0.25),
-      inset 0 -3px 6px rgba(0, 0, 0, 0.20);
-    transform-style: preserve-3d;
-    transition: box-shadow 400ms var(--ease-out), transform 300ms var(--ease-3d-spring);
-    animation: float-3d 8s ease-in-out infinite;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow var(--duration-normal) var(--ease-out);
   }
 
   .navbar-logo.logo-live {
-    animation: logo-celebrate 600ms var(--ease-out) both;
-    box-shadow: var(--glow-live), var(--shadow-sm);
+    box-shadow: var(--shadow-primary);
   }
 
   .navbar-brand {
@@ -268,24 +251,23 @@
     line-height: 1;
   }
 
-  /* Brand title — display font for premium feel */
+  /* Brand — the verdict voice speaks the name (serif italic, ember ink) */
   .navbar-title {
-    font-family: var(--font-display);
-    font-size: 1.0625rem; /* 17px */
-    font-weight: 800;
-    color: var(--text-primary);
-    letter-spacing: -0.025em;
+    font-size: var(--text-xl);
+    font-weight: 700;
+    color: var(--primary-700);
+    letter-spacing: -0.01em;
     line-height: 1.1;
   }
 
   .navbar-context-live {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    font-family: var(--font-display);
-    font-size: 0.6875rem; /* 11px — slightly larger than 9px */
+    gap: var(--space-1);
+    font-family: var(--font-sans);
+    font-size: var(--text-2xs);
     font-weight: 700;
-    color: var(--success-500);
+    color: var(--success-700);
     letter-spacing: 0.05em;
     text-transform: uppercase;
     line-height: 1;
@@ -295,16 +277,15 @@
     display: inline-block;
     width: 6px;
     height: 6px;
-    border-radius: 50%;
-    background: var(--success-500);
+    border-radius: var(--radius-full);
+    background: var(--status-live);
     animation: aurora-pulse 2s ease-in-out infinite;
     flex-shrink: 0;
-    box-shadow: 0 0 6px rgba(16, 185, 129, 0.60);
   }
 
   .navbar-context-ghost {
-    font-family: var(--font-display);
-    font-size: 0.6875rem;
+    font-family: var(--font-sans);
+    font-size: var(--text-2xs);
     font-weight: 700;
     color: var(--text-tertiary);
     letter-spacing: 0.05em;
@@ -351,204 +332,148 @@
     margin-left: auto;
   }
 
-  /* Individual nav buttons — 3D interactive */
+  /* Individual nav buttons — 44px round paper targets */
   .nav-btn {
     position: relative;
-    width: 34px;
-    height: 34px;
-    border-radius: var(--radius-md);
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-full);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--text-tertiary);
+    color: var(--text-secondary);
     background: transparent;
     border: none;
     cursor: pointer;
     flex-shrink: 0;
-    transform-style: preserve-3d;
     transition:
-      color 150ms var(--ease-out),
-      background 150ms var(--ease-out),
-      box-shadow var(--duration-3d) var(--ease-3d-out),
-      transform var(--duration-3d) var(--ease-3d-spring);
-  }
-
-  /* Left-edge active accent line — glanceable state beyond color alone */
-  .nav-btn::before {
-    content: '';
-    position: absolute;
-    left: 2px;
-    top: 50%;
-    width: 3px;
-    height: 18px;
-    border-radius: var(--radius-full);
-    background: var(--primary-400);
-    transform: translateY(-50%) scaleY(0);
-    opacity: 0;
-    transform-origin: center;
-    transition:
-      transform 200ms var(--ease-spring),
-      opacity 160ms var(--ease-out);
-    pointer-events: none;
-  }
-
-  .nav-btn.active::before {
-    transform: translateY(-50%) scaleY(1);
-    opacity: 1;
-  }
-
-  .nav-btn-safety.active::before {
-    background: var(--accent-guardian);
+      color var(--duration-fast) var(--ease-out),
+      background var(--duration-fast) var(--ease-out),
+      transform var(--duration-fast) var(--ease-out);
   }
 
   .nav-btn:hover {
     color: var(--text-primary);
-    background: var(--surface-hover);
-    transform: perspective(600px) translateY(-2px) translateZ(4px) scale(1.06);
-    box-shadow: var(--elevation-1);
+    background: var(--surface-3);
   }
 
   .nav-btn:active {
-    transform: perspective(600px) translateZ(-4px) scale(0.90) !important;
-    transition-duration: 60ms !important;
-    box-shadow: var(--shadow-3d-active);
+    transform: scale(0.94);
+    transition-duration: var(--duration-fast);
   }
 
+  .nav-btn:focus-visible {
+    outline: 2px solid var(--primary-500);
+    outline-offset: 2px;
+  }
+
+  /* Active destination — filled ember-light pill, the reference's grammar */
   .nav-btn.active {
-    color: var(--primary-400);
-    background: rgba(99, 102, 241, 0.12);
-    box-shadow:
-      0 0 0 1px rgba(99, 102, 241, 0.28),
-      0 4px 12px rgba(99, 102, 241, 0.18),
-      inset 0 1px 0 rgba(255, 255, 255, 0.08);
-    transform: perspective(600px) translateZ(2px);
+    color: var(--primary-700);
+    background: var(--primary-100);
   }
 
-  /* Safety button gets a subtle guardian tint when active */
+  /* Safety shares the single-accent grammar; no second hue competes */
   .nav-btn-safety.active {
-    color: var(--accent-guardian);
-    background: color-mix(in oklch, var(--accent-guardian) 12%, transparent);
-    box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    color: var(--primary-700);
+    background: var(--primary-100);
   }
 
-  /* Sign-out — warning/danger tint on intent */
+  /* Sign-out — ochre "pause" tint on intent; never vermilion */
   .nav-btn-logout:hover {
-    color: var(--danger-500);
-    background: var(--danger-500-12);
-    box-shadow: 0 0 0 1px var(--danger-500-20);
+    color: var(--warning-700);
+    background: color-mix(in oklch, var(--warning-500) 12%, transparent);
   }
 
-  /* ── Premium track pill — 3D hero action ────────────────────────────── */
+  /* ── Track pill — the one filled ember action on the strip ───────────── */
   .track-pill {
     border-radius: var(--radius-full);
+    min-height: 44px;
     padding: var(--space-2) var(--space-4);
-    font-family: var(--font-display);
-    font-size: 0.8125rem;
-    font-weight: 800;
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    font-weight: 700;
     letter-spacing: -0.005em;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     white-space: nowrap;
     cursor: pointer;
     border: none;
     flex-shrink: 0;
-    transform-style: preserve-3d;
     transition:
-      transform var(--duration-3d) var(--ease-3d-spring),
-      box-shadow var(--duration-3d) var(--ease-3d-out),
-      background 180ms var(--ease-out);
+      transform var(--duration-fast) var(--ease-out),
+      box-shadow var(--duration-normal) var(--ease-out),
+      background var(--duration-normal) var(--ease-out);
+  }
+  .track-pill:focus-visible {
+    outline: 2px solid var(--primary-500);
+    outline-offset: 2px;
   }
 
-  /* Idle: indigo 3D pill with strong depth */
+  /* Idle: filled ember — begin accompanying */
   .track-pill:not(.live) {
-    background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-700) 100%);
-    color: white;
-    box-shadow:
-      0 6px 20px rgba(79, 70, 229, 0.50),
-      0 2px 6px rgba(79, 70, 229, 0.30),
-      0 0 0 1px rgba(99, 102, 241, 0.35),
-      inset 0 1px 0 rgba(255, 255, 255, 0.20),
-      inset 0 -2px 4px rgba(0, 0, 0, 0.12);
+    background: var(--primary-500);
+    color: var(--text-on-primary);
+    box-shadow: var(--shadow-primary);
   }
 
   .track-pill:not(.live):hover {
-    transform: perspective(600px) translateY(-3px) translateZ(8px) scale(1.04);
-    box-shadow:
-      0 10px 32px rgba(79, 70, 229, 0.55),
-      0 4px 10px rgba(79, 70, 229, 0.35),
-      var(--glow-primary),
-      inset 0 1px 0 rgba(255, 255, 255, 0.22),
-      inset 0 -2px 4px rgba(0, 0, 0, 0.10);
+    background: var(--primary-600);
+    transform: translateY(-1px);
   }
 
-  /* Live: aurora green with 3D breathing glow */
+  /* Live: settled sage — quietly present */
   .track-pill.live {
-    background: linear-gradient(135deg, var(--success-400) 0%, var(--success-600) 100%);
-    color: white;
-    box-shadow:
-      0 6px 20px rgba(16, 185, 129, 0.50),
-      0 2px 6px rgba(16, 185, 129, 0.30),
-      0 0 0 1px rgba(16, 185, 129, 0.40),
-      inset 0 1px 0 rgba(255, 255, 255, 0.20),
-      inset 0 -2px 4px rgba(0, 0, 0, 0.10);
-    animation: live-glow-pulse 2.5s ease-in-out infinite;
+    background: var(--success-500);
+    color: var(--text-inverse);
+    box-shadow: 0 4px 16px color-mix(in oklch, var(--success-500) 28%, transparent);
   }
 
   .track-pill:active {
-    transform: perspective(600px) translateZ(-6px) scale(0.92) !important;
-    transition-duration: 55ms !important;
-    box-shadow: var(--btn-3d-press) !important;
+    transform: scale(0.96);
+    transition-duration: var(--duration-fast);
   }
 
-  /* Recording dot — white with subtle pulse */
+  /* Recording dot — paper-bright breathing point */
   .rec-dot {
     display: inline-block;
     width: 7px;
     height: 7px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.95);
+    border-radius: var(--radius-full);
+    background: color-mix(in oklch, var(--text-inverse) 95%, transparent);
     flex-shrink: 0;
     animation: recording-blink 1.2s ease-in-out infinite;
-    box-shadow: 0 0 4px rgba(255, 255, 255, 0.60);
   }
 
-  /* Avatar — bumped to 34px, display font initials, live presence ring */
+  /* Avatar — warm ember-tinted pebble, sage ring when live */
   .navbar-avatar {
     width: 34px;
     height: 34px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, rgba(99,102,241,0.25), rgba(79,70,229,0.15));
-    color: var(--primary-300);
+    border-radius: var(--radius-full);
+    background: var(--primary-100);
+    color: var(--primary-700);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: var(--font-display);
+    font-family: var(--font-sans);
     font-weight: 700;
-    font-size: 0.8125rem; /* 13px for initials at 34px */
+    font-size: var(--text-sm);
     flex-shrink: 0;
     user-select: none;
-    border: 1.5px solid rgba(99, 102, 241, 0.30);
+    border: 1.5px solid color-mix(in oklch, var(--primary-500) 30%, transparent);
     transition:
-      box-shadow 300ms var(--ease-out),
-      border-color 300ms var(--ease-out),
-      transform 200ms var(--ease-spring);
+      box-shadow var(--duration-normal) var(--ease-out),
+      border-color var(--duration-normal) var(--ease-out);
     cursor: default;
   }
 
-  :global([data-theme="light"]) .navbar-avatar {
-    background: linear-gradient(135deg, var(--primary-100), rgba(99,102,241,0.08));
-    color: var(--primary-600);
-    border-color: rgba(99, 102, 241, 0.20);
-  }
-
-  /* Live: aurora green ring with glow */
+  /* Live: sage presence ring */
   .avatar-live {
     border-color: var(--success-500);
     box-shadow:
       0 0 0 2px var(--success-500),
-      0 0 0 4px rgba(0, 0, 0, 0.55),
-      0 0 14px rgba(16, 185, 129, 0.45);
+      0 0 0 4px var(--paper-warm);
     animation: aurora-pulse 2.5s ease-in-out infinite;
   }
 
@@ -563,7 +488,14 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .nav-btn::before { transition: none; }
+    .context-dot,
+    .rec-dot,
+    .avatar-live,
+    .hub-badge.hub-badge-urgent { animation: none; }
+    .nav-btn:active,
+    .track-pill:not(.live):hover,
+    .track-pill:active,
+    .nav-dashboard-btn:active { transform: none; }
   }
 
   /* Mobile: hide desktop navbar */

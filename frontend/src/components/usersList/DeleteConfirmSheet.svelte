@@ -41,9 +41,7 @@
   .qa-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.45);
-    backdrop-filter: blur(3px);
-    -webkit-backdrop-filter: blur(3px);
+    background: color-mix(in oklch, var(--ink) 40%, transparent);
     z-index: var(--z-modal, 5000);
     touch-action: none;
   }
@@ -54,52 +52,48 @@
     right: 0;
     bottom: 0;
     z-index: calc(var(--z-modal, 5000) + 1);
-    background: var(--surface-2, rgba(12, 12, 28, 0.88));
-    backdrop-filter: blur(32px) saturate(180%) brightness(1.06);
-    -webkit-backdrop-filter: blur(32px) saturate(180%) brightness(1.06);
-    border-top: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 20px 20px 0 0;
-    box-shadow:
-      0 -8px 48px rgba(0, 0, 0, 0.40),
-      0 -1px 0 rgba(255, 255, 255, 0.10),
-      inset 0 1px 0 rgba(255, 255, 255, 0.08),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.10);
-    padding: 8px 16px calc(24px + env(safe-area-inset-bottom, 0px));
+    background: var(--card);
+    border-top: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+    box-shadow: var(--sh-up);
+    padding: var(--space-2) var(--space-4);
+    padding-bottom: max(var(--space-6), env(safe-area-inset-bottom));
     will-change: transform;
   }
 
   .qa-handle {
-    width: 40px;
-    height: 5px;
-    background: var(--gray-400, rgba(255,255,255,0.22));
-    border-radius: 999px;
-    margin: 4px auto 16px;
+    width: 36px;
+    height: 4px;
+    background: var(--border-strong);
+    border-radius: var(--radius-full);
+    margin: var(--space-1) auto var(--space-4);
   }
 
   .qa-cancel-btn {
     display: block;
     width: 100%;
-    padding: 15px;
-    background: var(--surface-inset, rgba(255,255,255,0.04));
-    border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
-    border-radius: var(--radius-lg, 12px);
+    min-height: 44px;
+    padding: var(--space-3-5);
+    background: var(--surface-inset);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
     color: var(--text-secondary);
     font-family: var(--font-sans);
-    font-size: var(--text-base, 16px);
+    font-size: var(--text-base);
     font-weight: 600;
     cursor: pointer;
     text-align: center;
     transition: background var(--duration-fast) var(--ease-out);
     -webkit-tap-highlight-color: transparent;
-    margin-top: 4px;
+    margin-top: var(--space-1);
   }
 
   .qa-cancel-btn:hover { background: var(--surface-hover); }
-  .qa-cancel-btn:active { transform: scale(0.98); transition-duration: 60ms; }
+  .qa-cancel-btn:active { transform: scale(0.98); transition-duration: var(--duration-fast); }
 
   /* ── Admin delete confirmation ─────────────────────────────────────────── */
   .delete-confirm-sheet {
-    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: max(var(--space-5), env(safe-area-inset-bottom));
   }
 
   .delete-confirm-text {
@@ -117,12 +111,14 @@
     gap: var(--space-3);
   }
 
+  /* Destructive ≠ vermilion (reserved for SOS). Ochre carries "pause and
+     look" weight for the remove confirmation. */
   .delete-confirm-btn {
-    padding: 14px;
-    background: color-mix(in oklch, var(--danger-500) 12%, transparent);
-    border: 1px solid color-mix(in oklch, var(--danger-500) 28%, transparent);
-    border-radius: var(--radius-lg);
-    color: var(--danger-400, var(--danger-400));
+    padding: var(--space-3-5);
+    background: color-mix(in oklch, var(--warning-500) 14%, transparent);
+    border: 1px solid color-mix(in oklch, var(--warning-500) 30%, transparent);
+    border-radius: var(--radius-md);
+    color: var(--warning-700);
     font-family: var(--font-sans);
     font-size: var(--text-base);
     font-weight: 700;
@@ -131,6 +127,6 @@
     -webkit-tap-highlight-color: transparent;
     min-height: 44px;
   }
-  .delete-confirm-btn:hover { background: color-mix(in oklch, var(--danger-500) 20%, transparent); }
-  .delete-confirm-btn:active { transform: scale(0.97); transition-duration: 60ms; }
+  .delete-confirm-btn:hover { background: color-mix(in oklch, var(--warning-500) 22%, transparent); }
+  .delete-confirm-btn:active { transform: scale(0.97); transition-duration: var(--duration-fast); }
 </style>

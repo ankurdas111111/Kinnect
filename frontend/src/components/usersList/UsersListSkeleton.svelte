@@ -28,9 +28,9 @@
   .skel-avatar {
     width: 44px;
     height: 44px;
-    border-radius: 50%;
+    border-radius: var(--radius-full);
     flex-shrink: 0;
-    background: var(--skeleton-base, rgba(255,255,255,0.05));
+    background: var(--skeleton-base, var(--surface-inset));
     animation: skel-pulse var(--skeleton-duration, 1.6s) ease-in-out infinite;
     animation-delay: calc(var(--skel-i, 0) * 120ms);
   }
@@ -46,7 +46,7 @@
   .skel-row {
     height: var(--space-3);
     border-radius: var(--radius-sm);
-    background: var(--skeleton-base, rgba(255,255,255,0.05));
+    background: var(--skeleton-base, var(--surface-inset));
     animation: skel-pulse var(--skeleton-duration, 1.6s) ease-in-out infinite;
     animation-delay: calc(var(--skel-i, 0) * 120ms);
   }

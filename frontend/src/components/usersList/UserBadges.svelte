@@ -50,41 +50,37 @@
 {/if}
 
 <style>
-  /* SOS badge — high urgency */
+  /* SOS badge — the ONE place a badge may wear vermilion: an active crisis. */
   .sos-badge-pill {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    font-family: var(--font-display);
-    font-size: 0.6875rem;
-    font-weight: 800;
-    color: white;
-    background: linear-gradient(135deg, var(--danger-500, var(--danger-500)), var(--danger-700, var(--danger-700)));
+    gap: var(--space-1);
+    font-family: var(--font-sans);
+    font-size: var(--text-2xs);
+    font-weight: 700;
+    color: var(--text-inverse);
+    background: var(--danger-500);
     border-radius: var(--radius-full);
-    padding: 2px 8px 2px 5px;
+    padding: var(--space-0-5) var(--space-2) var(--space-0-5) var(--space-1-5);
     line-height: 1.3;
     flex-shrink: 0;
     letter-spacing: 0.04em;
-    box-shadow:
-      0 0 8px color-mix(in srgb, var(--danger-500) 55%, transparent),
-      0 0 16px color-mix(in srgb, var(--danger-500) 30%, transparent),
-      inset 0 1px 0 color-mix(in srgb, white 20%, transparent);
+    box-shadow: 0 0 8px color-mix(in oklch, var(--danger-500) 45%, transparent);
     animation: sos-urgent-pulse 1s ease-in-out infinite;
   }
 
   .sos-badge-dot {
     width: 5px;
     height: 5px;
-    border-radius: 50%;
-    background: color-mix(in srgb, white 90%, transparent);
+    border-radius: var(--radius-full);
+    background: color-mix(in oklch, var(--text-inverse) 90%, transparent);
     flex-shrink: 0;
   }
 
   .status-msg-badge {
     display: inline-block;
-    font-size: 0.6875rem;
+    font-size: var(--text-2xs);
     color: var(--text-secondary);
-    font-style: italic;
     max-width: 120px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -93,50 +89,47 @@
     flex-shrink: 1;
   }
 
-  /* Ride share badge — color-mix replaces hardcoded rgba */
+  /* Ride share badge — quiet ember tint (an activity, not an alarm) */
   .ride-badge {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
-    font-size: 0.625rem;
-    font-weight: 700;
-    color: var(--primary-400);
-    background: color-mix(in srgb, var(--primary-500) 12%, transparent);
-    border: 1px solid color-mix(in srgb, var(--primary-500) 22%, transparent);
+    gap: var(--space-0-5);
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    color: var(--primary-700);
+    background: color-mix(in oklch, var(--primary-500) 12%, transparent);
     border-radius: var(--radius-full);
-    padding: 1px 6px 1px 4px;
+    padding: var(--space-0-5) var(--space-1-5);
     white-space: nowrap;
     flex-shrink: 0;
   }
 
-  /* Crowd / Festival mode badge — color-mix replaces hardcoded rgba */
+  /* Crowd / Festival mode badge — ochre register ("worth a look") */
   .crowd-badge {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
-    font-size: 0.625rem;
-    font-weight: 700;
-    color: var(--warning-500);
-    background: color-mix(in srgb, var(--warning-500) 12%, transparent);
-    border: 1px solid color-mix(in srgb, var(--warning-500) 22%, transparent);
+    gap: var(--space-0-5);
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    color: var(--warning-700);
+    background: color-mix(in oklch, var(--warning-500) 12%, transparent);
     border-radius: var(--radius-full);
-    padding: 1px 6px 1px 4px;
+    padding: var(--space-0-5) var(--space-1-5);
     white-space: nowrap;
     flex-shrink: 0;
   }
 
-  /* Quiet hours badge — same grammar as ride badge */
+  /* Quiet hours badge — same quiet ember grammar as ride */
   .quiet-badge {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
-    font-size: 0.625rem;
-    font-weight: 700;
-    color: var(--primary-400);
-    background: color-mix(in srgb, var(--primary-500) 12%, transparent);
-    border: 1px solid color-mix(in srgb, var(--primary-500) 22%, transparent);
+    gap: var(--space-0-5);
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    color: var(--primary-700);
+    background: color-mix(in oklch, var(--primary-500) 12%, transparent);
     border-radius: var(--radius-full);
-    padding: 1px 6px 1px 4px;
+    padding: var(--space-0-5) var(--space-1-5);
     white-space: nowrap;
     flex-shrink: 0;
   }
@@ -145,13 +138,13 @@
   .more-badge {
     display: inline-flex;
     align-items: center;
-    font-family: var(--font-display);
-    font-size: 0.625rem;
-    font-weight: 700;
+    font-family: var(--font-sans);
+    font-size: var(--text-2xs);
+    font-weight: 600;
     color: var(--text-tertiary);
-    background: var(--surface-inset, rgba(255, 255, 255, 0.05));
+    background: var(--surface-inset);
     border-radius: var(--radius-full);
-    padding: 1px 5px;
+    padding: var(--space-0-5) var(--space-1);
     white-space: nowrap;
     flex-shrink: 0;
     font-variant-numeric: tabular-nums;

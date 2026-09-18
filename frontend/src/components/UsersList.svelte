@@ -202,8 +202,8 @@
     <!-- Recent chats strip — quick-access avatars for ongoing conversations -->
     <RecentChatsStrip {userList} on:secretChat />
 
-    <!-- Section label -->
-    <PeopleSectionHeader count={($myLocation ? 1 : 0) + userList.length} />
+    <!-- Sheet crest — serif title + quiet "Add person" action (Hearth) -->
+    <PeopleSectionHeader count={($myLocation ? 1 : 0) + userList.length} onAddPeople={handleAddPeople} />
 
     <!-- Self entry — always shown when tracking -->
     <SelfRow on:locate={(e) => locateUser(e.detail)} />
@@ -259,17 +259,17 @@
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    transition: height 120ms ease, opacity 120ms ease;
-    color: var(--primary-400);
+    transition: height var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out);
+    color: var(--primary-500);
     flex-shrink: 0;
   }
 
   .pull-spinner {
     width: 18px;
     height: 18px;
-    border: 2.5px solid color-mix(in srgb, var(--primary-400) 25%, transparent);
-    border-top-color: var(--primary-400);
-    border-radius: 50%;
+    border: 2.5px solid color-mix(in oklch, var(--primary-500) 25%, transparent);
+    border-top-color: var(--primary-500);
+    border-radius: var(--radius-full);
     animation: pull-spin 0.7s linear infinite;
   }
 

@@ -34,7 +34,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: var(--font-display);
+    font-family: var(--font-sans);
     font-weight: 700;
     font-size: 1.0625rem; /* 17px — legible initials */
     text-transform: uppercase;
