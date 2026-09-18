@@ -37,6 +37,32 @@
   let stepIndex = $derived(step === 'arrived' ? 2 : step === 'active' ? 1 : 0);
   const WALK_STEPS = ['Set up', 'Walking', 'Arrived'];
 
+  // Companion name for the live-status line — resolved from the same store
+  // the watcher picker reads; presentation only.
+  let companionName = $derived(
+    selectedWatcher
+      ? (members.find(m => m.userId === selectedWatcher)?.displayName?.split(' ')[0] || null)
+      : null
+  );
+
+  // ── Journey timeline — quiet sentence entries built from the session's
+  //    real events (started / alerts / shares / arrival). Presentation-layer
+  //    log only: every socket emit, toast and Live Activity call is unchanged.
+  let journey = $state([]);
+  function logMoment(text, tone) {
+    journey = [...journey, { text, at: Date.now(), tone }];
+  }
+  function softTime(at) {
+    return new Date(at)
+      .toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+      .toLowerCase();
+  }
+
+  function initials(name) {
+    if (!name) return '?';
+    return name.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+  }
+
   function startWalk() {
     if (!destLat || !destLng) {
       toasts.add('Pick a destination first');
@@ -53,16 +79,20 @@
     socket.emit('endWalkWithMe');
     step = 'pick';
     walkToken = null;
+    journey = [];
   }
 
   function shareLink() {
     if (!walkToken) return;
     const url = `${getShareOrigin()}/live/${walkToken}`;
     if (navigator.share) {
-      navigator.share({ title: 'Walk With Me', text: `Watch me walk safely to ${destName}`, url });
+      navigator.share({ title: 'Walk With Me', text: `Watch me walk safely to ${destName}`, url })
+        .then(() => logMoment('You invited your circle to follow along', 'quiet'))
+        .catch(() => { /* share sheet dismissed — nothing to record */ });
     } else if (navigator.clipboard) {
       navigator.clipboard.writeText(url);
       toasts.add('Link copied!');
+      logMoment('You invited your circle to follow along', 'quiet');
     }
   }
 
@@ -73,11 +103,13 @@
     step = 'active';
     starting = false;
     toasts.add('Walk With Me started');
+    journey = [{ text: `You set out for ${data.destName || 'your destination'}`, at: Date.now(), tone: 'ember' }];
     startLiveShareActivity('walk', { status: 'Walking', detail: `To ${data.destName || 'destination'}` });
   };
   const onWalkArrived = (data) => {
     step = 'arrived';
     toasts.add(`You arrived safely at ${data.destName}!`);
+    logMoment(`You arrived at ${data.destName || 'your destination'}`, 'sage');
     updateLiveShareActivity({ status: 'Arrived safely', detail: `At ${data.destName || 'destination'}` });
     endLiveShareActivity();
   };
@@ -87,10 +119,14 @@
     } else {
       step = 'pick';
       walkToken = null;
+      journey = [];
     }
     endLiveShareActivity();
   };
-  const onWalkAlert = (data) => { toasts.add(data.message, 'warning'); };
+  const onWalkAlert = (data) => {
+    toasts.add(data.message, 'warning');
+    if (data.message) logMoment(data.message, 'note');
+  };
   const onWalkError = (data) => { starting = false; toasts.add(data.message || 'Failed to start walk'); };
 
   socket.on('walkStarted', onWalkStarted);
@@ -133,41 +169,46 @@
 </script>
 
 <div class="wwm">
-  <!-- Step progress — token-restyled stepper: nodes + track, no new build -->
-  <div class="step-progress" aria-hidden="true">
+  <!-- Step progress — same derived state, rendered as a quiet bead path -->
+  <ol class="wwm-steps" aria-label="Walk progress">
     {#each WALK_STEPS as label, i}
-      <!-- track segment before every node except the first -->
-      {#if i > 0}
-        <div class="step-track" class:step-track-done={stepIndex >= i} aria-hidden="true"></div>
-      {/if}
-      <div class="step-item" class:step-active={stepIndex === i} class:step-complete={stepIndex > i}>
-        <span class="step-bead" aria-hidden="true">
+      <li
+        class="wwm-step"
+        class:is-active={stepIndex === i}
+        class:is-done={stepIndex > i}
+        aria-current={stepIndex === i ? 'step' : undefined}
+      >
+        <span class="wwm-step-bead" aria-hidden="true">
           {#if stepIndex > i}
-            <!-- checkmark glyph for completed steps -->
-            <svg width="8" height="8" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <svg width="9" height="9" viewBox="0 0 10 10" fill="none" aria-hidden="true">
               <polyline points="2,5.5 4.5,8 8,2.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           {/if}
         </span>
-        <span class="step-label">{label}</span>
-      </div>
+        <span class="wwm-step-label">{label}</span>
+      </li>
     {/each}
-  </div>
+  </ol>
 
   {#if step === 'pick'}
-    <div class="wwm-header">
-      <h3 class="wwm-title">Walk With Me</h3>
-      <p class="wwm-desc">A family member will watch your journey until you arrive safe.</p>
-    </div>
+    <!-- Verdict crest — the one honest sentence, serif italic -->
+    <header class="wwm-crest">
+      <h3 class="wwm-verdict">
+        {destName ? `You're heading to ${destName}.` : 'Where are you heading?'}
+      </h3>
+      <p class="wwm-sub">Someone who loves you keeps you company until you're safely there.</p>
+    </header>
 
-    <div class="wwm-section wwm-card">
-      <label class="wwm-label">Where are you going?</label>
+    <section class="wwm-row" role="group" aria-labelledby="wwm-dest-label">
+      <h4 class="wwm-label" id="wwm-dest-label">Where you're going</h4>
       {#if savedPlaces.length > 0}
         <div class="wwm-places">
           {#each savedPlaces as place}
             <button
+              type="button"
               class="wwm-place"
-              class:wwm-place-sel={destLat === place.latitude && destLng === place.longitude}
+              class:is-selected={destLat === place.latitude && destLng === place.longitude}
+              aria-pressed={destLat === place.latitude && destLng === place.longitude}
               onclick={() => pickPlace(place)}
             >
               {place.name}
@@ -177,68 +218,140 @@
       {:else}
         <p class="wwm-hint">Save places like Home or Work in Settings for quick access.</p>
       {/if}
-      <input class="wwm-input" type="text" bind:value={destName} placeholder="Or type a place name..." />
-    </div>
+      <input
+        class="wwm-input"
+        type="text"
+        bind:value={destName}
+        placeholder="Or type a place name…"
+        aria-label="Destination name"
+      />
+    </section>
 
-    <div class="wwm-section wwm-card">
-      <label class="wwm-label">Who should watch over you?</label>
+    <section class="wwm-row" role="group" aria-labelledby="wwm-comp-label">
+      <h4 class="wwm-label" id="wwm-comp-label">Who walks with you</h4>
       <div class="wwm-watchers">
         {#each members as user (user.userId)}
           <button
+            type="button"
             class="wwm-watcher"
-            class:wwm-watcher-sel={selectedWatcher === user.userId}
+            class:is-selected={selectedWatcher === user.userId}
+            aria-pressed={selectedWatcher === user.userId}
             onclick={() => selectedWatcher = selectedWatcher === user.userId ? null : user.userId}
           >
-            <!-- shape + color + text: dot conveys status, not color alone -->
-            <span class="wwm-w-dot" class:wwm-w-sos={user.sos?.active} aria-hidden="true"></span>
-            {user.displayName?.split(' ')[0] || 'User'}
+            <span class="wwm-pebble" aria-hidden="true">
+              {initials(user.displayName)}
+              <!-- presence pip: shape + position carry meaning, not color alone;
+                   vermilion appears ONLY when this person is in an active SOS -->
+              <span class="wwm-pip" class:wwm-pip-sos={user.sos?.active}></span>
+            </span>
+            <span class="wwm-watcher-name">{user.displayName?.split(' ')[0] || 'User'}</span>
+            {#if user.sos?.active}
+              <span class="visually-hidden">— in an active SOS</span>
+            {/if}
           </button>
         {/each}
         {#if members.length === 0}
-          <p class="wwm-hint">No one is online right now. You can share the link instead.</p>
+          <p class="wwm-hint">No one is online right now — you can still share a live link once you set out.</p>
         {/if}
       </div>
-    </div>
+    </section>
 
     <MagneticButton strength={5} className="mag-full">
-      <button class="wwm-start" onclick={startWalk} disabled={!destLat || starting}>
-        {starting ? 'Starting...' : 'Start Walking'}
+      <button type="button" class="wwm-start" onclick={startWalk} disabled={!destLat || starting}>
+        {starting ? 'Starting…' : 'Start walking'}
       </button>
     </MagneticButton>
 
   {:else if step === 'active'}
-    <!-- Night-walk instrument card: large mono distance placeholder, 16px+ body -->
-    <div class="wwm-active wwm-card">
-      <div class="wwm-active-icon" aria-hidden="true">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1.5"/><path d="M9 20l1.5-5 2.5 2 2.5-7"/><path d="M6 9h12"/></svg>
-      </div>
-      <!-- destination headline — legible at arm's length -->
-      <h3 class="wwm-title wwm-title-active">Walking to {destName}</h3>
-      <p class="wwm-desc wwm-desc-active">Someone is watching your journey. Stay safe.</p>
+    <!-- 1 · Verdict banner + live status (reference: destination header + remaining row) -->
+    <header class="wwm-crest">
+      <h3 class="wwm-verdict">You're walking to {destName}.</h3>
+      <p class="wwm-live" aria-live="polite">
+        <span class="wwm-live-dot" aria-hidden="true"><span class="wwm-live-halo fx-ambient"></span></span>
+        <span class="wwm-live-word">Live</span>
+        <span class="wwm-live-rest">
+          — {companionName ? `${companionName} is walking with you` : 'your circle can follow your journey'}
+        </span>
+      </p>
+    </header>
 
-      <div class="wwm-actions">
-        <button class="wwm-share" onclick={shareLink}>Share Link</button>
-        <button class="wwm-end" onclick={endWalk}>I've Arrived</button>
+    <!-- 2 · Journey timeline — quiet sentences with soft timestamps -->
+    <section class="wwm-row" aria-labelledby="wwm-journey-label">
+      <h4 class="wwm-label" id="wwm-journey-label">Along the way</h4>
+      {#if journey.length > 0}
+        <ol class="wwm-journey">
+          {#each journey as entry}
+            <li class="wwm-entry wwm-entry-{entry.tone}">
+              <span class="wwm-entry-dot" aria-hidden="true"></span>
+              <span class="wwm-entry-text">{entry.text}</span>
+              <time class="wwm-entry-time" datetime={new Date(entry.at).toISOString()}>{softTime(entry.at)}</time>
+            </li>
+          {/each}
+        </ol>
+      {:else}
+        <p class="wwm-hint">Your walk has just begun.</p>
+      {/if}
+    </section>
+
+    <!-- 3 · Gentle reassurance row (reference: warm-ping row → our real share feature) -->
+    <section class="wwm-ping">
+      <span class="wwm-ping-pebble" aria-hidden="true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+      </span>
+      <span class="wwm-ping-copy">
+        <span class="wwm-ping-title">Bring someone along</span>
+        <span class="wwm-ping-cap">A live link lets them walk beside you, quietly.</span>
+      </span>
+      <button type="button" class="wwm-share" onclick={shareLink}>Share link</button>
+    </section>
+
+    <!-- 4 · How this ends (reference: arrival safety protocol) -->
+    <section class="wwm-ends" aria-labelledby="wwm-ends-label">
+      <div class="wwm-ends-head">
+        <span class="wwm-ends-icon" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        </span>
+        <h4 class="wwm-ends-title" id="wwm-ends-label">How this walk ends</h4>
+        <span class="wwm-tag">Automatic</span>
       </div>
+      <p class="wwm-ends-body">
+        When you reach {destName}, your companions are told you made it and the walk closes on its own.
+        You can also end it yourself below.
+      </p>
+    </section>
+
+    <!-- 5 · Session controls (reference footer register — no SOS affordance exists here) -->
+    <div class="wwm-controls">
+      <button type="button" class="wwm-arrive" onclick={endWalk}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        <span>I've arrived safely</span>
+      </button>
     </div>
 
   {:else if step === 'arrived'}
-    <!-- Calm green moment — single border pulse, no confetti, no looping motion -->
-    <div class="wwm-arrived wwm-card">
-      <div class="wwm-arrived-icon" aria-hidden="true">
-        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
-      </div>
-      <h3 class="wwm-title">You arrived safely.</h3>
-      <p class="wwm-desc">Your family has been notified.</p>
-      <button class="wwm-done" onclick={() => { step = 'pick'; walkToken = null; dispatch('close'); }}>Close</button>
-    </div>
+    <!-- Arrival — the settled sage moment: one gentle entry, then still -->
+    <section class="wwm-arrived">
+      <span class="wwm-arrived-pebble" aria-hidden="true">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+      </span>
+      <h3 class="wwm-verdict">You arrived safely.</h3>
+      <p class="wwm-sub">Your circle has been told you're here. Nothing more to do.</p>
+      <button type="button" class="wwm-done" onclick={() => { step = 'pick'; walkToken = null; journey = []; dispatch('close'); }}>
+        Close
+      </button>
+    </section>
   {/if}
 </div>
 
 <style>
+  /* ═══ Ground — a warm paper sheet; rows separated by whitespace, not rules ═══ */
   .wwm {
-    padding: var(--space-4, 16px);
+    background: var(--paper);
+    border-radius: var(--radius-xl); /* sheet register, 20px */
+    box-shadow: var(--shadow-xs);
+    padding: var(--space-5) var(--space-4) var(--space-4);
     color: var(--text-primary);
+    font-family: var(--font-sans);
   }
 
   /* Full-width magnetic CTA wrapper */
@@ -247,181 +360,205 @@
     width: 100%;
   }
 
-  /* ── Step progress: nodes + connecting track ─────────────────── */
-  .step-progress {
+  .visually-hidden {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* ═══ Step progress — quiet beads on a hairline path ═══ */
+  .wwm-steps {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: var(--space-2, 8px);
-    margin-bottom: var(--space-4, 16px);
+    gap: var(--space-2);
+    list-style: none;
+    margin: 0 0 var(--space-5);
+    padding: 0;
   }
 
-  /* Track line between beads */
-  .step-track {
-    flex: 1;
-    max-width: 32px;
-    height: 1px;
-    background: var(--border-subtle);
-    border-radius: 1px;
-    transition: background-color var(--duration-normal, 200ms) var(--ease-out);
-  }
-  .step-track.step-track-done {
-    background: var(--primary-500);
-  }
-
-  .step-item {
+  .wwm-step {
     display: flex;
     align-items: center;
-    gap: var(--space-1, 4px);
+    gap: var(--space-1-5);
   }
 
-  .step-bead {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: var(--surface-inset, rgba(255,255,255,0.05));
-    border: 1.5px solid var(--border-default);
+  /* leading track segment on every step after the first */
+  .wwm-step + .wwm-step::before {
+    content: '';
+    width: var(--space-6);
+    height: 1px;
+    background: var(--hairline);
+    border-radius: var(--radius-full);
+    margin-right: var(--space-1-5);
+    transition: background-color var(--duration-normal) var(--ease-out);
+  }
+  .wwm-step.is-active::before,
+  .wwm-step.is-done::before {
+    background: var(--primary-500-30);
+  }
+
+  .wwm-step-bead {
+    width: 18px;
+    height: 18px;
+    border-radius: var(--radius-full);
+    background: var(--surface-inset);
+    border: 1px solid var(--hairline);
     display: flex;
     align-items: center;
     justify-content: center;
     color: transparent;
     transition:
-      transform var(--duration-fast, 100ms) var(--ease-spring, cubic-bezier(0.34,1.56,0.64,1)),
-      background-color var(--duration-normal, 200ms) var(--ease-out),
-      border-color var(--duration-normal, 200ms) var(--ease-out),
-      color var(--duration-normal, 200ms) var(--ease-out);
+      background-color var(--duration-normal) var(--ease-out),
+      border-color var(--duration-normal) var(--ease-out),
+      box-shadow var(--duration-normal) var(--ease-out),
+      color var(--duration-normal) var(--ease-out);
   }
 
-  .step-label {
-    font-family: var(--font-display, system-ui);
-    font-size: var(--text-xs, 11px);
-    font-weight: 700;
+  .wwm-step-label {
+    font-size: var(--text-xs);
+    font-weight: 600;
     letter-spacing: 0.04em;
     color: var(--text-tertiary);
-    transition: color var(--duration-normal, 200ms) var(--ease-out);
+    transition: color var(--duration-normal) var(--ease-out);
   }
 
-  /* Active node: primary ring, slightly scaled */
-  .step-item.step-active .step-bead {
+  /* Active bead: the ember presence, with a static soft ring */
+  .wwm-step.is-active .wwm-step-bead {
     background: var(--primary-500);
     border-color: var(--primary-500);
-    transform: scale(1.15);
-    box-shadow: 0 0 0 3px var(--primary-500-20, color-mix(in oklch, var(--primary-500) 20%, transparent));
+    box-shadow: 0 0 0 3px var(--primary-500-20);
   }
-  /* Active-step ring: .fx-ambient so tokens-fx.css suppresses at data-fx=minimal */
-  .step-item.step-active .step-bead.fx-ambient {
-    /* static fallback is the box-shadow above — animation adds soft pulsing ring */
-    animation: wwm-step-ring 2s var(--ease-in-out, ease-in-out) infinite;
-  }
-  .step-item.step-active .step-label {
-    color: var(--primary-300, var(--primary-300));
+  .wwm-step.is-active .wwm-step-label {
+    color: var(--primary-700);
   }
 
-  /* Complete node: success tint + checkmark */
-  .step-item.step-complete .step-bead {
-    background: var(--success-500, var(--success-500));
-    border-color: var(--success-500, var(--success-500));
-    color: white;
+  /* Done bead: sage settled */
+  .wwm-step.is-done .wwm-step-bead {
+    background: var(--success-500);
+    border-color: var(--success-500);
+    color: var(--text-inverse);
   }
-  .step-item.step-complete .step-label {
+  .wwm-step.is-done .wwm-step-label {
     color: var(--text-secondary);
   }
 
-  /* Milestone check pop — plays once per step completion (JS adds .step-complete) */
-  @keyframes wwm-step-pop {
-    0%   { transform: scale(0.6); }
-    60%  { transform: scale(1.25); }
-    100% { transform: scale(1); }
+  /* ═══ Verdict crest — serif italic, the only serif on the sheet ═══ */
+  .wwm-crest {
+    text-align: center;
+    margin-bottom: var(--space-6);
+    padding: 0 var(--space-2);
   }
 
-  /* Active-step soft ring pulse — decorative ambient */
-  @keyframes wwm-step-ring {
-    0%, 100% { box-shadow: 0 0 0 3px var(--primary-500-20, color-mix(in oklch, var(--primary-500) 20%, transparent)); }
-    50%       { box-shadow: 0 0 0 7px transparent; }
-  }
-
-  /* ── Section header + description ───────────────────────────── */
-  .wwm-header { margin-bottom: var(--space-4, 16px); }
-
-  .wwm-title {
-    font-size: var(--text-lg, 18px);
-    font-weight: 800;
-    margin: 0 0 var(--space-1, 4px);
-    font-family: var(--font-display, system-ui);
+  .wwm-verdict {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 400;
+    font-size: var(--text-2xl);
+    line-height: 1.35;
+    letter-spacing: -0.01em;
     color: var(--text-primary);
-    letter-spacing: -0.02em;
+    margin: 0 0 var(--space-2);
+    overflow-wrap: break-word;
   }
 
-  /* Active state: even larger for one-handed arm's-length readability */
-  .wwm-title-active {
-    font-size: var(--text-xl, 20px);
-  }
-
-  .wwm-desc {
-    font-size: var(--text-sm, 14px); /* ≥13px — spec says 16px min body */
+  .wwm-sub {
+    font-size: var(--text-base);
+    line-height: 1.55;
     color: var(--text-secondary);
     margin: 0;
-    line-height: 1.5;
   }
 
-  /* Active screen description bumped to full 16px spec */
-  .wwm-desc-active {
-    font-size: var(--text-base, 16px);
+  /* Live status row — sage breath for "live", ember word for presence */
+  .wwm-live {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: var(--space-1-5);
+    margin: 0;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--text-secondary);
   }
 
-  /* ── Card containers ─────────────────────────────────────────── */
-  .wwm-section { margin-bottom: var(--space-3, 12px); }
-
-  .wwm-card {
-    padding: var(--space-3, 12px);
-    border-radius: var(--radius-lg, 12px);
-    background: var(--glass-card-bg, var(--surface-1, rgba(255,255,255,0.03)));
-    border: 1px solid var(--glass-card-border, var(--border-subtle));
-    box-shadow: var(--glass-card-shadow, var(--elevation-1));
+  .wwm-live-word {
+    color: var(--primary-700);
+    font-weight: 600;
   }
 
-  /* ── Field label ─────────────────────────────────────────────── */
+  .wwm-live-dot {
+    position: relative;
+    width: 8px;
+    height: 8px;
+    border-radius: var(--radius-full);
+    background: var(--status-live);
+    flex-shrink: 0;
+  }
+
+  /* breathing halo — transform/opacity only, fades out under calm/minimal fx */
+  .wwm-live-halo {
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-full);
+    background: var(--success-500-30);
+    animation: wwm-breathe 4s var(--ease-in-out) infinite;
+  }
+
+  @keyframes wwm-breathe {
+    0%, 100% { transform: scale(1);   opacity: 0.8; }
+    50%      { transform: scale(2.1); opacity: 0; }
+  }
+
+  /* ═══ Rows — whitespace-separated groups ═══ */
+  .wwm-row { margin-bottom: var(--space-5); }
+
   .wwm-label {
-    display: block;
-    font-size: var(--text-2xs, 10px);
-    font-weight: 700;
+    font-size: var(--text-xs);
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
     color: var(--text-tertiary);
-    margin-bottom: var(--space-1, 4px);
+    margin: 0 0 var(--space-2);
   }
 
   .wwm-hint {
-    font-size: var(--text-sm, 13px);
+    font-size: var(--text-sm);
+    line-height: 1.5;
     color: var(--text-tertiary);
-    margin: 0;
+    margin: 0 0 var(--space-2);
   }
 
-  /* ── Saved-place quick-pick pills ────────────────────────────── */
+  /* ═══ Saved-place quick picks — soft paper pills ═══ */
   .wwm-places {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-1, 4px);
-    margin-bottom: var(--space-2, 8px);
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
   }
 
   .wwm-place {
-    padding: var(--space-2, 8px) var(--space-3, 12px);
-    border-radius: var(--radius-full, 9999px);
-    font-size: var(--text-sm, 13px);
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-full);
+    font-family: inherit;
+    font-size: var(--text-sm);
     font-weight: 600;
     min-height: 44px;
     display: flex;
     align-items: center;
-    background: var(--surface-inset);
-    border: 1px solid var(--border-subtle);
+    background: var(--surface-2);
+    border: none;
     color: var(--text-secondary);
     cursor: pointer;
-    transition:
-      background-color var(--duration-fast, 100ms) var(--ease-out),
-      border-color var(--duration-fast, 100ms) var(--ease-out),
-      color var(--duration-fast, 100ms) var(--ease-out);
     outline: none;
+    transition:
+      background-color var(--duration-fast) var(--ease-out),
+      box-shadow var(--duration-fast) var(--ease-out),
+      color var(--duration-fast) var(--ease-out);
   }
   .wwm-place:hover {
     background: var(--surface-hover);
@@ -431,58 +568,61 @@
     outline: 2px solid var(--primary-400);
     outline-offset: 2px;
   }
-  .wwm-place-sel {
-    background: var(--primary-500-20, color-mix(in oklch, var(--primary-500) 15%, transparent)) !important;
-    border-color: var(--primary-500) !important;
-    color: var(--primary-300);
+  .wwm-place.is-selected {
+    background: var(--primary-100);
+    color: var(--primary-700);
+    box-shadow: inset 0 0 0 1.5px var(--primary-500);
   }
 
+  /* ═══ Destination input — warm inset, ember focus glow ═══ */
   .wwm-input {
     width: 100%;
-    padding: var(--space-2, 8px) var(--space-3, 12px);
-    border-radius: var(--radius-md, 8px);
-    font-size: var(--text-base, 15px);
-    min-height: 44px;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-input);
+    font-family: inherit;
+    font-size: var(--text-base);
+    min-height: 48px;
     box-sizing: border-box;
     background: var(--surface-inset);
-    border: 1px solid var(--border-subtle);
+    border: 1px solid transparent;
     color: var(--text-primary);
     outline: none;
     transition:
-      border-color var(--duration-fast, 100ms) var(--ease-out),
-      box-shadow var(--duration-fast, 100ms) var(--ease-out);
+      border-color var(--duration-fast) var(--ease-out),
+      box-shadow var(--duration-fast) var(--ease-out);
   }
   .wwm-input:focus {
     border-color: var(--primary-500);
-    box-shadow: 0 0 0 3px var(--primary-500-20, color-mix(in oklch, var(--primary-500) 15%, transparent));
+    box-shadow: 0 0 0 3px var(--primary-500-20);
   }
   .wwm-input::placeholder { color: var(--text-tertiary); }
 
-  /* ── Watcher selection ───────────────────────────────────────── */
+  /* ═══ Companion picker — people as pebbles, never pins ═══ */
   .wwm-watchers {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-1, 4px);
+    gap: var(--space-2);
   }
 
   .wwm-watcher {
     display: flex;
     align-items: center;
-    gap: var(--space-1, 4px);
-    padding: var(--space-2, 8px) var(--space-3, 12px);
-    border-radius: var(--radius-full, 9999px);
-    font-size: var(--text-sm, 13px);
+    gap: var(--space-2);
+    padding: var(--space-1-5) var(--space-3) var(--space-1-5) var(--space-1-5);
+    border-radius: var(--radius-full);
+    font-family: inherit;
+    font-size: var(--text-sm);
     font-weight: 600;
     min-height: 44px;
-    background: var(--surface-inset);
-    border: 1px solid var(--border-subtle);
+    background: var(--surface-2);
+    border: none;
     color: var(--text-secondary);
     cursor: pointer;
     outline: none;
     transition:
-      background-color var(--duration-fast, 100ms) var(--ease-out),
-      border-color var(--duration-fast, 100ms) var(--ease-out),
-      color var(--duration-fast, 100ms) var(--ease-out);
+      background-color var(--duration-fast) var(--ease-out),
+      box-shadow var(--duration-fast) var(--ease-out),
+      color var(--duration-fast) var(--ease-out);
   }
   .wwm-watcher:hover {
     background: var(--surface-hover);
@@ -492,133 +632,266 @@
     outline: 2px solid var(--primary-400);
     outline-offset: 2px;
   }
-  .wwm-watcher-sel {
-    background: var(--primary-500-20, color-mix(in oklch, var(--primary-500) 15%, transparent)) !important;
-    border-color: var(--primary-500) !important;
-    color: var(--primary-300);
+  .wwm-watcher.is-selected {
+    background: var(--primary-100);
+    color: var(--primary-700);
+    box-shadow: inset 0 0 0 1.5px var(--primary-500);
   }
 
-  /* Status dot: shape (circle) + token color, not raw hex; .wwm-w-sos applies danger color */
-  .wwm-w-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
+  .wwm-pebble {
+    position: relative;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-full);
+    background: var(--surface-inset);
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
-    background: var(--status-live, var(--success-500)); /* token, not literal */
+    transition:
+      background-color var(--duration-fast) var(--ease-out),
+      color var(--duration-fast) var(--ease-out);
   }
-  .wwm-w-dot.wwm-w-sos {
-    background: var(--status-sos, var(--danger-500));
+  .wwm-watcher.is-selected .wwm-pebble {
+    background: var(--primary-500);
+    color: var(--text-on-primary);
   }
 
-  /* ── Start CTA ───────────────────────────────────────────────── */
+  /* presence pip — sage when live; vermilion strictly for an active SOS */
+  .wwm-pip {
+    position: absolute;
+    right: -1px;
+    bottom: -1px;
+    width: 9px;
+    height: 9px;
+    border-radius: var(--radius-full);
+    background: var(--status-live);
+    border: 2px solid var(--paper);
+  }
+  .wwm-pip.wwm-pip-sos {
+    background: var(--status-sos);
+  }
+
+  /* ═══ Start CTA — the one ember fill ═══ */
   .wwm-start {
     width: 100%;
-    padding: var(--space-3, 12px);
-    border-radius: var(--radius-lg, 12px);
-    font-size: var(--text-base, 15px);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-button);
+    font-family: inherit;
+    font-size: var(--text-base);
     font-weight: 700;
-    min-height: 44px;
-    background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
-    color: var(--text-on-primary, white);
+    min-height: 48px;
+    background: var(--primary-500);
+    color: var(--text-on-primary);
     border: none;
     cursor: pointer;
     outline: none;
+    box-shadow: var(--shadow-sm);
     transition:
-      box-shadow var(--duration-normal, 200ms) var(--ease-out),
-      opacity var(--duration-fast, 100ms) var(--ease-out);
-    box-shadow: 0 2px 12px var(--primary-500-30, color-mix(in oklch, var(--primary-500) 30%, transparent));
+      background-color var(--duration-normal) var(--ease-out),
+      box-shadow var(--duration-normal) var(--ease-out),
+      opacity var(--duration-fast) var(--ease-out);
   }
-  .wwm-start:hover {
-    box-shadow: 0 4px 18px var(--primary-500-30, color-mix(in oklch, var(--primary-500) 40%, transparent));
+  .wwm-start:hover:not(:disabled) {
+    background: var(--primary-600);
+    box-shadow: var(--shadow-primary);
   }
   .wwm-start:focus-visible {
     outline: 2px solid var(--primary-400);
     outline-offset: 2px;
   }
-  .wwm-start:disabled { opacity: 0.4; cursor: not-allowed; }
+  .wwm-start:disabled { opacity: 0.45; cursor: not-allowed; }
 
-  /* ── Active walk instrument card ─────────────────────────────── */
-  .wwm-active {
-    text-align: center;
-    padding: var(--space-5, 20px) var(--space-4, 16px);
+  /* ═══ Journey timeline — sentences on quiet paper ═══ */
+  .wwm-journey {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
   }
 
-  .wwm-active-icon {
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    margin: 0 auto var(--space-3, 12px);
-    background: var(--primary-500-20, color-mix(in oklch, var(--primary-500) 12%, transparent));
-    border: 1px solid var(--primary-500-30, color-mix(in oklch, var(--primary-500) 25%, transparent));
+  .wwm-entry {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+
+  .wwm-entry-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: var(--radius-full);
+    background: var(--text-tertiary);
+    flex-shrink: 0;
+    align-self: center;
+  }
+  .wwm-entry-ember .wwm-entry-dot { background: var(--primary-500); }
+  .wwm-entry-note  .wwm-entry-dot { background: var(--warning-500); }
+  .wwm-entry-sage  .wwm-entry-dot { background: var(--success-500); }
+
+  .wwm-entry-text {
+    flex: 1;
+    font-size: var(--text-base);
+    line-height: 1.5;
+    color: var(--text-primary);
+    overflow-wrap: break-word;
+    min-width: 0;
+  }
+  .wwm-entry-note .wwm-entry-text { color: var(--text-secondary); }
+
+  .wwm-entry-time {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* ═══ Gentle reassurance row — share the walk ═══ */
+  .wwm-ping {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-5);
+  }
+
+  .wwm-ping-pebble {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-full);
+    background: var(--primary-100);
+    color: var(--primary-700);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--primary-400);
-    /* static default — fx-ambient class enables animation */
-  }
-  /* gated behind .fx-ambient: tokens-fx.css suppresses at data-fx=minimal */
-  .wwm-active-icon.fx-ambient {
-    animation: wwm-icon-pulse 2s var(--ease-in-out, ease-in-out) infinite;
+    flex-shrink: 0;
   }
 
-  @keyframes wwm-icon-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 var(--primary-500-20, color-mix(in oklch, var(--primary-500) 20%, transparent)); }
-    50%       { box-shadow: 0 0 0 10px transparent; }
-  }
-
-  .wwm-actions {
+  .wwm-ping-copy {
+    flex: 1;
+    min-width: 0;
     display: flex;
-    gap: var(--space-2, 8px);
-    margin-top: var(--space-4, 16px);
-    justify-content: center;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .wwm-ping-title {
+    font-size: var(--text-base);
+    font-weight: 500;
+    line-height: 1.3;
+    color: var(--text-primary);
+  }
+
+  .wwm-ping-cap {
+    font-size: var(--text-xs);
+    line-height: 1.4;
+    color: var(--text-tertiary);
   }
 
   .wwm-share {
-    padding: var(--space-2, 8px) var(--space-4, 16px);
-    border-radius: var(--radius-md, 10px);
-    font-size: var(--text-sm, 13px);
-    font-weight: 700;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: var(--text-sm);
+    font-weight: 600;
     min-height: 44px;
     display: flex;
     align-items: center;
-    background: var(--primary-500-20, color-mix(in oklch, var(--primary-500) 15%, transparent));
-    border: 1px solid var(--primary-500-30, color-mix(in oklch, var(--primary-500) 30%, transparent));
-    color: var(--primary-300);
+    flex-shrink: 0;
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    color: var(--primary-700);
     cursor: pointer;
     outline: none;
-    transition:
-      background-color var(--duration-fast, 100ms) var(--ease-out),
-      box-shadow var(--duration-fast, 100ms) var(--ease-out);
+    transition: background-color var(--duration-fast) var(--ease-out);
   }
-  .wwm-share:hover { background: var(--primary-500-20, color-mix(in oklch, var(--primary-500) 22%, transparent)); }
-  .wwm-share:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
+  .wwm-share:hover { background: var(--primary-100); }
+  .wwm-share:focus-visible {
+    outline: 2px solid var(--primary-400);
+    outline-offset: 2px;
+  }
 
-  .wwm-end {
-    padding: var(--space-2, 8px) var(--space-4, 16px);
-    border-radius: var(--radius-md, 10px);
-    font-size: var(--text-sm, 13px);
-    font-weight: 700;
-    min-height: 44px;
+  /* ═══ How this ends — the sage promise ═══ */
+  .wwm-ends { margin-bottom: var(--space-5); }
+
+  .wwm-ends-head {
     display: flex;
     align-items: center;
-    background: color-mix(in oklch, var(--danger-500) 12%, transparent); /* raw-color-ok: no --danger-* alpha token exists */
-    border: 1px solid color-mix(in oklch, var(--danger-500) 25%, transparent); /* raw-color-ok */
-    color: var(--danger-400, var(--danger-400));
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+  }
+
+  .wwm-ends-icon {
+    color: var(--success-500);
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .wwm-ends-title {
+    flex: 1;
+    font-size: var(--text-base);
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+  }
+
+  .wwm-tag {
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-full);
+    background: var(--success-500-20);
+    color: var(--success-700);
+  }
+
+  .wwm-ends-body {
+    font-size: var(--text-base);
+    line-height: 1.55;
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  /* ═══ Session controls — quiet paper, sage check ═══ */
+  .wwm-controls { display: flex; }
+
+  .wwm-arrive {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-button);
+    font-family: inherit;
+    font-size: var(--text-base);
+    font-weight: 600;
+    min-height: 48px;
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    color: var(--text-primary);
     cursor: pointer;
     outline: none;
-    transition:
-      background-color var(--duration-fast, 100ms) var(--ease-out);
+    transition: background-color var(--duration-fast) var(--ease-out);
   }
-  .wwm-end:hover { background: color-mix(in oklch, var(--danger-500) 18%, transparent); } /* raw-color-ok */
-  .wwm-end:focus-visible { outline: 2px solid var(--danger-400); outline-offset: 2px; }
+  .wwm-arrive svg { color: var(--success-500); flex-shrink: 0; }
+  .wwm-arrive:hover { background: var(--surface-hover); }
+  .wwm-arrive:focus-visible {
+    outline: 2px solid var(--primary-400);
+    outline-offset: 2px;
+  }
 
-  /* ── Arrived state — calm green moment ──────────────────────── */
+  /* ═══ Arrived — the settled moment ═══ */
   .wwm-arrived {
     text-align: center;
-    padding: var(--space-6, 24px) var(--space-4, 16px);
-    /* single entry animation — not infinite; calm-core: one 300ms pulse then static */
-    animation: wwm-arrived-enter 300ms var(--ease-out) forwards;
-    border: 1.5px solid var(--ring-color-live, var(--status-live, var(--success-500)));
+    padding: var(--space-4) var(--space-2) var(--space-2);
+    /* single gentle entry, then still — transform/opacity only */
+    animation: wwm-arrived-enter var(--duration-slow) var(--ease-out) both;
   }
 
   @keyframes wwm-arrived-enter {
@@ -626,66 +899,66 @@
     to   { opacity: 1; transform: translateY(0); }
   }
 
-  .wwm-arrived-icon {
+  .wwm-arrived-pebble {
     width: 64px;
     height: 64px;
-    border-radius: 50%;
-    margin: 0 auto var(--space-3, 12px);
-    background: color-mix(in oklch, var(--success-500) 12%, transparent); /* raw-color-ok: --success-* alpha not tokenised */
-    border: 2px solid var(--ring-color-live, var(--status-live, var(--success-500)));
+    border-radius: var(--radius-full);
+    margin: 0 auto var(--space-4);
+    background: var(--success-500-20);
+    color: var(--success-600);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--success-500, var(--success-500));
-    /* One pop on entry — not infinite */
-    animation: wwm-arrived-pop 300ms var(--ease-spring, cubic-bezier(0.34,1.56,0.64,1)) forwards;
+    /* one pop on entry — never loops */
+    animation: wwm-arrived-pop var(--duration-slow) var(--ease-spring) both;
   }
 
   @keyframes wwm-arrived-pop {
     0%   { transform: scale(0.7); }
-    60%  { transform: scale(1.1); }
+    60%  { transform: scale(1.08); }
     100% { transform: scale(1); }
   }
 
   .wwm-done {
-    margin-top: var(--space-4, 16px);
-    padding: var(--space-3, 12px) var(--space-6, 24px);
-    border-radius: var(--radius-lg, 12px);
-    min-height: 44px;
+    margin-top: var(--space-5);
+    padding: var(--space-3) var(--space-8);
+    border-radius: var(--radius-button);
+    min-height: 48px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: var(--text-base, 15px);
-    font-weight: 700;
-    background: color-mix(in oklch, var(--success-500) 15%, transparent); /* raw-color-ok */
-    border: 1px solid var(--ring-color-live, var(--status-live, var(--success-500)));
-    color: var(--success-400, var(--success-400));
+    font-family: inherit;
+    font-size: var(--text-base);
+    font-weight: 600;
+    background: var(--success-500-08);
+    border: 1px solid var(--success-500-28);
+    color: var(--text-primary);
     cursor: pointer;
     outline: none;
-    transition: background-color var(--duration-fast, 100ms) var(--ease-out);
+    transition: background-color var(--duration-fast) var(--ease-out);
   }
-  .wwm-done:hover { background: color-mix(in oklch, var(--success-500) 22%, transparent); } /* raw-color-ok */
-  .wwm-done:focus-visible { outline: 2px solid var(--success-400); outline-offset: 2px; }
+  .wwm-done:hover { background: var(--success-500-20); }
+  .wwm-done:focus-visible {
+    outline: 2px solid var(--success-400);
+    outline-offset: 2px;
+  }
 
-  /* ── Reduced motion ──────────────────────────────────────────── */
+  /* ═══ Reduced motion — everything lands at its final state ═══ */
   @media (prefers-reduced-motion: reduce) {
-    .step-bead,
-    .step-track,
-    .step-label,
+    .wwm-step-bead,
+    .wwm-step-label,
+    .wwm-step + .wwm-step::before,
     .wwm-place,
     .wwm-watcher,
+    .wwm-pebble,
+    .wwm-input,
+    .wwm-start,
     .wwm-share,
-    .wwm-end,
+    .wwm-arrive,
     .wwm-done { transition: none; }
 
-    .step-item.step-active .step-bead { transform: none; }
-
-    /* Infinite loops: land at final state immediately */
-    .wwm-active-icon.fx-ambient { animation: none; }
-    .step-item.step-active .step-bead.fx-ambient { animation: none; }
-
-    /* Entry animations: jump to end state */
-    .wwm-arrived { animation: none; opacity: 1; transform: none; }
-    .wwm-arrived-icon { animation: none; transform: scale(1); }
+    .wwm-live-halo { animation: none; opacity: 0; }
+    .wwm-arrived { animation: none; }
+    .wwm-arrived-pebble { animation: none; }
   }
 </style>
