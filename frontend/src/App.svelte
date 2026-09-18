@@ -5,7 +5,6 @@
   import { loadSession } from './lib/stores/auth.js';
   import { familyVerdict } from './lib/stores/verdict.js';
   import Login from './pages/Login.svelte';
-  import Register from './pages/Register.svelte';
   import MainApp from './pages/MainApp.svelte';
   import Toast from './components/primitives/Toast.svelte';
 
@@ -16,7 +15,9 @@
     '/landing': wrap({ asyncComponent: () => import('./pages/Landing.svelte') }),
     '/dashboard': wrap({ asyncComponent: () => import('./pages/FamilyDashboard.svelte') }),
     '/login': Login,
-    '/register': Register,
+    // Register grew into a 3-step wizard under Hearth; lazy like the other
+    // heavy pages so the entry ratchet holds. Login stays eager (hot path).
+    '/register': wrap({ asyncComponent: () => import('./pages/Register.svelte') }),
     '/monitoring': wrap({ asyncComponent: () => import('./pages/Monitoring.svelte') }),
     '/emergency': wrap({ asyncComponent: () => import('./pages/EmergencyProfile.svelte') }),
     '/replay': wrap({ asyncComponent: () => import('./pages/RoutePlayback.svelte') }),

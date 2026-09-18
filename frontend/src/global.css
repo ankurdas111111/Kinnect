@@ -235,8 +235,6 @@
   --brand-sos:         #ef4444;
   --brand-safe:        #10b981;
   --brand-guardian:    oklch(0.70 0.14 310);
-  --whatsapp-green:    #25D366;  /* WhatsApp brand green — used for share actions */
-  --whatsapp-dark:     #128C7E;  /* WhatsApp dark green — hover state */
 
   /* ── RGB Triplets (for rgba() fallbacks in components) ───────────── */
   --danger-500-rgb:  239, 68, 68;
@@ -251,14 +249,9 @@
   --ring-live:   0 0 0 3px rgba(16, 185, 129, 0.4);
   --ring-sos:    0 0 0 4px rgba(239, 68, 68, 0.5);
   --ring-ghost:  0 0 0 3px rgba(156, 163, 175, 0.3);
-  --color-live:  #10b981;
-  --color-rec:   #ef4444;
 
   /* ── Glow Shadows (MERIDIAN) ───────────────────────────────────────── */
   --glow-primary: 0 0 24px color-mix(in oklch, var(--primary-500) 22%, transparent), 0 0 48px color-mix(in oklch, var(--primary-500) 10%, transparent);
-  --glow-live:    0 0 20px rgba(16, 185, 129, 0.28), 0 0 40px rgba(16, 185, 129, 0.10);
-  --glow-sos:     0 0 24px rgba(239, 68, 68, 0.38), 0 0 60px rgba(239, 68, 68, 0.18);
-  --glow-link:    0 0 20px rgba(6, 182, 212, 0.24);
 
   /* ── Presence Vocabulary (MERIDIAN SPATIAL) ────────────────────────── */
   --presence-now:    #10b981;   /* active this second */
@@ -277,8 +270,6 @@
   /* ── Border Highlights ─────────────────────────────────────────────── */
   --border-highlight: rgba(255, 255, 255, 0.18);
   --border-glow-primary: color-mix(in oklch, var(--primary-500) 30%, transparent);
-  --border-glow-live:    rgba(16, 185, 129, 0.28);
-  --border-glow-sos:     rgba(239, 68, 68, 0.42);
 
   /* ── Avatar System ──────────────────────────────────────────────────── */
   --avatar-xs:  32px;
@@ -299,17 +290,11 @@
   --section-header-spacing: 0.08em;
 
   /* ── Skeleton / Loading ─────────────────────────────────────────────── */
-  --skeleton-base:      rgba(255, 255, 255, 0.06);
-  --skeleton-highlight: rgba(255, 255, 255, 0.12);
   --skeleton-duration:  1.6s;
 
   /* ── Stronger Aurora Glows (AURORA tier) ────────────────────────────── */
   --glow-primary-sm:  0 0 12px color-mix(in oklch, var(--primary-500) 25%, transparent);
   --glow-primary-lg:  0 0 32px color-mix(in oklch, var(--primary-500) 35%, transparent), 0 0 64px color-mix(in oklch, var(--primary-500) 18%, transparent);
-  --glow-live-sm:     0 0 10px rgba(16, 185, 129, 0.30);
-  --glow-live-lg:     0 0 28px rgba(16, 185, 129, 0.40), 0 0 56px rgba(16, 185, 129, 0.18);
-  --glow-sos-sm:      0 0 12px rgba(239, 68, 68, 0.40);
-  --glow-sos-lg:      0 0 32px rgba(239, 68, 68, 0.55), 0 0 80px rgba(239, 68, 68, 0.28);
 
   /* ── Gradient Utilities ─────────────────────────────────────────────── */
   --gradient-primary:   linear-gradient(135deg, var(--primary-500) 0%, var(--primary-700) 100%);
@@ -423,14 +408,9 @@
 
   /* Dark glow tokens — richer than light */
   --glow-primary: 0 0 28px color-mix(in oklch, var(--primary-500) 32%, transparent), 0 0 56px color-mix(in oklch, var(--primary-500) 14%, transparent);
-  --glow-live:    0 0 24px rgba(16, 185, 129, 0.35), 0 0 48px rgba(16, 185, 129, 0.15);
-  --glow-sos:     0 0 28px rgba(239, 68, 68, 0.50), 0 0 72px rgba(239, 68, 68, 0.25);
-  --glow-link:    0 0 24px rgba(6, 182, 212, 0.32);
 
   --border-highlight: rgba(255, 255, 255, 0.12);
   --border-glow-primary: color-mix(in oklch, var(--primary-500) 35%, transparent);
-  --border-glow-live:    rgba(16, 185, 129, 0.32);
-  --border-glow-sos:     rgba(239, 68, 68, 0.48);
 
   /* 3D Dark overrides */
   --elevation-0: 0 1px 3px rgba(0,0,0,0.30), 0 0 0 1px rgba(255,255,255,0.04);
@@ -513,14 +493,9 @@
     --map-chip-shadow:   0 2px 12px rgba(0, 0, 0, 0.40);
 
     --glow-primary: 0 0 28px color-mix(in oklch, var(--primary-500) 32%, transparent), 0 0 56px color-mix(in oklch, var(--primary-500) 14%, transparent);
-    --glow-live:    0 0 24px rgba(16, 185, 129, 0.35), 0 0 48px rgba(16, 185, 129, 0.15);
-    --glow-sos:     0 0 28px rgba(239, 68, 68, 0.50), 0 0 72px rgba(239, 68, 68, 0.25);
-    --glow-link:    0 0 24px rgba(6, 182, 212, 0.32);
 
     --border-highlight: rgba(255, 255, 255, 0.12);
     --border-glow-primary: color-mix(in oklch, var(--primary-500) 35%, transparent);
-    --border-glow-live:    rgba(16, 185, 129, 0.32);
-    --border-glow-sos:     rgba(239, 68, 68, 0.48);
 
     /* 3D Dark overrides (auto dark) */
     --glass-3d:            rgba(15, 15, 30, 0.70);
@@ -1152,7 +1127,7 @@ html:not([data-theme="light"]):not([data-theme="dark"]) .skeleton {
 }
 .btn-danger:hover {
   background: var(--danger-600);
-  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.30);
+  box-shadow: 0 6px 20px color-mix(in oklch, var(--danger-500) 30%, transparent);
 }
 
 /* Secondary / Muted */

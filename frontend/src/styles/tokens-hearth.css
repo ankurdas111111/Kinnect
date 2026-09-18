@@ -356,6 +356,29 @@
   --glow-success-sm: 0 0 12px color-mix(in oklch, var(--success-500) 25%, transparent);
   --shadow-color:    oklch(0.3 0.03 60 / 0.25);
 
+  /* Legacy status/glow/skeleton tokens still consumed by a few components —
+     re-pinned from the VIGIL emerald/cool-red/cyan values to the Hearth hues.
+     This :root loads after global.css, so it wins over the stale definitions
+     in both the light root and global.css's bare [data-theme="dark"] block. */
+  --color-live: var(--success-500);
+  --color-rec:  var(--danger-500);
+  --glow-live:    0 0 20px color-mix(in oklch, var(--success-500) 28%, transparent), 0 0 40px color-mix(in oklch, var(--success-500) 12%, transparent);
+  --glow-live-sm: 0 0 10px color-mix(in oklch, var(--success-500) 30%, transparent);
+  --glow-live-lg: 0 0 28px color-mix(in oklch, var(--success-500) 40%, transparent), 0 0 56px color-mix(in oklch, var(--success-500) 18%, transparent);
+  --glow-sos:     0 0 28px color-mix(in oklch, var(--danger-500) 45%, transparent), 0 0 72px color-mix(in oklch, var(--danger-500) 22%, transparent);
+  --glow-sos-sm:  0 0 12px color-mix(in oklch, var(--danger-500) 40%, transparent);
+  --glow-sos-lg:  0 0 32px color-mix(in oklch, var(--danger-500) 55%, transparent), 0 0 80px color-mix(in oklch, var(--danger-500) 28%, transparent);
+  --border-glow-live: color-mix(in oklch, var(--success-500) 28%, transparent);
+  --border-glow-sos:  color-mix(in oklch, var(--danger-500) 42%, transparent);
+  --glow-link: 0 0 24px color-mix(in oklch, var(--member-3) 32%, transparent);
+  --skeleton-base:      color-mix(in oklch, var(--text-primary) 7%, transparent);
+  --skeleton-highlight: color-mix(in oklch, var(--text-primary) 13%, transparent);
+  /* Light theme never defined --surface-active — consumers fell to transparent. */
+  --surface-active: oklch(0.325 0.011 67 / 0.09);
+  /* WhatsApp brand green retired from the palette; stragglers render ember. */
+  --whatsapp-green: var(--primary-500);
+  --whatsapp-dark:  var(--primary-600);
+
   --font-body: var(--font-sans);
   --dur-fast:   var(--duration-fast);
   --dur-normal: var(--duration-normal);

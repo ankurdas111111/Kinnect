@@ -144,7 +144,7 @@
 
     function addCircleSources() {
       ensureCircleSource('my-geofence');
-      ensureCircleLayer('my-geofence-fill', 'my-geofence', '#8b5cf6', 0.10, '#8b5cf6', 2.5, [8, 5]);
+      ensureCircleLayer('my-geofence-fill', 'my-geofence', '#477c5d', 0.10, '#477c5d', 2.5, [8, 5]);
 
       // Cluster source for dense groups (only used when zoom < 12)
       map.addSource('users-cluster', {
@@ -164,16 +164,16 @@
         paint: {
           'circle-color': [
             'step', ['get', 'point_count'],
-            'rgba(59,130,246,0.85)',  3,
-            'rgba(139,92,246,0.85)', 7,
-            'rgba(239,68,68,0.85)'
+            'rgba(198,93,40,0.85)',  3,
+            'rgba(176,84,35,0.88)', 7,
+            'rgba(157,63,8,0.90)'
           ],
           'circle-radius': [
             'step', ['get', 'point_count'],
             22, 5, 28, 10, 34
           ],
           'circle-stroke-width': 2,
-          'circle-stroke-color': 'rgba(255,255,255,0.5)',
+          'circle-stroke-color': 'rgba(255,248,244,0.6)',
         }
       });
 
@@ -392,7 +392,7 @@
       return createPersonMarker({
         displayName: user.displayName,
         userId: user.userId,
-        color: isSos ? '#ef4444' : (user.online === false ? '#6b7280' : color),
+        color: isSos ? '#d4381b' : (user.online === false ? '#8a7268' : color),
         isSelf: false,
         isSos,
         presenceState,
@@ -680,7 +680,7 @@
           const srcId = 'gf-' + sid;
           if (gf?.enabled && gf.centerLat != null && gf.centerLng != null && gf.radiusM > 0) {
             ensureCircleSource(srcId);
-            ensureCircleLayer(srcId + '-fill', srcId, '#8b5cf6', 0.08, '#8b5cf6', 2, [6, 4]);
+            ensureCircleLayer(srcId + '-fill', srcId, '#477c5d', 0.08, '#477c5d', 2, [6, 4]);
             updateCircleSource(srcId, [gf.centerLng, gf.centerLat], gf.radiusM);
             geofenceIds.add(sid);
           } else if (geofenceIds.has(sid)) {
@@ -742,9 +742,9 @@
           // NOTE: brand-indigo hex literals mirror --primary-500 / --indigo-400 tokens.
           // MapLibre paint needs literal colors (this file does not read CSS vars at runtime).
           map.addLayer({ id: glowId, type: 'line', source: srcId,
-            paint: { 'line-color': '#6366f1', 'line-width': 9, 'line-opacity': 0.24, 'line-blur': 4 } });
+            paint: { 'line-color': '#c65d28', 'line-width': 9, 'line-opacity': 0.24, 'line-blur': 4 } });
           map.addLayer({ id: layerId, type: 'line', source: srcId,
-            paint: { 'line-color': '#818cf8', 'line-width': 4.5, 'line-opacity': 0.92 },
+            paint: { 'line-color': '#c65d28', 'line-width': 4.5, 'line-opacity': 0.92 },
             layout: { 'line-cap': 'round', 'line-join': 'round' } });
         }
       } else {
@@ -775,9 +775,9 @@
           // NOTE: amber hex literals mirror --warning-500 / --warning-400 tokens.
           // Trail breadcrumb — clearer but calm: a touch wider/more opaque than before.
           map.addLayer({ id: 'trail-glow', type: 'line', source: 'trail-route',
-            paint: { 'line-color': '#f59e0b', 'line-width': 11, 'line-opacity': 0.20, 'line-blur': 4 } });
+            paint: { 'line-color': '#a17a26', 'line-width': 11, 'line-opacity': 0.20, 'line-blur': 4 } });
           map.addLayer({ id: 'trail-line', type: 'line', source: 'trail-route',
-            paint: { 'line-color': '#fbbf24', 'line-width': 3.5, 'line-opacity': 0.9, 'line-dasharray': [2.5, 1.5] },
+            paint: { 'line-color': '#b8933c', 'line-width': 3.5, 'line-opacity': 0.9, 'line-dasharray': [2.5, 1.5] },
             layout: { 'line-cap': 'round', 'line-join': 'round' } });
         }
         // Fit to trail bounds
@@ -935,7 +935,7 @@
     border-radius: 50% 50% 50% 4px;
     transform: rotate(-45deg);
     background: linear-gradient(135deg, var(--indigo-400), var(--indigo-500));
-    border: 2.5px solid #fff;
+    border: 2.5px solid #fff8f4;
     box-shadow: 0 4px 18px rgba(99,102,241,0.55), 0 2px 6px rgba(0,0,0,0.25);
     display: flex;
     align-items: center;
@@ -1042,7 +1042,7 @@
     width: 14px;
     height: 14px;
     border-radius: 50%;
-    background: var(--danger-500, #ef4444);
+    background: var(--danger-500, #d4381b);
     opacity: 0;
     transform: translate(-50%, 50%);
     animation: pin-ripple-sos 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
@@ -1059,7 +1059,7 @@
     width: 14px;
     height: 14px;
     border-radius: 50%;
-    background: var(--danger-500, #ef4444);
+    background: var(--danger-500, #d4381b);
     opacity: 0;
     transform: translate(-50%, 50%);
     animation: pin-ripple-sos 1.2s cubic-bezier(0.4, 0, 0.2, 1) 0.4s infinite;
@@ -1084,7 +1084,7 @@
 
   :global(.maplibregl-popup-content) {
     background: rgba(255, 255, 255, 0.96);
-    color: var(--popup-text-val, #1e293b);
+    color: var(--popup-text-val, #38332e);
     border-radius: var(--radius-xl, 20px);
     box-shadow:
       0 12px 40px rgba(0, 0, 0, 0.22),
@@ -1126,7 +1126,7 @@
   /* Fix #1: increased base font sizes for readability on mobile */
   :global(.pu-wrap)  { min-width: 190px; font-size: 13px; line-height: 1.5; }
   :global(.pu-hdr)   { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid rgba(0,0,0,0.07); }
-  :global(.pu-name)  { font-family: var(--font-display); font-size: 15px; font-weight: 700; letter-spacing: -0.01em; color: var(--popup-text-heading, #0f172a); }
+  :global(.pu-name)  { font-family: var(--font-display); font-size: 15px; font-weight: 700; letter-spacing: -0.01em; color: var(--popup-text-heading, #38332e); }
   /* Hearth 02b: status is a dot and words on its own line, and the card leads
      with a sentence rather than a grid of numbers. */
   :global(.pu-status) { display: flex; align-items: center; gap: 5px; margin: -4px 0 10px; font-size: 11px; font-weight: 600; }
@@ -1136,36 +1136,36 @@
     font-size: 15px;
     line-height: 1.35;
     margin-bottom: 12px;
-    color: var(--popup-text-heading, #0f172a);
+    color: var(--popup-text-heading, #38332e);
   }
   :global(.pu-dot)   { width: 7px; height: 7px; border-radius: 50%; background: currentColor; display: inline-block; }
-  :global(.pu-online)  { color: var(--success-500, #22c55e); }
-  :global(.pu-offline) { color: var(--gray-400, #9ca3af); }
+  :global(.pu-online)  { color: var(--success-500, #477c5d); }
+  :global(.pu-offline) { color: var(--gray-400, #8a7268); }
   :global(.pu-grid)  { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 13px; align-items: baseline; }
-  :global(.pu-lbl)   { font-size: 11px; font-weight: 500; letter-spacing: 0.02em; text-transform: uppercase; color: var(--popup-text-label, #64748b); }
-  :global(.pu-val)   { font-size: 13px; font-weight: 600; text-align: right; color: var(--popup-text-val, #1e293b); }
-  :global(.pu-good)  { color: var(--success-500, #22c55e); font-weight: 700; }
-  :global(.pu-warn)  { color: var(--warning-500, #eab308); font-weight: 700; }
-  :global(.pu-danger){ color: var(--danger-500, #ef4444); font-weight: 700; }
+  :global(.pu-lbl)   { font-size: 11px; font-weight: 500; letter-spacing: 0.02em; text-transform: uppercase; color: var(--popup-text-label, #8a7268); }
+  :global(.pu-val)   { font-size: 13px; font-weight: 600; text-align: right; color: var(--popup-text-val, #38332e); }
+  :global(.pu-good)  { color: var(--success-500, #477c5d); font-weight: 700; }
+  :global(.pu-warn)  { color: var(--warning-500, #a17a26); font-weight: 700; }
+  :global(.pu-danger){ color: var(--danger-500, #d4381b); font-weight: 700; }
   :global(.pu-mono)  { font-family: monospace; font-size: 11px; letter-spacing: -0.02em; }
   :global(.pu-badges){ margin-top: 10px; display: flex; flex-direction: column; gap: 4px; font-size: 10px; }
   :global(.pu-badge) { border-radius: 8px; padding: 4px 9px; font-weight: 500; border: 1px solid transparent; }
-  :global(.pu-badge-sos)    { background: rgba(220, 38, 38, 0.10); color: var(--danger-600, #dc2626); border-color: rgba(220, 38, 38, 0.25); font-weight: 700; }
-  :global(.pu-badge-geo)    { background: rgba(124, 58, 237, 0.10); color: var(--violet-600); border-color: rgba(124, 58, 237, 0.25); }
-  :global(.pu-badge-autoSos){ background: rgba(217, 119, 6, 0.10); color: var(--warning-600); border-color: rgba(217, 119, 6, 0.25); }
-  :global(.pu-badge-checkin){ background: rgba(8, 145, 178, 0.10); color: #0891b2; border-color: rgba(8, 145, 178, 0.25); }
+  :global(.pu-badge-sos)    { background: rgba(212, 56, 27, 0.10); color: var(--danger-600, #b12d15); border-color: rgba(212, 56, 27, 0.25); font-weight: 700; }
+  :global(.pu-badge-geo)    { background: rgba(58, 104, 78, 0.10); color: var(--violet-600); border-color: rgba(58, 104, 78, 0.25); }
+  :global(.pu-badge-autoSos){ background: rgba(138, 103, 29, 0.10); color: var(--warning-600); border-color: rgba(138, 103, 29, 0.25); }
+  :global(.pu-badge-checkin){ background: rgba(61, 122, 140, 0.10); color: #3d7a8c; border-color: rgba(61, 122, 140, 0.25); }
   :global(.pu-feats) { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 5px; font-size: 10px; }
   :global(.pu-feat)  { font-weight: 600; }
-  :global(.pu-feat-geo)    { color: #8b5cf6; }
+  :global(.pu-feat-geo)    { color: #477c5d; }
   :global(.pu-feat-autoSos){ color: var(--warning-500); }
-  :global(.pu-feat-checkin){ color: #06b6d4; }
-  :global(.pu-rooms) { margin-top: 8px; font-size: 10px; color: var(--popup-text-label, #64748b); }
+  :global(.pu-feat-checkin){ color: #3d7a8c; }
+  :global(.pu-rooms) { margin-top: 8px; font-size: 10px; color: var(--popup-text-label, #8a7268); }
   :global(.pu-actions) { display: flex; gap: 8px; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(0,0,0,0.08); }
-  :global(.pu-chat-btn) { display: inline-flex; align-items: center; gap: 5px; padding: 6px 13px; border-radius: 9px; background: rgba(99,102,241,0.10); border: 1px solid rgba(99,102,241,0.22); color: var(--indigo-500); font-size: 12px; font-weight: 600; cursor: pointer; transition: background 120ms; }
+  :global(.pu-chat-btn) { display: inline-flex; align-items: center; gap: 5px; padding: 6px 13px; border-radius: 9px; background: rgba(198,93,40,0.10); border: 1px solid rgba(99,102,241,0.22); color: var(--indigo-500); font-size: 12px; font-weight: 600; cursor: pointer; transition: background 120ms; }
   :global(.pu-chat-btn:hover) { background: rgba(99,102,241,0.18); }
-  :global(.pu-trail-btn) { display: inline-flex; align-items: center; gap: 5px; padding: 6px 13px; border-radius: 9px; background: rgba(245,158,11,0.10); border: 1px solid rgba(245,158,11,0.22); color: var(--warning-600); font-size: 12px; font-weight: 600; cursor: pointer; transition: background 120ms; }
+  :global(.pu-trail-btn) { display: inline-flex; align-items: center; gap: 5px; padding: 6px 13px; border-radius: 9px; background: rgba(161,122,38,0.10); border: 1px solid rgba(245,158,11,0.22); color: var(--warning-600); font-size: 12px; font-weight: 600; cursor: pointer; transition: background 120ms; }
   :global(.pu-trail-btn:hover) { background: rgba(245,158,11,0.18); }
-  :global([data-theme="dark"] .pu-trail-btn) { background: rgba(252,211,77,0.10); border-color: rgba(252,211,77,0.22); color: var(--warning-300); }
+  :global([data-theme="dark"] .pu-trail-btn) { background: rgba(197,164,84,0.10); border-color: rgba(252,211,77,0.22); color: var(--warning-300); }
   :global([data-theme="dark"] .pu-trail-btn:hover) { background: rgba(252,211,77,0.18); }
 
   /* Fix #1 continued: mobile-specific font size bump for popup text */
@@ -1184,10 +1184,10 @@
   :global([data-theme="dark"] .pu-rooms) { color: rgba(255, 255, 255, 0.55); }
   :global([data-theme="dark"] .pu-actions) { border-top-color: rgba(255, 255, 255, 0.10); }
   /* Dark mode: badge colours stay vivid, labels adapt */
-  :global([data-theme="dark"] .pu-badge-sos)    { background: rgba(220, 38, 38, 0.20); border-color: rgba(220, 38, 38, 0.40); color: var(--danger-300); }
-  :global([data-theme="dark"] .pu-badge-geo)    { background: rgba(167, 139, 250, 0.15); border-color: rgba(167, 139, 250, 0.30); color: var(--violet-300); }
-  :global([data-theme="dark"] .pu-badge-autoSos){ background: rgba(252, 211, 77, 0.12); border-color: rgba(252, 211, 77, 0.25); color: var(--warning-300); }
-  :global([data-theme="dark"] .pu-badge-checkin){ background: rgba(103, 232, 249, 0.12); border-color: rgba(103, 232, 249, 0.25); color: #67e8f9; }
+  :global([data-theme="dark"] .pu-badge-sos)    { background: rgba(212, 56, 27, 0.20); border-color: rgba(212, 56, 27, 0.40); color: var(--danger-300); }
+  :global([data-theme="dark"] .pu-badge-geo)    { background: rgba(122, 165, 140, 0.15); border-color: rgba(122, 165, 140, 0.30); color: var(--violet-300); }
+  :global([data-theme="dark"] .pu-badge-autoSos){ background: rgba(197, 164, 84, 0.12); border-color: rgba(197, 164, 84, 0.25); color: var(--warning-300); }
+  :global([data-theme="dark"] .pu-badge-checkin){ background: rgba(127, 177, 192, 0.12); border-color: rgba(127, 177, 192, 0.25); color: #7fb1c0; }
 
   /* ── Contextual float chip — floating-glass chip tier + status halo ──────
      Base chip lives in global.css; these overrides re-source the material onto
@@ -1240,13 +1240,13 @@
     pointer-events: auto;
     animation: chip-in 0.3s var(--ease-spring);
   }
-  .safety-chip.geofence { background: rgba(139, 92, 246, 0.18); border: 1px solid rgba(139, 92, 246, 0.35); color: var(--violet-600); }
-  .safety-chip.autosos  { background: rgba(245, 158, 11, 0.18); border: 1px solid rgba(245, 158, 11, 0.35); color: var(--warning-600); }
-  .safety-chip.checkin  { background: rgba(6, 182, 212, 0.18); border: 1px solid rgba(6, 182, 212, 0.35); color: #0891b2; }
+  .safety-chip.geofence { background: rgba(71, 124, 93, 0.18); border: 1px solid rgba(71, 124, 93, 0.35); color: var(--violet-600); }
+  .safety-chip.autosos  { background: rgba(161, 122, 38, 0.18); border: 1px solid rgba(161, 122, 38, 0.35); color: var(--warning-600); }
+  .safety-chip.checkin  { background: rgba(61, 122, 140, 0.18); border: 1px solid rgba(61, 122, 140, 0.35); color: #3d7a8c; }
 
-  :global([data-theme="dark"]) .safety-chip.geofence { background: rgba(139, 92, 246, 0.22); color: var(--violet-400); }
-  :global([data-theme="dark"]) .safety-chip.autosos  { background: rgba(245, 158, 11, 0.22); color: var(--warning-400); }
-  :global([data-theme="dark"]) .safety-chip.checkin  { background: rgba(6, 182, 212, 0.22); color: var(--cyan-400); }
+  :global([data-theme="dark"]) .safety-chip.geofence { background: rgba(71, 124, 93, 0.22); color: var(--violet-400); }
+  :global([data-theme="dark"]) .safety-chip.autosos  { background: rgba(161, 122, 38, 0.22); color: var(--warning-400); }
+  :global([data-theme="dark"]) .safety-chip.checkin  { background: rgba(61, 122, 140, 0.22); color: var(--cyan-400); }
   .safety-icon { font-size: 13px; }
   .safety-detail { opacity: 0.7; font-weight: 500; font-size: 10px; }
   @media (max-width: 767px) {
