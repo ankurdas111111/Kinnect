@@ -17,10 +17,12 @@
 </script>
 
 {#if profile.emergencyContacts.length === 0}
+  <!-- tone stays ember — a missing contact is an invitation, not an alarm
+       (vermilion is SOS-only on this page). -->
   <EmptyState
     title="No emergency contacts yet"
-    body="First responders use these to notify your family immediately in an SOS."
-    tone="danger"
+    body="Add the people who should be called for you — they're notified the moment you trigger an SOS."
+    tone="primary"
   >
     {#snippet icon()}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"

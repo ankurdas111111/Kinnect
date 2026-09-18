@@ -3,27 +3,33 @@
    * ContactCard — one emergency contact (name / relation / phone / address).
    * Presentational: `contact` is bindable; index drives the identical field
    * ids (ep-contact-{i}-name, -relation, -phone, -address) and remove callback.
+   *
+   * Hearth register: the card leads with a warm identity pebble (the person's
+   * initial) rather than a numbered register row, and "Remove" is a plain-ink
+   * worded action — removing a contact is quiet, never red.
    */
   import { haptics } from '../../lib/haptics.js';
 
   /** @type {{ contact: any, index: number, phoneError?: string, onremove: (i: number) => void }} */
   let { contact = $bindable(), index, phoneError = '', onremove } = $props();
+
+  let initial = $derived((contact.name || '').trim().charAt(0).toUpperCase() || '?');
+  let displayLabel = $derived((contact.name || '').trim() || `Contact ${index + 1}`);
 </script>
 
 <div class="ep-contact-card">
   <div class="ep-contact-header">
-    <span class="ep-contact-num">Contact {index + 1}</span>
+    <span class="ep-contact-id">
+      <span class="ep-contact-pebble" aria-hidden="true">{initial}</span>
+      <span class="ep-contact-num">{displayLabel}</span>
+    </span>
     <button
       class="ep-remove-btn"
       type="button"
       aria-label="Remove contact {index + 1}"
       onclick={() => { haptics.tap(); onremove(index); }}
     >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-           stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <line x1="18" y1="6" x2="6" y2="18"/>
-        <line x1="6" y1="6" x2="18" y2="18"/>
-      </svg>
+      Remove
     </button>
   </div>
 

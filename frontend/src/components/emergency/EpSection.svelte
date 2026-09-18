@@ -2,10 +2,11 @@
   /**
    * EpSection — the collapsible section shell for the Emergency Profile.
    *
-   * Replaces the 6 duplicated header blocks (was EmergencyProfile.svelte
-   * :349, :442, :571, :596, :622, :735) and the max-height accordion
-   * transition (was reveal(), :207–217, which animated layout per frame in
-   * violation of the GPU-only rule).
+   * Hearth register: a quiet paper sheet lifted one tonal step off the paper
+   * ground (surface tier + warm shadow, no boxed outline, no glass blur).
+   * The header keeps a bare ember icon beside plain Work Sans words — the
+   * reference's section-crest treatment — and the whole shell stays a real
+   * disclosure so an anxious user can collapse what they don't need.
    *
    * Disclosure grammar (infoPanel pattern): chevron rotate 200ms + content
    * opacity 150ms, DISPLAY-GATED (`{#if open}` unmounts, so no reflow cost and
@@ -15,8 +16,6 @@
    * persists openSections. Header is a real <button> with aria-expanded /
    * aria-controls wired to a stable id so screen-reader muscle memory survives.
    */
-
-  import SectionHeader from '../primitives/SectionHeader.svelte';
 
   /**
    * @type {{
@@ -48,7 +47,7 @@
   }
 </script>
 
-<section class="ep-section" class:ep-section--open={open} aria-labelledby={headingId}>
+<section class="ep-section" aria-labelledby={headingId}>
   <button
     class="ep-section-header"
     id={`${id}-btn`}
@@ -84,21 +83,12 @@
 </section>
 
 <style>
-  /* ── Section card (glass) ─────────────────────────────────────────────── */
+  /* ── Section sheet — tonal lift off the paper ground, no boxed border ──── */
   .ep-section {
-    border-radius: var(--radius-xl, 20px);
-    background: var(--surface-2);
-    border: 1px solid var(--border-default);
-    box-shadow: var(--shadow-sm);
+    border-radius: var(--radius-card, 20px);
+    background: var(--surface-1);
+    box-shadow: var(--shadow-xs);
     overflow: hidden;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    transition: box-shadow 240ms var(--ease-out),
-                border-color 240ms var(--ease-out);
-  }
-  .ep-section--open {
-    border-color: var(--primary-500-20);
-    box-shadow: var(--shadow-md);
   }
 
   .ep-section-header {
@@ -107,40 +97,34 @@
     display: flex;
     align-items: center;
     gap: var(--space-2-5);
-    padding: var(--space-3-5) var(--space-4);
+    padding: var(--space-4) var(--space-4);
     border: none;
     background: transparent;
     cursor: pointer;
     text-align: left;
+    font-family: var(--font-sans);
     transition: background 120ms var(--ease-out);
   }
   .ep-section-header:hover {
-    background: var(--primary-500-08);
+    background: var(--surface-hover);
   }
   .ep-section-header:focus-visible {
     outline: 2px solid var(--primary-400);
     outline-offset: -2px;
   }
 
+  /* Bare ember glyph beside the words — no icon chip, no badge box. */
   .ep-section-icon {
     flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 34px;
-    height: 34px;
-    border-radius: var(--radius-sm2, 9px);
-    background: var(--primary-500-12);
-    color: var(--primary-500);
-    transition: background 240ms var(--ease-out);
-  }
-  .ep-section--open .ep-section-icon {
-    background: var(--primary-500-20);
+    color: var(--primary-700);
   }
 
   .ep-section-title {
     flex: 1;
-    font-size: var(--text-base);
+    font-size: var(--text-xl);
     font-weight: 600;
     color: var(--text-primary);
     letter-spacing: -0.01em;
@@ -150,14 +134,14 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 20px;
-    height: 20px;
-    padding: 0 var(--space-1-5);
+    min-width: 22px;
+    height: 22px;
+    padding: 0 var(--space-2);
     border-radius: var(--radius-full, 9999px);
-    background: var(--primary-500-12);
-    color: var(--primary-500);
+    background: var(--surface-3);
+    color: var(--text-secondary);
     font-size: var(--text-xs);
-    font-weight: 700;
+    font-weight: 600;
     margin-left: auto;
   }
 
@@ -172,12 +156,12 @@
     transform: rotate(180deg);
   }
 
+  /* Body separated from the header by whitespace alone — no divider rule. */
   .ep-section-body {
-    padding: var(--space-1) var(--space-4) var(--space-4);
+    padding: var(--space-1) var(--space-4) var(--space-5);
     display: flex;
     flex-direction: column;
     gap: var(--space-3-5);
-    border-top: 1px solid var(--border-subtle);
   }
 
   /* Disclosure reveal — opacity only (GPU-safe), display-gated by {#if}. */
@@ -191,8 +175,7 @@
 
   @media (prefers-reduced-motion: reduce) {
     .ep-section-chevron,
-    .ep-section-icon,
-    .ep-section { transition: none; }
+    .ep-section-header { transition: none; }
     .ep-reveal { animation: none; }
   }
 </style>

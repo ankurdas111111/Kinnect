@@ -4,6 +4,11 @@
    * localStorage logic; components/emergency/* children are presentational
    * (props + callbacks, zero socket imports). Storage shape, validation, and
    * legacy-contact migration live in lib/emergencyProfile.js (tested).
+   *
+   * Hearth register (Stitch "Emergency Profile"): paper ground, a serif
+   * verdict crest ("Elena's Emergency Information"), a plain-words note about
+   * who sees this and when, quiet paper sections separated by whitespace, and
+   * no vermilion anywhere — this page is dignity, not a medical form.
    */
   import { onMount, onDestroy } from 'svelte';
   import { push } from 'svelte-spa-router';
@@ -47,6 +52,9 @@
   let hasErrors = $derived(!!(doctorPhoneError || dobError || contactPhoneErrors.some(Boolean)));
   let lastUpdatedLabel = $derived(fmtDate(profile.updatedAt));
   let shareCode = $derived($authUser?.shareCode ?? '');
+  // Crest voice — the page greets its owner by name, like the reference's
+  // "Elena's Emergency Information". Presentation only.
+  let crestName = $derived(((profile.fullName || $authUser?.displayName || '').trim().split(/\s+/)[0]) || '');
 
   function fmtDate(iso) {
     if (!iso) return null;
@@ -145,20 +153,28 @@
   </header>
 
   <main class="ep-body">
-    <CompletenessMeter {progress} {filledCount} totalFields={TRACKED_FIELDS.length} lastUpdated={lastUpdatedLabel} />
-
-    <div class="ep-warning-card" role="note" aria-label="SOS sharing notice">
-      <span class="ep-warning-icon" aria-hidden="true">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      </span>
-      <p class="ep-warning-text">
-        In an SOS, this profile is shared with your emergency contacts so first responders have your medical information immediately.
+    <!-- Screen crest — record status, serif verdict title, plain-words note
+         about exactly who can see this and when. -->
+    <section class="ep-crest">
+      <CompletenessMeter {progress} {filledCount} totalFields={TRACKED_FIELDS.length} lastUpdated={lastUpdatedLabel} />
+      <h1 class="ep-crest-title verdict-voice">
+        {crestName ? `${crestName}'s Emergency Information` : 'Your Emergency Information'}
+      </h1>
+      <p class="ep-crest-note" role="note" aria-label="Who can see this profile and when">
+        Day to day, only you can see this page. If you ever trigger an SOS, Kinnect
+        shares it with your emergency contacts so first responders have what they
+        need right away.
       </p>
-    </div>
+    </section>
 
     <EpSection id="section-personal" title="Personal Information" bind:open={openSections.personal}>
       {#snippet icon()}<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>{/snippet}
       <PersonalInfoSection bind:profile {dobError} {todayIso} />
+    </EpSection>
+
+    <EpSection id="section-medical" title="Medical Information" bind:open={openSections.medical}>
+      {#snippet icon()}<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>{/snippet}
+      <MedicalInfoSection bind:profile {doctorPhoneError} />
     </EpSection>
 
     <EpSection id="section-contacts" title="Emergency Contacts" count={profile.emergencyContacts.length} bind:open={openSections.contacts}>
@@ -174,11 +190,6 @@
         bind:heartbeatEnabled bind:heartbeatDeadline
         onsavePanic={savePanicPhones} onsaveHeartbeat={saveHeartbeat}
       />
-    </EpSection>
-
-    <EpSection id="section-medical" title="Medical Information" bind:open={openSections.medical}>
-      {#snippet icon()}<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>{/snippet}
-      <MedicalInfoSection bind:profile {doctorPhoneError} />
     </EpSection>
 
     <EpSection id="section-responder" title="First Responder Notes" bind:open={openSections.responder}>
@@ -210,10 +221,28 @@
       </div>
     </EpSection>
 
-    <div class="ep-privacy-note" role="note">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-      This information is stored locally on your device only. Kinnect does not upload your medical data to any server.
-    </div>
+    <!-- Privacy disclosure — the reference's quiet vault card: where the data
+         lives, in plain words, on the deepest paper tier. -->
+    <section class="ep-vault" role="note" aria-label="Where this information is stored">
+      <div class="ep-vault-main">
+        <span class="ep-vault-icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </span>
+        <div class="ep-vault-text">
+          <p class="ep-vault-title">Kept on this device</p>
+          <p class="ep-vault-body">
+            Your medical details are stored only on this phone. Kinnect never uploads
+            them to any server.
+          </p>
+        </div>
+      </div>
+      <div class="ep-vault-footer">
+        <span class="ep-vault-check" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </span>
+        <span class="ep-vault-footnote">Shared only during an active SOS</span>
+      </div>
+    </section>
 
     <button class="ep-save-bottom-btn tactile" class:ep-save-bottom-btn--success={saveSuccess} disabled={saving || hasErrors} aria-label="Save emergency profile" onclick={save}>
       {#if saveSuccess}
@@ -233,11 +262,12 @@
     min-height: 100dvh;
     display: flex;
     flex-direction: column;
-    background: var(--surface-0);
+    background: var(--paper);
     font-family: var(--font-sans);
     color: var(--text-primary);
   }
 
+  /* ── Top bar — plain paper, no chrome; the crest below carries the voice ── */
   .ep-header {
     position: sticky;
     top: 0;
@@ -245,11 +275,8 @@
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    padding: calc(env(safe-area-inset-top, 0px) + var(--space-3)) var(--space-4) var(--space-3);
-    background: var(--surface-2);
-    backdrop-filter: blur(20px) saturate(1.6);
-    -webkit-backdrop-filter: blur(20px) saturate(1.6);
-    border-bottom: 1px solid var(--border-default);
+    padding: calc(env(safe-area-inset-top, 0px) + var(--space-2-5)) var(--space-4) var(--space-2-5);
+    background: var(--paper);
   }
   .ep-back-btn {
     flex-shrink: 0;
@@ -258,15 +285,16 @@
     justify-content: center;
     width: 44px;
     height: 44px;
-    border-radius: var(--radius-md, 10px);
-    border: 1px solid var(--border-default);
-    background: var(--surface-1);
+    border-radius: var(--radius-full, 9999px);
+    border: none;
+    background: transparent;
     color: var(--text-primary);
     cursor: pointer;
     transition: background 150ms var(--ease-out), transform 100ms var(--ease-out);
   }
-  .ep-back-btn:hover { background: var(--surface-3); }
+  .ep-back-btn:hover { background: var(--surface-hover); }
   .ep-back-btn:active { transform: scale(0.94); }
+  .ep-back-btn:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
   .ep-header-title { flex: 1; min-width: 0; text-align: center; }
   .ep-header-heading { font-size: var(--text-base); font-weight: 600; letter-spacing: -0.01em; color: var(--text-primary); }
 
@@ -286,63 +314,74 @@
     transition: background 150ms var(--ease-out), transform 120ms var(--ease-out);
   }
   .ep-save-btn { flex-shrink: 0; min-height: 44px; padding: 0 var(--space-4); border-radius: var(--radius-md, 10px); font-size: var(--text-sm); }
-  .ep-save-bottom-btn { width: 100%; height: 52px; gap: var(--space-2); border-radius: var(--radius-button, 14px); font-size: var(--text-base); font-weight: 700; margin-top: var(--space-1); }
+  .ep-save-bottom-btn { width: 100%; min-height: 48px; height: 52px; gap: var(--space-2); border-radius: var(--radius-md, 10px); font-size: var(--text-base); font-weight: 600; margin-top: var(--space-1); }
   .ep-save-btn:hover:not(:disabled),
   .ep-save-bottom-btn:hover:not(:disabled) { background: var(--primary-600); }
   .ep-save-btn:active:not(:disabled) { transform: scale(0.95); }
   .ep-save-bottom-btn:active:not(:disabled) { transform: scale(0.97); }
   .ep-save-btn:disabled,
   .ep-save-bottom-btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+  .ep-save-btn:focus-visible,
+  .ep-save-bottom-btn:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
+  /* Saved = sage settle, the palette's "confirmed" voice. */
   .ep-save-btn--success,
   .ep-save-bottom-btn--success {
     background: var(--success-500) !important;
     box-shadow: 0 4px 14px var(--success-500-20) !important;
   }
 
+  /* ── One calibrated column, sections apart on whitespace alone ──────────── */
   .ep-body {
     flex: 1;
-    padding: var(--space-5) var(--space-4) calc(env(safe-area-inset-bottom, 0px) + var(--space-8));
+    padding: var(--space-4) var(--space-4) calc(env(safe-area-inset-bottom, 0px) + var(--space-8));
     max-width: 640px;
     width: 100%;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: var(--space-3);
+    gap: var(--space-5);
   }
 
-  /* ── Warning card ─────────────────────────────────────────────────────── */
-  .ep-warning-card {
+  /* ── Screen crest ────────────────────────────────────────────────────────── */
+  .ep-crest {
     display: flex;
-    align-items: flex-start;
+    flex-direction: column;
     gap: var(--space-2-5);
-    padding: var(--space-3) var(--space-3-5);
-    border-radius: var(--radius-lg, 14px);
-    background: color-mix(in oklch, var(--warning-500) 8%, transparent);
-    border: 1px solid color-mix(in oklch, var(--warning-500) 22%, transparent);
+    padding: var(--space-2) var(--space-1) 0;
   }
-  .ep-warning-icon { flex-shrink: 0; color: var(--warning-500); margin-top: 1px; }
-  .ep-warning-text { font-size: var(--text-sm); color: var(--warning-600); line-height: var(--leading-relaxed, 1.625); }
-  :global([data-theme='dark']) .ep-warning-text { color: var(--warning-400); }
+  /* .verdict-voice (global) supplies the Newsreader italic — the one serif
+     register on this page. */
+  .ep-crest-title {
+    margin: 0;
+    font-size: var(--heading-hero);
+    line-height: var(--leading-tight);
+    font-weight: 400;
+    color: var(--text-primary);
+  }
+  .ep-crest-note {
+    margin: 0;
+    font-size: var(--text-base);
+    color: var(--text-secondary);
+    line-height: var(--leading-relaxed, 1.625);
+  }
 
-  /* ── QR / share card ──────────────────────────────────────────────────── */
+  /* ── SOS share link card — warm inset tier, ember accents ───────────────── */
   .ep-qr-info-card {
     display: flex;
     gap: var(--space-3);
-    padding: var(--space-3-5);
+    padding: var(--space-4);
     border-radius: var(--radius-lg, 14px);
-    background: var(--primary-500-08);
-    border: 1px solid var(--primary-500-12);
+    background: var(--surface-2);
   }
-  .ep-qr-info-icon { flex-shrink: 0; color: var(--primary-500); margin-top: 1px; }
+  .ep-qr-info-icon { flex-shrink: 0; color: var(--primary-700); margin-top: 1px; }
   .ep-qr-info-text { display: flex; flex-direction: column; gap: var(--space-1-5); }
-  .ep-qr-title { font-size: var(--text-sm); font-weight: 600; color: var(--text-primary); }
-  .ep-qr-body { font-size: var(--text-sm); color: var(--text-secondary); line-height: var(--leading-relaxed, 1.625); }
+  .ep-qr-title { margin: 0; font-size: var(--text-base); font-weight: 600; color: var(--text-primary); }
+  .ep-qr-body { margin: 0; font-size: var(--text-base); color: var(--text-secondary); line-height: var(--leading-relaxed, 1.625); }
   .ep-watch-link-block {
     margin-top: var(--space-2);
     padding: var(--space-2-5) var(--space-3);
-    border-radius: var(--radius-md, 10px);
-    background: var(--surface-inset, var(--surface-3));
-    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-input, 10px);
+    background: var(--surface-3);
     display: flex;
     flex-direction: column;
     gap: var(--space-1);
@@ -354,21 +393,37 @@
     letter-spacing: 0.05em;
     color: var(--text-tertiary);
   }
-  .ep-watch-link-code { font-family: var(--font-mono, monospace); font-size: var(--text-sm); color: var(--primary-600); background: none; padding: 0; }
+  .ep-watch-link-code { font-family: var(--font-mono, monospace); font-size: var(--text-sm); color: var(--primary-700); background: none; padding: 0; }
   :global([data-theme='dark']) .ep-watch-link-code { color: var(--primary-400); }
-  .ep-watch-link-note { font-size: var(--text-xs); color: var(--text-secondary); line-height: var(--leading-relaxed, 1.625); margin-top: 2px; }
+  .ep-watch-link-note { margin: 0; font-size: var(--text-sm); color: var(--text-secondary); line-height: var(--leading-relaxed, 1.625); margin-top: 2px; }
 
-  /* ── Privacy note ─────────────────────────────────────────────────────── */
-  .ep-privacy-note {
+  /* ── Vault card — deepest paper tier, plain words about where data lives ── */
+  .ep-vault {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-5);
+    border-radius: var(--radius-card, 20px);
+    background: var(--surface-inset, var(--surface-3));
+  }
+  .ep-vault-main {
     display: flex;
     align-items: flex-start;
-    gap: var(--space-1-5);
-    font-size: var(--text-xs);
-    color: var(--text-tertiary);
-    padding: 0 var(--space-1);
-    line-height: var(--leading-relaxed, 1.625);
+    gap: var(--space-3);
   }
-  .ep-privacy-note svg { flex-shrink: 0; margin-top: 1px; }
+  .ep-vault-icon { flex-shrink: 0; color: var(--text-secondary); margin-top: 1px; }
+  .ep-vault-text { display: flex; flex-direction: column; gap: var(--space-1); }
+  .ep-vault-title { margin: 0; font-size: var(--text-base); font-weight: 600; color: var(--text-primary); }
+  .ep-vault-body { margin: 0; font-size: var(--text-base); color: var(--text-secondary); line-height: var(--leading-relaxed, 1.625); }
+  .ep-vault-footer {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding-top: var(--space-2-5);
+    border-top: 1px solid var(--border-subtle);
+  }
+  .ep-vault-check { display: flex; color: var(--success-500); }
+  .ep-vault-footnote { font-size: var(--text-xs); font-weight: 600; color: var(--text-secondary); }
 
   @media (prefers-reduced-motion: reduce) {
     .ep-back-btn, .ep-save-btn, .ep-save-bottom-btn { transition: none; }

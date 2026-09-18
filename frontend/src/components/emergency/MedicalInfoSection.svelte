@@ -1,9 +1,10 @@
 <script>
   /**
-   * MedicalInfoSection — conditions, allergies (critical card), medications,
-   * doctor name + phone. The allergy/blood tint is static hierarchy, not
-   * motion. Field ids preserved: ep-conditions, ep-allergies, ep-medications,
-   * ep-doctor-name, ep-doctor-phone.
+   * MedicalInfoSection — allergies (critical card, first — the reference
+   * leads its medical profile with critical allergies), conditions,
+   * medications, doctor name + phone. The allergy emphasis is a warm ember
+   * label, not a red panel. Field ids preserved: ep-conditions, ep-allergies,
+   * ep-medications, ep-doctor-name, ep-doctor-phone.
    */
   import { autoResize } from './epActions.js';
 
@@ -11,22 +12,7 @@
   let { profile = $bindable(), doctorPhoneError = '' } = $props();
 </script>
 
-<!-- Conditions — medical card -->
-<div class="ep-med-card">
-  <label for="ep-conditions" class="ep-med-card-title">Medical Conditions</label>
-  <textarea
-    id="ep-conditions"
-    class="ep-textarea"
-    bind:value={profile.conditions}
-    use:autoResize
-    placeholder="e.g. Type 2 Diabetes, Hypertension, Asthma..."
-    rows="2"
-    aria-describedby="ep-conditions-desc"
-  ></textarea>
-  <span id="ep-conditions-desc" class="ep-field-hint">List all diagnosed conditions</span>
-</div>
-
-<!-- Allergies — critical medical card -->
+<!-- Allergies — critical medical card, leads the section -->
 <div class="ep-med-card ep-med-card--allergy">
   <label for="ep-allergies" class="ep-med-card-title">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -35,7 +21,7 @@
       <line x1="12" y1="8" x2="12" y2="12"/>
       <line x1="12" y1="16" x2="12.01" y2="16"/>
     </svg>
-    Allergies
+    Critical Allergies
   </label>
   <textarea
     id="ep-allergies"
@@ -47,6 +33,21 @@
     aria-describedby="ep-allergies-desc"
   ></textarea>
   <span id="ep-allergies-desc" class="ep-field-hint">Include drug, food, and environmental allergies</span>
+</div>
+
+<!-- Conditions — medical card -->
+<div class="ep-med-card">
+  <label for="ep-conditions" class="ep-med-card-title">Ongoing Conditions</label>
+  <textarea
+    id="ep-conditions"
+    class="ep-textarea"
+    bind:value={profile.conditions}
+    use:autoResize
+    placeholder="e.g. Type 2 Diabetes, Hypertension, Asthma..."
+    rows="2"
+    aria-describedby="ep-conditions-desc"
+  ></textarea>
+  <span id="ep-conditions-desc" class="ep-field-hint">List all diagnosed conditions</span>
 </div>
 
 <div class="ep-field">
