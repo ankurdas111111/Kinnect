@@ -1,25 +1,27 @@
 <script>
   /**
    * SettingsSection — settings group wrapper (title + optional description + children).
-   * Renders a glass Card with consistent spacing; supports a danger variant for
-   * destructive actions (Delete Account).
+   *
+   * Hearth register: a quiet paper sheet lifted one tonal step off the panel
+   * ground (surface tier + warm shadow) — no glass blur, no boxed glow.
+   * The `danger` prop is kept for API stability but no longer paints red:
+   * destructive sections speak through explicit copy, not alarm color
+   * (vermilion is SOS-only).
    *
    * Props:
    *   title       — string (required) — section heading
    *   description — string            — secondary hint beneath title
-   *   danger      — boolean           — red accent border + title colour
+   *   danger      — boolean           — accepted, visually identical (see above)
    *   children    — Snippet (required)
    */
-
-  import Card from '../primitives/Card.svelte';
 
   /** @type {{ title: string, description?: string, danger?: boolean, children: import('svelte').Snippet }} */
   let { title, description = '', danger = false, children } = $props();
 </script>
 
-<Card variant="glass" hover={false} padding="md" glow={danger ? 'danger' : undefined}>
+<section class="ss-card" class:ss-card--danger={danger}>
   <div class="ss-header">
-    <h4 class="ss-title" class:ss-title--danger={danger}>{title}</h4>
+    <h4 class="ss-title">{title}</h4>
     {#if description}
       <p class="ss-desc">{description}</p>
     {/if}
@@ -27,9 +29,20 @@
   <div class="ss-body">
     {@render children()}
   </div>
-</Card>
+</section>
 
 <style>
+  /* Quiet paper sheet — tonal lift, no border-in-border. */
+  .ss-card {
+    background: var(--surface-1);
+    border-radius: var(--radius-card, 20px);
+    box-shadow: var(--shadow-xs);
+    padding: var(--space-4) var(--space-4) var(--space-4);
+  }
+
+  /* Destructive sections look the same on purpose — words carry the weight. */
+  .ss-card--danger { background: var(--surface-1); }
+
   .ss-header {
     margin-bottom: var(--space-3);
   }
@@ -37,25 +50,18 @@
   .ss-title {
     margin: 0;
     font-family: var(--font-display);
-    font-size: var(--text-base);
-    font-weight: 700;
+    font-size: var(--text-xl);
+    font-weight: 600;
     color: var(--text-primary);
-    line-height: 1.2;
-  }
-
-  .ss-title--danger {
-    color: var(--danger-600);
-  }
-
-  :global([data-theme='dark']) .ss-title--danger {
-    color: var(--danger-400);
+    letter-spacing: -0.01em;
+    line-height: 1.25;
   }
 
   .ss-desc {
-    margin: var(--space-1) 0 0;
-    font-size: var(--text-xs);
-    color: var(--text-tertiary);
-    line-height: 1.4;
+    margin: var(--space-1-5) 0 0;
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    line-height: 1.5;
   }
 
   .ss-body {

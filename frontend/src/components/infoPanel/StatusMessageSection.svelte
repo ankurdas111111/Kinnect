@@ -55,8 +55,8 @@
     flex-direction: column;
     gap: var(--space-2);
     background: var(--surface-1);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-card, 20px);
+    box-shadow: var(--shadow-xs);
     padding: var(--space-3) var(--space-4);
   }
   .status-msg-row {
@@ -66,22 +66,39 @@
   }
   .status-msg-input {
     flex: 1;
-    font-size: var(--text-sm);
-    padding: 7px 10px;
-    border-radius: var(--radius-md);
+    /* 16px floor — prevents iOS zoom-on-focus */
+    font-size: max(16px, var(--text-base));
+    padding: var(--space-2) var(--space-3);
+    min-height: 44px;
+    border-radius: var(--radius-input);
     border: 1px solid var(--border-subtle);
     background: var(--surface-3);
     color: var(--text-primary);
+    font-family: var(--font-sans);
     min-width: 0;
+    transition: border-color 150ms var(--ease-out), box-shadow 150ms var(--ease-out);
+  }
+  .status-msg-input::placeholder { color: var(--text-tertiary); }
+  .status-msg-input:focus {
+    outline: none;
+    border-color: var(--primary-500);
+    box-shadow: 0 0 0 3px var(--primary-500-12);
   }
   .status-expiry-select {
-    font-size: var(--text-xs);
-    padding: 7px 6px;
-    border-radius: var(--radius-md);
+    font-size: max(16px, var(--text-base));
+    padding: var(--space-2) var(--space-2);
+    min-height: 44px;
+    border-radius: var(--radius-input);
     border: 1px solid var(--border-subtle);
     background: var(--surface-3);
-    color: var(--text-secondary);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
     cursor: pointer;
+  }
+  .status-expiry-select:focus-visible {
+    outline: none;
+    border-color: var(--primary-500);
+    box-shadow: 0 0 0 3px var(--primary-500-12);
   }
   .status-msg-actions {
     display: flex;

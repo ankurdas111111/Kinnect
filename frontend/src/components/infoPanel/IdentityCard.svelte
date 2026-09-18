@@ -44,7 +44,7 @@
       <span class="qr-title">Your Family Code</span>
       <div class="qr-image-wrap">
         <img
-          src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={encodeURIComponent(getShareOrigin() + '/#/add-contact/' + $myShareCode)}&margin=6&bgcolor=ffffff&color=0f0f23"
+          src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={encodeURIComponent(getShareOrigin() + '/#/add-contact/' + $myShareCode)}&margin=6&bgcolor=ffffff&color=38332e"
           alt="QR code for signal code {$myShareCode}"
           width="180"
           height="180"
@@ -59,12 +59,10 @@
 {/if}
 
 <style>
-  /* ── Identity Card ──────────────────────────────────────────────── */
+  /* ── Identity Card — a quiet ember-tinted paper sheet, no holo shimmer ── */
   .identity-card {
-    background: linear-gradient(135deg, color-mix(in oklch, var(--primary-500) 6%, transparent) 0%, color-mix(in oklch, var(--primary-500) 4%, transparent) 60%, transparent 100%);
-    border: 1px solid color-mix(in oklch, var(--primary-500) 18%, transparent);
-    border-top-color: color-mix(in oklch, var(--primary-400) 32%, transparent);
-    border-radius: var(--radius-xl);
+    background: var(--primary-500-12, color-mix(in oklch, var(--primary-500) 10%, transparent));
+    border-radius: var(--radius-card, 20px);
     padding: var(--space-4);
     display: flex;
     flex-direction: column;
@@ -74,27 +72,7 @@
        and overflow:hidden then chops the code + Copy/QR buttons clean off. */
     flex-shrink: 0;
     position: relative;
-    box-shadow:
-      0 0 16px color-mix(in oklch, var(--primary-500) 8%, transparent),
-      inset 0 1px 0 color-mix(in oklch, var(--primary-400) 10%, transparent);
     overflow: hidden;
-  }
-
-  /* Shimmer sweep on identity card */
-  .identity-card::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-      105deg,
-      transparent 30%,
-      color-mix(in oklch, var(--primary-500) 6%, transparent) 50%,
-      transparent 70%
-    );
-    transform: translateX(-100%);
-    pointer-events: none;
-    animation: holo-travel 6s ease-in-out 2s infinite;
-    border-radius: inherit;
   }
   .identity-body {
     display: flex;
@@ -107,10 +85,8 @@
     font-size: var(--text-xl);
     font-weight: 700;
     letter-spacing: 0.08em;
-    color: var(--primary-400);
-    text-shadow:
-      0 0 10px color-mix(in oklch, var(--primary-500) 55%, transparent),
-      0 0 24px color-mix(in oklch, var(--primary-500) 25%, transparent);
+    color: var(--primary-700);
+    font-variant-numeric: tabular-nums;
   }
 
   /* Skeleton placeholder while the share code is loading */
@@ -119,7 +95,9 @@
     width: 110px;
     height: var(--space-6, 24px);
     border-radius: var(--radius-sm);
-    background: var(--skeleton-base, rgba(255,255,255,0.05));
+    /* Ink-tint shimmer base — the global --skeleton-base is white-on-white
+       in light Hearth (flagged for a shared fix). */
+    background: color-mix(in oklch, var(--text-primary) 7%, transparent);
     animation: skel-pulse var(--skeleton-duration, 1.6s) ease-in-out infinite;
   }
   @keyframes skel-pulse {
@@ -145,30 +123,31 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: var(--radius-md);
-    background: var(--surface-inset);
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-input);
+    background: var(--surface-1);
     border: 1px solid var(--border-subtle);
-    color: var(--text-tertiary);
+    color: var(--text-secondary);
     cursor: pointer;
     flex-shrink: 0;
     transition: background 150ms var(--ease-out), color 150ms, transform 120ms var(--ease-spring);
   }
   .qr-icon-btn:hover {
     background: var(--surface-2);
-    color: var(--primary-400);
-    transform: scale(1.08);
+    color: var(--primary-700);
+    transform: scale(1.05);
   }
-  .qr-icon-btn:active { transform: scale(0.93); }
+  .qr-icon-btn:active { transform: scale(0.95); }
+  .qr-icon-btn:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
 
   /* ── QR modal ────────────────────────────────────────────────────── */
   .qr-backdrop {
     position: fixed;
     inset: 0;
     z-index: var(--z-modal, 5000);
-    background: rgba(5, 5, 18, 0.72);
-    backdrop-filter: blur(8px) saturate(1.4);
+    background: color-mix(in oklch, var(--ink) 45%, transparent);
+    backdrop-filter: blur(8px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -181,7 +160,7 @@
     position: relative;
     background: var(--surface-1);
     border: 1px solid var(--border-default);
-    border-radius: var(--radius-2xl, 20px);
+    border-radius: var(--radius-sheet, 24px);
     padding: var(--space-6, 24px) var(--space-5, 20px) var(--space-4);
     display: flex;
     flex-direction: column;
@@ -189,7 +168,7 @@
     gap: var(--space-3);
     max-width: min(100%, 260px);
     width: 100%;
-    box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+    box-shadow: var(--shadow-xl);
     animation: qr-slide-up 220ms var(--ease-spring, cubic-bezier(0.34,1.56,0.64,1)) both;
   }
   @keyframes qr-slide-up { from { transform: translateY(16px) scale(0.95); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -214,17 +193,18 @@
 
   .qr-title {
     font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 700;
+    font-size: var(--text-base);
+    font-weight: 600;
     color: var(--text-primary);
   }
 
   .qr-image-wrap {
-    background: white;
+    /* Scanners need a true-white quiet zone in both themes. */
+    background: oklch(1 0 0);
     border-radius: var(--radius-lg);
     padding: 8px;
     line-height: 0;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    box-shadow: var(--shadow-sm);
   }
 
   .qr-image {
@@ -238,7 +218,7 @@
     font-family: var(--font-mono);
     font-size: var(--text-sm);
     font-weight: 700;
-    color: var(--primary-400);
+    color: var(--primary-700);
     letter-spacing: 0.08em;
     background: var(--surface-inset);
     border: 1px solid var(--border-subtle);
@@ -259,6 +239,5 @@
     .qr-backdrop { animation: none; }
     .qr-modal { animation: none; }
     .signal-code-skeleton { animation: none; opacity: 0.7; }
-    .identity-card::after { animation: none; }
   }
 </style>

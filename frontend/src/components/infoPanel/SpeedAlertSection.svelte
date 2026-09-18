@@ -41,8 +41,8 @@
     flex-direction: column;
     gap: var(--space-2);
     background: var(--surface-1);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-card, 20px);
+    box-shadow: var(--shadow-xs);
     padding: var(--space-3) var(--space-4);
   }
 
@@ -56,17 +56,21 @@
   .feature-input {
     flex: 1;
     min-width: 80px;
-    font-size: var(--text-sm);
-    padding: 7px 10px;
-    border-radius: var(--radius-md);
+    /* 16px floor — prevents iOS zoom-on-focus */
+    font-size: max(16px, var(--text-base));
+    padding: var(--space-2) var(--space-3);
+    min-height: 44px;
+    border-radius: var(--radius-input);
     border: 1px solid var(--border-subtle);
     background: var(--surface-3);
     color: var(--text-primary);
+    font-family: var(--font-sans);
+    transition: border-color 150ms var(--ease-out), box-shadow 150ms var(--ease-out);
   }
-  @media (max-width: 767px) {
-    .feature-input {
-      min-height: 44px;
-      font-size: var(--text-base);
-    }
+  .feature-input::placeholder { color: var(--text-tertiary); }
+  .feature-input:focus {
+    outline: none;
+    border-color: var(--primary-500);
+    box-shadow: 0 0 0 3px var(--primary-500-12);
   }
 </style>

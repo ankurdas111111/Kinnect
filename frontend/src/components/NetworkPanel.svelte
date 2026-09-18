@@ -15,15 +15,17 @@
   /** @type {Props} */
   let { embedded = false } = $props();
 
-  // Design tokens (global.css / tokens-oklch.css). Applied via inline style,
-  // not SVG presentation attributes — var() is not valid in attributes.
+  // Design tokens (tokens-hearth.css). Applied via inline style, not SVG
+  // presentation attributes — var() is not valid in attributes.
+  // Ember is reserved for "you" (self node + your room ties); people ride
+  // the member wheel; guardian ties speak in ochre.
   const edgeColors = {
-    contact: 'var(--indigo-400)',
+    contact: 'var(--member-1)',
     guardian: 'var(--warning-500)',
     ward: 'var(--warning-500)',
     room: 'var(--primary-500)',
   };
-  const EDGE_FALLBACK = 'var(--presence-gone)';
+  const EDGE_FALLBACK = 'var(--status-offline)';
 
   function refresh() {
     socket.emit('getNetworkGraph');
@@ -120,7 +122,7 @@
   {:else}
     <!-- Legend -->
     <div class="legend-row">
-      <span class="legend-item"><span class="legend-dot" style="background:var(--indigo-400)"></span>Contact</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--member-1)"></span>Contact</span>
       <span class="legend-item"><span class="legend-dot" style="background:var(--warning-500)"></span>Guardian</span>
       <span class="legend-item"><span class="legend-dot" style="background:var(--primary-500)"></span>Room</span>
     </div>
@@ -148,21 +150,19 @@
         >
           <circle
             r={n.role === 'self' ? 18 : 14}
-            style="fill: {n.role === 'self' ? 'var(--indigo-400)' : getUserColor(n.id)}"
+            style="fill: {n.role === 'self' ? 'var(--primary-500)' : getUserColor(n.id)}; stroke: var(--surface-1);"
             fill-opacity={n.online ? 1 : 0.4}
-            stroke={n.online ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.2)'}
             stroke-width="1.5"
           />
           {#if !n.online}
-            <circle r={n.role === 'self' ? 18 : 14} fill="none" style="stroke: var(--presence-gone)" stroke-width="1.5" stroke-dasharray="3 2"/>
+            <circle r={n.role === 'self' ? 18 : 14} fill="none" style="stroke: var(--status-offline)" stroke-width="1.5" stroke-dasharray="3 2"/>
           {/if}
           <text
             text-anchor="middle"
             dominant-baseline="central"
             font-size={n.role === 'self' ? '10' : '8'}
             font-weight="700"
-            fill="white"
-            style="user-select:none;pointer-events:none;"
+            style="user-select:none;pointer-events:none;fill:var(--text-inverse);"
           >
             {(n.name || '?').split(' ').map(w => w[0] || '').join('').toUpperCase().slice(0, 2)}
           </text>
@@ -186,14 +186,17 @@
 <style>
   .network-panel { padding: var(--space-4); }
   .network-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2); }
-  .refresh-btn { background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 4px; border-radius: var(--radius-md); }
-  .refresh-btn:hover { color: var(--text-primary); background: var(--surface-2); }
-  .network-svg { display: block; margin: 0 auto; border-radius: var(--radius-xl); background: var(--surface-1); }
+  .refresh-btn { background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 0; min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius-input); }
+  .refresh-btn:hover { color: var(--text-primary); background: var(--surface-hover); }
+  .refresh-btn:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
+  /* The graph sits on a slightly warmer paper tier — tonal separation, no border. */
+  .network-svg { display: block; margin: 0 auto; border-radius: var(--radius-card, 20px); background: var(--surface-2); max-width: 100%; }
   .network-node { cursor: pointer; }
   .network-node:hover circle:first-child { stroke-width: 2.5; }
+  .network-node:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
   .legend-row { display: flex; gap: var(--space-3); margin-bottom: var(--space-2); flex-wrap: wrap; }
   .legend-item { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-secondary); }
   .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .network-hint { text-align: center; font-size: 11px; color: var(--text-tertiary); margin-top: var(--space-2); }
-  .empty-state { text-align: center; color: var(--text-secondary); font-size: 13px; padding: var(--space-8) 0; }
+  .network-hint { text-align: center; font-size: var(--text-sm); color: var(--text-tertiary); margin-top: var(--space-2); }
+  .empty-state { text-align: center; color: var(--text-secondary); font-size: var(--text-base); padding: var(--space-8) var(--space-4); line-height: 1.5; }
 </style>

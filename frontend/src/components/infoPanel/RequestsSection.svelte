@@ -83,16 +83,16 @@
             {#if req.myVote === 'approve'}
               <span class="badge badge-success badge-xs">You approved</span>
             {:else if req.myVote === 'deny'}
-              <span class="badge badge-danger badge-xs">You denied</span>
+              <span class="badge badge-neutral badge-xs">You denied</span>
             {:else}
               <button class="btn btn-primary btn-sm" onclick={() => approveRequest(req, idx)} disabled={busyRequests.has(req.type + '-' + req.from)}>Approve</button>
-              <button class="btn btn-danger btn-sm" onclick={() => denyRequest(req, idx)} disabled={busyRequests.has(req.type + '-' + req.from)}>Deny</button>
+              <button class="btn btn-secondary btn-sm" onclick={() => denyRequest(req, idx)} disabled={busyRequests.has(req.type + '-' + req.from)}>Deny</button>
             {/if}
           </div>
         {:else}
           <div class="req-actions">
             <button class="btn btn-primary btn-sm" onclick={() => approveRequest(req, idx)} disabled={busyRequests.has(req.type + '-' + req.from)}>Approve</button>
-            <button class="btn btn-danger btn-sm" onclick={() => denyRequest(req, idx)} disabled={busyRequests.has(req.type + '-' + req.from)}>Deny</button>
+            <button class="btn btn-secondary btn-sm" onclick={() => denyRequest(req, idx)} disabled={busyRequests.has(req.type + '-' + req.from)}>Deny</button>
           </div>
         {/if}
       </div>
@@ -137,18 +137,19 @@
     display: flex;
     gap: var(--space-2);
   }
+  /* Pending count — quiet ochre chip ("needs a look"), no solid alarm dot. */
   .req-count {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 18px;
-    height: 18px;
+    min-width: 20px;
+    height: 20px;
     border-radius: var(--radius-full);
-    background: var(--warning-500);
-    color: white;
-    font-size: 10px;
-    font-weight: 800;
-    padding: 0 4px;
+    background: var(--warning-500-12, color-mix(in oklch, var(--warning-500) 12%, transparent));
+    color: var(--warning-700);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 0 var(--space-1-5);
     margin-left: 4px;
   }
 </style>

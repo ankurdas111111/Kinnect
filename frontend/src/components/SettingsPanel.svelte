@@ -108,7 +108,7 @@
     togglingPush = false;
     if (payload && !payload.ok) {
       pushEnabled = false;
-      flashBanner('sos', payload.error || 'Server rejected push subscription', 3000);
+      flashBanner('info', payload.error || 'The server rejected the push subscription. Try again in a moment.', 3000);
     }
   }
 
@@ -116,7 +116,7 @@
     togglingPush = false;
     if (payload && !payload.ok) {
       pushEnabled = true;
-      flashBanner('sos', 'Server could not remove subscription', 3000);
+      flashBanner('info', 'The server could not remove the subscription. Try again in a moment.', 3000);
     }
   }
 
@@ -200,13 +200,13 @@
       const perm = await Notification.requestPermission();
       if (perm !== 'granted') {
         togglingPush = false;
-        flashBanner('sos', 'Notification permission denied', 3000);
+        flashBanner('info', 'Notification permission was denied.', 3000);
         return;
       }
       const keyPayload = await fetchVapidKey();
       if (!keyPayload.ok || !keyPayload.key) {
         togglingPush = false;
-        flashBanner('sos', 'Push notifications not configured on server', 3000);
+        flashBanner('info', 'Push notifications are not configured on the server.', 3000);
         return;
       }
       const reg = await Promise.race([
@@ -225,7 +225,7 @@
         : (err.message?.includes('denied') || err.message?.includes('permission'))
           ? 'Notification permission denied — enable in browser settings'
           : (err.message || String(err));
-      flashBanner('sos', 'Could not enable notifications: ' + msg, 3500);
+      flashBanner('info', 'Could not enable notifications: ' + msg, 3500);
     }
   }
 
@@ -251,7 +251,7 @@
       }
     } catch (err) {
       togglingPush = false;
-      flashBanner('sos', 'Could not disable notifications: ' + (err.message || err), 3000);
+      flashBanner('info', 'Could not disable notifications: ' + (err.message || err), 3000);
     }
   }
 
@@ -260,12 +260,12 @@
     const res = await apiPost('/api/profile/update', { firstName, lastName, email, mobile });
     saving = false;
     if (res.ok) flashBanner('info', 'Looking good. Profile saved.', 2000);
-    else         flashBanner('sos', res.error || 'Failed to update', 3000);
+    else         flashBanner('info', res.error || 'The profile could not be saved. Try again.', 3000);
   }
 
   async function changePassword() {
     if (newPassword !== confirmPassword) {
-      flashBanner('sos', 'Passwords do not match', 2000);
+      flashBanner('info', 'The passwords do not match.', 2000);
       return;
     }
     changingPw = true;
@@ -275,7 +275,7 @@
       currentPassword = ''; newPassword = ''; confirmPassword = '';
       flashBanner('info', "New password locked in. Don't lose this one.", 2000);
     } else {
-      flashBanner('sos', res.error || 'Failed', 3000);
+      flashBanner('info', res.error || 'The password could not be changed. Try again.', 3000);
     }
   }
 
@@ -284,7 +284,7 @@
     const res = await apiPost('/api/profile/delete', { password: deletePassword });
     deleting = false;
     if (res.ok) { authUser.set(null); window.location.hash = '#/login'; }
-    else         flashBanner('sos', res.error || 'Failed', 3000);
+    else         flashBanner('info', res.error || 'The account could not be deleted. Check the password and try again.', 3000);
   }
 
   async function logout() {
@@ -432,7 +432,9 @@
       {#snippet children()}
         {#if privacyActive}
           <div class="privacy-active">
-            <span class="ghost-emoji" aria-hidden="true">👻</span>
+            <span class="ghost-icon" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            </span>
             <div class="ghost-info">
               <p class="ghost-status">You're hidden</p>
               <p class="ghost-time">{privacyTimeLeft} left</p>
@@ -641,29 +643,33 @@
     padding: var(--space-3);
   }
 
-  /* ── Form fields ──────────────────────────────────────────────────────────── */
+  /* ── Form fields — warm inset tier, ember focus ring ─────────────────────── */
   .field-label {
     display: flex;
     flex-direction: column;
     gap: var(--space-1);
-    font-size: var(--text-xs);
-    font-weight: 600;
+    font-size: var(--text-sm);
+    font-weight: 500;
     color: var(--text-secondary);
   }
 
   .field-input {
-    padding: var(--space-2) var(--space-2-5);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-md);
-    font-size: var(--text-sm);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-input);
+    /* 16px floor — prevents iOS zoom-on-focus */
+    font-size: max(16px, var(--text-base));
     background: var(--surface-3);
     color: var(--text-primary);
+    font-family: var(--font-sans);
     min-height: 44px;
+    transition: border-color 150ms var(--ease-out), box-shadow 150ms var(--ease-out);
   }
+  .field-input::placeholder { color: var(--text-tertiary); }
 
   .field-input:focus {
     outline: none;
-    border-color: var(--primary-400);
+    border-color: var(--primary-500);
     box-shadow: 0 0 0 3px var(--primary-500-12);
   }
 
@@ -671,8 +677,8 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-1);
-    font-size: var(--text-xs);
-    font-weight: 600;
+    font-size: var(--text-sm);
+    font-weight: 500;
     color: var(--text-secondary);
   }
 
@@ -687,13 +693,19 @@
 
   /* ── Misc text ────────────────────────────────────────────────────────────── */
   .hint {
-    font-size: var(--text-xs);
+    font-size: var(--text-sm);
     color: var(--text-tertiary);
     margin: 0;
-    line-height: 1.4;
+    line-height: 1.5;
   }
 
-  .danger-text { color: var(--danger-500); }
+  /* Deleting an account is grave, not an alarm — the explicit words carry the
+     weight (vermilion is SOS-only). */
+  .danger-text {
+    color: var(--text-primary);
+    font-size: var(--text-sm);
+    line-height: 1.5;
+  }
 
   /* ── Buttons ──────────────────────────────────────────────────────────────── */
   .btn-sm {
@@ -702,14 +714,16 @@
     min-height: 44px;
   }
 
+  /* Destructive entry point: quiet ink outline + explicit label, never red. */
   .btn-danger-outline {
     background: transparent;
-    color: var(--danger-500);
-    border: 1px solid var(--danger-500);
+    color: var(--text-primary);
+    border: 1px solid var(--border-strong);
     cursor: pointer;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-input);
   }
-  .btn-danger-outline:hover { background: var(--danger-500-10, color-mix(in srgb, var(--danger-500) 10%, transparent)); }
+  .btn-danger-outline:hover { background: var(--surface-hover); }
+  .btn-danger-outline:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
 
   .logout-btn { width: 100%; }
 
@@ -719,17 +733,21 @@
     gap: var(--space-2);
   }
 
-  /* --countdown-color swapped gray→amber→red; transition is functional feedback, survives reduced-motion */
+  /* --countdown-color swaps quiet→ochre→ink while the button arms; the color
+     transition is functional feedback and survives reduced-motion. Final state
+     is a solid ink button — deliberate, not alarming. */
   .delete-countdown-btn {
-    --countdown-color: var(--danger-500);
+    --countdown-color: var(--text-primary);
     background: var(--countdown-color);
-    color: white; /* raw-color-ok */
+    color: var(--surface-0);
     border: none;
-    transition: background var(--duration-countdown, 800ms), box-shadow var(--duration-countdown, 800ms);
+    border-radius: var(--radius-input);
+    transition: background var(--duration-countdown, 800ms);
   }
-  .delete-countdown-btn.counting3 { --countdown-color: var(--gray-500, #6b7280); box-shadow: none; }
-  .delete-countdown-btn.counting2 { --countdown-color: var(--warning-500); box-shadow: none; }
-  .delete-countdown-btn.counting1 { --countdown-color: var(--danger-500); box-shadow: var(--glow-sos, none); }
+  .delete-countdown-btn.counting3 { --countdown-color: var(--text-tertiary); }
+  .delete-countdown-btn.counting2 { --countdown-color: var(--warning-600); }
+  .delete-countdown-btn.counting1 { --countdown-color: var(--text-primary); }
+  .delete-countdown-btn:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
 
   /* ── Visual effects segmented control ────────────────────────────────────── */
   .fx-segmented-2 { grid-template-columns: repeat(2, 1fr); }
@@ -774,10 +792,11 @@
   .fx-seg-name {
     font-family: var(--font-display);
     font-size: var(--text-sm);
-    font-weight: 700;
+    font-weight: 600;
     line-height: 1.1;
   }
-  .fx-seg-btn.active .fx-seg-name { color: var(--primary-400); }
+  /* Small ember text sits on the AA step, never the raw accent. */
+  .fx-seg-btn.active .fx-seg-name { color: var(--primary-700); }
 
   .fx-seg-desc {
     font-size: var(--text-xs);
@@ -785,20 +804,22 @@
     line-height: 1.2;
   }
 
-  /* ── Privacy active card ──────────────────────────────────────────────────── */
+  /* ── Privacy active card — ochre "needs a look" register ─────────────────── */
   .privacy-active {
     display: flex;
     align-items: center;
     gap: var(--space-3);
     padding: var(--space-3);
-    background: var(--warning-500-08, color-mix(in srgb, var(--warning-500, #f59e0b) 8%, transparent));
-    border: 1px solid var(--warning-500-20, color-mix(in srgb, var(--warning-500, #f59e0b) 20%, transparent));
-    border-radius: var(--radius-md);
+    background: var(--warning-500-08);
+    border: 1px solid var(--warning-500-20);
+    border-radius: var(--radius-input);
     flex-wrap: wrap;
   }
-  .ghost-emoji {
-    font-size: var(--text-2xl, 24px);
-    display: inline-block;
+  .ghost-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--warning-700);
     flex-shrink: 0;
   }
   .ghost-info {
@@ -810,14 +831,15 @@
   }
   .ghost-status {
     font-size: var(--text-sm);
-    font-weight: 700;
-    color: var(--warning-700, #b45309);
+    font-weight: 600;
+    color: var(--warning-700);
   }
   .ghost-time {
     font-size: var(--text-xs);
     color: var(--text-tertiary);
   }
-  :global([data-theme='dark']) .ghost-status { color: var(--warning-400, #fbbf24); }
+  :global([data-theme='dark']) .ghost-status,
+  :global([data-theme='dark']) .ghost-icon { color: var(--warning-400); }
 
   .privacy-btns {
     display: flex;
@@ -837,17 +859,17 @@
     margin-bottom: var(--space-2);
   }
   .battery-status--ok {
-    background: var(--success-500-12, color-mix(in srgb, var(--success-500, #10b981) 12%, transparent));
-    border: 1px solid var(--success-500-28, color-mix(in srgb, var(--success-500, #10b981) 28%, transparent));
-    color: var(--success-700, #047857);
+    background: var(--success-500-08);
+    border: 1px solid var(--success-500-20);
+    color: var(--success-700);
   }
   .battery-status--warn {
-    background: var(--warning-500-12, color-mix(in srgb, var(--warning-500, #f59e0b) 12%, transparent));
-    border: 1px solid var(--warning-500-30, color-mix(in srgb, var(--warning-500, #f59e0b) 30%, transparent));
-    color: var(--warning-700, #b45309);
+    background: var(--warning-500-12);
+    border: 1px solid var(--warning-500-30);
+    color: var(--warning-700);
   }
-  :global([data-theme='dark']) .battery-status--ok  { color: var(--success-400, #34d399); }
-  :global([data-theme='dark']) .battery-status--warn { color: var(--warning-400, #fbbf24); }
+  :global([data-theme='dark']) .battery-status--ok  { color: var(--success-400); }
+  :global([data-theme='dark']) .battery-status--warn { color: var(--warning-400); }
 
   /* ── Mobile layout ───────────────────────────────────────────────────────── */
   @media (max-width: 767px) {

@@ -62,7 +62,7 @@
           <div class="skel-row skel-short"></div>
         </div>
       {:else if myActivityDays.length === 0}
-        <p class="empty-hint">No activity data yet.</p>
+        <p class="empty-hint">Nothing to show yet — activity appears here after a day of moving about.</p>
       {:else}
         {#each myActivityDays as day}
           <div class="activity-row">
@@ -82,8 +82,8 @@
     flex-direction: column;
     gap: var(--space-2);
     background: var(--surface-1);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-card, 20px);
+    box-shadow: var(--shadow-xs);
     padding: var(--space-3) var(--space-4);
   }
 
@@ -135,14 +135,15 @@
 
   .activity-stat {
     font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
     font-size: 11px;
-    color: var(--primary-400);
-    font-weight: 700;
+    color: var(--text-secondary);
+    font-weight: 600;
     flex-shrink: 0;
   }
 
   .empty-hint {
-    font-size: var(--text-xs);
+    font-size: var(--text-sm);
     color: var(--text-tertiary);
     text-align: center;
     padding: 8px 0;
@@ -160,7 +161,7 @@
   .skel-row {
     height: var(--space-4);
     border-radius: var(--radius-sm);
-    background: var(--skeleton-base, rgba(255,255,255,0.05));
+    background: color-mix(in oklch, var(--text-primary) 7%, transparent);
     animation: skel-pulse var(--skeleton-duration, 1.6s) ease-in-out infinite;
   }
 

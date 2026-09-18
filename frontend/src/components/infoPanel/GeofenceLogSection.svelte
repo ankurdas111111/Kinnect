@@ -56,7 +56,7 @@
           <div class="skel-row skel-short"></div>
         </div>
       {:else if $geofenceLog.length === 0}
-        <p class="empty-hint">No geofence events yet.</p>
+        <p class="empty-hint">No comings or goings yet.</p>
       {:else}
         {#each $geofenceLog as ev}
           <div class="log-item" class:log-entry={ev.eventType === 'entry'} class:log-exit={ev.eventType === 'exit'}>
@@ -76,8 +76,8 @@
     flex-direction: column;
     gap: var(--space-2);
     background: var(--surface-1);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-card, 20px);
+    box-shadow: var(--shadow-xs);
     padding: var(--space-3) var(--space-4);
   }
 
@@ -123,8 +123,8 @@
   }
 
   .log-badge {
-    font-size: 9px;
-    font-weight: 800;
+    font-size: 11px;
+    font-weight: 600;
     letter-spacing: 0.05em;
     text-transform: uppercase;
     padding: 2px 6px;
@@ -138,10 +138,11 @@
     border: 1px solid color-mix(in oklch, var(--success-500) 25%, transparent);
   }
 
+  /* Leaving a zone is a "needs a look", never an alarm — ochre register. */
   .log-exit .log-badge {
-    background: color-mix(in oklch, var(--danger-500) 12%, transparent);
-    color: var(--danger-500);
-    border: 1px solid color-mix(in oklch, var(--danger-500) 22%, transparent);
+    background: var(--warning-500-12, color-mix(in oklch, var(--warning-500) 12%, transparent));
+    color: var(--warning-700);
+    border: 1px solid color-mix(in oklch, var(--warning-500) 25%, transparent);
   }
 
   .log-name {
@@ -154,13 +155,13 @@
   }
 
   .log-time {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-tertiary);
     flex-shrink: 0;
   }
 
   .empty-hint {
-    font-size: var(--text-xs);
+    font-size: var(--text-sm);
     color: var(--text-tertiary);
     text-align: center;
     padding: 8px 0;
@@ -178,7 +179,7 @@
   .skel-row {
     height: var(--space-4);
     border-radius: var(--radius-sm);
-    background: var(--skeleton-base, rgba(255,255,255,0.05));
+    background: color-mix(in oklch, var(--text-primary) 7%, transparent);
     animation: skel-pulse var(--skeleton-duration, 1.6s) ease-in-out infinite;
   }
 

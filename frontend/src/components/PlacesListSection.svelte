@@ -305,8 +305,8 @@
   }
 
   .item-name {
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-base);
+    font-weight: 500;
     color: var(--text-primary);
     white-space: nowrap;
     overflow: hidden;
@@ -337,10 +337,11 @@
 
   .icon-action:hover { background: var(--surface-hover); color: var(--text-primary); }
   .icon-action:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
-  /* Danger hover: use CSS custom-property tint (no raw rgba) */
+  /* Removing a place is routine housekeeping — ink hover, never red;
+     the explicit aria-label carries the meaning. */
   .icon-action--danger:hover {
-    background: color-mix(in srgb, var(--danger-500) 10%, transparent);
-    color: var(--danger-500);
+    background: var(--surface-hover);
+    color: var(--text-primary);
   }
 
   /* ── Empty state ─────────────────────────────────────────────────────────── */
@@ -361,10 +362,8 @@
     width: 48px;
     height: 48px;
     border-radius: var(--radius-full);
-    /* Tint: primary-500-12 pattern — no raw rgba */
-    background: color-mix(in srgb, var(--primary-500) 12%, transparent);
-    border: 1px solid color-mix(in srgb, var(--primary-500) 18%, transparent);
-    color: var(--primary-500);
+    background: var(--primary-500-12, color-mix(in oklch, var(--primary-500) 12%, transparent));
+    color: var(--primary-700);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -373,15 +372,15 @@
 
   .empty-title {
     font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 700;
+    font-size: var(--text-base);
+    font-weight: 600;
     color: var(--text-primary);
     margin: 0;
   }
 
   .empty-sub {
-    font-size: var(--text-xs);
-    color: var(--text-tertiary);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
     line-height: var(--leading-normal);
     margin: 0;
     max-width: 220px;
@@ -406,7 +405,8 @@
   .skel-row {
     height: var(--space-3);
     border-radius: var(--radius-sm);
-    background: var(--skeleton-base, color-mix(in srgb, var(--text-primary) 5%, transparent));
+    /* Ink-tint base — the global --skeleton-base is white-on-white in light Hearth. */
+    background: color-mix(in oklch, var(--text-primary) 7%, transparent);
     animation: skel-pulse 1.6s ease-in-out infinite;
   }
   .skel-wide { width: 100%; }
@@ -422,7 +422,7 @@
   }
 
   .story-empty {
-    font-size: var(--text-xs);
+    font-size: var(--text-sm);
     color: var(--text-tertiary);
     margin: 0;
     padding: var(--space-1) 0;
@@ -437,12 +437,15 @@
   }
   .story-row:last-of-type { border-bottom: none; }
 
+  /* Family members are pebbles in warm paper, never the ember (that hue is
+     reserved for "you" and actions). */
   .story-avatar {
     width: 24px;
     height: 24px;
     border-radius: var(--radius-full);
-    background: var(--primary-500);
-    color: var(--text-inverse);
+    background: var(--surface-3);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
     font-size: var(--text-2xs);
     font-weight: 700;
     display: flex;
@@ -476,9 +479,9 @@
   .story-badge-here {
     font-size: var(--text-2xs);
     font-weight: 600;
-    color: var(--success-600);
-    background: color-mix(in srgb, var(--success-500) 12%, transparent);
-    border: 1px solid color-mix(in srgb, var(--success-500) 24%, transparent);
+    color: var(--success-700);
+    background: var(--success-500-08, color-mix(in oklch, var(--success-500) 8%, transparent));
+    border: 1px solid var(--success-500-20, color-mix(in oklch, var(--success-500) 20%, transparent));
     padding: 2px var(--space-1-5);
     border-radius: var(--radius-full);
     flex-shrink: 0;
@@ -505,10 +508,12 @@
   }
 
   .field-input {
-    padding: var(--space-2) var(--space-2-5);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-md);
-    font-size: var(--text-sm);
+    padding: var(--space-2) var(--space-3);
+    min-height: 44px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-input);
+    /* 16px floor — prevents iOS zoom-on-focus */
+    font-size: max(16px, var(--text-base));
     background: var(--surface-3);
     color: var(--text-primary);
     font-family: var(--font-sans);
@@ -521,12 +526,12 @@
   .field-input:focus {
     outline: none;
     border-color: var(--primary-500);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-500) 18%, transparent);
+    box-shadow: 0 0 0 3px var(--primary-500-12);
   }
 
   .field-full { width: 100%; box-sizing: border-box; }
   .field-sm   { flex: 1; min-width: 80px; }
-  .field-num  { width: 64px; flex: none; }
+  .field-num  { width: 76px; flex: none; }
 
   .field-label-inline {
     display: flex;

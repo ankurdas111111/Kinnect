@@ -122,7 +122,9 @@
           aria-checked={visibility === 'personal'}
           onclick={() => visibility = 'personal'}
         >
-          <span class="cpd-vis-icon">🔒</span>
+          <span class="cpd-vis-icon" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </span>
           <span class="cpd-vis-text">
             <strong>Personal</strong>
             <span>Only you</span>
@@ -137,7 +139,9 @@
           disabled={$myRooms.length === 0}
           title={$myRooms.length === 0 ? 'You are not in any rooms' : undefined}
         >
-          <span class="cpd-vis-icon">🏠</span>
+          <span class="cpd-vis-icon" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          </span>
           <span class="cpd-vis-text">
             <strong>Room</strong>
             <span>Specific room</span>
@@ -150,7 +154,9 @@
           aria-checked={visibility === 'universal'}
           onclick={() => visibility = 'universal'}
         >
-          <span class="cpd-vis-icon">👨‍👩‍👧</span>
+          <span class="cpd-vis-icon" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </span>
           <span class="cpd-vis-text">
             <strong>Family</strong>
             <span>Everyone</span>
@@ -185,7 +191,7 @@
     position: fixed;
     inset: 0;
     z-index: var(--z-modal, 5000);
-    background: rgba(0, 0, 0, 0.45);
+    background: color-mix(in oklch, var(--ink) 45%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -195,15 +201,15 @@
   }
 
   .cpd-card {
-    background: var(--surface-2, #fff);
-    border: 1px solid var(--border-default, #e2e8f0);
-    border-radius: var(--radius-xl, 20px);
-    box-shadow: var(--shadow-xl, 0 20px 60px rgba(0,0,0,0.2));
+    background: var(--surface-1);
+    border-radius: var(--radius-sheet, 24px);
+    box-shadow: var(--shadow-xl);
     width: 340px;
     max-width: calc(100vw - 32px);
+    max-height: calc(100dvh - var(--safe-bottom, 0px) - 32px);
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
   }
 
   .cpd-header {
@@ -214,19 +220,20 @@
   }
 
   .cpd-title {
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--text-primary, #0f172a);
-    font-family: var(--font-display, 'Inter', sans-serif);
+    font-size: var(--text-xl);
+    font-weight: 600;
+    color: var(--text-primary);
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
   }
 
   .cpd-close {
     background: none;
     border: none;
     cursor: pointer;
-    color: var(--text-secondary, #64748b);
+    color: var(--text-secondary);
     padding: 4px;
-    border-radius: 6px;
+    border-radius: var(--radius-input);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -235,7 +242,8 @@
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
   }
-  .cpd-close:hover { background: var(--surface-3, #f1f5f9); }
+  .cpd-close:hover { background: var(--surface-hover); color: var(--text-primary); }
+  .cpd-close:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
 
   .cpd-body {
     padding: 12px 16px;
@@ -245,40 +253,43 @@
   }
 
   .cpd-coords {
-    font-family: monospace;
-    font-size: 10px;
-    color: var(--text-secondary, #64748b);
-    background: var(--surface-1, #f8fafc);
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 11px;
+    color: var(--text-secondary);
+    background: var(--surface-3);
     padding: 4px 8px;
-    border-radius: 6px;
-    border: 1px solid var(--border-default, #e2e8f0);
+    border-radius: var(--radius-sm);
     align-self: flex-start;
   }
 
   .cpd-label {
     font-size: 11px;
     font-weight: 600;
-    color: var(--text-secondary, #64748b);
+    color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
 
   .cpd-input {
     width: 100%;
-    padding: 8px 12px;
-    border-radius: var(--radius-md, 10px);
-    border: 1.5px solid var(--border-default, #e2e8f0);
-    background: var(--surface-1, #f8fafc);
-    color: var(--text-primary, #0f172a);
-    font-size: 16px;
-    font-family: var(--font-sans, 'Inter', sans-serif);
+    padding: var(--space-2-5) var(--space-3);
+    min-height: 44px;
+    border-radius: var(--radius-input);
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-3);
+    color: var(--text-primary);
+    /* 16px floor — prevents iOS zoom-on-focus */
+    font-size: max(16px, var(--text-base));
+    font-family: var(--font-sans);
     outline: none;
     box-sizing: border-box;
-    transition: border-color 0.15s;
+    transition: border-color 150ms var(--ease-out), box-shadow 150ms var(--ease-out);
   }
+  .cpd-input::placeholder { color: var(--text-tertiary); }
   .cpd-input:focus {
-    border-color: var(--primary-400, var(--primary-400));
-    background: var(--surface-2, #fff);
+    border-color: var(--primary-500);
+    box-shadow: 0 0 0 3px var(--primary-500-12);
   }
 
   .cpd-icon-grid {
@@ -293,26 +304,27 @@
     align-items: center;
     gap: 2px;
     padding: 8px 4px 6px;
-    border-radius: 10px;
-    border: 1.5px solid transparent;
-    background: var(--surface-1, #f8fafc);
+    min-height: 44px;
+    border-radius: var(--radius-input);
+    border: 1px solid transparent;
+    background: var(--surface-2);
     cursor: pointer;
-    transition: border-color 0.12s, background 0.12s;
+    transition: border-color 120ms var(--ease-out), background 120ms var(--ease-out);
   }
   .cpd-icon-btn:hover {
-    background: var(--primary-50, var(--primary-50));
-    border-color: var(--primary-200, #c7d2fe);
+    background: var(--surface-3);
   }
   .cpd-icon-btn.selected {
-    background: var(--primary-50, var(--primary-50));
-    border-color: var(--primary-400, var(--primary-400));
+    background: var(--primary-100, var(--primary-500-12));
+    border-color: var(--primary-500);
   }
+  .cpd-icon-btn:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
 
   .cpd-emoji { font-size: 20px; line-height: 1; }
   .cpd-icon-label {
-    font-size: 9px;
-    font-weight: 600;
-    color: var(--text-secondary, #64748b);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
     text-align: center;
     white-space: nowrap;
     overflow: hidden;
@@ -333,27 +345,36 @@
     align-items: center;
     gap: 4px;
     padding: 10px 6px;
-    border-radius: 12px;
-    border: 1.5px solid var(--border-default, #e2e8f0);
-    background: var(--surface-1, #f8fafc);
+    min-height: 44px;
+    border-radius: var(--radius-input);
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-2);
     cursor: pointer;
     text-align: center;
-    transition: border-color 0.12s, background 0.12s;
+    transition: border-color 120ms var(--ease-out), background 120ms var(--ease-out);
   }
   .cpd-vis-btn:hover:not(:disabled) {
-    background: var(--primary-50, var(--primary-50));
-    border-color: var(--primary-200, #c7d2fe);
+    background: var(--surface-3);
   }
   .cpd-vis-btn.selected {
-    background: var(--primary-50, var(--primary-50));
-    border-color: var(--primary-400, var(--primary-400));
+    background: var(--primary-100, var(--primary-500-12));
+    border-color: var(--primary-500);
   }
+  .cpd-vis-btn:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
   .cpd-vis-btn:disabled {
-    opacity: 0.4;
     cursor: not-allowed;
   }
+  .cpd-vis-btn:disabled .cpd-vis-icon,
+  .cpd-vis-btn:disabled strong,
+  .cpd-vis-btn:disabled span {
+    color: var(--text-tertiary);
+  }
 
-  .cpd-vis-icon { font-size: 20px; line-height: 1; }
+  .cpd-vis-icon {
+    display: inline-flex;
+    color: var(--text-secondary);
+  }
+  .cpd-vis-btn.selected .cpd-vis-icon { color: var(--primary-700); }
 
   .cpd-vis-text {
     display: flex;
@@ -361,40 +382,46 @@
     gap: 1px;
   }
   .cpd-vis-text strong {
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--text-primary, #0f172a);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
     line-height: 1.2;
   }
   .cpd-vis-text span {
-    font-size: 9px;
-    color: var(--text-secondary, #64748b);
-    line-height: 1.2;
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.25;
   }
 
   /* Room selector */
   .cpd-room-select {
     width: 100%;
-    padding: 8px 12px;
-    border-radius: var(--radius-md, 10px);
-    border: 1.5px solid var(--primary-400, var(--primary-400));
-    background: var(--surface-1, #f8fafc);
-    color: var(--text-primary, #0f172a);
-    font-size: 16px; /* 16px minimum prevents iOS Safari auto-zoom on focus */
-    font-family: var(--font-sans, 'Inter', sans-serif);
+    padding: var(--space-2-5) var(--space-3);
+    min-height: 44px;
+    border-radius: var(--radius-input);
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-3);
+    color: var(--text-primary);
+    font-size: max(16px, var(--text-base)); /* 16px minimum prevents iOS Safari auto-zoom on focus */
+    font-family: var(--font-sans);
     outline: none;
     box-sizing: border-box;
     cursor: pointer;
     touch-action: manipulation;
   }
+  .cpd-room-select:focus-visible {
+    border-color: var(--primary-500);
+    box-shadow: 0 0 0 3px var(--primary-500-12);
+  }
 
+  /* Validation speaks in ochre — a gentle correction, never an alarm. */
   .cpd-error {
-    font-size: 12px;
-    color: var(--danger-500, var(--danger-500));
-    background: color-mix(in oklch, var(--danger-500) 8%, transparent);
+    font-size: var(--text-sm);
+    color: var(--warning-700);
+    background: var(--warning-500-08, color-mix(in oklch, var(--warning-500) 8%, transparent));
     padding: 6px 10px;
-    border-radius: 8px;
-    border: 1px solid color-mix(in oklch, var(--danger-500) 20%, transparent);
+    border-radius: var(--radius-sm2, 8px);
+    border: 1px solid var(--warning-500-20, color-mix(in oklch, var(--warning-500) 20%, transparent));
   }
 
   .cpd-footer {
@@ -402,5 +429,9 @@
     gap: 8px;
     justify-content: flex-end;
     padding: 0 16px 14px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cpd-icon-btn, .cpd-vis-btn, .cpd-input { transition: none; }
   }
 </style>

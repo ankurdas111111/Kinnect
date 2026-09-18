@@ -81,7 +81,7 @@
           <div class="alert-item">
             <span class="alert-name">{a.targetName || a.targetUserId}</span>
             <span class="alert-radius">{a.radiusM}m</span>
-            <button class="btn btn-danger btn-xs" onclick={() => emitRemoveProximityAlert(a.targetUserId)} aria-label="Remove proximity alert for {a.targetName || a.targetUserId}">Remove</button>
+            <button class="btn btn-secondary btn-xs" onclick={() => emitRemoveProximityAlert(a.targetUserId)} aria-label="Remove proximity alert for {a.targetName || a.targetUserId}">Remove</button>
           </div>
         {/each}
       </div>
@@ -95,8 +95,8 @@
     flex-direction: column;
     gap: var(--space-2);
     background: var(--surface-1);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-card, 20px);
+    box-shadow: var(--shadow-xs);
     padding: var(--space-3) var(--space-4);
   }
 
@@ -133,18 +133,22 @@
   .feature-input {
     flex: 1;
     min-width: 80px;
-    font-size: var(--text-sm);
-    padding: 7px 10px;
-    border-radius: var(--radius-md);
+    /* 16px floor — prevents iOS zoom-on-focus */
+    font-size: max(16px, var(--text-base));
+    padding: var(--space-2) var(--space-3);
+    min-height: 44px;
+    border-radius: var(--radius-input);
     border: 1px solid var(--border-subtle);
     background: var(--surface-3);
     color: var(--text-primary);
+    font-family: var(--font-sans);
+    transition: border-color 150ms var(--ease-out), box-shadow 150ms var(--ease-out);
   }
-  @media (max-width: 767px) {
-    .feature-input {
-      min-height: 44px;
-      font-size: var(--text-base);
-    }
+  .feature-input::placeholder { color: var(--text-tertiary); }
+  .feature-input:focus {
+    outline: none;
+    border-color: var(--primary-500);
+    box-shadow: 0 0 0 3px var(--primary-500-12);
   }
 
   .feature-input--sm {
@@ -180,7 +184,8 @@
 
   .alert-radius {
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    font-size: 11px;
     color: var(--text-tertiary);
     flex-shrink: 0;
   }
@@ -196,7 +201,7 @@
   .skel-row {
     height: var(--space-4);
     border-radius: var(--radius-sm);
-    background: var(--skeleton-base, rgba(255,255,255,0.05));
+    background: color-mix(in oklch, var(--text-primary) 7%, transparent);
     animation: skel-pulse var(--skeleton-duration, 1.6s) ease-in-out infinite;
   }
 

@@ -13,7 +13,6 @@
   } from '../lib/stores/history.js';
   import { myContacts } from '../lib/stores/contacts.js';
   import PlaybackControls from './primitives/PlaybackControls.svelte';
-  import StatCard        from './primitives/StatCard.svelte';
   import EmptyState      from './primitives/EmptyState.svelte';
   import SectionHeader   from './primitives/SectionHeader.svelte';
 
@@ -254,18 +253,11 @@
       </EmptyState>
 
     {:else if $historyVisible && $historyPoints.length > 0}
-      <!-- ── Stats ──────────────────────────────────────────────────── -->
-      <div class="history-stats" role="region" aria-label="Route statistics">
-        <StatCard label="Points"   value={$historyPoints.length} tint="primary" />
-        {#if distKm !== null}
-          <StatCard label="Distance" value={distKm} unit="km" tint="primary" />
-        {/if}
-        {#if formatTime($historyPoints[0]?.t)}
-          <StatCard label="Start"   value={formatTime($historyPoints[0].t)} tint="neutral" />
-        {/if}
-        {#if formatTime($historyPoints[$historyPoints.length - 1]?.t)}
-          <StatCard label="End"     value={formatTime($historyPoints[$historyPoints.length - 1].t)} tint="neutral" />
-        {/if}
+      <!-- ── Route facts — one quiet line, all the same data, no KPI grid ── -->
+      <div class="history-facts" role="region" aria-label="Route statistics">
+        <p class="history-facts-line">
+          {$historyPoints.length} points{#if distKm !== null}&nbsp;· {distKm} km{/if}{#if formatTime($historyPoints[0]?.t)}&nbsp;· {formatTime($historyPoints[0].t)}{#if formatTime($historyPoints[$historyPoints.length - 1]?.t)}&nbsp;– {formatTime($historyPoints[$historyPoints.length - 1].t)}{/if}{/if}
+        </p>
       </div>
 
       <!-- ── Playback ───────────────────────────────────────────────── -->
@@ -343,8 +335,8 @@
 
   .field-label {
     display: block;
-    font-size: var(--text-xs);
-    font-weight: 600;
+    font-size: var(--text-sm);
+    font-weight: 500;
     color: var(--text-secondary);
     margin-bottom: var(--space-1);
   }
@@ -353,9 +345,10 @@
     width: 100%;
     /* 16px minimum — prevents iOS Safari auto-zoom on focus */
     font-size: max(16px, var(--text-base));
-    padding: var(--space-2) var(--space-2-5);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-md);
+    padding: var(--space-2) var(--space-3);
+    min-height: 44px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-input);
     background: var(--surface-3);
     color: var(--text-primary);
     box-sizing: border-box;
@@ -369,7 +362,7 @@
   .field-input:focus {
     outline: none;
     border-color: var(--primary-500);
-    box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary-500) 18%, transparent);
+    box-shadow: 0 0 0 3px var(--primary-500-12);
   }
 
   .field-input option { background: var(--surface-2); color: var(--text-primary); }
@@ -391,7 +384,8 @@
   .skel-row {
     height: var(--space-4);
     border-radius: var(--radius-sm);
-    background: var(--skeleton-base, rgba(255,255,255,0.05));
+    /* Ink-tint base — the global --skeleton-base is white-on-white in light Hearth. */
+    background: color-mix(in oklch, var(--text-primary) 7%, transparent);
     animation: skel-pulse 1.6s ease-in-out infinite;
   }
 
@@ -404,13 +398,17 @@
     50%       { opacity: 1; }
   }
 
-  /* ── Stats ─────────────────────────────────────────────────────────────── */
-  .history-stats {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-2);
+  /* ── Route facts — plain sentence, tabular numerals ───────────────────── */
+  .history-facts {
     padding: var(--space-3) var(--space-4);
     border-top: 1px solid var(--border-subtle);
+  }
+  .history-facts-line {
+    margin: 0;
+    font-size: var(--text-base);
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.5;
   }
 
   /* ── Playback ─────────────────────────────────────────────────────────── */
@@ -436,16 +434,15 @@
     gap: var(--space-3);
     padding: var(--space-3) var(--space-4);
     margin: 0 var(--space-4);
-    background: var(--surface-inset);
-    border: 1px dashed var(--border-subtle);
+    background: var(--surface-2);
     border-radius: var(--radius-lg);
-    color: var(--text-tertiary);
+    color: var(--text-secondary);
   }
 
   .onboard-hint svg { flex-shrink: 0; margin-top: 2px; }
 
   .onboard-hint p {
-    font-size: var(--text-xs);
+    font-size: var(--text-sm);
     line-height: var(--leading-normal);
     margin: 0;
   }

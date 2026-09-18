@@ -153,19 +153,15 @@
 </div>
 
 <style>
-  /* ── Safety Zone ────────────────────────────────────────────────── */
+  /* ── Safety Zone — plain paper; only the SOS trigger itself may be red ── */
   .safety-zone {
-    background: color-mix(in oklch, var(--danger-500) 3%, transparent);
-    border: 1px solid color-mix(in oklch, var(--danger-500) 10%, transparent);
-    border-radius: var(--radius-xl);
+    background: var(--surface-1);
+    border-radius: var(--radius-card, 20px);
+    box-shadow: var(--shadow-xs);
     padding: var(--space-4);
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
-  }
-  :global([data-theme="dark"]) .safety-zone {
-    background: color-mix(in oklch, var(--danger-500) 5%, transparent);
-    border-color: color-mix(in oklch, var(--danger-500) 14%, transparent);
   }
   .safety-actions {
     display: grid;
@@ -174,50 +170,52 @@
     align-items: stretch;
   }
 
-  /* SOS primary action */
+  /* SOS primary action — the one vermilion surface in this panel. Steady,
+     not pulsing: urgency should cut through quiet, not manufacture it. */
   .sos-action-btn {
     display: flex;
     align-items: center;
     gap: var(--space-2-5);
     padding: var(--space-3) var(--space-4);
-    background: linear-gradient(135deg, var(--danger-600), var(--danger-500));
-    border: 1px solid color-mix(in oklch, var(--danger-500) 40%, transparent);
-    border-top-color: rgba(255, 100, 100, 0.48);
-    border-radius: var(--radius-lg);
-    color: white;
+    background: var(--danger-500);
+    border: none;
+    border-radius: var(--radius-button, 14px);
+    color: var(--text-inverse);
     font-family: var(--font-display);
-    font-weight: 800;
+    font-weight: 700;
     font-size: var(--text-base);
     letter-spacing: -0.01em;
     cursor: pointer;
     min-height: 52px;
-    box-shadow: var(--glow-sos), var(--shadow-md);
-    animation: sos-urgent-pulse 2.5s ease-in-out infinite;
-    transition: opacity 200ms;
+    box-shadow: var(--shadow-danger);
+    transition: background 150ms var(--ease-out);
   }
   .sos-action-btn.sos-live {
     background: var(--surface-2);
     color: var(--text-secondary);
-    border-color: var(--border-default);
+    border: 1px solid var(--border-default);
     box-shadow: var(--shadow-sm);
-    animation: none;
   }
   .sos-action-btn:hover:not(.sos-live) {
-    filter: brightness(1.08);
+    background: var(--danger-600);
+  }
+  .sos-action-btn:focus-visible {
+    outline: 2px solid var(--primary-400);
+    outline-offset: 2px;
   }
   .sos-icon-wrap {
     width: 26px;
     height: 26px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.18);
+    background: oklch(1 0 0 / 0.18);
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
   }
   .sos-action-btn.sos-live .sos-icon-wrap {
-    background: color-mix(in oklch, var(--danger-500) 12%, transparent);
-    color: var(--danger-500);
+    background: var(--surface-inset);
+    color: var(--text-secondary);
   }
 
   /* Secondary row gap modifier — replaces inline margin-top */
@@ -225,7 +223,8 @@
     margin-top: var(--space-2);
   }
 
-  /* I'm OK / secondary action buttons */
+  /* Routine actions are quiet paper buttons; an ACTIVE session speaks in the
+     ember tint (the one accent), never red or a second hue. */
   .ok-action-btn {
     display: flex;
     flex-direction: column;
@@ -233,49 +232,35 @@
     justify-content: center;
     gap: 3px;
     padding: var(--space-2) var(--space-3);
-    background: color-mix(in oklch, var(--success-500) 8%, transparent);
-    border: 1px solid color-mix(in oklch, var(--success-500) 18%, transparent);
-    border-radius: var(--radius-lg);
-    color: var(--success-500);
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-button, 14px);
+    color: var(--text-secondary);
     font-family: var(--font-display);
     font-size: var(--text-xs);
-    font-weight: 700;
+    font-weight: 600;
     cursor: pointer;
     min-height: 52px;
     min-width: 60px;
-    transition: background 150ms var(--ease-out), box-shadow 150ms var(--ease-out);
+    transition: background 150ms var(--ease-out), color 150ms var(--ease-out);
   }
   .ok-action-btn:hover {
-    background: color-mix(in oklch, var(--success-500) 14%, transparent);
-    box-shadow: 0 0 16px color-mix(in oklch, var(--success-500) 18%, transparent);
+    background: var(--surface-3);
+    color: var(--text-primary);
   }
-  .ok-action-btn--active {
-    background: color-mix(in oklch, var(--danger-500) 10%, transparent);
-    border-color: color-mix(in oklch, var(--danger-500) 25%, transparent);
-    color: var(--danger-500);
+  .ok-action-btn:focus-visible {
+    outline: 2px solid var(--primary-400);
+    outline-offset: 2px;
   }
-  .ok-action-btn--active:hover {
-    background: color-mix(in oklch, var(--danger-500) 16%, transparent);
-  }
+  .ok-action-btn--active,
   .ok-action-btn--crowd {
-    background: color-mix(in oklch, var(--warning-500) 12%, transparent);
-    border-color: color-mix(in oklch, var(--warning-500) 28%, transparent);
-    color: var(--warning-500, var(--warning-500));
+    background: var(--primary-500-12, color-mix(in oklch, var(--primary-500) 12%, transparent));
+    border-color: var(--primary-500-20, color-mix(in oklch, var(--primary-500) 20%, transparent));
+    color: var(--primary-700);
   }
+  .ok-action-btn--active:hover,
   .ok-action-btn--crowd:hover {
-    background: color-mix(in oklch, var(--warning-500) 18%, transparent);
-  }
-  /* F2: I'm Safe button — teal/green variant */
-  .ok-action-btn--safe {
-    background: color-mix(in oklch, var(--member-3) 10%, transparent);
-    border-color: color-mix(in oklch, var(--member-3) 24%, transparent);
-    color: var(--cyan-500, var(--member-3));
-  }
-  .ok-action-btn--safe:hover {
-    background: color-mix(in oklch, var(--member-3) 18%, transparent);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .sos-action-btn { animation: none; }
+    background: color-mix(in oklch, var(--primary-500) 18%, transparent);
+    color: var(--primary-700);
   }
 </style>

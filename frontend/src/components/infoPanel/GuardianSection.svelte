@@ -23,11 +23,11 @@
         <span class="network-status-badge" class:active={g.status === 'active'} class:pending={g.status !== 'active'}>{g.status}</span>
         {#if g.status === 'pending' && g.initiatedBy === 'ward'}
           <button class="btn btn-primary btn-sm" onclick={() => socket.emit('approveGuardian', { wardUserId: g.wardId })}>Accept</button>
-          <button class="btn btn-danger btn-sm" onclick={() => socket.emit('denyGuardian', { wardUserId: g.wardId })}>Decline</button>
+          <button class="btn btn-secondary btn-sm" onclick={() => socket.emit('denyGuardian', { wardUserId: g.wardId })}>Decline</button>
         {:else if g.status === 'active'}
-          <button class="btn btn-danger btn-sm" onclick={() => revokeGuardian(g.wardId, null)}>Revoke</button>
+          <button class="btn btn-secondary btn-sm" onclick={() => revokeGuardian(g.wardId, null)}>Revoke</button>
         {:else if g.status === 'pending'}
-          <button class="btn btn-danger btn-sm" onclick={() => revokeGuardian(g.wardId, null)}>Cancel</button>
+          <button class="btn btn-secondary btn-sm" onclick={() => revokeGuardian(g.wardId, null)}>Cancel</button>
         {/if}
       </div>
     {/each}
@@ -41,9 +41,9 @@
         <span class="network-status-badge" class:active={g.status === 'active'} class:pending={g.status !== 'active'}>{g.status}</span>
         {#if g.status === 'pending' && g.initiatedBy === 'guardian'}
           <button class="btn btn-primary btn-sm" onclick={() => socket.emit('approveGuardian', { guardianUserId: g.guardianId })}>Accept</button>
-          <button class="btn btn-danger btn-sm" onclick={() => socket.emit('denyGuardian', { guardianUserId: g.guardianId })}>Decline</button>
+          <button class="btn btn-secondary btn-sm" onclick={() => socket.emit('denyGuardian', { guardianUserId: g.guardianId })}>Decline</button>
         {:else if g.status === 'pending' && g.initiatedBy === 'ward'}
-          <button class="btn btn-danger btn-sm" onclick={() => revokeGuardian(null, g.guardianId)}>Cancel</button>
+          <button class="btn btn-secondary btn-sm" onclick={() => revokeGuardian(null, g.guardianId)}>Cancel</button>
         {:else if g.status === 'active'}
           <span class="network-caption">Guardian controls this link</span>
         {/if}

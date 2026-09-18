@@ -98,40 +98,46 @@
 </ul>
 
 <style>
+  /* Warm paper dropdown — quiet rows, ember highlight for the active one. */
   .sr-list {
     position: absolute; top: calc(100% + 4px); left: 0; right: 0;
-    background: rgba(8,12,24,0.96);
-    backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 14px; padding: 4px;
+    background: var(--surface-1);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-button, 14px); padding: 4px;
     list-style: none; margin: 0;
     max-height: 300px; overflow-y: auto;
-    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
-    scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.06) transparent;
+    box-shadow: var(--shadow-lg);
+    scrollbar-width: thin; scrollbar-color: var(--border-default) transparent;
     z-index: 30;
   }
   .sr-section {
     padding: 6px 12px 2px;
-    font-size: 9px; font-weight: 700; letter-spacing: 0.08em;
-    color: rgba(255,255,255,0.20); text-transform: uppercase;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+    color: var(--text-tertiary); text-transform: uppercase;
   }
   .sr-row {
     display: flex; align-items: center; gap: 10px;
     padding: 9px 12px; min-height: 44px; width: 100%;
-    border-radius: 10px; border: none; background: transparent;
+    border-radius: var(--radius-input); border: none; background: transparent;
     text-align: left; cursor: pointer;
-    transition: background 0.1s;
+    transition: background 100ms var(--ease-out, ease-out);
     touch-action: manipulation; -webkit-tap-highlight-color: transparent;
   }
-  .sr-row:hover, .sr-hl { background: color-mix(in oklch, var(--primary-500) 10%, transparent); }
+  .sr-row:hover, .sr-hl { background: var(--primary-500-12, color-mix(in oklch, var(--primary-500) 10%, transparent)); }
   .sr-row:active { background: color-mix(in oklch, var(--primary-500) 18%, transparent); }
+  .sr-row:focus-visible { outline: 2px solid var(--primary-400); outline-offset: -2px; }
   .sr-icon {
-    color: color-mix(in oklch, var(--primary-500) 55%, transparent); flex-shrink: 0;
+    color: var(--text-tertiary); flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
     width: 20px; height: 20px;
   }
+  .sr-row:hover .sr-icon, .sr-hl .sr-icon { color: var(--primary-700); }
   .sr-icon--emoji { font-size: 15px; line-height: 1; }
   .sr-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
-  .sr-name { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.88); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .sr-sub { font-size: 11px; color: rgba(255,255,255,0.30); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sr-name { font-size: var(--text-base); font-weight: 500; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sr-sub { font-size: var(--text-xs); color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sr-row { transition: none; }
+  }
 </style>

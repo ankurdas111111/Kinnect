@@ -100,7 +100,7 @@
       setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 2500);
       return true;
     }
-    banner.set({ type: 'sos', text: res?.error || 'Failed to save place — check your connection and try again', actions: [] });
+    banner.set({ type: 'info', text: res?.error || 'The place could not be saved — check your connection and try again.', actions: [] });
     setTimeout(() => banner.set({ type: null, text: null, actions: [] }), 3000);
     return false;
   }

@@ -274,8 +274,8 @@
   }
 
   .item-name {
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-base);
+    font-weight: 500;
     color: var(--text-primary);
     white-space: nowrap;
     overflow: hidden;
@@ -306,10 +306,11 @@
 
   .icon-action:hover { background: var(--surface-hover); color: var(--text-primary); }
   .icon-action:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
-  /* Danger hover: token-based tint, no raw rgba */
+  /* Removing an alert is routine — ink hover, never red; the explicit
+     aria-label carries the meaning. */
   .icon-action--danger:hover {
-    background: color-mix(in srgb, var(--danger-500) 10%, transparent);
-    color: var(--danger-500);
+    background: var(--surface-hover);
+    color: var(--text-primary);
   }
 
   /* ── Inline empty states ─────────────────────────────────────────────────── */
@@ -318,8 +319,8 @@
   }
 
   .inline-empty-text {
-    font-size: var(--text-xs);
-    color: var(--text-tertiary);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
     margin: 0;
     line-height: var(--leading-normal);
   }
@@ -349,10 +350,12 @@
   }
 
   .field-input {
-    padding: var(--space-2) var(--space-2-5);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-md);
-    font-size: var(--text-sm);
+    padding: var(--space-2) var(--space-3);
+    min-height: 44px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-input);
+    /* 16px floor — prevents iOS zoom-on-focus */
+    font-size: max(16px, var(--text-base));
     background: var(--surface-3);
     color: var(--text-primary);
     font-family: var(--font-sans);
@@ -365,11 +368,11 @@
   .field-input:focus {
     outline: none;
     border-color: var(--primary-500);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-500) 18%, transparent);
+    box-shadow: 0 0 0 3px var(--primary-500-12);
   }
 
   .field-sm  { flex: 1; min-width: 80px; }
-  .field-num { width: 64px; flex: none; }
+  .field-num { width: 76px; flex: none; }
 
   /* Speed limit group: input + range hint stacked */
   .speed-limit-group {
@@ -416,11 +419,16 @@
     display: flex;
     align-items: center;
     gap: var(--space-1-5);
-    font-size: var(--text-xs);
+    font-size: var(--text-sm);
     color: var(--text-primary);
     cursor: pointer;
     user-select: none;
     min-height: 44px;
+  }
+  .check-label input[type='checkbox'] {
+    accent-color: var(--primary-500);
+    width: 18px;
+    height: 18px;
   }
 
   /* ── Utilities ───────────────────────────────────────────────────────────── */

@@ -90,10 +90,10 @@
   }
 
   .rpg-pill.active {
-    background: var(--primary-600);
-    color: white; /* raw-color-ok — white is the universal contrast pair for primary-600 */
+    background: var(--primary-500);
+    color: var(--text-on-primary);
     border-color: var(--primary-500);
-    box-shadow: var(--glow-primary, none), var(--shadow-xs, none);
+    box-shadow: var(--shadow-sm);
     transform: scale(1.04);
   }
 

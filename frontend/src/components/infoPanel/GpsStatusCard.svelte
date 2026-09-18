@@ -86,10 +86,9 @@
 <style>
   /* ── GPS Live Card ──────────────────────────────────────────────── */
   .gps-live-card {
-    background: var(--surface-inset);
+    background: var(--surface-2);
     border: 1px solid var(--border-subtle);
-    border-top-color: var(--border-highlight);
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-card, 20px);
     padding: var(--space-4);
     display: flex;
     align-items: center;
@@ -101,19 +100,15 @@
       box-shadow 500ms var(--ease-out);
     user-select: none;
   }
+  /* Live = a quiet sage wash, not a glow rig — sage says "settled". */
   .gps-live-card.is-tracking {
-    border-color: color-mix(in oklch, var(--success-500) 35%, transparent);
-    border-top-color: color-mix(in oklch, var(--success-500) 55%, transparent);
-    background: linear-gradient(135deg, color-mix(in oklch, var(--success-500) 9%, transparent) 0%, transparent 65%);
-    box-shadow:
-      0 0 20px color-mix(in oklch, var(--success-500) 12%, transparent),
-      0 0 0 1px color-mix(in oklch, var(--success-500) 8%, transparent),
-      inset 0 1px 0 color-mix(in oklch, var(--success-500) 12%, transparent);
+    border-color: color-mix(in oklch, var(--success-500) 25%, transparent);
+    background: color-mix(in oklch, var(--success-500) 7%, transparent);
   }
   .gps-accuracy-label {
     font-family: var(--font-display);
     font-size: var(--text-base);
-    font-weight: 700;
+    font-weight: 600;
     color: var(--text-primary);
     letter-spacing: -0.01em;
     line-height: 1.2;
@@ -138,10 +133,7 @@
   }
   .gps-ping.active {
     background: var(--success-500);
-    box-shadow:
-      0 0 6px color-mix(in oklch, var(--success-500) 75%, transparent),
-      0 0 12px color-mix(in oklch, var(--success-500) 40%, transparent),
-      0 0 20px color-mix(in oklch, var(--success-500) 18%, transparent);
+    box-shadow: 0 0 8px color-mix(in oklch, var(--success-500) 40%, transparent);
     animation: gps-pulse 2.2s ease-in-out infinite;
   }
   .gps-ping.active::before {
@@ -171,7 +163,7 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 500;
     color: var(--text-tertiary);
     white-space: nowrap;
@@ -183,12 +175,13 @@
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: var(--gray-400);
+    background: var(--status-offline);
     flex-shrink: 0;
   }
+  /* Rough accuracy is a "needs a look", never an alarm — ochre, not red. */
   .accuracy-dot.green  { background: var(--success-500); }
   .accuracy-dot.yellow { background: var(--warning-500); }
-  .accuracy-dot.red    { background: var(--danger-500); }
+  .accuracy-dot.red    { background: var(--warning-700); }
 
   /* Speed badge */
   .speed-pill {
@@ -198,31 +191,26 @@
     align-items: center;
     justify-content: center;
     gap: 0;
-    background: color-mix(in oklch, var(--primary-500) 10%, transparent);
-    border: 1px solid color-mix(in oklch, var(--primary-500) 22%, transparent);
-    border-top-color: color-mix(in oklch, var(--primary-400) 35%, transparent);
-    border-radius: var(--radius-md);
+    background: var(--primary-500-12, color-mix(in oklch, var(--primary-500) 12%, transparent));
+    border-radius: var(--radius-input);
     padding: var(--space-1-5) var(--space-3);
     flex-shrink: 0;
     min-width: 52px;
     text-align: center;
-    box-shadow:
-      0 0 10px color-mix(in oklch, var(--primary-500) 14%, transparent),
-      inset 0 1px 0 rgba(255,255,255,0.08);
   }
   .speed-num {
     font-size: var(--text-xl);
-    font-weight: 800;
-    color: var(--primary-400);
+    font-weight: 700;
+    color: var(--primary-700);
     line-height: 1;
-    letter-spacing: -0.04em;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
   }
   .speed-unit {
-    font-size: 9px;
+    font-size: 11px;
     color: var(--text-tertiary);
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
+    font-weight: 500;
+    letter-spacing: 0.04em;
   }
 
   /* GPS Acquiring state */
@@ -231,25 +219,24 @@
     align-items: center;
     gap: var(--space-3);
     padding: var(--space-4);
-    background: var(--surface-inset);
+    background: var(--surface-2);
     border: 1px solid var(--border-subtle);
-    border-top-color: var(--border-highlight);
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-card, 20px);
   }
-  .acquire-icon { color: var(--primary-400); flex-shrink: 0; }
+  .acquire-icon { color: var(--primary-700); flex-shrink: 0; }
   .acquire-title {
     font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 700;
-    color: var(--text-secondary);
+    font-size: var(--text-base);
+    font-weight: 600;
+    color: var(--text-primary);
     margin: 0;
   }
   .acquire-hint {
-    font-size: var(--text-xs);
-    color: var(--text-tertiary);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
     margin: 2px 0 0;
   }
-  .acquire-hint strong { color: var(--text-secondary); }
+  .acquire-hint strong { color: var(--text-primary); font-weight: 600; }
 
   /* Debug stats */
   .tracking-stats {
@@ -265,9 +252,10 @@
     padding: 1px 0;
   }
   .stat-row span:first-child { font-weight: 600; }
-  .latency-good { color: var(--success-500); font-weight: 600; }
-  .latency-ok   { color: var(--warning-500); font-weight: 600; }
-  .latency-bad  { color: var(--danger-500);  font-weight: 600; }
+  /* Latency grades stay sage/ochre — a slow socket is not an emergency. */
+  .latency-good { color: var(--success-600); font-weight: 600; }
+  .latency-ok   { color: var(--warning-600); font-weight: 600; }
+  .latency-bad  { color: var(--warning-700); font-weight: 700; }
 
   @media (prefers-reduced-motion: reduce) {
     .gps-ping.active,
