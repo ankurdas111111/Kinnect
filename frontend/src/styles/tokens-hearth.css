@@ -15,28 +15,36 @@
    Load order: after tokens-oklch.css (which defines the VIGIL ramps) and
    before tokens-fx.css (which stays the last word on blur).
 
-   PALETTE — six colours, one accent (values taken verbatim from the design)
-     Paper     oklch(0.975 0.008 80)   ground, sheets
-     Ink       oklch(0.24  0.02  60)   type, icons
-     Ember     oklch(0.55  0.16  38)   you, actions        ← the only accent
-     Sage      oklch(0.50  0.10 150)   live, settled
-     Ochre     oklch(0.55  0.12  75)   needs a look
-     Vermilion oklch(0.55  0.22  27)   SOS only — nothing else is ever red
+   PALETTE — six colours, one accent. Values pinned to the Stitch "Kinnect
+   Hearth" design system hexes (projects/3208115058720321602), which shifted
+   the original brief warmer and lighter:
+     Background #fff8f4  page ground            (oklch 0.981 0.008 62)
+     Paper      #faf6f0  warm sheet tier        (oklch 0.975 0.009 78)
+     Ink        #38332e  type, icons            (oklch 0.325 0.011 67)
+     Ember      #c65d28  you, actions — the only accent (oklch 0.599 0.149 44.5)
+     Sage       #477c5d  live, settled          (oklch 0.540 0.075 157)
+     Ochre      #a17a26  needs a look           (oklch 0.603 0.109 82.5)
+     Vermilion  #d4381b  SOS only — nothing else is ever red (oklch 0.576 0.197 33)
+   Small ember-coloured TEXT uses --primary-700 (#9d3f08, the system primary)
+   for AA contrast; ember itself is fills, rings, icons and large text.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
-  /* ── Raw Hearth palette (design tokens, verbatim) ────────────────────── */
-  --paper:   oklch(0.975 0.008 80);
-  --paper-2: oklch(0.955 0.01  80);
-  --card:    oklch(1 0 0);
-  --ink:     oklch(0.24 0.02 60);
-  --ink-2:   oklch(0.45 0.02 60);
-  --ink-3:   oklch(0.52 0.02 60);
-  --hairline: oklch(0.24 0.02 60 / 0.10);
-  --ember:   oklch(0.55 0.16 38);
-  --sage:    oklch(0.50 0.10 150);
-  --ochre:   oklch(0.55 0.12 75);
-  --vermilion: oklch(0.55 0.22 27);
+  /* ── Raw Hearth palette (Stitch hexes, verbatim) ─────────────────────── */
+  --paper:   #fff8f4;              /* background / surface                  */
+  --paper-warm: #faf6f0;           /* the design's "paper" card tier        */
+  --paper-2: #f6ece4;              /* surface-container                     */
+  --card:    #ffffff;              /* surface-container-lowest              */
+  --ink:     #38332e;
+  --ink-2:   #56423a;              /* on-surface-variant                    */
+  --ink-3:   #8a7268;              /* outline                               */
+  --hairline: oklch(0.325 0.011 67 / 0.12);
+  --outline-variant: #ddc1b5;
+  --ember:   #c65d28;
+  --ember-light: #f6dfd2;
+  --sage:    #477c5d;
+  --ochre:   #a17a26;
+  --vermilion: #d4381b;
 
   /* Map canvas tokens (warm, low-contrast base) */
   --map-base:   oklch(0.95 0.012 80);
@@ -49,47 +57,50 @@
   --sh-up: 0 -8px 32px oklch(0.3 0.03 60 / 0.14);
 
   /* ── Ember ramp → --primary-* ────────────────────────────────────────
-     Ember is the ONE accent: "you" and actions. L/C follow the design's
-     0.55/0.16 at hue 38, stepped for hover/active and tinted fills. */
-  --primary-50:  oklch(0.97 0.02  38);
-  --primary-100: oklch(0.95 0.03  38);   /* ember tint bg (design) */
-  --primary-200: oklch(0.89 0.06  38);
-  --primary-300: oklch(0.72 0.12  38);
-  --primary-400: oklch(0.63 0.15  38);
-  --primary-500: oklch(0.55 0.16  38);   /* the accent */
-  --primary-600: oklch(0.48 0.15  38);
-  --primary-700: oklch(0.41 0.13  38);
-  --primary-800: oklch(0.35 0.11  38);
-  --primary-900: oklch(0.30 0.09  38);
-  --brand-hue: 38;
+     Ember is the ONE accent: "you" and actions. Recentred on the Stitch
+     hex #c65d28 (oklch 0.599 0.149 44.5); 100 = #f6dfd2 (ember-light) and
+     700 = #9d3f08 (the Stitch system primary — small accent TEXT uses
+     this step for AA contrast on paper). */
+  --primary-50:  oklch(0.97 0.018 44.5);
+  --primary-100: #f6dfd2;                  /* ember tint bg (Stitch)      */
+  --primary-200: oklch(0.86 0.06  45);
+  --primary-300: oklch(0.74 0.11  45);
+  --primary-400: oklch(0.66 0.135 45);
+  --primary-500: #c65d28;                  /* the accent (Stitch ember)   */
+  --primary-600: oklch(0.53 0.145 44.5);
+  --primary-700: #9d3f08;                  /* Stitch primary — AA text    */
+  --primary-800: oklch(0.42 0.12  44);
+  --primary-900: oklch(0.36 0.10  44);
+  --brand-hue: 44.5;
 
-  /* ── Sage → --success-* (live, settled) ─────────────────────────────── */
-  --success-400: oklch(0.58 0.10 150);
-  --success-500: oklch(0.50 0.10 150);
-  --success-600: oklch(0.43 0.09 150);
-  --success-700: oklch(0.37 0.08 150);
+  /* ── Sage → --success-* (live, settled) — Stitch #477c5d, hue 157 ───── */
+  --success-400: oklch(0.61 0.08  157);
+  --success-500: #477c5d;
+  --success-600: oklch(0.47 0.07  157);
+  --success-700: oklch(0.41 0.065 157);
 
-  /* ── Ochre → --warning-* (needs a look) ─────────────────────────────── */
-  --warning-300: oklch(0.80 0.10 75);
-  --warning-400: oklch(0.63 0.12 75);
-  --warning-500: oklch(0.55 0.12 75);
-  --warning-600: oklch(0.48 0.11 75);
-  --warning-700: oklch(0.41 0.10 75);
+  /* ── Ochre → --warning-* (needs a look) — Stitch #a17a26, hue 82.5 ──── */
+  --warning-300: oklch(0.80 0.09  82.5);
+  --warning-400: oklch(0.66 0.11  82.5);
+  --warning-500: #a17a26;
+  --warning-600: oklch(0.53 0.10  82.5);
+  --warning-700: oklch(0.46 0.09  82.5);
 
-  /* ── Vermilion → --danger-* (SOS ONLY) ──────────────────────────────── */
-  --danger-300: oklch(0.72 0.16 27);
-  --danger-400: oklch(0.62 0.20 27);
-  --danger-500: oklch(0.55 0.22 27);
-  --danger-600: oklch(0.48 0.21 27);
-  --danger-700: oklch(0.42 0.19 27);
+  /* ── Vermilion → --danger-* (SOS ONLY) — Stitch #d4381b, hue 33 ─────── */
+  --danger-300: oklch(0.72 0.15  33);
+  --danger-400: oklch(0.63 0.18  33);
+  --danger-500: #d4381b;
+  --danger-600: oklch(0.50 0.19  33);
+  --danger-700: oklch(0.44 0.17  33);
 
-  /* ── Surfaces — paper, sheets, cards ────────────────────────────────── */
+  /* ── Surfaces — the Stitch container ladder ─────────────────────────
+     lowest #ffffff · low #fcf2ea · container #f6ece4 · high #f0e6df     */
   --surface-0: var(--paper);
   --surface-1: var(--card);
-  --surface-2: var(--card);
+  --surface-2: #fcf2ea;
   --surface-3: var(--paper-2);
-  --surface-inset: var(--paper-2);
-  --surface-hover: oklch(0.24 0.02 60 / 0.04);
+  --surface-inset: #f0e6df;
+  --surface-hover: oklch(0.325 0.011 67 / 0.05);
   --surface-midnight: var(--paper-2);
 
   /* ── Ink ─────────────────────────────────────────────────────────────── */
@@ -101,8 +112,8 @@
 
   /* ── Hairlines ───────────────────────────────────────────────────────── */
   --border-default: var(--hairline);
-  --border-subtle:  oklch(0.24 0.02 60 / 0.06);
-  --border-strong:  oklch(0.24 0.02 60 / 0.18);
+  --border-subtle:  oklch(0.325 0.011 67 / 0.07);
+  --border-strong:  var(--outline-variant);
 
   /* ── Glass → paper. Hearth has sheets, not glass; keep the token so the
      39 files reading --glass-* keep working, but resolve it to card. ──── */
@@ -115,8 +126,8 @@
   --shadow-md: 0 4px 12px oklch(0.3 0.03 60 / 0.10);
   --shadow-lg: var(--sh);
   --shadow-xl: 0 16px 48px oklch(0.3 0.03 60 / 0.16);
-  --shadow-primary: 0 4px 14px oklch(0.55 0.16 38 / 0.28);
-  --shadow-danger:  0 4px 14px oklch(0.55 0.22 27 / 0.28);
+  --shadow-primary: 0 4px 16px oklch(0.599 0.149 44.5 / 0.28);
+  --shadow-danger:  0 6px 24px oklch(0.576 0.197 33 / 0.35);
 
   /* ── Status tokens follow the ladder, not the old traffic-light set ─── */
   --status-live:    var(--sage);
@@ -138,15 +149,16 @@
   --member-4-halo: oklch(0.68 0.06 280);
   --member-offline: oklch(0.70 0.008 60);
 
-  /* ── Typography — Instrument Serif italic for verdicts, Sans for all else.
-     --font-display drives headings app-wide; the serif verdict voice is
-     applied via .verdict-voice (below) so only verdicts get the italic. ─ */
-  --font-display: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-sans:    'Instrument Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-serif:   'Instrument Serif', ui-serif, Georgia, serif;
+  /* ── Typography — the Stitch dual register: Newsreader italic is the
+     verdict voice (moments of truth, screen titles, summary verdicts);
+     Work Sans carries everything functional. The serif is applied via
+     .verdict-voice (below) so only verdicts get the italic. ─────────── */
+  --font-display: 'Work Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-sans:    'Work Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-serif:   'Newsreader', ui-serif, Georgia, serif;
   /* Tabular numerals live in the sans face — the design sets numbers as
      "8 min · 1.2 km · 64%", sparse and aligned, not in a mono face. */
-  --font-mono:    'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono:    'Work Sans', ui-sans-serif, system-ui, sans-serif;
 
   /* Pages that predate Hearth read --bg-base for their page ground; without
      a definition they fall back to VIGIL near-black hexes. */
@@ -172,68 +184,73 @@
    data-theme, so this is the single source of night truth.
    ═══════════════════════════════════════════════════════════════════════════ */
 :root[data-theme="dark"] {
-  /* ── Raw night palette ───────────────────────────────────────────────── */
-  --paper:   oklch(0.21 0.01 60);
-  --paper-2: oklch(0.245 0.012 60);
-  --card:    oklch(0.25 0.01 60);
-  --ink:     oklch(0.95 0.008 80);
-  --ink-2:   oklch(0.78 0.012 80);
-  --ink-3:   oklch(0.65 0.012 80);
-  --hairline: oklch(0.95 0.008 80 / 0.12);
-  --ember:   oklch(0.76 0.13 38);
-  --sage:    oklch(0.62 0.10 150);
-  --ochre:   oklch(0.68 0.12 75);
-  --vermilion: oklch(0.64 0.20 27);
-  --lp-quiet: oklch(0.42 0.012 60);
+  /* ── Raw night palette (Stitch: canvas #292623, text #f5f2ed,
+       ember #e48552, SOS glow #ff5c3b) ───────────────────────────────── */
+  --paper:   #292623;
+  --paper-warm: oklch(0.29 0.008 67);
+  --paper-2: oklch(0.31 0.009 67);
+  --card:    oklch(0.315 0.008 67);
+  --ink:     #f5f2ed;
+  --ink-2:   oklch(0.79 0.012 75);
+  --ink-3:   oklch(0.66 0.012 75);
+  --hairline: oklch(0.962 0.007 81 / 0.12);
+  --outline-variant: oklch(0.962 0.007 81 / 0.20);
+  --ember:   #e48552;
+  --ember-light: oklch(0.35 0.045 48);
+  --sage:    oklch(0.65 0.08 157);
+  --ochre:   oklch(0.70 0.11 82.5);
+  --vermilion: #ff5c3b;
+  --lp-quiet: oklch(0.44 0.010 67);
 
-  /* Night map canvas tokens */
-  --map-base:   oklch(0.245 0.012 60);
-  --map-street: oklch(0.30 0.012 60);
-  --map-park:   oklch(0.27 0.03 140);
-  --map-water:  oklch(0.27 0.03 230);
+  /* Night map canvas tokens (anchored to the #292623 canvas, warm hue 67) */
+  --map-base:   oklch(0.30 0.010 67);
+  --map-street: oklch(0.35 0.010 67);
+  --map-park:   oklch(0.32 0.03 145);
+  --map-water:  oklch(0.32 0.03 230);
 
   --sh:   0  8px 24px oklch(0 0 0 / 0.45);
   --sh-up: 0 -8px 32px oklch(0 0 0 / 0.50);
 
-  /* ── Ember ramp, brightened — light accent needs DARK ink on it ─────── */
-  --primary-50:  oklch(0.26 0.03 38);
-  --primary-100: oklch(0.30 0.05 38);
-  --primary-200: oklch(0.38 0.08 38);
-  --primary-300: oklch(0.66 0.12 38);
-  --primary-400: oklch(0.72 0.13 38);
-  --primary-500: oklch(0.76 0.13 38);
-  --primary-600: oklch(0.80 0.13 38);
-  --primary-700: oklch(0.62 0.14 38);
-  --primary-800: oklch(0.54 0.13 38);
-  --primary-900: oklch(0.46 0.11 38);
+  /* ── Ember ramp, brightened — light accent needs DARK ink on it.
+       Recentred on the Stitch dark ember #e48552 (oklch 0.709 0.134 48) ── */
+  --primary-50:  oklch(0.30 0.03  48);
+  --primary-100: oklch(0.34 0.05  48);
+  --primary-200: oklch(0.42 0.08  48);
+  --primary-300: oklch(0.62 0.115 48);
+  --primary-400: oklch(0.67 0.125 48);
+  --primary-500: #e48552;
+  --primary-600: oklch(0.75 0.135 48);
+  --primary-700: oklch(0.60 0.13  48);
+  --primary-800: oklch(0.52 0.12  48);
+  --primary-900: oklch(0.45 0.10  48);
 
-  --success-400: oklch(0.68 0.10 150);
-  --success-500: oklch(0.62 0.10 150);
-  --success-600: oklch(0.54 0.09 150);
-  --success-700: oklch(0.46 0.08 150);
+  --success-400: oklch(0.70 0.085 157);
+  --success-500: oklch(0.65 0.08  157);
+  --success-600: oklch(0.57 0.075 157);
+  --success-700: oklch(0.49 0.07  157);
 
-  --warning-300: oklch(0.78 0.11 75);
-  --warning-400: oklch(0.72 0.12 75);
-  --warning-500: oklch(0.68 0.12 75);
-  --warning-600: oklch(0.58 0.11 75);
-  --warning-700: oklch(0.50 0.10 75);
+  --warning-300: oklch(0.78 0.10  82.5);
+  --warning-400: oklch(0.73 0.105 82.5);
+  --warning-500: oklch(0.70 0.11  82.5);
+  --warning-600: oklch(0.60 0.10  82.5);
+  --warning-700: oklch(0.52 0.09  82.5);
 
-  --danger-300: oklch(0.74 0.16 27);
-  --danger-400: oklch(0.68 0.19 27);
-  --danger-500: oklch(0.64 0.20 27);
-  --danger-600: oklch(0.55 0.20 27);
-  --danger-700: oklch(0.47 0.18 27);
+  --danger-300: oklch(0.75 0.16  33);
+  --danger-400: oklch(0.71 0.185 33);
+  --danger-500: #ff5c3b;
+  --danger-600: oklch(0.60 0.19  33);
+  --danger-700: oklch(0.52 0.17  33);
 
   /* ── Surfaces ────────────────────────────────────────────────────────── */
   --surface-0: var(--paper);
   --surface-1: var(--card);
-  --surface-2: oklch(0.27 0.012 60);
-  --surface-3: oklch(0.235 0.01 60);
-  --surface-inset: oklch(0.185 0.01 60);
-  --surface-hover: oklch(0.95 0.008 80 / 0.07);
-  --surface-active: oklch(0.95 0.008 80 / 0.11);
+  --surface-2: oklch(0.335 0.010 67);
+  --surface-3: oklch(0.295 0.008 67);
+  --surface-inset: oklch(0.245 0.008 67);
+  --surface-hover: oklch(0.962 0.007 81 / 0.07);
+  --surface-active: oklch(0.962 0.007 81 / 0.11);
   --surface-selected: color-mix(in oklch, var(--primary-500) 14%, transparent);
-  --surface-midnight: oklch(0.185 0.01 60);
+  --surface-midnight: oklch(0.245 0.008 67);
   --primary-ghost-hover: color-mix(in oklch, var(--primary-500) 12%, transparent);
 
   /* ── Ink ─────────────────────────────────────────────────────────────── */
@@ -243,25 +260,25 @@
   /* Consumers use --text-inverse ON colored/dark surfaces (SOS banner, toggle
      thumbs) — it stays light at night; flipping it dark would break them. */
   --text-inverse:   oklch(0.99 0.004 80);
-  --text-on-primary: oklch(0.20 0.04 38);
+  --text-on-primary: oklch(0.22 0.05 48);
 
   /* ── Hairlines ───────────────────────────────────────────────────────── */
   --border-default: var(--hairline);
-  --border-subtle:  oklch(0.95 0.008 80 / 0.07);
-  --border-strong:  oklch(0.95 0.008 80 / 0.20);
-  --border-highlight: oklch(0.95 0.008 80 / 0.14);
+  --border-subtle:  oklch(0.962 0.007 81 / 0.07);
+  --border-strong:  oklch(0.962 0.007 81 / 0.20);
+  --border-highlight: oklch(0.962 0.007 81 / 0.14);
 
   /* ── Glass → dusk paper (kills the VIGIL indigo glass everywhere) ───── */
-  --glass-bg:            oklch(0.25 0.01 60 / 0.92);
-  --glass-bg-strong:     oklch(0.23 0.01 60 / 0.95);
-  --glass-border:        oklch(0.95 0.008 80 / 0.10);
-  --glass-border-strong: oklch(0.95 0.008 80 / 0.16);
-  --glass-3d:            oklch(0.26 0.012 60 / 0.85);
-  --glass-3d-border:     oklch(0.95 0.008 80 / 0.10);
-  --nav-tint:            oklch(0.30 0.015 60);
-  --nav-specular:        oklch(0.95 0.008 80 / 0.10);
-  --map-chip-bg:         oklch(0.24 0.01 60 / 0.88);
-  --map-chip-border:     oklch(0.95 0.008 80 / 0.10);
+  --glass-bg:            oklch(0.315 0.008 67 / 0.92);
+  --glass-bg-strong:     oklch(0.29 0.008 67 / 0.95);
+  --glass-border:        oklch(0.962 0.007 81 / 0.10);
+  --glass-border-strong: oklch(0.962 0.007 81 / 0.16);
+  --glass-3d:            oklch(0.325 0.010 67 / 0.85);
+  --glass-3d-border:     oklch(0.962 0.007 81 / 0.10);
+  --nav-tint:            oklch(0.36 0.012 67);
+  --nav-specular:        oklch(0.962 0.007 81 / 0.10);
+  --map-chip-bg:         oklch(0.30 0.008 67 / 0.88);
+  --map-chip-border:     oklch(0.962 0.007 81 / 0.10);
 
   /* ── Warm-black elevation ────────────────────────────────────────────── */
   --shadow-xs: 0 1px  3px oklch(0 0 0 / 0.35);
@@ -269,8 +286,8 @@
   --shadow-md: 0 4px 14px oklch(0 0 0 / 0.45);
   --shadow-lg: var(--sh);
   --shadow-xl: 0 16px 48px oklch(0 0 0 / 0.55);
-  --shadow-primary: 0 4px 18px oklch(0.76 0.13 38 / 0.30);
-  --shadow-danger:  0 4px 18px oklch(0.64 0.20 27 / 0.35);
+  --shadow-primary: 0 4px 18px oklch(0.709 0.134 48 / 0.30);
+  --shadow-danger:  0 6px 24px oklch(0.687 0.204 33 / 0.40);
 
   /* ── Status ladder ───────────────────────────────────────────────────── */
   --status-live:    var(--sage);
@@ -362,7 +379,7 @@
 
 /* ═══════════════════════════════════════════════════════════════════════════
    THE VERDICT VOICE
-   "Everyone's settled." — Instrument Serif italic, the one place the app
+   "Everyone's settled." — Newsreader italic, the one place the app
    speaks in a human sentence. Applied by class so headings elsewhere keep
    the sans face.
    ═══════════════════════════════════════════════════════════════════════════ */

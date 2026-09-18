@@ -2,15 +2,15 @@ import { mount } from 'svelte';
 import App from './App.svelte';
 // Self-hosted fonts (Fontsource): no fonts.googleapis.com runtime dependency,
 // so Capacitor cold starts render branded type even fully offline.
-// HEARTH: Instrument Sans carries everything; Instrument Serif italic is the
-// verdict voice only ("Everyone's settled."). Numbers are tabular in the sans
-// face — the design sets data as "8 min · 1.2 km · 64%", not in a mono face.
-import '@fontsource/instrument-sans/400.css';
-import '@fontsource/instrument-sans/500.css';
-import '@fontsource/instrument-sans/600.css';
-import '@fontsource/instrument-sans/700.css';
-import '@fontsource/instrument-serif/400.css';
-import '@fontsource/instrument-serif/400-italic.css';
+// HEARTH (Stitch "Kinnect Hearth"): Work Sans carries everything functional;
+// Newsreader italic is the verdict voice only ("Everyone's settled.").
+// Numbers are tabular in the sans face — "8 min · 1.2 km · 64%", not mono.
+import '@fontsource/work-sans/400.css';
+import '@fontsource/work-sans/500.css';
+import '@fontsource/work-sans/600.css';
+import '@fontsource/work-sans/700.css';
+import '@fontsource/newsreader/400.css';
+import '@fontsource/newsreader/400-italic.css';
 import './global.css';
 // OKLCH re-expression of the core color scales — MUST stay between global.css
 // (defines the scales) and themes.css (named themes override --primary-*).
