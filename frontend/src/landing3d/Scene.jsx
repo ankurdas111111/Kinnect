@@ -1,6 +1,6 @@
 import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Environment, ContactShadows, RoundedBox } from '@react-three/drei';
+import { Environment, Lightformer, ContactShadows, RoundedBox } from '@react-three/drei';
 import * as THREE from 'three';
 import { BOARD, PALETTE, BUILDINGS, ROADS, PARK, WATER, PERSON_R, MARKER_H } from './world.js';
 import CityProps from './CityProps.jsx';
@@ -41,6 +41,59 @@ function roadGeometry(pts, width) {
   geo.setIndex(index);
   geo.computeVertexNormals();
   return geo;
+}
+
+/**
+ * The environment map, built in-process from a handful of emissive panels.
+ *
+ * This used to be `<Environment preset="city" />`, which downloads a 1k HDRI
+ * from raw.githubusercontent.com at runtime. Suspense blanks the whole scene
+ * while that is in flight, so a slow or blocked network left the landing page
+ * showing nothing at all — for ~20s on a normal connection, forever behind a
+ * firewall. A hero that depends on a third-party CDN is not a hero.
+ *
+ * Lightformers bake to a cubemap once (`frames={1}`) with no network at all,
+ * and they are art-directable, which a stock HDRI is not.
+ */
+function EnvRig({ theme }) {
+  const night = theme === 'dark';
+  return (
+    <Environment
+      key={theme}
+      resolution={128}
+      frames={1}
+      background={false}
+      environmentIntensity={night ? 0.55 : 0.4}
+    >
+      {night ? (
+        <>
+          {/* cool night sky overhead */}
+          <Lightformer form="rect" intensity={0.55} color="#5d7096" scale={[70, 70, 1]}
+            position={[0, 26, 0]} rotation={[-Math.PI / 2, 0, 0]} />
+          {/* the city's own sodium glow, bouncing off haze at street level */}
+          <Lightformer form="rect" intensity={2.2} color="#ff9a4d" scale={[70, 12, 1]}
+            position={[0, -7, 26]} rotation={[Math.PI / 2, 0, 0]} />
+          <Lightformer form="rect" intensity={1.4} color="#ff8c3c" scale={[70, 12, 1]}
+            position={[0, -7, -26]} rotation={[Math.PI / 2, 0, 0]} />
+          {/* moon side, for a cool rim on one face of every building */}
+          <Lightformer form="rect" intensity={1.1} color="#a9c0e4" scale={[10, 40, 1]}
+            position={[-30, 12, -14]} rotation={[0, Math.PI / 2, 0]} />
+        </>
+      ) : (
+        <>
+          {/* sky dome */}
+          <Lightformer form="rect" intensity={1.5} color="#e8f1ff" scale={[80, 80, 1]}
+            position={[0, 30, 0]} rotation={[-Math.PI / 2, 0, 0]} />
+          {/* warm late-afternoon sun side */}
+          <Lightformer form="rect" intensity={2.4} color="#fff0d8" scale={[26, 40, 1]}
+            position={[30, 14, 16]} rotation={[0, -Math.PI / 2, 0]} />
+          {/* ground bounce — warm, and the reason shadowed walls are not grey */}
+          <Lightformer form="rect" intensity={0.9} color="#e3d2b4" scale={[80, 80, 1]}
+            position={[0, -14, 0]} rotation={[Math.PI / 2, 0, 0]} />
+        </>
+      )}
+    </Environment>
+  );
 }
 
 export default function Scene({ theme = 'light', tone = null, people = [] }) {
@@ -119,10 +172,7 @@ export default function Scene({ theme = 'light', tone = null, people = [] }) {
         </>
       )}
 
-      <Environment
-        preset={theme === 'dark' ? 'night' : 'city'}
-        environmentIntensity={theme === 'dark' ? 0.5 : 0.38}
-      />
+      <EnvRig theme={theme} />
 
       {/* Ground */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow position={[0, -0.02, 0]}>

@@ -21,6 +21,33 @@
 .l3d-stage.is-ready { opacity: 1; }
 .l3d-canvas { display: block; width: 100%; height: 100%; }
 
+/* The text column always sits left; the diorama is free to wander under it.
+   This keeps the copy on a quiet ground without darkening the whole scene. */
+.l3d-scrim {
+  position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    var(--surface-0) 0%,
+    color-mix(in oklch, var(--surface-0) 88%, transparent) 22%,
+    color-mix(in oklch, var(--surface-0) 40%, transparent) 40%,
+    transparent 58%
+  );
+}
+/* Narrow screens have no side column, so the split is horizontal instead: the
+   city owns the top of the frame, the copy owns the bottom, and the scrim is
+   opaque under the copy rather than merely tinted. */
+@media (max-width: 900px) {
+  .l3d-scrim {
+    background: linear-gradient(
+      to top,
+      var(--surface-0) 0%,
+      var(--surface-0) 36%,
+      color-mix(in oklch, var(--surface-0) 55%, transparent) 54%,
+      transparent 78%
+    );
+  }
+}
+
 .l3d > *:not(.l3d-stage) { position: relative; z-index: 1; }
 
 /* ── Nav ─────────────────────────────────────────────────────────────────── */
@@ -150,6 +177,17 @@
   display: flex; flex-wrap: wrap; gap: var(--space-4);
   margin-top: var(--space-10);
   font-size: var(--text-sm); color: var(--text-tertiary);
+}
+
+/* Small screens: push the hero copy to the bottom so it lands on the opaque
+   half of the scrim and the diorama gets the top of the frame to itself. */
+@media (max-width: 900px) {
+  .l3d-hero {
+    min-height: 94vh;
+    justify-content: flex-end;
+    padding-bottom: var(--space-10);
+  }
+  .l3d-close { min-height: 80vh; }
 }
 
 @media (prefers-reduced-motion: reduce) {

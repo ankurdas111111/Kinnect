@@ -16,14 +16,14 @@ const prefersReduced = () =>
  * Rule of thumb here: height ≈ 1.4× the distance you want to see across.
  */
 const SHOTS = [
-  { pos: [30, 250, 300], look: [10, -6, 4], fov: 30, parallax: 10 },     // establishing
+  { pos: [30, 250, 300], look: [-34, -6, 4], fov: 30, parallax: 10 },    // establishing
   { pos: [-46, 225, 275], look: [-30, -6, 20], fov: 29, parallax: 9 },  // school walk
   { pos: [78, 235, 255], look: [58, -6, -28], fov: 29, parallax: 9 },   // office
-  { pos: [20, 275, 330], look: [10, -6, 4], fov: 31, parallax: 11 },     // quiet noon
+  { pos: [20, 275, 330], look: [-14, -6, 4], fov: 31, parallax: 11 },    // quiet noon
   { pos: [14, 215, 258], look: [4, -6, 8], fov: 29, parallax: 8 },      // Nani
   { pos: [-38, 195, 235], look: [-30, -6, 38], fov: 28, parallax: 7 },  // SOS
   { pos: [-38, 205, 245], look: [-30, -6, 38], fov: 28, parallax: 7 },  // safe
-  { pos: [26, 290, 350], look: [10, -6, 4], fov: 32, parallax: 12 },     // settled
+  { pos: [26, 290, 350], look: [-34, -6, 4], fov: 32, parallax: 12 },    // settled
 ];
 
 function peopleAt(beatIndex) {
@@ -89,6 +89,9 @@ export default function App({ onExit }) {
     <div className="l3d" ref={rootRef} data-tone={tone || 'calm'}>
       <div className={`l3d-stage ${ready ? 'is-ready' : ''}`} aria-hidden="true">
         <ViewCanvas theme={theme} tone={tone} people={people} target={target} reduced={reduced} />
+        {/* Reads as distance haze; its real job is to guarantee the text column
+            has a quiet ground no matter what the camera is over. */}
+        <div className="l3d-scrim" />
       </div>
 
       <header className="l3d-nav">
