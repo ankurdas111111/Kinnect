@@ -1,513 +1,297 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   AUTH PAGES — Dark Glass Design System (unified with main app)
+   AUTH PAGES — "Kinnect Hearth" warm-paper shell
+   Rendering spec: Stitch "Kinnect — Sign In & Create Circle" screen +
+   the Kinnect Hearth design system.
+
+   One calibrated column on warm paper (max 640px), a serif-italic verdict
+   headline, a tactile paper-pill mode switcher, warm inset fields with an
+   ember focus ring, and ONE 48px ember action. No cards, no glass — the
+   form sits directly on the paper ground with tonal separation only.
+
+   Everything reads Hearth semantic tokens, so Hearth Night (dark mode)
+   follows automatically — no [data-theme] blocks needed here.
+
+   Vermilion is BANNED on auth (SOS-only). Form errors speak in ochre
+   (--warning-*) with descriptive copy.
+
+   Consumed via @import inside Login.svelte / Register.svelte <style>
+   blocks, so selectors are Svelte-scoped per component; :root and
+   .auth-page-level custom properties survive scoping.
    ═══════════════════════════════════════════════════════════════════════════ */
-
-/* ── Auth page background tokens — scoped to auth pages only ─────────── */
-/* Auth page intentionally always dark (brand experience), but uses tokens */
-:root {
-  --auth-page-bg: var(--surface-0);
-  --auth-page-text: #ffffff;
-  --auth-page-text-muted: rgba(255, 255, 255, 0.62);
-  --auth-card-bg: rgba(8, 14, 24, 0.65);
-  --auth-input-bg: rgba(255, 255, 255, 0.06);
-  --auth-input-text: #ffffff;
-  --auth-input-placeholder: rgba(255, 255, 255, 0.25);
-  --auth-input-border: rgba(255, 255, 255, 0.10);
-}
-
-/* Light mode: auth page flips to a soft light aesthetic.
-   :global() is REQUIRED: this file is consumed via @import inside Login/
-   Register component <style> blocks, so Svelte scopes bare selectors —
-   an unwrapped [data-theme] block silently matches nothing (html is
-   outside the component). :root survives scoping; this must too. */
-:global([data-theme="light"]) {
-  /* HEARTH: warm ink, not the cool slate ramp — --gray-900/500 sit at hue
-     265/257 and rendered the auth headline navy on warm paper. */
-  --auth-page-bg: var(--surface-0);
-  --auth-page-text: var(--text-primary);
-  --auth-page-text-muted: var(--text-secondary);
-  --auth-card-bg: var(--card, rgba(255, 255, 255, 0.94));
-  --auth-input-bg: var(--paper-2, rgba(15, 23, 42, 0.04));
-  --auth-input-text: var(--text-primary);
-  --auth-input-placeholder: var(--text-tertiary);
-  --auth-input-border: var(--border-default);
-}
 
 /* ── Page shell ─────────────────────────────────────────────────────────── */
 .auth-page {
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
+  flex-direction: column;
   font-family: var(--font-sans);
-  background: var(--auth-page-bg);
-  position: relative;
-  overflow: hidden;
+  background: var(--paper);
+  color: var(--text-primary);
+
+  /* Local extension tokens (auth-only):
+     — hero size: the design's headline-hero ramp (30px mobile → 40px
+       desktop, Newsreader 400 italic); the global type scale tops out at
+       --text-3xl (28px), so the verdict headline extends it here.
+     — error voice: ochre leaned toward ink so it self-adapts — darker
+       ochre on paper, lighter ochre on the night canvas. Never vermilion. */
+  --auth-hero-size: clamp(1.875rem, 1.25rem + 2.6vw, 2.5rem);
+  --auth-error-text: color-mix(in oklch, var(--warning-600) 72%, var(--text-primary));
+  --auth-error-bg: color-mix(in oklch, var(--warning-500) 10%, var(--paper));
+  --auth-error-border: color-mix(in oklch, var(--warning-500) 35%, transparent);
 }
 
-/* Decorative mesh never participates in layout — at any width */
-.auth-page > .fx-ambient {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
+/* One-column calibrated focus — a single centered 640px rail. */
+.auth-topbar,
+.auth-main,
+.auth-footer {
+  width: 100%;
+  max-width: 40rem; /* 640px — the design system's one-column maximum */
+  margin-inline: auto;
+  padding-inline: var(--space-5);
 }
 
-/* Radial gradient background — teal brand palette */
-.auth-page::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(ellipse 70% 60% at 25% 40%, color-mix(in oklch, var(--primary-500) 12%, transparent) 0%, transparent 70%),
-    radial-gradient(ellipse 50% 50% at 75% 60%, color-mix(in oklch, var(--primary-600) 8%, transparent) 0%, transparent 70%),
-    radial-gradient(ellipse 100% 80% at 50% 100%, color-mix(in oklch, var(--member-1) 6%, transparent) 0%, transparent 60%);
-}
-
-/* Subtle noise texture */
-.auth-page::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23noise)' opacity='0.025'/%3E%3C/svg%3E");
-  background-size: 200px 200px;
-  background-repeat: repeat;
-}
-
-/* ── Animated background blob (referenced in Login.svelte & Register.svelte) */
-.auth-bg {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.auth-bg-blob {
-  position: absolute;
-  width: 700px;
-  height: 700px;
-  border-radius: 50%;
-  background: radial-gradient(
-    circle at center,
-    color-mix(in oklch, var(--primary-500) 20%, transparent) 0%,
-    color-mix(in oklch, var(--primary-600) 14%, transparent) 35%,
-    color-mix(in oklch, var(--member-1) 7%, transparent) 60%,
-    transparent 75%
-  );
-  top: -200px;
-  left: -150px;
-  animation: blob-drift 22s ease-in-out infinite;
-  filter: blur(60px);
-  /* GPU compositor hint — blob animates only transform, no layout */
-  will-change: transform;
-}
-
-.auth-bg-blob::after {
-  content: '';
-  position: absolute;
-  width: 500px;
-  height: 500px;
-  border-radius: 50%;
-  background: radial-gradient(
-    circle at center,
-    color-mix(in oklch, var(--primary-500) 8%, transparent) 0%,
-    color-mix(in oklch, var(--primary-600) 6%, transparent) 40%,
-    transparent 70%
-  );
-  bottom: -100px;
-  right: -100px;
-  animation: blob-drift 28s ease-in-out infinite reverse;
-  filter: blur(50px);
-  will-change: transform;
-}
-
-@keyframes blob-drift {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  25%       { transform: translate(80px, 60px) scale(1.08); }
-  50%       { transform: translate(40px, 120px) scale(0.96); }
-  75%       { transform: translate(-40px, 40px) scale(1.04); }
-}
-
-/* Disable decorative blob animation for users who prefer reduced motion */
-@media (prefers-reduced-motion: reduce) {
-  .auth-bg-blob,
-  .auth-bg-blob::after {
-    animation: none;
-    will-change: auto;
-  }
-  .auth-brand-features li {
-    animation: none;
-    opacity: 1;
-    transform: none;
-  }
-  .auth-card {
-    animation: none;
-  }
-  .auth-submit::after {
-    display: none;
-  }
-}
-
-/* ── Brand panel (desktop split layout) ─────────────────────────────────── */
-.auth-brand {
-  display: none;
-}
-
-@media (min-width: 768px) {
-  /* Proportional two-column split.
-     Cols: [gutter] [brand 5fr] [form 4fr] [gutter]
-     Gutters keep the content rail at min(~92vw, 90rem), centered.
-     The form column never collapses below min(26rem, 50vw) so the card
-     stays usable at tablet widths. */
-  .auth-page {
-    display: grid;
-    grid-template-columns:
-      max(4vw, calc((100% - 90rem) / 2))
-      minmax(0, 5fr)
-      minmax(min(26rem, 50vw), 4fr)
-      max(4vw, calc((100% - 90rem) / 2));
-  }
-
-  /* Decorative mesh wrapper leaves the grid flow — all its layers are
-     position:fixed, so pulling it out of flow changes nothing visually
-     but prevents it from occupying the first grid track. */
-  .auth-page > .fx-ambient {
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-  }
-
-  .auth-brand {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    grid-column: 2;
-    grid-row: 1;
-    position: relative;
-    z-index: 1;
-    padding: clamp(var(--space-8), 4vw, var(--space-16));
-    overflow: hidden;
-  }
-
-  .auth-brand-inner {
-    position: relative;
-    z-index: 1;
-    width: 100%;
-    max-width: min(100%, 34rem);
-  }
-
-  .auth-brand-logo {
-    width: 56px;
-    height: 56px;
-    background: linear-gradient(135deg, var(--primary-400) 0%, var(--primary-600) 50%, var(--primary-800) 100%);
-    box-shadow:
-      0 12px 32px color-mix(in oklch, var(--primary-500) 40%, transparent),
-      0 4px 10px color-mix(in oklch, var(--primary-500) 22%, transparent),
-      inset 0 2px 4px rgba(255, 255, 255, 0.25),
-      inset 0 -3px 6px rgba(0, 0, 0, 0.20);
-    border-radius: var(--radius-lg);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: var(--space-5);
-    flex-shrink: 0;
-  }
-
-  .auth-brand-logo svg {
-    width: 28px;
-    height: 28px;
-    color: white;
-  }
-
-  .auth-brand-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1-5);
-    background: color-mix(in oklch, var(--primary-500) 14%, transparent);
-    border: 1px solid color-mix(in oklch, var(--primary-500) 30%, transparent);
-    border-radius: var(--radius-full);
-    padding: 4px 14px;
-    font-size: var(--text-xs);
-    font-weight: 700;
-    color: var(--primary-400);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    margin-bottom: var(--space-5);
-    box-shadow: 0 2px 8px color-mix(in oklch, var(--primary-500) 16%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  }
-
-  /* Headline lays out as wrapping flex so word spans can animate
-     independently while wrapping ONLY at word boundaries. */
-  .auth-brand h1 {
-    display: flex;
-    flex-wrap: wrap;
-    column-gap: 0.3em;
-    font-family: var(--font-serif, Georgia, serif);
-    font-style: italic;
-    font-size: clamp(2.2rem, 3.8vw, 4.2rem);
-    font-weight: 400;
-    color: var(--auth-page-text);
-    line-height: 1.08;
-    letter-spacing: -0.015em;
-    margin-bottom: var(--space-4);
-  }
-
-  .auth-brand p {
-    font-size: clamp(var(--text-base), 1.1vw, var(--text-lg));
-    color: var(--auth-page-text-muted);
-    max-width: min(100%, 30rem);
-    line-height: var(--leading-relaxed);
-    margin-bottom: var(--space-8);
-  }
-
-  .auth-brand-features {
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-  }
-
-  .auth-brand-features li {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    font-size: clamp(var(--text-sm), 0.9vw, var(--text-base));
-    font-weight: 500;
-    color: var(--auth-page-text-muted);
-    animation: feature-slide-in 400ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
-  }
-
-  .auth-brand-features li:nth-child(1) { animation-delay: 200ms; }
-  .auth-brand-features li:nth-child(2) { animation-delay: 310ms; }
-  .auth-brand-features li:nth-child(3) { animation-delay: 420ms; }
-  .auth-brand-features li:nth-child(4) { animation-delay: 530ms; }
-
-  @keyframes feature-slide-in {
-    from { opacity: 0; transform: translateX(-14px); }
-    to   { opacity: 1; transform: translateX(0); }
-  }
-
-  /* Glowing checkmark indicator — 3D sphere */
-  .feature-check {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 20px;
-    height: 20px;
-    flex-shrink: 0;
-    border-radius: 50%;
-    background: color-mix(in oklch, var(--member-1) 20%, transparent);
-    border: 1px solid color-mix(in oklch, var(--member-1) 40%, transparent);
-    /* 3D sphere glow */
-    box-shadow:
-      0 0 14px color-mix(in oklch, var(--member-1) 30%, transparent),
-      0 2px 6px color-mix(in oklch, var(--member-1) 20%, transparent),
-      inset 0 1px 2px rgba(255, 255, 255, 0.15),
-      inset 0 -1px 2px rgba(0, 0, 0, 0.10);
-  }
-
-  .feature-check::before {
-    content: '';
-    display: block;
-    width: 5px;
-    height: 9px;
-    border-right: 2px solid var(--success-500, #47795b);
-    border-bottom: 2px solid var(--success-500, #47795b);
-    transform: rotate(45deg) translate(-1px, -1px);
-    border-radius: 1px;
-  }
-
-  /* Decorative floating pins behind the brand content */
-  .auth-brand-inner::before {
-    content: '';
-    position: absolute;
-    top: -80px;
-    right: -60px;
-    width: 240px;
-    height: 240px;
-    border-radius: 50%;
-    background: radial-gradient(circle at 40% 40%, color-mix(in oklch, var(--primary-500) 12%, transparent) 0%, transparent 65%);
-    filter: blur(30px);
-    animation: blob-drift 16s ease-in-out infinite;
-    pointer-events: none;
-  }
-
-  .auth-brand-inner::after {
-    content: '';
-    position: absolute;
-    bottom: -60px;
-    left: -40px;
-    width: 180px;
-    height: 180px;
-    border-radius: 50%;
-    background: radial-gradient(circle, color-mix(in oklch, var(--member-1) 10%, transparent) 0%, transparent 65%);
-    filter: blur(24px);
-    animation: blob-drift 20s ease-in-out infinite reverse;
-    pointer-events: none;
-  }
-}
-
-/* ── Kinetic headline words ─────────────────────────────────────────────
-   Bug fix: the headline previously animated per-CHARACTER via KineticText,
-   where every character (and each space) was its own inline-block span.
-   Inline-block boxes are legal line-break points, so the headline could
-   wrap MID-WORD ("Keep your f / amily close"). Words are now atomic spans:
-   inline-block + nowrap means breaks only happen between words. */
-.auth-brand-h1 .kinetic-word {
-  display: inline-block;
-  white-space: nowrap;
-  animation: kinetic-word-rise 500ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
-  will-change: transform, opacity;
-}
-
-@keyframes kinetic-word-rise {
-  from {
-    opacity: 0;
-    transform: translateY(0.5em) scale(0.92);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-/* ── Form area ──────────────────────────────────────────────────────────── */
-.auth-form-area {
-  flex: 1;
+/* ── Top app bar — brand anchor wordmark with the ember dot ─────────────── */
+.auth-topbar {
+  padding-top: calc(var(--safe-top, 0px) + var(--space-4));
+  padding-bottom: var(--space-2);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-4);
-  position: relative;
-  z-index: 1;
+  user-select: none;
 }
 
-/* ── Auth card — glass with depth ───────────────────────────────────────── */
-.auth-card {
-  width: 100%;
-  max-width: 420px;
-  background: var(--auth-card-bg);
-  padding: var(--space-8) var(--space-6);
-  border-radius: var(--radius-2xl);
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  border-top-color: rgba(255, 255, 255, 0.22);
-  box-shadow:
-    0 32px 80px rgba(0, 0, 0, 0.50),
-    0 12px 24px rgba(0, 0, 0, 0.30),
-    0 4px 8px rgba(0, 0, 0, 0.20),
-    0 0 0 1px rgba(255, 255, 255, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.15);
-  backdrop-filter: blur(28px) saturate(2.0);
-  -webkit-backdrop-filter: blur(28px) saturate(2.0);
-  animation: card-enter 600ms var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
-  position: relative;
-  overflow: hidden;
-  transition:
-    box-shadow 300ms ease,
-    transform 300ms var(--ease-out);
+.auth-wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
 }
 
-/* Only lift when not actively filling a form — prevents jarring motion mid-type */
-.auth-card:hover:not(:focus-within) {
-  box-shadow:
-    0 40px 100px rgba(0, 0, 0, 0.55),
-    0 16px 32px rgba(0, 0, 0, 0.35),
-    0 4px 8px rgba(0, 0, 0, 0.20),
-    0 0 0 1px rgba(255, 255, 255, 0.06),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.15);
-  transform: translateY(-4px);
-}
-
-/* Crisp ember top border — was a soft blurred gradient streak */
-.auth-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--primary-500);
-}
-
-@media (max-width: 480px) {
-  .auth-card {
-    padding: var(--space-6) var(--space-4);
-    border-radius: var(--radius-xl);
-    background: var(--auth-card-bg);
-  }
-}
-
-.auth-card h2 {
+/* Wordmark sits in the title register (Newsreader italic per the spec's
+   title-lg); all interactive/functional text below stays Work Sans. */
+.auth-wordmark-name {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
   font-size: var(--text-2xl);
-  font-weight: 700;
-  color: var(--auth-page-text);
-  margin: 0 0 var(--space-1) 0;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
+  color: var(--primary-700);
 }
 
-.auth-card .subtitle {
+.auth-wordmark-dot {
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--primary-500);
+  box-shadow: var(--shadow-xs);
+}
+
+/* ── Main canvas ────────────────────────────────────────────────────────── */
+.auth-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding-top: var(--space-2);
+  padding-bottom: var(--space-8);
+}
+
+/* ── Tactile pebble group — the header accent ───────────────────────────
+   People are pebbles, never pins. On Login the side pebbles ignite as the
+   identifier/password become valid (the handshake); on Register the three
+   pebbles are the three steps warming up. Decorative only (aria-hidden) —
+   real progress semantics live in visible/sr-only text. */
+.auth-pebbles {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: var(--space-2) 0 var(--space-4);
+}
+
+.auth-pebble {
+  position: relative;
+  width: var(--space-10);
+  height: var(--space-10);
+  border-radius: var(--radius-full);
+  border: 2px solid var(--paper);
+  background: var(--surface-inset);
+  color: var(--text-tertiary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: var(--text-sm);
-  color: var(--auth-page-text-muted);
+  font-weight: 600;
+  box-shadow: var(--shadow-xs);
+  transition:
+    background var(--duration-normal) var(--ease-out),
+    color var(--duration-normal) var(--ease-out),
+    transform var(--duration-normal) var(--ease-out);
+}
+
+.auth-pebble + .auth-pebble {
+  margin-left: calc(-1 * var(--space-2-5));
+}
+
+.auth-pebble svg {
+  width: var(--space-5);
+  height: var(--space-5);
+}
+
+/* The self/current pebble — slightly larger, always warm. */
+.auth-pebble--self {
+  width: calc(var(--space-10) + var(--space-1));
+  height: calc(var(--space-10) + var(--space-1));
+  z-index: 1;
+  background: var(--primary-100);
+  color: var(--primary-700);
+  box-shadow: var(--shadow-sm);
+}
+
+.auth-pebble.lit {
+  background: var(--primary-100);
+  color: var(--primary-700);
+}
+
+.auth-pebble.igniting {
+  background: var(--primary-100);
+  color: var(--primary-700);
+  animation: pebble-pop 280ms var(--ease-spring) both;
+}
+
+/* Sage presence dot — appears on success (settled, confirmed). */
+.auth-pebble-presence {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: var(--space-3);
+  height: var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--success-500);
+  border: 2px solid var(--paper);
+}
+
+/* The knock — gentle breathing pulse on the self pebble while the sign-in/
+   create request is in flight. GPU-only (transform), gated in JS by the
+   effects store + OS reduce-motion, and killed again below by the media
+   query as a second line of defence. */
+.auth-pebbles.knocking .auth-pebble--self {
+  animation: pebble-knock 900ms var(--ease-in-out) infinite;
+}
+
+/* Convergence — on success the circle huddles: sides lean toward center. */
+.auth-pebbles.converging .auth-pebble:first-child {
+  transform: translateX(var(--space-1));
+}
+.auth-pebbles.converging .auth-pebble:last-child {
+  transform: translateX(calc(-1 * var(--space-1)));
+}
+
+@keyframes pebble-pop {
+  from { transform: scale(0.7); }
+  60%  { transform: scale(1.12); }
+  to   { transform: scale(1); }
+}
+
+@keyframes pebble-knock {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.06); }
+}
+
+/* ── Emotional header crest — the verdict voice ─────────────────────────── */
+.auth-headline {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: var(--auth-hero-size);
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  color: var(--text-primary);
+  text-align: center;
+  margin: 0 0 var(--space-2);
+}
+
+.auth-subcopy {
+  font-size: var(--text-base);
+  line-height: var(--leading-relaxed);
+  color: var(--text-secondary);
+  text-align: center;
+  max-width: 24rem;
+  margin: 0 auto var(--space-6);
+}
+
+/* ── Segmented mode switcher — tactile paper pill (page-level nav) ──────── */
+.auth-mode-switch {
+  display: flex;
+  align-items: stretch;
+  padding: var(--space-1);
+  background: var(--surface-2);
+  border: 1px solid color-mix(in oklch, var(--outline-variant) 30%, transparent);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-xs);
   margin-bottom: var(--space-6);
 }
 
-/* ── Desktop fluid sizing — card + form area scale with the viewport ─────
-   Placed AFTER the base .auth-form-area / .auth-card rules so these
-   equal-specificity overrides win in the cascade. Gated at ≥768px so
-   mobile renders pixel-identical to before. */
-@media (min-width: 768px) {
-  .auth-form-area {
-    grid-column: 3;
-    grid-row: 1;
-    padding: clamp(var(--space-4), 3vw, var(--space-12));
-  }
-
-  .auth-card {
-    width: min(100%, clamp(24rem, 30vw, 34rem));
-    max-width: none;
-    padding: clamp(var(--space-8), 3vw, var(--space-12)) clamp(var(--space-6), 2.5vw, var(--space-10));
-  }
-
-  .auth-card h2 {
-    font-size: clamp(var(--text-2xl), 1.6vw, var(--text-3xl));
-  }
-
-  .auth-card .subtitle {
-    font-size: clamp(var(--text-sm), 0.85vw, var(--text-base));
-  }
+.auth-mode-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px; /* touch-target floor */
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: var(--leading-normal);
+  text-align: center;
+  text-decoration: none;
+  color: var(--text-secondary);
+  transition:
+    color var(--duration-normal) var(--ease-out),
+    background var(--duration-normal) var(--ease-out),
+    box-shadow var(--duration-normal) var(--ease-out);
 }
 
-/* ── Error banner ──────────────────────────────────────────────────────── */
+.auth-mode-btn:hover {
+  color: var(--text-primary);
+}
+
+.auth-mode-btn.active {
+  background: var(--card);
+  color: var(--text-primary);
+  font-weight: 600;
+  box-shadow: var(--shadow-xs);
+}
+
+.auth-mode-btn:focus-visible {
+  outline: 2px solid var(--primary-500);
+  outline-offset: 2px;
+}
+
+/* ── Error banner — ochre, never vermilion ──────────────────────────────── */
 .auth-error {
-  background: rgba(239, 68, 68, 0.12);
-  color: var(--danger-400, #f87171);
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-md);
-  font-size: var(--text-sm);
-  margin-bottom: var(--space-4);
-  border: 1px solid rgba(239, 68, 68, 0.25);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-2);
-  animation: shake 0.4s var(--ease-out);
+  background: var(--auth-error-bg);
+  border: 1px solid var(--auth-error-border);
+  color: var(--auth-error-text);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: var(--leading-normal);
+  margin-bottom: var(--space-4);
 }
 
 .auth-error svg {
-  width: 16px;
-  height: 16px;
+  width: var(--space-4);
+  height: var(--space-4);
   flex-shrink: 0;
+  margin-top: var(--space-0-5);
 }
 
-/* ── Field ─────────────────────────────────────────────────────────────── */
+/* ── Fields — warm inset tier, generous padding, ember focus ring ───────── */
 .auth-field {
   display: flex;
   flex-direction: column;
@@ -515,598 +299,324 @@
   margin-bottom: var(--space-4);
 }
 
-.auth-field label {
-  font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--auth-page-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+.auth-field > label,
+.auth-label {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: var(--leading-normal);
+  color: var(--text-primary);
+  margin-left: var(--space-1);
 }
 
-.auth-field input {
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--auth-input-border);
-  border-radius: var(--radius-md);
-  font-family: var(--font-sans);
-  font-size: var(--text-base);
-  background: var(--auth-input-bg);
-  color: var(--auth-input-text);
-  outline: none;
-  box-shadow:
-    inset 0 2px 6px rgba(0, 0, 0, 0.25),
-    inset 0 0 0 1px rgba(0, 0, 0, 0.10),
-    0 1px 0 rgba(255, 255, 255, 0.06);
+/* The field shell: one warm inset container holding icon + control(s).
+   14px/16px padding per the design system's input spec (--space-3-5/-4). */
+.field-shell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--surface-2);
+  border: 1px solid color-mix(in oklch, var(--outline-variant) 55%, transparent);
+  border-radius: var(--radius-input);
+  padding: var(--space-3-5) var(--space-4);
   transition:
     border-color var(--duration-normal) var(--ease-out),
-    box-shadow 250ms cubic-bezier(0.16, 1, 0.3, 1),
-    background var(--duration-normal) var(--ease-out);
+    box-shadow var(--duration-normal) var(--ease-out);
 }
 
-.auth-field input::placeholder {
-  color: var(--auth-input-placeholder);
+.field-shell:focus-within {
+  border-color: var(--primary-500);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary-500) 20%, transparent);
 }
 
-.auth-field input:focus {
-  border-color: var(--primary-400);
-  box-shadow:
-    0 0 0 3px color-mix(in oklch, var(--primary-500) 22%, transparent),
-    0 0 0 6px color-mix(in oklch, var(--primary-500) 8%, transparent),
-    0 4px 16px color-mix(in oklch, var(--primary-500) 15%, transparent),
-    inset 0 1px 2px rgba(0, 0, 0, 0.15);
-  background: var(--auth-input-bg);
+.field-shell.is-invalid {
+  border-color: var(--warning-500);
 }
 
-.auth-field input.is-invalid {
-  border-color: var(--danger-400);
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.14);
+.field-shell.is-invalid:focus-within {
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--warning-500) 18%, transparent);
 }
 
-.auth-field .auth-hint {
+.field-shell.is-valid {
+  border-color: color-mix(in oklch, var(--success-500) 60%, transparent);
+}
+
+.field-icon {
+  width: var(--space-5);
+  height: var(--space-5);
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.field-shell input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-base); /* 16px floor — also prevents iOS zoom */
+  line-height: var(--leading-normal);
+  color: var(--text-primary);
+}
+
+.field-shell input::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* Sage check — quiet confirmation, paired with the border tint. */
+.field-check {
+  width: var(--space-5);
+  height: var(--space-5);
+  color: var(--success-500);
+  flex-shrink: 0;
+}
+
+/* Trailing in-field button (password visibility). 44px target overlapping
+   the shell padding so the field height stays put. */
+.field-trailing-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;  /* touch-target floor */
+  min-height: 44px;
+  margin: calc(-1 * var(--space-2-5)) calc(-1 * var(--space-2));
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--text-tertiary);
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.field-trailing-btn:hover {
+  color: var(--text-primary);
+}
+
+.field-trailing-btn:focus-visible {
+  outline: 2px solid var(--primary-500);
+  outline-offset: -4px;
+}
+
+.field-trailing-btn svg {
+  width: var(--space-5);
+  height: var(--space-5);
+}
+
+/* Country-code prefix — lives INSIDE the field shell, soft divider after. */
+.field-cc {
+  appearance: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: var(--text-base); /* 16px — no iOS zoom */
+  color: var(--text-secondary);
+  padding: 0 var(--space-2-5) 0 0;
+  margin-block: calc(-1 * var(--space-2));
+  min-height: 44px; /* touch-target floor */
+  max-width: 7.5rem;
+  border-right: 1px solid color-mix(in oklch, var(--outline-variant) 60%, transparent);
+  border-radius: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+  flex-shrink: 0;
+}
+
+.field-cc:focus-visible {
+  outline: 2px solid var(--primary-500);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm);
+}
+
+.field-cc option {
+  background: var(--card);
+  color: var(--text-primary);
+}
+
+/* ── Hints & captions ───────────────────────────────────────────────────── */
+/* Always-present live region wrapper (never display:none — a live region
+   must pre-exist in the a11y tree for its first announcement to fire). */
+.auth-hint-slot {
+  min-height: 0;
+}
+
+.auth-hint {
+  display: inline-block;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--text-secondary);
+  margin-left: var(--space-1);
+}
+
+.auth-hint.error {
+  color: var(--auth-error-text);
+  font-weight: 500;
+}
+
+/* Quiet reassurance caption (lock line under the password). */
+.auth-caption {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1-5);
   font-size: var(--text-xs);
-  color: var(--auth-page-text-muted);
-  opacity: 0.75;
+  line-height: var(--leading-relaxed);
+  color: var(--text-secondary);
+  margin: var(--space-1-5) var(--space-1) 0;
 }
 
-.auth-field .auth-hint.error {
-  color: var(--danger-400, #f87171);
+.auth-caption svg {
+  width: var(--space-3-5);
+  height: var(--space-3-5);
+  flex-shrink: 0;
+  color: var(--success-500);
+  margin-top: var(--space-0-5);
 }
 
-/* ── Name row ──────────────────────────────────────────────────────────── */
+/* ── Name row (Register step 1) ─────────────────────────────────────────── */
 .auth-name-row {
   display: flex;
   gap: var(--space-3);
 }
+
 .auth-name-row .auth-field {
   flex: 1;
   min-width: 0;
 }
 
-/* Stack name row on very small screens */
 @media (max-width: 400px) {
   .auth-name-row {
     flex-direction: column;
-    gap: var(--space-3);
+    gap: 0; /* .auth-field brings its own margin-bottom */
   }
 }
 
-/* ── Segmented Toggle ──────────────────────────────────────────────────── */
+/* ── Inner segmented toggle (email/mobile tablist) — same pill language ─── */
 .auth-toggle {
   display: flex;
-  padding: 3px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: var(--space-1);
+  background: var(--surface-2);
+  border: 1px solid color-mix(in oklch, var(--outline-variant) 30%, transparent);
+  border-radius: var(--radius-full);
   margin-bottom: var(--space-4);
-  /* 3D inset container */
-  box-shadow:
-    inset 0 2px 4px rgba(0, 0, 0, 0.20),
-    0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .auth-toggle-btn {
   flex: 1;
-  padding: var(--space-2-5) 0;
+  min-height: 44px; /* touch-target floor */
+  padding: var(--space-2) var(--space-3);
   border: none;
   background: transparent;
-  color: var(--text-tertiary); /* theme-aware: was white-alpha — invisible on Dawn */
-  font-family: var(--font-display);
-  font-size: var(--text-sm);
-  font-weight: 600;
   cursor: pointer;
-  border-radius: calc(var(--radius-md) - 3px);
+  border-radius: var(--radius-full);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-secondary);
   transition:
     color var(--duration-normal) var(--ease-out),
-    background var(--duration-normal) var(--ease-out);
+    background var(--duration-normal) var(--ease-out),
+    box-shadow var(--duration-normal) var(--ease-out);
 }
 
 .auth-toggle-btn.active {
+  background: var(--card);
   color: var(--text-primary);
-  background: color-mix(in oklch, var(--primary-500) 38%, transparent);
-  border: 1px solid color-mix(in oklch, var(--primary-500) 45%, transparent);
-  box-shadow:
-    0 2px 12px color-mix(in oklch, var(--primary-500) 30%, transparent),
-    0 1px 3px rgba(0, 0, 0, 0.20),
-    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  font-weight: 600;
+  box-shadow: var(--shadow-xs);
 }
 
 .auth-toggle-btn:not(.active):hover {
-  color: var(--text-secondary);
+  color: var(--text-primary);
 }
 
-/* ── Phone row ─────────────────────────────────────────────────────────── */
-.auth-phone-row {
-  display: flex;
-  gap: var(--space-2);
-  align-items: flex-start;
+.auth-toggle-btn:focus-visible {
+  outline: 2px solid var(--primary-500);
+  outline-offset: 2px;
 }
 
-.auth-cc-select {
-  width: 110px;
-  flex-shrink: 0;
-  appearance: none;
-  padding: var(--space-3) var(--space-2);
-  border: 1px solid var(--auth-input-border);
-  border-radius: var(--radius-md);
-  font-family: var(--font-sans);
-  /* 16px minimum prevents iOS Safari auto-zoom on focus */
-  font-size: 16px;
-  background: var(--auth-input-bg);
-  color: var(--auth-input-text);
-  cursor: pointer;
-  outline: none;
-  touch-action: manipulation;
-  transition: border-color var(--duration-normal) var(--ease-out);
-}
-
-.auth-cc-select option {
-  background: #1a1f2e;
-  color: #ffffff;
-}
-
-.auth-cc-select:focus {
-  border-color: var(--primary-400);
-  box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary-500) 18%, transparent);
-}
-
-.auth-phone-row input {
-  flex: 1;
-  min-width: 0;
-}
-
-/* ── Submit button ──────────────────────────────────────────────────────── */
+/* ── Primary action — the single warm ember, 48px, paper-white text ─────── */
 .auth-submit {
   width: 100%;
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: var(--radius-md);
-  background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-700) 100%);
-  color: var(--text-on-primary, #fff);
-  font-family: var(--font-display);
+  min-height: var(--space-12); /* 48px */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  border: none;
+  border-radius: var(--radius-lg);
+  background: var(--primary-500);
+  color: var(--text-on-primary);
+  font-family: var(--font-sans);
   font-size: var(--text-base);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.01em;
   cursor: pointer;
-  box-shadow:
-    0 8px 24px color-mix(in oklch, var(--primary-500) 40%, transparent),
-    0 3px 8px color-mix(in oklch, var(--primary-500) 25%, transparent),
-    0 0 0 1px color-mix(in oklch, var(--primary-500) 20%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    inset 0 -2px 6px rgba(0, 0, 0, 0.15);
-  position: relative;
-  overflow: hidden;
+  box-shadow: var(--shadow-primary);
   transition:
-    transform 200ms var(--ease-out),
-    box-shadow 200ms var(--ease-out);
-  min-height: 48px;
+    background var(--duration-normal) var(--ease-out),
+    box-shadow var(--duration-normal) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
-/* Shimmer sweep — slides right on hover */
-.auth-submit::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 60%;
-  height: 100%;
-  background: linear-gradient(
-    105deg,
-    transparent 20%,
-    rgba(255, 255, 255, 0.18) 50%,
-    transparent 80%
-  );
-  transition: left 450ms var(--ease-out);
-  pointer-events: none;
+.auth-submit svg {
+  width: var(--space-5);
+  height: var(--space-5);
+  flex-shrink: 0;
 }
 
-.auth-submit:hover::after {
-  left: 150%;
+.auth-submit:hover:not(:disabled) {
+  background: var(--primary-600);
+  transform: translateY(-1px);
 }
 
-.auth-submit:hover {
-  transform: translateY(-2px) scale(1.02);
-  box-shadow:
-    0 12px 36px color-mix(in oklch, var(--primary-500) 50%, transparent),
-    0 4px 12px color-mix(in oklch, var(--primary-500) 30%, transparent),
-    0 0 0 1px color-mix(in oklch, var(--primary-500) 30%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25),
-    inset 0 -2px 6px rgba(0, 0, 0, 0.12);
-}
-
-.auth-submit:active {
-  transform: translateY(1px) scale(0.97) !important;
-  box-shadow:
-    0 2px 8px color-mix(in oklch, var(--primary-500) 25%, transparent),
-    inset 0 2px 6px rgba(0, 0, 0, 0.25) !important;
-  transition-duration: 80ms !important;
+.auth-submit:active:not(:disabled) {
+  transform: scale(0.98);
+  box-shadow: var(--shadow-sm);
 }
 
 .auth-submit:disabled {
-  opacity: 0.5;
+  opacity: 0.55;
   cursor: not-allowed;
-  transform: none !important;
-  box-shadow: none !important;
+  box-shadow: var(--shadow-xs);
 }
 
-/* ── Link ──────────────────────────────────────────────────────────────── */
-.auth-link {
-  margin-top: var(--space-5);
-  text-align: center;
-  font-size: var(--text-sm);
-  color: var(--auth-page-text-muted);
+.auth-submit:focus-visible {
+  outline: 2px solid var(--primary-700);
+  outline-offset: 2px;
 }
 
-.auth-link a {
-  color: var(--primary-400);
-  text-decoration: none;
-  font-weight: 600;
-  transition: color var(--duration-normal) var(--ease-out);
+/* Success shift — sage, the settled color (never green-out-of-palette). */
+.auth-submit.redirecting {
+  background: var(--success-500);
+  box-shadow: 0 6px 20px color-mix(in oklch, var(--success-500) 30%, transparent);
 }
 
-.auth-link a:hover {
-  color: var(--primary-300);
-  text-decoration: underline;
+/* In-button spinner — essential loading feedback (kept under reduced
+   motion; it is status, not decoration). */
+.submit-spinner {
+  display: inline-block;
+  width: var(--space-4);
+  height: var(--space-4);
+  border: 2px solid color-mix(in oklch, currentColor 30%, transparent);
+  border-top-color: currentColor;
+  border-radius: var(--radius-full);
+  animation: spin 700ms linear infinite;
+  flex-shrink: 0;
 }
 
-/* ── noscript ──────────────────────────────────────────────────────────── */
-.auth-noscript {
-  padding: var(--space-8);
-  text-align: center;
-  color: var(--auth-page-text-muted);
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
-/* ── Password toggle button ────────────────────────────────────────────── */
-.auth-field .pw-toggle {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  color: var(--auth-page-text-muted);
-  opacity: 0.65;
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: opacity var(--duration-fast) var(--ease-out);
-}
-.auth-field .pw-toggle:hover { opacity: 1; }
-.auth-field .input-wrap { position: relative; }
-.auth-field .input-wrap input { padding-right: 44px; }
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   2026 AURORA MESH — Enhanced auth page atmospheric depth
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-/* Additional aurora orbs — floating atmospheric glow blobs */
-.auth-aurora-orb {
-  position: fixed;
-  border-radius: 50%;
-  pointer-events: none;
-  filter: blur(80px);
-  will-change: transform;
-  z-index: 0;
-}
-
-.auth-aurora-orb-1 {
-  width: 500px; height: 500px;
-  background: radial-gradient(circle, color-mix(in oklch, var(--primary-500) 22%, transparent) 0%, transparent 65%);
-  top: -120px; right: -100px;
-  animation: aurora-drift-3 20s ease-in-out infinite;
-}
-
-.auth-aurora-orb-2 {
-  width: 400px; height: 400px;
-  background: radial-gradient(circle, color-mix(in oklch, var(--member-1) 16%, transparent) 0%, transparent 65%);
-  bottom: 10%; left: -80px;
-  animation: aurora-drift-2 26s ease-in-out infinite reverse;
-}
-
-/* Bug fix: orb-3 had base transform: translateX(-50%) AND keyframes starting at translate(0,0),
-   which snapped the element on animation start. Fixed by removing base transform and
-   using left: calc(50% - 150px) to achieve the centering without conflicting with keyframes. */
-.auth-aurora-orb-3 {
-  width: 300px; height: 300px;
-  background: radial-gradient(circle, color-mix(in oklch, var(--member-2) 12%, transparent) 0%, transparent 65%);
-  top: 40%;
-  left: calc(50% - 150px);
-  animation: aurora-drift-1 32s ease-in-out infinite;
-}
-
-/* Grid overlay — spatial depth grid */
-.auth-grid-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background-image:
-    linear-gradient(0deg, color-mix(in oklch, var(--primary-500) 2%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in oklch, var(--primary-500) 2%, transparent) 1px, transparent 1px);
-  background-size: 60px 60px;
-  opacity: 0.6;
-  mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
-  -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
-}
-
-/* Floating particle dots — CSS-only, no JS */
-.auth-particles {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.auth-particle {
-  position: absolute;
-  width: 2px; height: 2px;
-  border-radius: 50%;
-  background: color-mix(in oklch, var(--primary-500) 50%, transparent);
-  box-shadow: 0 0 6px color-mix(in oklch, var(--primary-500) 40%, transparent);
-  animation: particle-float linear infinite;
-  will-change: transform, opacity;
-}
-
-/* Staggered positions and timings for particles */
-.auth-particle:nth-child(1)  { left: 8%;  top: 20%; animation-duration: 6s;  animation-delay: -1s; }
-.auth-particle:nth-child(2)  { left: 18%; top: 70%; animation-duration: 8s;  animation-delay: -3s; opacity: 0.3; }
-.auth-particle:nth-child(3)  { left: 30%; top: 15%; animation-duration: 7s;  animation-delay: -5s; }
-.auth-particle:nth-child(4)  { left: 45%; top: 85%; animation-duration: 9s;  animation-delay: -2s; opacity: 0.25; }
-.auth-particle:nth-child(5)  { left: 60%; top: 30%; animation-duration: 5s;  animation-delay: -4s; }
-.auth-particle:nth-child(6)  { left: 75%; top: 60%; animation-duration: 10s; animation-delay: -1s; opacity: 0.2; }
-.auth-particle:nth-child(7)  { left: 85%; top: 45%; animation-duration: 7s;  animation-delay: -6s; }
-.auth-particle:nth-child(8)  { left: 90%; top: 10%; animation-duration: 6s;  animation-delay: -3s; opacity: 0.35; }
-.auth-particle:nth-child(9)  { left: 12%; top: 50%; animation-duration: 8s;  animation-delay: -7s; }
-.auth-particle:nth-child(10) { left: 55%; top: 75%; animation-duration: 9s;  animation-delay: -2s; opacity: 0.28; }
-.auth-particle:nth-child(11) { left: 38%; top: 40%; animation-duration: 11s; animation-delay: -5s; }
-.auth-particle:nth-child(12) { left: 70%; top: 25%; animation-duration: 7s;  animation-delay: -8s; opacity: 0.22; }
-
-/* Larger glowing orb particles */
-.auth-particle.large {
-  width: 4px; height: 4px;
-  background: color-mix(in oklch, var(--primary-400) 40%, transparent);
-  box-shadow: 0 0 10px color-mix(in oklch, var(--primary-400) 50%, transparent), 0 0 20px color-mix(in oklch, var(--primary-500) 25%, transparent);
-}
-
-/* ── Mobile brand header — single authoritative definition ──────────────
-   NOTE: Login.svelte and Register.svelte previously had duplicate scoped
-   definitions that conflicted with these. Those duplicates have been removed.
-   The mobile-brand-header is hidden by default on desktop; shown on mobile. */
-.mobile-brand-header {
-  display: none;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-1);
-  margin-bottom: var(--space-6);
-  padding-top: calc(var(--safe-top, 0px) + var(--space-4));
-}
-
-@media (max-width: 767px) {
-  .mobile-brand-header {
-    display: flex;
-  }
-  /* header stacks ABOVE the card — the row default sat them side by side,
-     splitting a 375px screen into two crushed columns */
-  .auth-form-area {
-    flex-direction: column;
-    justify-content: center;
-    gap: var(--space-5);
-  }
-  .auth-card {
-    max-width: min(100%, 26rem);
-  }
-}
-
-.mobile-brand-logo {
-  width: 44px;
-  height: 44px;
-  background: linear-gradient(135deg, var(--primary-400) 0%, var(--primary-600) 100%);
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow:
-    0 8px 24px color-mix(in oklch, var(--primary-500) 45%, transparent),
-    0 3px 8px color-mix(in oklch, var(--primary-500) 25%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.20);
-  margin-bottom: var(--space-1);
-  animation: depth-breathe 4s ease-in-out infinite;
-}
-
-.mobile-brand-name {
-  font-family: var(--font-display);
-  font-size: var(--text-xl);
-  font-weight: 800;
-  color: var(--text-primary, #2a231c);
-  letter-spacing: -0.025em;
-}
-
-.mobile-brand-tagline {
-  font-size: var(--text-xs);
-  color: var(--text-tertiary, rgba(42, 35, 28, 0.55));
-  font-weight: 500;
-  letter-spacing: 0.02em;
-}
-
-/* ── Enhanced page entrance ─────────────────────────────────────────────── */
-.page-enter {
-  animation: page-mount 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   KEYFRAMES — All animation definitions in one place.
-   Bug fix: previously missing keyframes (aurora-drift-*, depth-breathe,
-   particle-float, card-enter) caused silent animation failures.
-   page-mount-3d used filter:blur which is not GPU-composited — replaced with
-   transform-only page-mount.
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-/* Card entrance — spring scale+translate, GPU only (no filter) */
-@keyframes card-enter {
-  from {
-    opacity: 0;
-    transform: translateY(24px) scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-/* Page mount — GPU only transform, no filter blur */
-@keyframes page-mount {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Aurora orb drifts */
-@keyframes aurora-drift-1 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  20%       { transform: translate(60px, -40px) scale(1.06); }
-  40%       { transform: translate(30px, 80px) scale(0.97); }
-  60%       { transform: translate(-50px, 30px) scale(1.04); }
-  80%       { transform: translate(20px, -20px) scale(1.02); }
-}
-
-@keyframes aurora-drift-2 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  25%       { transform: translate(-70px, 50px) scale(1.08); }
-  50%       { transform: translate(-20px, 100px) scale(0.94); }
-  75%       { transform: translate(60px, -30px) scale(1.05); }
-}
-
-@keyframes aurora-drift-3 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33%       { transform: translate(40px, -60px) scale(1.10); }
-  66%       { transform: translate(-30px, 40px) scale(0.96); }
-}
-
-/* Mobile logo depth-breathe — subtle scale pulse for brand presence */
-@keyframes depth-breathe {
-  0%, 100% { transform: scale(1) translateY(0); box-shadow: 0 8px 24px color-mix(in oklch, var(--primary-500) 45%, transparent), 0 3px 8px color-mix(in oklch, var(--primary-500) 25%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.20); }
-  50%       { transform: scale(1.04) translateY(-2px); box-shadow: 0 12px 32px color-mix(in oklch, var(--primary-500) 55%, transparent), 0 5px 12px color-mix(in oklch, var(--primary-500) 30%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.25); }
-}
-
-/* Particle float — GPU only (transform + opacity) */
-@keyframes particle-float {
-  0%, 100% {
-    transform: translateY(0) translateX(0) scale(1);
-    opacity: 0.25;
-  }
-  33% {
-    transform: translateY(-12px) translateX(6px) scale(1.2);
-    opacity: 0.4;
-  }
-  66% {
-    transform: translateY(8px) translateX(-4px) scale(0.9);
-    opacity: 0.15;
-  }
-}
-
-/* Shake — for error banners */
-@keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  20%       { transform: translateX(-6px); }
-  40%       { transform: translateX(6px); }
-  60%       { transform: translateX(-4px); }
-  80%       { transform: translateX(4px); }
-}
-
-/* ── Reduced motion ─────────────────────────────────────────────────────── */
-@media (prefers-reduced-motion: reduce) {
-  .auth-aurora-orb,
-  .auth-aurora-orb-1,
-  .auth-aurora-orb-2,
-  .auth-aurora-orb-3 {
-    animation: none;
-    will-change: auto;
-  }
-  .auth-particle {
-    animation: none;
-    opacity: 0.2;
-    will-change: auto;
-  }
-  .mobile-brand-logo {
-    animation: none;
-  }
-  .auth-card {
-    animation: none;
-  }
-  .auth-bg-blob,
-  .auth-bg-blob::after,
-  .auth-brand-inner::before,
-  .auth-brand-inner::after {
-    animation: none;
-    will-change: auto;
-  }
-  .auth-brand-features li {
-    animation: none;
-    opacity: 1;
-    transform: none;
-  }
-  .auth-brand-h1 .kinetic-word {
-    animation: none;
-    opacity: 1;
-    transform: none;
-    will-change: auto;
-  }
-  .auth-submit::after {
-    display: none;
-  }
-  .page-enter {
-    animation: none;
-    opacity: 1;
-    transform: none;
-  }
-}
-
-/* ── Micro-constellation (mobile brand header) ───────────────────────────
-   ADDITIVE: 24px dormant Constellation shown beside the mobile brand mark
-   so mobile users (where .auth-brand is hidden) still see the shell world.
-   Shared by Login/Register. Sized wrapper only — all pin/link styling and
-   motion gating live inside the Constellation primitive. */
-.mobile-brand-cst {
-  width: 24px;
-  height: 24px;
-  margin-top: var(--space-1);
-  pointer-events: none;
-}
-
-/* ── Register 3-step nav (Back / Continue row) ────────────────────────────
-   ADDITIVE: Register.svelte progressive-disclosure step navigation. Both
-   controls are ≥48px tall (44px touch-target rule) and token-driven. */
+/* ── Quiet secondary — Back (Register step nav) ─────────────────────────── */
 .step-nav {
   display: flex;
   gap: var(--space-3);
   align-items: stretch;
+  margin-top: var(--space-2);
 }
 
 .step-nav .auth-submit {
@@ -1114,33 +624,134 @@
 }
 
 .auth-step-back {
-  min-height: 48px;
-  min-width: 84px;
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--auth-input-border);
-  border-radius: var(--radius-md);
-  background: var(--auth-input-bg);
-  color: var(--auth-page-text-muted);
-  font-family: var(--font-display);
+  min-height: var(--space-12); /* 48px */
+  padding: var(--space-3) var(--space-5);
+  border: 1px solid color-mix(in oklch, var(--ink) 15%, transparent);
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
   font-size: var(--text-base);
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
   transition:
     color var(--duration-normal) var(--ease-out),
-    border-color var(--duration-normal) var(--ease-out);
+    border-color var(--duration-normal) var(--ease-out),
+    background var(--duration-normal) var(--ease-out);
 }
 
-.auth-step-back:hover {
-  color: var(--auth-page-text);
-  border-color: var(--primary-400);
+.auth-step-back:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: color-mix(in oklch, var(--ink) 30%, transparent);
+  background: var(--surface-hover);
 }
 
 .auth-step-back:focus-visible {
-  outline: 2px solid var(--primary-400);
+  outline: 2px solid var(--primary-500);
   outline-offset: 2px;
 }
 
 .auth-step-back:disabled {
-  opacity: 0.5;
+  opacity: 0.55;
   cursor: not-allowed;
+}
+
+/* ── Step progress label (Register) ─────────────────────────────────────── */
+.reg-step-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  text-align: center;
+  margin: 0 0 var(--space-4);
+}
+
+/* ── Cross links ("New here?" / "Already have a circle?") ───────────────── */
+.auth-link {
+  margin-top: var(--space-6);
+  text-align: center;
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+}
+
+.auth-link a {
+  color: var(--primary-700); /* AA step for small accent text */
+  text-decoration: none;
+  font-weight: 600;
+  transition: color var(--duration-normal) var(--ease-out);
+}
+
+.auth-link a:hover {
+  text-decoration: underline;
+}
+
+.auth-link a:focus-visible {
+  outline: 2px solid var(--primary-500);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ── Privacy sanctuary footer — frameless warm note ─────────────────────── */
+.auth-footer {
+  padding-top: var(--space-4);
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--space-6));
+  text-align: center;
+  user-select: none;
+}
+
+.auth-footer-shield {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-8);
+  height: var(--space-8);
+  border-radius: var(--radius-full);
+  background: var(--paper-2);
+  color: var(--success-500);
+  margin-bottom: var(--space-2);
+}
+
+.auth-footer-shield svg {
+  width: var(--space-4);
+  height: var(--space-4);
+}
+
+.auth-footer p {
+  font-size: var(--text-xs);
+  line-height: var(--leading-relaxed);
+  color: var(--text-secondary);
+  max-width: 20rem;
+  margin: 0 auto;
+}
+
+/* ── noscript ───────────────────────────────────────────────────────────── */
+.auth-noscript {
+  padding: var(--space-8);
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+/* ── Reduced motion — decorative motion off; spinner (status) stays ─────── */
+@media (prefers-reduced-motion: reduce) {
+  .auth-pebble,
+  .field-shell,
+  .auth-mode-btn,
+  .auth-toggle-btn,
+  .auth-submit,
+  .auth-step-back,
+  .field-trailing-btn {
+    transition: none;
+  }
+  .auth-pebble.igniting,
+  .auth-pebbles.knocking .auth-pebble--self {
+    animation: none;
+  }
+  .auth-pebbles.converging .auth-pebble:first-child,
+  .auth-pebbles.converging .auth-pebble:last-child {
+    transform: none;
+  }
+  .auth-submit:hover:not(:disabled) {
+    transform: none;
+  }
 }

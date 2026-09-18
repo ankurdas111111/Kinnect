@@ -11,13 +11,6 @@
   import { prefersReducedMotion } from '../lib/deviceCapability.js';
   import { onMount, onDestroy } from 'svelte';
   import { slide } from 'svelte/transition';
-  import AnimatedMeshBackground from '../components/primitives/AnimatedMeshBackground.svelte';
-  import Constellation from '../components/primitives/Constellation.svelte';
-
-  // Headline animates per-WORD (not per-character) so line breaks can only
-  // happen at word boundaries — never mid-word ("f / amily").
-  const headlineText = 'A quiet map for the people you love.';
-  const headlineWords = headlineText.split(' ');
 
   let mode = $state('email');
   let loginId = $state('');
@@ -65,17 +58,17 @@
   let mobileValid = $derived(mobileDigits ? validateMobileLength(countryIso, mobileDigits).valid : false);
   let passwordError = $derived(passwordTouched && password.length > 0 && password.length < 6);
 
-  /* ── The handshake — reactive constellation wired to EXISTING form state.
+  /* ── The handshake — the pebble trio wired to EXISTING form state.
      Sync format checks only (no async validation on login fields — user
-     enumeration risk). Node 0 = self beacon (always live). Member pins ignite
-     as the identifier and password become valid; the remaining two pulse in
-     on submit (the "knock"); success converges the whole constellation as a
-     fire-and-forget flourish (CSS-capped ≤500ms) — navigation is NEVER
-     delayed for it. Purely decorative: the SVG stays aria-hidden. */
+     enumeration risk). Center pebble = self beacon (always warm). Side
+     pebbles ignite as the identifier and password become valid; submit is
+     the "knock" (gentle self-pebble pulse); success converges the circle
+     as a fire-and-forget flourish — navigation is NEVER delayed for it.
+     Purely decorative: the cluster stays aria-hidden. */
   let idValid = $derived(mode === 'email' ? emailValid : mobileValid);
   let pwReady = $derived(password.length >= 6);
   let converging = $state(false);
-  // Ignition state for member pins 1–4 (identity, password, knock ×2).
+  // Ignition state for pebbles 1–4 (identity, password, knock ×2).
   let memberStates = $state(['unlit', 'unlit', 'unlit', 'unlit']);
   const igniteTimers = [null, null, null, null];
 
@@ -103,22 +96,9 @@
     }
   });
 
-  // Deco-map geometry (unchanged coordinates) + VIGIL member hue tokens.
-  let cstNodes = $derived([
-    { x: 180, y: 130, state: converging ? 'converging' : 'live' },
-    { x: 90,  y: 80,  hue: 'var(--member-1)', state: converging ? 'converging' : memberStates[0] },
-    { x: 260, y: 90,  hue: 'var(--member-2)', state: converging ? 'converging' : memberStates[1] },
-    { x: 140, y: 200, hue: 'var(--member-3)', state: converging ? 'converging' : memberStates[2] },
-    { x: 290, y: 170, hue: 'var(--member-4)', state: converging ? 'converging' : memberStates[3] },
-  ]);
-
-  // 24px micro-constellation for the mobile brand header (3 nodes, dormant).
-  const MICRO_NODES = [
-    { x: 170, y: 140, state: 'live' },
-    { x: 70,  y: 70,  hue: 'var(--member-1)', state: 'live' },
-    { x: 270, y: 210, hue: 'var(--member-2)', state: 'live' },
-  ];
-  const MICRO_LINKS = [[1, 0], [0, 2]];
+  // The knock pulse loops while the request is in flight — JS-gated like
+  // every looping decoration (effects store + live OS reduce-motion).
+  let pulseOk = $derived($allowMotion && !prefersReducedMotion());
 
   function onModeToggleKeydown(e, current) {
     var order = ['email', 'mobile'];
@@ -171,7 +151,7 @@
       if (res.ok) {
         redirecting = true;
         // Fire-and-forget convergence flourish, parallel to loadSession().
-        // CSS caps it at ≤500ms and it is never awaited — navigation wins.
+        // Pure CSS transition, never awaited — navigation wins.
         converging = true;
         toasts.success('Welcome back!');
         // Login creates a new server session with a new CSRF token.
@@ -205,257 +185,180 @@
 </script>
 
 <div class="auth-page page-enter">
-  <!-- 2026 Animated Mesh Background — aurora orbs + spatial grid + particles.
-       Wrapped in .fx-ambient so calm mode fades the decorative layer. -->
-  <div class="fx-ambient">
-    <AnimatedMeshBackground grid={true} particles={true} />
-  </div>
-
-  <div class="auth-brand">
-    <div class="auth-brand-inner">
-      <!-- The handshake — reactive constellation replaces the static deco-map.
-           Pure decoration (aria-hidden inside the primitive): never announces
-           on form-state churn, never steals focus. -->
-      <div class="auth-brand-deco fx-ambient" aria-hidden="true">
-        <Constellation mode="reactive" nodes={cstNodes} />
-      </div>
-
-      <div class="auth-brand-logo">
-        <svg width="24" height="29" viewBox="0 0 20 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M10 1C5.029 1 1 5.029 1 10c0 6.938 8.25 13.1 9 14.1.75-1 9-7.162 9-14.1C19 5.029 14.971 1 10 1z" fill="white" fill-opacity="0.95"/>
-          <path d="M7 7v6M7 10l3.5-3M7 10l3.5 3" stroke="rgba(255,255,255,0.90)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </div>
-      <!-- Kinetic headline — word-atomic spans (never breaks mid-word) with a
-           staggered spring entrance. Styles live in auth.css (.kinetic-word). -->
-      <h1 class="auth-brand-h1" aria-label={headlineText}>
-        {#each headlineWords as word, i}
-          <span class="kinetic-word" aria-hidden="true" style="animation-delay: {120 + i * 110}ms">{word}</span>
-        {/each}
-      </h1>
-      <p>Kinnect shows your family as a few pebbles and tells you, in one honest sentence, whether everyone’s OK.</p>
-      <ul class="auth-brand-features">
-        <li><span class="feature-check" aria-hidden="true"></span> Only people you invite can see you</li>
-        <li><span class="feature-check" aria-hidden="true"></span> Hold-to-send SOS for real emergencies</li>
-        <li><span class="feature-check" aria-hidden="true"></span> No ads — and you can stop sharing anytime</li>
-      </ul>
+  <header class="auth-topbar">
+    <div class="auth-wordmark">
+      <span class="auth-wordmark-name">Kinnect</span>
+      <span class="auth-wordmark-dot" aria-hidden="true"></span>
     </div>
-  </div>
+  </header>
 
-  <div class="auth-form-area">
-    <!-- Mobile-only brand header: shown when desktop brand panel is hidden -->
-    <div class="mobile-brand-header" aria-hidden="true">
-      <div class="mobile-brand-logo">
-        <svg width="18" height="22" viewBox="0 0 20 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M10 1C5.029 1 1 5.029 1 10c0 6.938 8.25 13.1 9 14.1.75-1 9-7.162 9-14.1C19 5.029 14.971 1 10 1z" fill="white" fill-opacity="0.95"/>
-          <path d="M7 7v6M7 10l3.5-3M7 10l3.5 3" stroke="rgba(255,255,255,0.90)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </div>
-      <span class="mobile-brand-name">Kinnect</span>
-      <span class="mobile-brand-tagline">A quiet map for the people you love.</span>
-      <!-- 24px micro-constellation — mobile users see the world too -->
-      <div class="mobile-brand-cst fx-ambient">
-        <Constellation mode="dormant" nodes={MICRO_NODES} links={MICRO_LINKS} />
-      </div>
+  <main class="auth-main">
+    <!-- The handshake pebbles — decorative echo of the form state -->
+    <div
+      class="auth-pebbles"
+      class:knocking={loading && !redirecting && pulseOk}
+      class:converging
+      aria-hidden="true"
+    >
+      <span class="auth-pebble" class:lit={memberStates[0] === 'live'} class:igniting={memberStates[0] === 'igniting'}>A</span>
+      <span class="auth-pebble auth-pebble--self lit">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        {#if converging}<span class="auth-pebble-presence"></span>{/if}
+      </span>
+      <span class="auth-pebble" class:lit={memberStates[1] === 'live'} class:igniting={memberStates[1] === 'igniting'}>M</span>
     </div>
 
-    <div class="auth-card">
-      <h2>Welcome back</h2>
-      <p class="subtitle">Your family is just a tap away</p>
+    <h1 class="auth-headline">Welcome home to your circle.</h1>
+    <p class="auth-subcopy">Sign in with your email or phone to see how everyone's doing.</p>
 
-      {#if error}
-        <div class="auth-error" role="alert">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          {error}
+    <!-- Page-level mode relationship: Sign In ↔ Create your Circle -->
+    <nav class="auth-mode-switch" aria-label="Sign in or create a circle">
+      <span class="auth-mode-btn active" aria-current="page">Sign in</span>
+      <a class="auth-mode-btn" href="#/register">Create your circle</a>
+    </nav>
+
+    {#if error}
+      <div class="auth-error" role="alert">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span>{error}</span>
+      </div>
+    {/if}
+
+    <form onsubmit={preventDefault(handleSubmit)} novalidate>
+      <div class="auth-toggle" role="tablist" aria-label="Login method">
+        <button type="button" class="auth-toggle-btn" class:active={mode === 'email'} onclick={() => mode = 'email'} onkeydown={(e) => onModeToggleKeydown(e, 'email')} role="tab" aria-selected={mode === 'email'} tabindex={mode === 'email' ? 0 : -1}>Email</button>
+        <button type="button" class="auth-toggle-btn" class:active={mode === 'mobile'} onclick={() => mode = 'mobile'} onkeydown={(e) => onModeToggleKeydown(e, 'mobile')} role="tab" aria-selected={mode === 'mobile'} tabindex={mode === 'mobile' ? 0 : -1}>Mobile</button>
+      </div>
+
+      {#if mode === 'email'}
+        <div class="auth-field" transition:slide={{ duration: 180, axis: 'y' }}>
+          <label for="login_email">Email address</label>
+          <div class="field-shell" class:is-invalid={emailError} class:is-valid={emailTouched && emailValid}>
+            <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+            <input
+              id="login_email"
+              type="email"
+              bind:value={loginId}
+              placeholder="you@example.com"
+              autocomplete="email"
+              enterkeyhint="next"
+              onblur={() => emailTouched = true}
+              aria-invalid={emailError ? 'true' : undefined}
+              aria-describedby={emailError ? 'login_email_err' : undefined}
+            />
+            {#if emailTouched && emailValid}
+              <svg class="field-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+            {/if}
+          </div>
+          <div class="auth-hint-slot" aria-live="polite">{#if emailError}<span class="auth-hint error" id="login_email_err">Enter a valid email address</span>{/if}</div>
+        </div>
+      {/if}
+      {#if mode === 'mobile'}
+        <div class="auth-field" transition:slide={{ duration: 180, axis: 'y' }}>
+          <label for="login_mobile">Mobile number</label>
+          <div class="field-shell" class:is-invalid={mobileTouched && mobileDigits && !mobileValid} class:is-valid={mobileTouched && mobileValid}>
+            <select class="field-cc" bind:value={countryIso} onchange={validateMobile} aria-label="Country code">
+              {#each COUNTRY_CODES as c}
+                <option value={c[1]}>{c[3]} {c[0]}</option>
+              {/each}
+            </select>
+            <input
+              id="login_mobile"
+              type="tel"
+              bind:value={mobileDigits}
+              placeholder={mobilePlaceholder()}
+              inputmode="numeric"
+              enterkeyhint="next"
+              onblur={() => { mobileTouched = true; validateMobile(); }}
+              aria-invalid={mobileTouched && mobileDigits && !mobileValid ? 'true' : undefined}
+              aria-describedby={mobileTouched && mobileHint ? 'login_mobile_err' : undefined}
+            />
+            {#if mobileTouched && mobileValid}
+              <svg class="field-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+            {/if}
+          </div>
+          <div class="auth-hint-slot" aria-live="polite">{#if mobileTouched && mobileHint}<span class="auth-hint error" id="login_mobile_err">{mobileHint}</span>{/if}</div>
         </div>
       {/if}
 
-      <form onsubmit={preventDefault(handleSubmit)} novalidate>
-        <div class="auth-toggle" role="tablist" aria-label="Login method">
-          <button type="button" class="auth-toggle-btn" class:active={mode === 'email'} onclick={() => mode = 'email'} onkeydown={(e) => onModeToggleKeydown(e, 'email')} role="tab" aria-selected={mode === 'email'} tabindex={mode === 'email' ? 0 : -1}>Email</button>
-          <button type="button" class="auth-toggle-btn" class:active={mode === 'mobile'} onclick={() => mode = 'mobile'} onkeydown={(e) => onModeToggleKeydown(e, 'mobile')} role="tab" aria-selected={mode === 'mobile'} tabindex={mode === 'mobile' ? 0 : -1}>Mobile</button>
-        </div>
-
-        {#if mode === 'email'}
-          <div class="auth-field" transition:slide={{ duration: 180, axis: 'y' }}>
-            <label for="login_email">Email address</label>
-            <div class="input-wrapper">
-              <input
-                id="login_email"
-                type="email"
-                class="input"
-                class:is-valid={emailTouched && emailValid}
-                class:is-invalid={emailError}
-                bind:value={loginId}
-                placeholder="you@example.com"
-                autocomplete="email"
-                enterkeyhint="next"
-                onblur={() => emailTouched = true}
-              />
-              {#if emailTouched && emailValid}
-                <span class="input-icon valid" aria-hidden="true">&#10003;</span>
-              {/if}
-            </div>
-            {#if emailError}
-              <span class="auth-hint error">Enter a valid email address</span>
+      <div class="auth-field">
+        <label for="password">Password</label>
+        <div class="field-shell" class:is-invalid={passwordError}>
+          <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg>
+          <input
+            id="password"
+            type={showPassword ? 'text' : 'password'}
+            bind:value={password}
+            placeholder="Your password"
+            autocomplete="current-password"
+            enterkeyhint="go"
+            onblur={() => passwordTouched = true}
+            aria-invalid={passwordError ? 'true' : undefined}
+            aria-describedby={passwordError ? 'login_password_err' : undefined}
+          />
+          <button type="button" class="field-trailing-btn" onclick={() => showPassword = !showPassword} aria-label={showPassword ? 'Hide password' : 'Show password'}>
+            {#if showPassword}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            {:else}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             {/if}
-          </div>
-        {/if}
-        {#if mode === 'mobile'}
-          <div class="auth-field" transition:slide={{ duration: 180, axis: 'y' }}>
-            <label for="login_mobile">Mobile number</label>
-            <div class="auth-phone-row">
-              <select class="auth-cc-select" bind:value={countryIso} onchange={validateMobile} aria-label="Country code">
-                {#each COUNTRY_CODES as c}
-                  <option value={c[1]}>{c[3]} {c[0]}</option>
-                {/each}
-              </select>
-              <input
-                id="login_mobile"
-                type="tel"
-                class="input"
-                class:is-valid={mobileTouched && mobileValid}
-                class:is-invalid={mobileTouched && mobileDigits && !mobileValid}
-                bind:value={mobileDigits}
-                placeholder={mobilePlaceholder()}
-                inputmode="numeric"
-                enterkeyhint="next"
-                onblur={() => { mobileTouched = true; validateMobile(); }}
-              />
-            </div>
-            {#if mobileTouched && mobileHint}<span class="auth-hint error">{mobileHint}</span>{/if}
-          </div>
-        {/if}
-
-        <div class="auth-field">
-          <label for="password">Password</label>
-          <div class="input-wrapper">
-            <input
-              id="password"
-              type={showPassword ? 'text' : 'password'}
-              class="input"
-              class:is-invalid={passwordError}
-              bind:value={password}
-              placeholder="Your password"
-              autocomplete="current-password"
-              enterkeyhint="go"
-              onblur={() => passwordTouched = true}
-            />
-            <button type="button" class="input-icon input-icon--toggle" onclick={() => showPassword = !showPassword} aria-label={showPassword ? 'Hide password' : 'Show password'}>
-              {#if showPassword}
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-              {:else}
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              {/if}
-            </button>
-          </div>
-          {#if passwordError}
-            <span class="auth-hint error">At least 6 characters required</span>
-          {/if}
+          </button>
         </div>
+        <div class="auth-hint-slot" aria-live="polite">{#if passwordError}<span class="auth-hint error" id="login_password_err">At least 6 characters required</span>{/if}</div>
+        <p class="auth-caption">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <span>Only people you invite can ever see where you are.</span>
+        </p>
+      </div>
 
-        <button class="auth-submit tactile" type="submit" disabled={loading} class:redirecting={redirecting}>
-          {#if loading}
-            <span class="submit-spinner" aria-hidden="true"></span>
-            {redirecting ? 'Opening dashboard...' : 'Signing in...'}
-          {:else}
-            Sign in
-          {/if}
-        </button>
-      </form>
+      <button class="auth-submit tactile" type="submit" disabled={loading} class:redirecting={redirecting}>
+        {#if loading}
+          <span class="submit-spinner" aria-hidden="true"></span>
+          <span>{redirecting ? 'Opening your circle...' : 'Signing you in...'}</span>
+        {:else}
+          <span>Enter your circle</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        {/if}
+      </button>
+    </form>
 
-      <p class="auth-link">Don't have an account? <a href="#/register">Create one</a></p>
-    </div>
-  </div>
+    <p class="auth-link">Don't have an account? <a href="#/register">Create your circle</a></p>
+  </main>
+
+  <footer class="auth-footer">
+    <span class="auth-footer-shield" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
+    </span>
+    <p>Encrypted on-device. Kinnect never sells location data or shows ads — built for quiet peace of mind.</p>
+  </footer>
 </div>
 
 <style>
   @import '../styles/auth.css';
 
-  /* Decorative constellation cluster (Constellation primitive lives inside) */
-  .auth-brand-deco {
-    position: absolute;
-    top: -40px;
-    right: -80px;
-    width: 340px;
-    height: 280px;
-    pointer-events: none;
-    opacity: 0.65;
-  }
-
-  .input-wrapper {
-    position: relative;
-  }
-  .input-wrapper .input {
-    padding-right: var(--space-8);
-  }
-  .input-icon {
-    position: absolute;
-    right: var(--space-3);
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: var(--text-sm);
-    pointer-events: none;
-  }
-  .input-icon.valid {
-    color: var(--success-500);
-  }
-  .input-icon--toggle {
-    pointer-events: auto;
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: var(--text-tertiary);
-    display: flex;
-    align-items: center;
-    padding: var(--space-3);
-    min-width: 44px;
-    min-height: 44px;
-    border-radius: 4px;
-    transition: color 0.15s;
-  }
-  .input-icon--toggle:hover { color: var(--text-secondary); }
-  .is-valid {
-    border-color: var(--success-400) !important;
-  }
-  .submit-spinner {
-    display: inline-block;
-    width: 16px;
-    height: 16px;
-    border: 2px solid rgba(255,255,255,0.3);
-    border-top-color: white;
-    border-radius: 50%;
-    animation: spin 0.6s linear infinite;
-    margin-right: var(--space-2);
-    vertical-align: middle;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
   /* ── Staggered field entrance ─────────────────────────────────────────────
      Form controls rise + fade in sequentially. GPU-only (transform/opacity).
-     Per-child delay derived from --stagger-step (40ms). Scoped overrides beat
-     the global auth.css definitions. */
-  .auth-card form > .auth-toggle,
-  .auth-card form > .auth-field,
-  .auth-card form > .auth-submit {
-    animation: field-rise var(--duration-normal, 240ms) var(--ease-out, cubic-bezier(0.4, 0, 0.2, 1)) both;
+     Per-child delay derived from --stagger-step (global.css). */
+  form > .auth-toggle,
+  form > .auth-field,
+  form > .auth-submit {
+    animation: field-rise var(--duration-normal, 200ms) var(--ease-out) both;
   }
-  .auth-card form > *:nth-child(1) { animation-delay: calc(var(--stagger-step, 40ms) * 1); }
-  .auth-card form > *:nth-child(2) { animation-delay: calc(var(--stagger-step, 40ms) * 2); }
-  .auth-card form > *:nth-child(3) { animation-delay: calc(var(--stagger-step, 40ms) * 3); }
-  .auth-card form > *:nth-child(4) { animation-delay: calc(var(--stagger-step, 40ms) * 4); }
+  form > *:nth-child(1) { animation-delay: calc(var(--stagger-step, 40ms) * 1); }
+  form > *:nth-child(2) { animation-delay: calc(var(--stagger-step, 40ms) * 2); }
+  form > *:nth-child(3) { animation-delay: calc(var(--stagger-step, 40ms) * 3); }
+  form > *:nth-child(4) { animation-delay: calc(var(--stagger-step, 40ms) * 4); }
 
   @keyframes field-rise {
-    from { opacity: 0; transform: translateY(10px); }
+    from { opacity: 0; transform: translateY(var(--space-2-5)); }
     to   { opacity: 1; transform: translateY(0); }
   }
 
   /* ── Calm error cue ───────────────────────────────────────────────────────
-     Replaces the jarring shake with a brief danger-tint flash. The banner
-     itself stays still; a pointer-events-free overlay fades its opacity from
-     full to zero (GPU-only), reading as a soft border + background flash. */
+     A brief ochre-tint flash instead of a shake. The banner stays still; a
+     pointer-events-free overlay fades from full to zero (GPU-only opacity),
+     reading as a soft border + background flash. Ochre, never vermilion. */
   .auth-error {
-    animation: none;
     position: relative;
     overflow: hidden;
   }
@@ -464,31 +367,21 @@
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    border: 1px solid var(--danger-500-20, rgba(239, 68, 68, 0.20));
-    background: var(--danger-500-20, rgba(239, 68, 68, 0.20));
+    border: 1px solid color-mix(in oklch, var(--warning-500) 45%, transparent);
+    background: color-mix(in oklch, var(--warning-500) 16%, transparent);
     pointer-events: none;
-    animation: error-tint-flash 700ms var(--ease-out, cubic-bezier(0.4, 0, 0.2, 1)) both;
+    animation: error-tint-flash 700ms var(--ease-out) both;
   }
   @keyframes error-tint-flash {
     0%   { opacity: 1; }
     100% { opacity: 0; }
   }
 
-  /* Submit button transitions to success green after redirect */
-  :global(.auth-submit.redirecting) {
-    background: linear-gradient(135deg, var(--success-500, #10b981) 0%, var(--success-700, #047857) 100%) !important;
-    box-shadow:
-      0 8px 24px rgba(16, 185, 129, 0.40),
-      0 3px 8px rgba(16, 185, 129, 0.25),
-      inset 0 1px 0 rgba(255, 255, 255, 0.22) !important;
-    transition: background 300ms var(--ease-out), box-shadow 300ms var(--ease-out) !important;
-  }
-
-  /* ── Reduced motion — disable the new decorative entrances/cues ──────────── */
+  /* ── Reduced motion — decorative entrances/cues off ─────────────────────── */
   @media (prefers-reduced-motion: reduce) {
-    .auth-card form > .auth-toggle,
-    .auth-card form > .auth-field,
-    .auth-card form > .auth-submit {
+    form > .auth-toggle,
+    form > .auth-field,
+    form > .auth-submit {
       animation: none;
       opacity: 1;
       transform: none;
