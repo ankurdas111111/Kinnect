@@ -22,10 +22,10 @@
       <button class="qr-close-btn" onclick={close} aria-label="Close QR code">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
-      <span class="qr-title">Your Family Code</span>
+      <span class="qr-title">Your family code</span>
       <div class="qr-image-wrap">
         <img
-          src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={encodeURIComponent(getShareOrigin() + '/#/add-contact/' + $myShareCode)}&margin=6&bgcolor=ffffff&color=0f0f23"
+          src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={encodeURIComponent(getShareOrigin() + '/#/add-contact/' + $myShareCode)}&margin=6&bgcolor=ffffff&color=38332e"
           alt="QR code for family code {$myShareCode}"
           width="180"
           height="180"
@@ -40,13 +40,14 @@
 {/if}
 
 <style>
+  /* ═══ Hearth: warm-ink veil, paper card, serif title ═══ */
   .qr-backdrop {
     position: fixed;
     inset: 0;
     z-index: var(--z-modal, 5000);
-    background: rgba(5, 5, 18, 0.72);
-    backdrop-filter: blur(8px) saturate(1.4);
-    -webkit-backdrop-filter: blur(8px) saturate(1.4);
+    background: var(--shadow-color);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -58,79 +59,83 @@
   .qr-modal {
     position: relative;
     background: var(--surface-1);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-2xl, 20px);
+    border-radius: var(--radius-xl);
     padding: var(--space-6, 24px) var(--space-5, 20px) var(--space-4);
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: var(--space-3);
-    max-width: min(100%, 260px);
+    max-width: min(100%, 280px);
     width: 100%;
-    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--shadow-xl);
     animation: qr-slide-up 220ms var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
   }
   @keyframes qr-slide-up { from { transform: translateY(16px) scale(0.95); opacity: 0; } to { transform: none; opacity: 1; } }
 
   .qr-close-btn {
     position: absolute;
-    top: var(--space-3);
-    right: var(--space-3);
-    width: 28px;
-    height: 28px;
+    top: var(--space-1);
+    right: var(--space-1);
+    width: 44px;
+    height: 44px;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: var(--radius-md);
-    background: var(--surface-2);
-    border: 1px solid var(--border-subtle);
-    color: var(--text-secondary);
+    background: transparent;
+    border: none;
+    color: var(--text-tertiary);
     cursor: pointer;
-    transition: background 120ms, color 120ms;
+    transition: background-color var(--duration-fast) var(--ease-out),
+                color var(--duration-fast) var(--ease-out);
   }
-  .qr-close-btn:hover { background: var(--surface-3, var(--surface-2)); color: var(--text-primary); }
+  .qr-close-btn:hover { background: var(--surface-hover); color: var(--text-primary); }
+  .qr-close-btn:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
 
   .qr-title {
-    font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 700;
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 400;
+    font-size: var(--text-2xl);
+    letter-spacing: -0.01em;
     color: var(--text-primary);
   }
 
   .qr-image-wrap {
-    background: white;
+    /* Always-light quiet zone so the code scans in night mode too */
+    background: var(--text-inverse);
     border-radius: var(--radius-lg);
     padding: 8px;
     line-height: 0;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--shadow-sm);
   }
 
   .qr-image {
     display: block;
     width: 180px;
     height: 180px;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
   }
 
   .qr-code-display {
     font-family: var(--font-mono);
-    font-size: var(--text-sm);
+    font-size: var(--text-base);
     font-weight: 700;
-    color: var(--primary-400);
+    color: var(--primary-700);
     letter-spacing: 0.08em;
-    background: var(--surface-inset);
-    border: 1px solid var(--border-subtle);
+    font-variant-numeric: tabular-nums;
+    background: var(--primary-100);
     border-radius: var(--radius-md);
-    padding: 4px 10px;
+    padding: 4px 12px;
   }
 
   .qr-hint {
-    font-size: var(--text-xs);
-    color: var(--text-tertiary);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
     text-align: center;
-    line-height: 1.45;
+    line-height: 1.5;
     margin: 0;
-    max-width: 200px;
+    max-width: 210px;
   }
 
   @media (prefers-reduced-motion: reduce) {

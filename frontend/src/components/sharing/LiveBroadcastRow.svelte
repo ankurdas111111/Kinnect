@@ -62,20 +62,19 @@
       </svg>
       WhatsApp
     </a>
-    <button class="btn btn-danger btn-sm tactile" onclick={() => onstop?.()}>Stop Sharing</button>
+    <button class="quiet-stop-btn tactile" onclick={() => onstop?.()}>Stop sharing</button>
   </div>
 </div>
 
 <style>
+  /* ═══ Hearth: a quiet paper tier, no border stack ═══ */
   .broadcast-row {
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
     padding: var(--space-3) var(--space-4);
     border-radius: var(--radius-lg);
-    background: var(--glass-card-bg, var(--surface-inset));
-    border: 1px solid var(--glass-card-border, var(--border-subtle));
-    box-shadow: var(--glass-card-shadow, var(--shadow-xs));
+    background: var(--surface-2);
   }
   .broadcast-head {
     display: flex;
@@ -88,13 +87,14 @@
     gap: 1px;
     min-width: 0;
   }
+  /* Live is sage, never red — red is the SOS register alone */
   .rec-dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: var(--color-rec);
+    background: var(--status-live);
     flex-shrink: 0;
-    animation: rec-blink 1.2s var(--ease-in-out) infinite;
+    animation: rec-blink 2s var(--ease-in-out) infinite;
   }
   @keyframes rec-blink {
     0%, 100% { opacity: 1; }
@@ -123,7 +123,7 @@
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: var(--color-success, var(--sage));
+    background: var(--status-live);
     flex-shrink: 0;
   }
 
@@ -133,28 +133,51 @@
     gap: var(--space-1);
     align-items: center;
   }
+  /* WhatsApp hand-off — quiet paper pill, ember word */
   .btn-wa {
     display: inline-flex;
     align-items: center;
     gap: var(--space-1);
     padding: var(--space-1-5) var(--space-3);
     min-height: 44px;
-    background: var(--whatsapp-green);
-    color: var(--text-on-primary);
+    background: var(--surface-1);
+    border: 1px solid var(--hairline);
+    color: var(--primary-700);
     border-radius: var(--radius-full);
-    font-family: var(--font-display);
-    font-size: var(--text-xs);
-    font-weight: 700;
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    font-weight: 600;
     text-decoration: none;
     cursor: pointer;
-    transition: background var(--duration-fast) var(--ease-out);
+    transition: background-color var(--duration-fast) var(--ease-out);
     flex-shrink: 0;
     white-space: nowrap;
   }
-  .btn-wa:hover { background: var(--whatsapp-dark); }
-  .btn-wa:focus-visible { outline: 2px solid var(--whatsapp-green); outline-offset: 2px; }
+  .btn-wa:hover { background: var(--primary-100); }
+  .btn-wa:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
+
+  /* Ending a share is a decision, not a danger — ink outline, plain words */
+  .quiet-stop-btn {
+    padding: var(--space-2) var(--space-3);
+    min-height: 44px;
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color var(--duration-fast) var(--ease-out);
+    touch-action: manipulation;
+  }
+  .quiet-stop-btn:hover { background: var(--surface-hover); }
+  .quiet-stop-btn:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
 
   @media (prefers-reduced-motion: reduce) {
     .rec-dot { animation: none; }
+    .btn-wa,
+    .quiet-stop-btn { transition: none; }
   }
 </style>

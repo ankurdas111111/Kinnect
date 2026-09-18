@@ -204,7 +204,7 @@
 
     <!-- ── MY CODE HERO ─────────────────────────────────────────── -->
     {#if myCode}
-      <Card variant="glass" glow="primary" padding="none">
+      <Card variant="glass" padding="none">
         <div class="my-code-card bento-col-4">
           <div class="my-code-left">
             <span class="my-code-label">My Code</span>
@@ -414,7 +414,7 @@
 {:else}
   <div class="panel-shell panel-left panel-base">
     <div class="panel-header">
-      <h3>Sharing</h3>
+      <h3 class="verdict-voice">Sharing</h3>
       <button class="btn btn-icon btn-ghost" aria-label="Close sharing panel" onclick={() => dispatch('close')}>
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
@@ -439,21 +439,19 @@
   }
 
   .section-badge {
-    font-family: var(--font-display);
+    font-family: var(--font-sans);
     font-size: var(--text-xs);
-    font-weight: 700;
-    color: var(--text-tertiary);
-    background: var(--glass-chip-bg, var(--surface-inset));
-    border: 1px solid var(--glass-chip-border, var(--border-subtle));
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: var(--surface-2);
     border-radius: var(--radius-full);
     padding: 1px 8px;
     min-width: 22px;
     text-align: center;
   }
   .section-badge-live {
-    color: var(--accent-link);
-    background: color-mix(in oklch, var(--accent-link) 8%, transparent);
-    border-color: color-mix(in oklch, var(--accent-link) 20%, transparent);
+    color: var(--primary-700);
+    background: var(--primary-100);
   }
 
   :global(.cta-mag) { flex-shrink: 0; }
@@ -495,17 +493,16 @@
     text-transform: uppercase;
     letter-spacing: 0.07em;
     color: var(--text-tertiary);
-    font-family: var(--font-display);
+    font-family: var(--font-sans);
   }
   .my-code-value {
     font-size: var(--text-xl);
-    font-weight: 800;
+    font-weight: 700;
     color: var(--text-primary);
     letter-spacing: 0.14em;
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
-    background: var(--primary-500-12);
-    border: 1px solid var(--primary-500-20);
+    background: var(--primary-100);
     border-radius: var(--radius-md);
     padding: var(--space-1) var(--space-2-5);
     width: fit-content;
@@ -522,32 +519,31 @@
     gap: var(--space-1);
     padding: var(--space-2) var(--space-3);
     min-height: 44px;
-    border-radius: var(--radius-sm2);
+    border-radius: var(--radius-md);
     border: 1px solid var(--border-default);
-    background: var(--surface-hover);
+    background: transparent;
     color: var(--text-secondary);
-    font-size: var(--text-xs);
+    font-size: var(--text-sm);
     font-weight: 600;
-    font-family: var(--font-display);
+    font-family: var(--font-sans);
     cursor: pointer;
     white-space: nowrap;
-    transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
+    transition: background-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
     touch-action: manipulation;
   }
-  .my-code-btn:hover { background: var(--surface-active); }
+  .my-code-btn:hover { background: var(--surface-hover); }
   .my-code-btn:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
   .my-code-btn--copied {
-    background: var(--primary-500-20);
-    border-color: var(--primary-500-30);
-    color: var(--success-500);
+    border-color: var(--success-500-20);
+    color: var(--success-700);
   }
-  .my-code-btn--copied:hover { background: var(--primary-500-20); }
+  /* WhatsApp hand-off — quiet paper, ember word; no brand green on Hearth */
   .my-code-btn--wa {
-    border-color: color-mix(in oklch, var(--whatsapp-green) 25%, transparent);
-    background: color-mix(in oklch, var(--whatsapp-green) 7%, transparent);
-    color: var(--whatsapp-green);
+    border-color: var(--hairline);
+    background: var(--surface-2);
+    color: var(--primary-700);
   }
-  .my-code-btn--wa:hover { background: color-mix(in oklch, var(--whatsapp-green) 14%, transparent); }
+  .my-code-btn--wa:hover { background: var(--primary-100); }
 
   /* ── Quick actions row ───────────────────────────────────────── */
   .quick-actions-row {
@@ -566,8 +562,8 @@
   .live-link-toolbar .btn { width: 100%; }
   .live-link-blurb {
     margin: 0 0 var(--space-3);
-    font-size: var(--text-sm);
-    line-height: 1.5;
+    font-size: var(--text-base);
+    line-height: 1.55;
     color: var(--text-secondary);
   }
   .duration-label {
@@ -587,23 +583,22 @@
   .pill-btn {
     padding: var(--space-1) var(--space-3);
     min-height: 44px;
-    font-family: var(--font-display);
-    font-size: var(--text-xs);
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
     font-weight: 600;
-    border: 1px solid var(--border-default);
+    border: none;
     border-radius: var(--radius-full);
-    background: var(--surface-1);
+    background: var(--surface-2);
     color: var(--text-secondary);
     cursor: pointer;
-    transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+    transition: background-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
     touch-action: manipulation;
   }
-  .pill-btn:hover { background: var(--surface-2); color: var(--text-primary); }
+  .pill-btn:hover { background: var(--surface-hover); color: var(--text-primary); }
   .pill-btn.pill-active {
-    background: var(--primary-600);
-    color: var(--text-on-primary);
-    border-color: var(--primary-500);
-    box-shadow: var(--glow-primary), var(--shadow-xs);
+    background: var(--primary-100);
+    color: var(--primary-700);
+    box-shadow: inset 0 0 0 1.5px var(--primary-500);
   }
   .pill-btn:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
 
@@ -613,17 +608,15 @@
     align-items: flex-start;
     gap: var(--space-3);
     padding: var(--space-3) var(--space-4);
-    background: var(--surface-inset);
-    border: 1px dashed var(--border-subtle);
+    background: var(--surface-2);
     border-radius: var(--radius-xl);
   }
   .section-empty-icon {
     width: 40px;
     height: 40px;
-    border-radius: var(--radius-lg);
-    background: var(--primary-500-12);
-    border: 1px solid var(--primary-500-20);
-    color: var(--primary-400);
+    border-radius: var(--radius-full);
+    background: var(--primary-100);
+    color: var(--primary-700);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -636,13 +629,13 @@
     min-width: 0;
   }
   .section-empty-text {
-    font-size: var(--text-sm);
-    color: var(--text-tertiary);
+    font-size: var(--text-base);
+    color: var(--text-secondary);
     line-height: var(--leading-normal);
   }
   .section-empty-cta-hint {
-    font-size: var(--text-xs);
-    color: var(--primary-500);
+    font-size: var(--text-sm);
+    color: var(--primary-700);
     font-weight: 500;
   }
 

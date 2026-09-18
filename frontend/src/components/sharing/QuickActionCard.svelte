@@ -32,6 +32,7 @@
 </button>
 
 <style>
+  /* ═══ Hearth: quiet paper tiles, one ember icon pebble ═══ */
   .qa-card {
     display: flex;
     flex-direction: column;
@@ -39,19 +40,17 @@
     gap: var(--space-1-5);
     padding: var(--space-3-5) var(--space-2);
     min-height: 44px;
-    background: var(--glass-chip-bg, var(--surface-inset));
-    border: 1px solid var(--glass-chip-border, var(--border-subtle));
+    background: var(--surface-2);
+    border: none;
     border-radius: var(--radius-lg);
     cursor: pointer;
     position: relative;
-    transition: background var(--duration-fast) var(--ease-out),
-                border-color var(--duration-fast) var(--ease-out);
+    transition: background-color var(--duration-fast) var(--ease-out);
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
   }
   .qa-card:hover {
     background: var(--surface-hover);
-    border-color: var(--border-default);
   }
   .qa-card:focus-visible {
     outline: 2px solid var(--primary-400);
@@ -60,40 +59,31 @@
 
   .qa-active {
     background: var(--success-500-12);
-    border-color: color-mix(in oklch, var(--success-500) 35%, transparent);
+    box-shadow: inset 0 0 0 1.5px var(--success-500);
   }
   .qa-active:hover {
-    background: color-mix(in oklch, var(--success-500) 16%, transparent);
+    background: var(--success-500-20);
   }
 
   .qa-icon {
     width: 40px;
     height: 40px;
-    border-radius: var(--radius-sm2);
+    border-radius: var(--radius-full);
     display: flex;
     align-items: center;
     justify-content: center;
+    background: var(--primary-100);
+    color: var(--primary-700);
   }
-  .qa-icon[data-tone='ride'] {
-    background: var(--primary-500-12);
-    border: 1px solid var(--primary-500-20);
-    color: var(--primary-400);
-  }
-  .qa-icon[data-tone='omw'] {
-    background: color-mix(in oklch, var(--primary-500) 12%, transparent);
-    border: 1px solid var(--primary-500-20);
-    color: var(--primary-500);
-  }
-  .qa-icon[data-tone='invite'] {
-    background: color-mix(in oklch, var(--whatsapp-green) 14%, transparent);
-    border: 1px solid color-mix(in oklch, var(--whatsapp-green) 22%, transparent);
-    color: var(--whatsapp-green);
+  .qa-active .qa-icon {
+    background: var(--success-500-20);
+    color: var(--success-700);
   }
 
   .qa-label {
-    font-family: var(--font-display);
+    font-family: var(--font-sans);
     font-size: var(--text-xs);
-    font-weight: 700;
+    font-weight: 600;
     color: var(--text-primary);
     letter-spacing: 0.01em;
     text-align: center;
@@ -107,8 +97,7 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: var(--success-500);
-    box-shadow: 0 0 6px color-mix(in oklch, var(--success-500) 50%, transparent);
+    background: var(--status-live);
     animation: qa-pulse 2s var(--ease-in-out) infinite;
   }
   @keyframes qa-pulse {

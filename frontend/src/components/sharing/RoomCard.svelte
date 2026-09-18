@@ -44,7 +44,7 @@
   const hasPendingMine = $derived(pending.some((r) => r.isMe));
 </script>
 
-<Card variant="glass" glow="primary" padding="none">
+<Card variant="glass" padding="none">
   <div class="room-card animate-slide-up" style="--room-accent: {accent};">
     <div class="room-head">
       <div class="room-icon">{(room.name || 'G')[0].toUpperCase()}</div>
@@ -56,10 +56,10 @@
         <span class="room-code">{room.code}</span>
       </div>
       <button
-        class="btn btn-danger btn-sm tactile"
+        class="quiet-leave-btn tactile"
         onclick={() => onleave?.()}
         disabled={leaving}
-      >{leaving ? 'Leaving…' : 'Leave'}</button>
+      >{leaving ? 'Leaving…' : 'Leave group'}</button>
     </div>
 
     {#if members.length > 0}
@@ -115,10 +115,10 @@
                 {#if par.myVote === 'approve'}
                   <span class="badge badge-success badge-xs">Approved</span>
                 {:else if par.myVote === 'deny'}
-                  <span class="badge badge-danger badge-xs">Denied</span>
+                  <span class="badge badge-denied badge-xs">Denied</span>
                 {:else}
                   <button class="btn btn-primary btn-xs tactile" onclick={() => onvote?.(par.from, 'approve')}>Approve</button>
-                  <button class="btn btn-danger btn-xs tactile" onclick={() => onvote?.(par.from, 'deny')}>Deny</button>
+                  <button class="quiet-deny-btn tactile" onclick={() => onvote?.(par.from, 'deny')}>Deny</button>
                 {/if}
               </div>
             {/if}
@@ -130,13 +130,13 @@
 </Card>
 
 <style>
+  /* ═══ Hearth: quiet paper row — tonal separation, no accent stripe ═══ */
   .room-card {
     padding: var(--space-3);
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
     border-radius: inherit;
-    border-top: 3px solid var(--room-accent, var(--primary-500));
   }
 
   .room-head {
@@ -144,18 +144,19 @@
     align-items: center;
     gap: var(--space-2-5);
   }
+  /* The room's wheel colour lives in its pebble, not a border stripe */
   .room-icon {
     width: 36px;
     height: 36px;
-    border-radius: var(--radius-md);
-    background: var(--primary-500-12);
-    color: var(--primary-400);
+    border-radius: var(--radius-full);
+    background: var(--room-accent, var(--primary-500));
+    color: var(--text-inverse);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: var(--font-display);
+    font-family: var(--font-sans);
     font-size: var(--text-base);
-    font-weight: 800;
+    font-weight: 700;
     flex-shrink: 0;
   }
   .room-meta {
@@ -190,22 +191,22 @@
     flex-wrap: wrap;
     gap: var(--space-1);
     padding-top: var(--space-2);
-    border-top: 1px solid var(--border-subtle);
   }
   .member-chip {
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    background: var(--glass-chip-bg, var(--surface-inset));
-    border: 1px solid var(--glass-chip-border, var(--border-subtle));
+    background: var(--surface-2);
+    border: none;
     border-radius: var(--radius-full);
     padding: 3px 10px;
-    font-family: var(--font-display);
+    min-height: 32px;
+    font-family: var(--font-sans);
     font-size: var(--text-xs);
     font-weight: 600;
     color: var(--text-secondary);
     cursor: pointer;
-    transition: background var(--duration-fast) var(--ease-out),
+    transition: background-color var(--duration-fast) var(--ease-out),
                 color var(--duration-fast) var(--ease-out);
   }
   .member-chip:hover { background: var(--surface-hover); color: var(--text-primary); }
@@ -214,29 +215,30 @@
     width: 18px;
     height: 18px;
     border-radius: 50%;
-    background: var(--primary-500-12);
-    color: var(--primary-400);
+    background: var(--primary-100);
+    color: var(--primary-700);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-family: var(--font-display);
+    font-family: var(--font-sans);
     font-size: 9px;
     font-weight: 700;
   }
+  /* Revoke is administrative, not an emergency — ink, with explicit hover */
   .revoke-inline {
     background: none;
     border: none;
     cursor: pointer;
-    color: var(--danger-400);
-    font-size: 13px;
+    color: var(--text-tertiary);
+    font-size: 14px;
     font-weight: 700;
-    padding: 0 2px;
+    padding: 0 4px;
     line-height: 1;
-    border-radius: 2px;
+    border-radius: var(--radius-sm);
     transition: color var(--duration-fast) var(--ease-out);
   }
-  .revoke-inline:hover { color: var(--danger-500); }
-  .revoke-inline:focus-visible { outline: 2px solid var(--danger-400); outline-offset: 1px; }
+  .revoke-inline:hover { color: var(--text-primary); }
+  .revoke-inline:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 1px; }
 
   .room-actions {
     display: flex;
@@ -246,22 +248,51 @@
     padding-top: var(--space-1);
   }
   .duration-select {
-    font-size: var(--text-xs);
+    font-size: var(--text-sm);
     padding: 2px 6px;
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-sm);
-    background: var(--surface-1);
+    border: 1px solid transparent;
+    border-radius: var(--radius-input);
+    background: var(--surface-inset);
     color: var(--text-primary);
     cursor: pointer;
-    max-width: 90px;
+    max-width: 110px;
     min-height: 44px;
+    transition: border-color var(--duration-fast) var(--ease-out);
+  }
+  .duration-select:focus-visible {
+    outline: none;
+    border-color: var(--primary-500);
+    box-shadow: 0 0 0 3px var(--primary-500-20);
   }
 
+  /* Leaving a group is a decision, not a danger — ink outline, plain words */
+  .quiet-leave-btn {
+    padding: var(--space-2) var(--space-3);
+    min-height: 44px;
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    cursor: pointer;
+    flex-shrink: 0;
+    white-space: nowrap;
+    transition: background-color var(--duration-fast) var(--ease-out);
+    touch-action: manipulation;
+  }
+  .quiet-leave-btn:hover:not(:disabled) { background: var(--surface-hover); }
+  .quiet-leave-btn:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
+  .quiet-leave-btn:disabled { opacity: 0.5; cursor: default; }
+
+  /* Pending votes sit on their own paper tier — no dashed rule */
   .pending-admin {
     width: 100%;
     margin-top: var(--space-2);
-    padding: var(--space-2) 0 0;
-    border-top: 1px dashed var(--border-default);
+    padding: var(--space-2) var(--space-3);
+    background: var(--surface-2);
+    border-radius: var(--radius-md);
   }
   .pending-row {
     display: flex;
@@ -273,10 +304,39 @@
   .pending-info { display: flex; flex-direction: column; gap: 1px; }
   .pending-actions { display: flex; gap: var(--space-1); flex-shrink: 0; }
   .vote-count { color: var(--text-secondary); }
-  .badge-danger { background: var(--danger-500); color: var(--text-on-primary); }
+  /* A denied vote is a fact, not an alarm */
+  .badge-denied {
+    background: var(--surface-inset);
+    color: var(--text-secondary);
+    border-radius: var(--radius-full);
+  }
+  .quiet-deny-btn {
+    font-family: var(--font-sans);
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    padding: 2px 10px;
+    min-height: 44px;
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background-color var(--duration-fast) var(--ease-out);
+    touch-action: manipulation;
+  }
+  .quiet-deny-btn:hover { background: var(--surface-hover); }
+  .quiet-deny-btn:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
   .btn-xs {
     font-size: var(--text-2xs);
     padding: 2px 8px;
     border-radius: var(--radius-sm);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .member-chip,
+    .revoke-inline,
+    .duration-select,
+    .quiet-leave-btn,
+    .quiet-deny-btn { transition: none; }
   }
 </style>

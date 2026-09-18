@@ -60,7 +60,7 @@
   const canRelate = $derived(!isGuardian && !isWard && !isPending);
 </script>
 
-<Card variant="glass" glow="primary" padding="none">
+<Card variant="glass" padding="none">
   <div class="contact-row animate-slide-up">
     <div class="avatar-wrap">
       <AvatarRing {ring} size={44} label={`${contact.displayName}, ${presenceText}`}>
@@ -91,10 +91,10 @@
         <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 1.892.402 3.13 1.5 4.5L12 22l6.5-7.5c1.098-1.37 1.5-2.608 1.5-4.5a8 8 0 0 0-8-8z"/></svg>
       </button>
       <button
-        class="btn btn-danger btn-sm tactile"
+        class="quiet-remove-btn tactile"
         onclick={() => onremove?.(contact.userId)}
         disabled={removing}
-      >{removing ? 'Removing…' : 'Remove'}</button>
+      >{removing ? 'Removing…' : 'Remove contact'}</button>
       {#if canRelate}
         <select class="duration-select" bind:value={guardianDuration} aria-label="Watch duration">
           <option value={null}>Permanent</option>
@@ -159,15 +159,15 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .status.status-now { color: var(--success-500); font-weight: 600; }
-  .status.status-sos { color: var(--danger-500); font-weight: 700; }
+  .status.status-now { color: var(--success-600); font-weight: 600; }
+  /* Vermilion is allowed here alone: this text reports an active SOS */
+  .status.status-sos { color: var(--danger-600); font-weight: 700; }
   .activity-chip {
     font-size: var(--text-2xs);
     color: var(--text-tertiary);
-    background: var(--glass-chip-bg, var(--surface-inset));
-    border: 1px solid var(--glass-chip-border, var(--border-subtle));
+    background: var(--surface-2);
     border-radius: var(--radius-full);
-    padding: 1px 7px;
+    padding: 2px 8px;
     width: fit-content;
     margin-top: 2px;
   }
@@ -186,25 +186,58 @@
     width: 44px;
     height: 44px;
     border-radius: var(--radius-full);
-    background: var(--primary-500-08);
-    border: 1px solid var(--primary-500-20);
-    color: var(--primary-400);
+    background: var(--primary-100);
+    border: none;
+    color: var(--primary-700);
     cursor: pointer;
     flex-shrink: 0;
-    transition: background var(--duration-fast) var(--ease-out);
+    transition: background-color var(--duration-fast) var(--ease-out);
     touch-action: manipulation;
   }
-  .locate-pill:hover { background: var(--primary-500-12); }
+  .locate-pill:hover { background: var(--primary-500-20); }
   .locate-pill:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
-  .duration-select {
-    font-size: var(--text-xs);
-    padding: 2px 6px;
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-sm);
-    background: var(--surface-1);
+
+  /* Removing a contact is a decision, not a danger — ink outline, plain words */
+  .quiet-remove-btn {
+    padding: var(--space-2) var(--space-3);
+    min-height: 44px;
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
     color: var(--text-primary);
     cursor: pointer;
-    max-width: 90px;
+    white-space: nowrap;
+    transition: background-color var(--duration-fast) var(--ease-out);
+    touch-action: manipulation;
+  }
+  .quiet-remove-btn:hover:not(:disabled) { background: var(--surface-hover); }
+  .quiet-remove-btn:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
+  .quiet-remove-btn:disabled { opacity: 0.5; cursor: default; }
+
+  .duration-select {
+    font-size: var(--text-sm);
+    padding: 2px 6px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-input);
+    background: var(--surface-inset);
+    color: var(--text-primary);
+    cursor: pointer;
+    max-width: 110px;
     min-height: 44px;
+    transition: border-color var(--duration-fast) var(--ease-out);
+  }
+  .duration-select:focus-visible {
+    outline: none;
+    border-color: var(--primary-500);
+    box-shadow: 0 0 0 3px var(--primary-500-20);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .locate-pill,
+    .quiet-remove-btn,
+    .duration-select { transition: none; }
   }
 </style>

@@ -419,7 +419,7 @@
     {:else}
       <!-- ── Active ride screen ──────────────────────────────────── -->
       <div class="ride-active-header">
-        <div class="ride-active-dot fx-ambient" aria-hidden="true"></div>
+        <div class="ride-active-dot" aria-hidden="true"><span class="ride-active-halo fx-ambient"></span></div>
         <div class="ride-active-meta">
           <h3 class="ride-title">
             {#if activeVehicleLabel}{activeVehicleLabel}{:else}Ride{/if} Active
@@ -447,7 +447,7 @@
         {@const pct     = Math.min(100, Math.max(0, (elapsed / total) * 100))}
         <div class="eta-bar-wrap" aria-hidden="true">
           <div class="eta-bar-track">
-            <div class="eta-bar-fill" style="width:{pct}%"></div>
+            <div class="eta-bar-fill" style="transform:scaleX({pct / 100})"></div>
           </div>
           <span class="eta-bar-label">{etaMinsLeft > 0 ? etaMinsLeft + 'm left' : 'ETA reached'}</span>
         </div>
@@ -491,12 +491,13 @@
 {/if}
 
 <style>
+  /* ═══ Hearth: warm-ink veil, then a paper sheet — no glass ═══ */
   .ride-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.5); /* raw-color-ok: overlay scrim */
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    background: var(--shadow-color);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
     z-index: var(--z-modal, 5000);
     touch-action: none;
   }
@@ -507,20 +508,17 @@
     right: 0;
     bottom: 0;
     z-index: calc(var(--z-modal, 5000) + 1);
-    background: var(--glass-panel-bg, var(--surface-2));
-    backdrop-filter: blur(var(--glass-panel-blur, 32px)) saturate(1.8);
-    -webkit-backdrop-filter: blur(var(--glass-panel-blur, 32px)) saturate(1.8);
-    border-top: 1px solid var(--glass-panel-border, var(--border-subtle));
-    border-radius: 20px 20px 0 0;
-    box-shadow: var(--glass-panel-shadow, 0 -8px 48px rgba(0,0,0,0.40)); /* raw-color-ok in fallback */
+    background: var(--surface-1);
+    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+    box-shadow: var(--sh-up);
     padding: 8px 20px calc(24px + env(safe-area-inset-bottom, 0px));
   }
 
   .ride-handle {
     width: 40px;
     height: 5px;
-    background: var(--border-default);
-    border-radius: 999px;
+    background: var(--border-strong);
+    border-radius: var(--radius-full);
     margin: 4px auto 20px;
   }
 
@@ -562,9 +560,9 @@
   }
 
   .step-label {
-    font-family: var(--font-display);
+    font-family: var(--font-sans);
     font-size: var(--text-xs, 11px);
-    font-weight: 700;
+    font-weight: 600;
     letter-spacing: 0.04em;
     color: var(--text-tertiary);
     transition: color var(--duration-normal, 200ms) var(--ease-out);
@@ -574,14 +572,14 @@
     background: var(--primary-500);
     border-color: var(--primary-500);
     transform: scale(1.12);
-    box-shadow: 0 0 0 3px var(--primary-500-20, color-mix(in oklch, var(--primary-500) 20%, transparent));
+    box-shadow: 0 0 0 3px var(--primary-500-20);
   }
-  .step-item.step-active .step-label { color: var(--primary-300); }
+  .step-item.step-active .step-label { color: var(--primary-700); }
 
   .step-item.step-complete .step-bead {
-    background: var(--success-500, var(--success-500));
-    border-color: var(--success-500, var(--success-500));
-    color: white;
+    background: var(--success-500);
+    border-color: var(--success-500);
+    color: var(--text-inverse);
   }
   .step-item.step-complete .step-label { color: var(--text-secondary); }
 
@@ -593,52 +591,52 @@
     margin-bottom: var(--space-4, 16px);
   }
 
+  /* Ember pebble, serif title, plain warm sentence */
   .ride-icon {
     width: 48px;
     height: 48px;
-    border-radius: var(--radius-lg, 14px);
-    background: var(--primary-500-20, color-mix(in oklch, var(--primary-500) 20%, transparent));
-    border: 1px solid var(--primary-500-30, color-mix(in oklch, var(--primary-500) 25%, transparent));
+    border-radius: var(--radius-full);
+    background: var(--primary-100);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--primary-400);
+    color: var(--primary-700);
     flex-shrink: 0;
   }
 
   .ride-title {
-    font-family: var(--font-display);
-    font-size: var(--text-lg, 18px);
-    font-weight: 700;
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 400;
+    font-size: var(--text-2xl);
     margin: 0 0 3px;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.01em;
+    line-height: 1.3;
     color: var(--text-primary);
   }
 
   .ride-subtitle {
-    font-size: var(--text-sm, 13px);
+    font-size: var(--text-base);
     color: var(--text-secondary);
     margin: 0;
-    line-height: 1.4;
+    line-height: 1.5;
   }
 
-  /* ── Setup card (elevated container) ─────────────────────────── */
+  /* ── Setup group — a warmer paper tier, no border stack ──────── */
   .setup-card {
-    background: var(--surface-1, rgba(255,255,255,0.03));
-    border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
-    border-radius: var(--radius-xl, 16px);
+    background: var(--surface-2);
+    border-radius: var(--radius-xl);
     padding: 16px;
     margin-bottom: 16px;
-    box-shadow: var(--elevation-2, 0 4px 16px rgba(0,0,0,0.10));
   }
 
   /* ── Vehicle type picker ─────────────────────────────────────── */
   .field-label {
     font-size: var(--text-xs, 11px);
-    font-weight: 700;
+    font-weight: 600;
     color: var(--text-tertiary);
     text-transform: uppercase;
-    letter-spacing: 0.07em;
+    letter-spacing: 0.06em;
     margin: 0 0 8px;
     display: block;
   }
@@ -661,17 +659,17 @@
     justify-content: center;
     gap: var(--space-1, 4px);
     padding: var(--space-3, 12px) var(--space-2, 8px);
-    background: var(--surface-inset);
-    border: 1px solid var(--border-subtle);
+    background: var(--surface-1);
+    border: none;
     border-radius: var(--radius-lg, 14px);
-    font-family: var(--font-display);
+    font-family: var(--font-sans);
     font-weight: 600;
     color: var(--text-secondary);
     cursor: pointer;
     outline: none;
     transition:
       background-color var(--duration-fast, 100ms) var(--ease-out),
-      border-color var(--duration-fast, 100ms) var(--ease-out),
+      box-shadow var(--duration-fast, 100ms) var(--ease-out),
       color var(--duration-fast, 100ms) var(--ease-out),
       transform var(--duration-fast, 100ms) var(--ease-spring, cubic-bezier(0.34,1.56,0.64,1));
   }
@@ -690,20 +688,19 @@
   .vchip:hover {
     background: var(--surface-hover);
     color: var(--text-primary);
-    border-color: var(--border-default);
   }
   .vchip:focus-visible {
     outline: 2px solid var(--primary-400);
     outline-offset: 2px;
   }
 
-  /* Selected: primary tint bg + 1px primary border. Pressable squish on click. */
+  /* Selected: ember tint + inset ring, AA ember word. Pressable squish. */
   .vchip.vchip-active {
-    background: var(--primary-500-20, color-mix(in oklch, var(--primary-500) 15%, transparent));
-    border-color: var(--primary-500);
-    color: var(--primary-300);
+    background: var(--primary-100);
+    box-shadow: inset 0 0 0 1.5px var(--primary-500);
+    color: var(--primary-700);
   }
-  .vchip.vchip-active .vchip-icon { color: var(--primary-300); }
+  .vchip.vchip-active .vchip-icon { color: var(--primary-700); }
   .vchip:active { transform: scale(0.96); }
 
   /* ── Form inputs ─────────────────────────────────────────────── */
@@ -715,31 +712,33 @@
 
   .form-label {
     font-size: var(--text-xs, 11px);
-    font-weight: 700;
+    font-weight: 600;
     color: var(--text-tertiary);
     text-transform: uppercase;
-    letter-spacing: 0.07em;
+    letter-spacing: 0.06em;
     margin-bottom: 4px;
     display: block;
   }
 
   .ride-input {
     width: 100%;
-    padding: 11px 14px;
-    background: var(--surface-inset, rgba(255,255,255,0.05));
-    border: 1px solid var(--border-subtle, rgba(255,255,255,0.10));
-    border-radius: var(--radius-lg, 12px);
+    padding: 12px 14px;
+    min-height: 48px;
+    background: var(--surface-inset);
+    border: 1px solid transparent;
+    border-radius: var(--radius-input);
     color: var(--text-primary);
-    font-size: var(--text-base, 15px);
+    font-size: var(--text-base);
     font-family: var(--font-sans);
     outline: none;
-    transition: border-color 0.15s, box-shadow 0.15s;
+    transition: border-color var(--duration-fast) var(--ease-out),
+                box-shadow var(--duration-fast) var(--ease-out);
     box-sizing: border-box;
   }
 
   .ride-input:focus {
-    border-color: var(--primary-500, var(--primary-500));
-    box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary-500) 12%, transparent);
+    border-color: var(--primary-500);
+    box-shadow: 0 0 0 3px var(--primary-500-20);
   }
 
   .ride-input::placeholder { color: var(--text-tertiary); }
@@ -755,38 +754,37 @@
   .pill-btn {
     padding: var(--space-2, 8px) var(--space-3, 12px);
     min-height: 44px; /* touch target */
-    font-family: var(--font-display);
-    font-size: var(--text-xs, 11px);
-    font-weight: 700;
-    border: 1px solid var(--border-default);
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    border: none;
     border-radius: var(--radius-full);
-    background: var(--surface-inset);
+    background: var(--surface-1);
     color: var(--text-secondary);
     cursor: pointer;
     outline: none;
     transition:
       background-color var(--duration-fast, 100ms) var(--ease-out),
       color var(--duration-fast, 100ms) var(--ease-out),
-      border-color var(--duration-fast, 100ms) var(--ease-out),
+      box-shadow var(--duration-fast, 100ms) var(--ease-out),
       transform var(--duration-fast, 100ms) var(--ease-spring, cubic-bezier(0.34,1.56,0.64,1));
   }
   .pill-btn:hover { background: var(--surface-hover); color: var(--text-primary); }
   .pill-btn:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
   .pill-btn.pill-active {
-    background: var(--primary-500-20, color-mix(in oklch, var(--primary-500) 20%, transparent));
-    color: var(--primary-200, #c7d2fe);
-    border-color: var(--primary-500);
+    background: var(--primary-100);
+    color: var(--primary-700);
+    box-shadow: inset 0 0 0 1.5px var(--primary-500);
   }
   .pill-btn:active { transform: scale(0.96); }
 
   .eta-arrival {
-    font-family: var(--font-display);
-    font-size: var(--text-xs, 11px);
-    font-weight: 700;
-    color: var(--primary-400);
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--primary-700);
     padding: var(--space-1, 4px) var(--space-2, 8px);
-    background: var(--primary-500-20, color-mix(in oklch, var(--primary-500) 10%, transparent));
-    border: 1px solid var(--primary-500-30, color-mix(in oklch, var(--primary-500) 20%, transparent));
+    background: var(--primary-100);
     border-radius: var(--radius-full);
   }
 
@@ -824,54 +822,59 @@
   }
 
   .ride-active-dot {
+    position: relative;
     width: 12px;
     height: 12px;
     border-radius: 50%;
-    background: var(--success-500, var(--success-500));
+    background: var(--status-live);
     flex-shrink: 0;
-    /* Static ring; fx-ambient class enables animation (suppressed at data-fx=minimal) */
-    box-shadow: 0 0 0 4px color-mix(in oklch, var(--success-500) 20%, transparent); /* raw-color-ok: no --success-* alpha token */
+    box-shadow: 0 0 0 4px var(--success-500-20);
   }
-  .ride-active-dot.fx-ambient {
-    animation: ride-pulse 2s var(--ease-in-out, ease-in-out) infinite;
+  /* Breathing halo — transform/opacity only (GPU); fx-ambient gates it */
+  .ride-active-halo {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: var(--success-500-30);
+  }
+  .ride-active-halo.fx-ambient {
+    animation: ride-breathe 2.4s var(--ease-in-out, ease-in-out) infinite;
   }
 
-  @keyframes ride-pulse {
-    0%, 100% { box-shadow: 0 0 0 4px color-mix(in oklch, var(--success-500) 20%, transparent); } /* raw-color-ok */
-    50%       { box-shadow: 0 0 0 8px transparent; }
+  @keyframes ride-breathe {
+    0%, 100% { transform: scale(1);   opacity: 0.8; }
+    50%      { transform: scale(2.1); opacity: 0; }
   }
 
-  /* ── Plate display — flagship glanceable: JetBrains Mono, 7:1 contrast ── */
+  /* ── Plate display — glanceable ink-on-inset, tonal not bordered ── */
   .plate-display {
     display: flex;
     align-items: center;
     gap: var(--space-3, 12px);
     padding: var(--space-3, 12px) var(--space-4, 16px);
     margin-bottom: var(--space-4, 16px);
-    background: var(--text-primary, #f8fafc); /* near-white plate background */
+    background: var(--surface-inset);
     border-radius: var(--radius-md, 10px);
-    border: 1px solid var(--border-default);
   }
 
   .plate-label {
-    font-family: var(--font-display);
-    font-size: var(--text-xs, 10px);
-    font-weight: 700;
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
+    font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--text-tertiary);
-    /* On a light plate background: needs a dark layer override */
-    color: rgba(0,0,0,0.45); /* raw-color-ok: on explicitly white bg */
     flex-shrink: 0;
   }
 
-  /* Plate number: JetBrains Mono, --text-2xl, near-black on white = 7:1+ */
+  /* Plate number: large tabular ink on the warm inset tier */
   .plate-num {
-    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-family: var(--font-mono);
     font-size: var(--text-2xl, 24px);
     font-weight: 700;
     letter-spacing: 0.1em;
-    color: rgba(0,0,0,0.87); /* raw-color-ok: on white plate bg — 7:1 contrast target */
+    font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
     line-height: 1;
   }
 
@@ -882,9 +885,10 @@
 
   .ride-timer {
     margin-left: auto;
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
     font-size: var(--text-sm, 13px);
-    font-weight: 700;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
     color: var(--text-secondary);
     background: var(--surface-inset);
     padding: 4px 10px;
@@ -909,17 +913,20 @@
     overflow: hidden;
   }
 
+  /* One ember, no gradient; scaleX so the fill animates on the GPU */
   .eta-bar-fill {
     height: 100%;
-    background: linear-gradient(90deg, var(--primary-500), var(--success-500));
-    border-radius: 99px;
-    transition: width 1s linear;
+    width: 100%;
+    background: var(--primary-500);
+    border-radius: var(--radius-full);
+    transform-origin: left center;
+    transition: transform 1s linear;
   }
 
   .eta-bar-label {
-    font-family: var(--font-display);
+    font-family: var(--font-sans);
     font-size: var(--text-xs);
-    font-weight: 700;
+    font-weight: 600;
     color: var(--text-tertiary);
     flex-shrink: 0;
   }
@@ -932,6 +939,7 @@
     margin-bottom: 10px;
   }
 
+  /* WhatsApp hand-off — the sheet's one ember fill, not brand green */
   .btn-wa {
     width: 100%;
     display: flex;
@@ -939,23 +947,24 @@
     justify-content: center;
     gap: var(--space-2, 10px);
     padding: var(--space-3, 12px) var(--space-4, 16px);
-    font-family: var(--font-display);
-    font-size: var(--text-base, 15px);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
     font-weight: 700;
-    background: var(--whatsapp-green, #25d366);
-    color: white;
+    background: var(--primary-500);
+    color: var(--text-on-primary);
     border: none;
-    border-radius: var(--radius-lg, 12px);
+    border-radius: var(--radius-button);
     cursor: pointer;
-    min-height: 44px;
+    min-height: 48px;
     outline: none;
+    box-shadow: var(--shadow-sm);
     transition:
       background-color var(--duration-fast, 100ms) var(--ease-out),
       transform var(--duration-fast, 100ms) var(--ease-spring, cubic-bezier(0.34,1.56,0.64,1)),
       box-shadow var(--duration-fast, 100ms) var(--ease-out);
   }
-  .btn-wa:hover { background: var(--whatsapp-dark, #1ebe5d); }
-  .btn-wa:focus-visible { outline: 2px solid var(--whatsapp-green, #25d366); outline-offset: 2px; }
+  .btn-wa:hover { background: var(--primary-600); box-shadow: var(--shadow-primary); }
+  .btn-wa:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
   .btn-wa:active { transform: scale(0.98); }
 
   .ride-secondary-actions {
@@ -971,23 +980,24 @@
     gap: 7px;
     padding: 11px;
     min-height: 44px;
-    font-family: var(--font-display);
+    font-family: var(--font-sans);
     font-size: var(--text-sm, 13px);
-    font-weight: 700;
-    background: var(--surface-inset);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-lg, 12px);
+    font-weight: 600;
+    background: var(--surface-2);
+    border: none;
+    border-radius: var(--radius-button);
     color: var(--text-secondary);
     cursor: pointer;
-    transition: background 150ms, color 150ms, border-color 150ms;
+    transition: background-color var(--duration-fast) var(--ease-out),
+                color var(--duration-fast) var(--ease-out);
   }
   .btn-secondary-action:hover {
     background: var(--surface-hover);
     color: var(--text-primary);
-    border-color: var(--border-default);
   }
+  .btn-secondary-action:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
 
-  /* ── Reached Safely button ───────────────────────────────────── */
+  /* ── Reached Safely — the sage settled moment ────────────────── */
   .btn-safe {
     width: 100%;
     display: flex;
@@ -995,18 +1005,22 @@
     justify-content: center;
     gap: 8px;
     padding: 14px;
-    font-family: var(--font-display);
-    font-size: var(--text-base, 15px);
+    min-height: 48px;
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
     font-weight: 700;
-    background: var(--success-500, var(--success-500));
-    color: white;
+    background: var(--success-500);
+    color: var(--text-inverse);
     border: none;
-    border-radius: var(--radius-lg, 12px);
+    border-radius: var(--radius-button);
     cursor: pointer;
-    transition: background 150ms, opacity 150ms, transform 120ms;
+    transition: background-color var(--duration-fast) var(--ease-out),
+                opacity var(--duration-fast) var(--ease-out),
+                transform var(--duration-fast) var(--ease-out);
   }
-  .btn-safe:hover  { background: #0ea774; }
+  .btn-safe:hover  { background: var(--success-600); }
   .btn-safe:active { transform: scale(0.98); }
+  .btn-safe:focus-visible { outline: 2px solid var(--success-500); outline-offset: 2px; }
   .btn-safe:disabled { opacity: 0.7; cursor: default; }
 
   /* ── "Reached Safely" success screen — calm green moment ───── */
@@ -1017,9 +1031,8 @@
     align-items: center;
     padding: var(--space-8, 32px) var(--space-5, 20px) var(--space-4, 16px);
     gap: var(--space-2, 10px);
-    /* border pulse: fades from ring-color to transparent in 300ms, then stays at final */
-    border: 1.5px solid var(--ring-color-live, var(--status-live, var(--success-500)));
-    border-radius: var(--radius-lg, 16px);
+    background: var(--success-500-08);
+    border-radius: var(--radius-xl);
     animation: safely-enter 300ms var(--ease-out) forwards;
   }
 
@@ -1032,12 +1045,11 @@
     width: 72px;
     height: 72px;
     border-radius: 50%;
-    background: color-mix(in oklch, var(--success-500) 12%, transparent); /* raw-color-ok */
-    border: 2px solid var(--ring-color-live, var(--status-live, var(--success-500)));
+    background: var(--success-500-20);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--success-500, var(--success-500));
+    color: var(--success-600);
     /* Single pop — not infinite; calm-core */
     animation: safely-icon-pop 300ms var(--ease-spring, cubic-bezier(0.34,1.56,0.64,1)) forwards;
   }
@@ -1048,18 +1060,20 @@
     100% { transform: scale(1); }
   }
 
+  /* The verdict sentence — serif italic, spoken once */
   .safely-text {
-    font-family: var(--font-display);
-    font-size: var(--text-xl, 20px);
-    font-weight: 800;
-    color: var(--success-500, var(--success-500));
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 400;
+    font-size: var(--text-2xl);
+    color: var(--text-primary);
     margin: 0;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.01em;
   }
 
   .safely-sub {
-    font-size: var(--text-sm, 13px);
-    color: var(--text-tertiary);
+    font-size: var(--text-base);
+    color: var(--text-secondary);
     margin: 0;
   }
 
@@ -1086,14 +1100,14 @@
     display: inline-flex;
     align-items: center;
     gap: var(--space-1, 4px);
-    padding: var(--space-1, 4px) var(--space-2, 8px);
-    min-height: 32px;
-    font-family: var(--font-display);
-    font-size: var(--text-xs, 11px);
+    padding: var(--space-1, 4px) var(--space-3, 12px);
+    min-height: 44px;
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
     font-weight: 600;
-    color: var(--text-tertiary);
+    color: var(--text-secondary);
     background: transparent;
-    border: 1px solid var(--border-subtle);
+    border: 1px solid var(--border-default);
     border-radius: var(--radius-full);
     cursor: pointer;
     outline: none;
@@ -1101,7 +1115,7 @@
       color var(--duration-fast, 100ms) var(--ease-out),
       border-color var(--duration-fast, 100ms) var(--ease-out);
   }
-  .import-ghost:hover { color: var(--text-secondary); border-color: var(--border-default); }
+  .import-ghost:hover { color: var(--text-primary); border-color: var(--border-strong); }
   .import-ghost:focus-visible { outline: 2px solid var(--primary-400); outline-offset: 2px; }
   .import-ghost:disabled { opacity: 0.5; cursor: wait; }
 
@@ -1110,17 +1124,26 @@
     width: 10px;
     height: 10px;
     border: 1.5px solid var(--text-tertiary);
-    border-top-color: var(--primary-400);
+    border-top-color: var(--primary-700);
     border-radius: 50%;
     animation: spin 0.6s linear infinite;
   }
 
-  .autofilled {
-    animation: autofill-glow 1.2s var(--ease-out) forwards;
+  /* One-shot autofill acknowledgement — static ember ring on a pseudo,
+     only its opacity animates (GPU) */
+  .autofilled { position: relative; }
+  .autofilled::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 0 0 3px var(--primary-500-30);
+    pointer-events: none;
+    animation: autofill-fade 1.2s var(--ease-out) forwards;
   }
-  @keyframes autofill-glow {
-    0%   { box-shadow: 0 0 0 3px var(--primary-500-20, color-mix(in oklch, var(--primary-500) 40%, transparent)); }
-    100% { box-shadow: none; }
+  @keyframes autofill-fade {
+    0%   { opacity: 1; }
+    100% { opacity: 0; }
   }
 
   .sr-only {
@@ -1142,15 +1165,24 @@
     .step-label,
     .vchip,
     .pill-btn,
+    .ride-input,
+    .btn-wa,
+    .btn-secondary-action,
+    .btn-safe,
+    .eta-bar-fill,
     .import-ghost { transition: none; }
 
     .step-item.step-active .step-bead { transform: none; }
     .vchip:active,
-    .pill-btn:active { transform: none; }
+    .pill-btn:active,
+    .btn-wa:active,
+    .btn-safe:active { transform: none; }
 
     /* Infinite loops → land at final state */
-    .ride-active-dot.fx-ambient { animation: none; }
+    .ride-active-halo,
+    .ride-active-halo.fx-ambient { animation: none; opacity: 0; }
     .import-spinner { animation: none; }
+    .autofilled::after { animation: none; opacity: 0; }
 
     /* Entry animations → jump to end state */
     .safely-done { animation: none; opacity: 1; transform: none; }
