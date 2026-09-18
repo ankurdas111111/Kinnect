@@ -184,7 +184,8 @@
 {/if}
 
 <style>
-  /* ── Float shell ──────────────────────────────────────────────────────────── */
+  /* ── Float shell — Stitch "SOS Hold Trigger" register: warm paper card,
+     vermilion reserved for the emergency accents, sheet radius 20px ────── */
   .sf {
     position: fixed;
     left: var(--space-4, 16px);
@@ -194,58 +195,51 @@
     width: min(300px, calc(100vw - 96px));
     border-radius: var(--radius-xl);
     overflow: hidden;
-    /* urgent neon glass */
-    background: rgba(8, 3, 3, 0.92);
-    border: 1px solid color-mix(in oklch, var(--danger-500) 40%, transparent);
-    border-top-color: rgba(255, 80, 80, 0.55);
-    box-shadow:
-      0 0 0 1px color-mix(in oklch, var(--danger-500) 15%, transparent),
-      0 8px 32px color-mix(in oklch, var(--danger-500) 28%, transparent),
-      0 2px 8px rgba(0, 0, 0, 0.55),
-      inset 0 1px 0 rgba(255, 255, 255, 0.10);
-    backdrop-filter: blur(28px) saturate(1.6);
-    -webkit-backdrop-filter: blur(28px) saturate(1.6);
-    animation: sf-mount-glow 1.2s var(--ease-out) both, sf-neon-pulse 2.4s ease-in-out 1.2s infinite;
+    background: color-mix(in oklch, var(--surface-1) 94%, transparent);
+    border: 1px solid color-mix(in oklch, var(--danger-500) 35%, transparent);
+    box-shadow: var(--shadow-danger), var(--shadow-lg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    animation: sf-mount-glow 1.2s var(--ease-out) both, sf-beacon 2.2s ease-out 1.2s infinite;
+
+    /* Accent ink that stays AA on paper by day and on dusk paper at night */
+    --sf-danger-ink: var(--danger-600);
+    --sf-success-ink: var(--success-600);
+  }
+  :global(:root[data-theme="dark"]) .sf {
+    --sf-danger-ink: var(--danger-300);
+    --sf-success-ink: var(--success-400);
   }
 
-  @keyframes sf-neon-pulse {
-    0%, 100% {
+  /* Emergency beacon — the Stitch expanding-halo pulse, quiet on paper */
+  @keyframes sf-beacon {
+    0% {
       box-shadow:
-        0 0 0 1px color-mix(in oklch, var(--danger-500) 15%, transparent),
-        0 8px 32px color-mix(in oklch, var(--danger-500) 28%, transparent),
-        0 2px 8px rgba(0, 0, 0, 0.55),
-        inset 0 1px 0 rgba(255, 255, 255, 0.10);
+        0 0 0 0 color-mix(in oklch, var(--danger-500) 30%, transparent),
+        var(--shadow-danger), var(--shadow-lg);
     }
-    50% {
+    70%, 100% {
       box-shadow:
-        0 0 0 2px color-mix(in oklch, var(--danger-500) 28%, transparent),
-        0 8px 48px color-mix(in oklch, var(--danger-500) 40%, transparent),
-        0 2px 8px rgba(0, 0, 0, 0.55),
-        inset 0 1px 0 rgba(255, 255, 255, 0.10);
+        0 0 0 var(--space-3) color-mix(in oklch, var(--danger-500) 0%, transparent),
+        var(--shadow-danger), var(--shadow-lg);
     }
   }
 
   @keyframes sf-mount-glow {
-    0%   {
+    0% {
       box-shadow:
         0 0 0 0 color-mix(in oklch, var(--danger-500) 0%, transparent),
-        0 8px 32px color-mix(in oklch, var(--danger-500) 22%, transparent),
-        0 2px 8px rgba(0, 0, 0, 0.45),
-        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        var(--shadow-danger), var(--shadow-lg);
     }
-    30%  {
+    30% {
       box-shadow:
-        0 0 0 6px color-mix(in oklch, var(--danger-500) 18%, transparent),
-        0 8px 48px color-mix(in oklch, var(--danger-500) 50%, transparent),
-        0 2px 8px rgba(0, 0, 0, 0.45),
-        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        0 0 0 var(--space-1-5) color-mix(in oklch, var(--danger-500) 20%, transparent),
+        var(--shadow-danger), var(--shadow-lg);
     }
     100% {
       box-shadow:
         0 0 0 0 color-mix(in oklch, var(--danger-500) 0%, transparent),
-        0 8px 32px color-mix(in oklch, var(--danger-500) 22%, transparent),
-        0 2px 8px rgba(0, 0, 0, 0.45),
-        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        var(--shadow-danger), var(--shadow-lg);
     }
   }
 
@@ -272,9 +266,9 @@
     width: 100%;
     display: flex;
     align-items: center;
-    gap: 7px;
-    padding: 10px 12px;
-    min-height: 44px;
+    gap: var(--space-2);
+    padding: var(--space-2-5) var(--space-3);
+    min-height: 44px; /* touch-target floor */
     background: transparent;
     border: none;
     cursor: pointer;
@@ -282,24 +276,23 @@
     -webkit-tap-highlight-color: transparent;
     transition: background var(--duration-fast) var(--ease-out);
   }
-  .sf-pill:hover { background: var(--danger-500-12); }
+  .sf-pill:hover { background: var(--danger-500-10); }
 
-  /* Pulsing live dot */
+  /* Pulsing live dot — transform/opacity only (GPU), static glow */
   .sf-pulse {
     flex-shrink: 0;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
+    width: var(--space-2);
+    height: var(--space-2);
+    border-radius: var(--radius-full);
     background: var(--danger-500);
     box-shadow:
-      0 0 6px color-mix(in oklch, var(--danger-500) 80%, transparent),
-      0 0 12px color-mix(in oklch, var(--danger-500) 45%, transparent),
-      0 0 20px color-mix(in oklch, var(--danger-500) 20%, transparent);
+      0 0 var(--space-1-5) color-mix(in oklch, var(--danger-500) 70%, transparent),
+      0 0 var(--space-3) color-mix(in oklch, var(--danger-500) 35%, transparent);
     animation: sf-pulse 1.2s ease-in-out infinite;
   }
   @keyframes sf-pulse {
-    0%, 100% { transform: scale(1);    opacity: 1;   box-shadow: 0 0 6px color-mix(in oklch, var(--danger-500) 80%, transparent), 0 0 12px color-mix(in oklch, var(--danger-500) 45%, transparent); }
-    50%       { transform: scale(1.55); opacity: 0.75; box-shadow: 0 0 10px color-mix(in oklch, var(--danger-500) 90%, transparent), 0 0 22px color-mix(in oklch, var(--danger-500) 60%, transparent), 0 0 36px color-mix(in oklch, var(--danger-500) 25%, transparent); }
+    0%, 100% { transform: scale(1);    opacity: 1; }
+    50%      { transform: scale(1.55); opacity: 0.75; }
   }
 
   /* Blood type badge */
@@ -308,69 +301,69 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 30px;
-    height: 22px;
-    padding: 0 6px;
-    border-radius: 6px;
-    background: color-mix(in oklch, var(--danger-500) 22%, transparent);
-    border: 1px solid color-mix(in oklch, var(--danger-500) 50%, transparent);
-    color: var(--danger-300);
-    font-size: 11px;
+    min-width: var(--space-8);
+    height: var(--space-6);
+    padding: 0 var(--space-1-5);
+    border-radius: var(--radius-sm);
+    background: color-mix(in oklch, var(--danger-500) 12%, transparent);
+    border: 1px solid color-mix(in oklch, var(--danger-500) 40%, transparent);
+    color: var(--sf-danger-ink);
+    font-size: var(--text-2xs);
     font-weight: 800;
     letter-spacing: 0.03em;
     font-variant-numeric: tabular-nums;
-    box-shadow: 0 0 8px color-mix(in oklch, var(--danger-500) 35%, transparent), inset 0 1px 0 rgba(255,255,255,0.12);
   }
 
   .sf-name {
     flex: 1;
-    font-size: 13px;
+    font-size: var(--text-sm);
     font-weight: 700;
-    color: #fff;
+    color: var(--text-primary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     min-width: 0;
   }
 
+  /* Solid vermilion chip — the one loud element on the pill */
   .sf-tag {
     flex-shrink: 0;
-    font-size: 10px;
+    font-size: var(--text-2xs);
     font-weight: 800;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--danger-400);
-    background: color-mix(in oklch, var(--danger-500) 15%, transparent);
-    border: 1px solid color-mix(in oklch, var(--danger-500) 30%, transparent);
-    border-radius: 5px;
-    padding: 2px 6px;
+    color: var(--text-on-danger);
+    background: var(--danger-500);
+    border: none;
+    border-radius: var(--radius-badge);
+    padding: var(--space-0-5) var(--space-1-5);
   }
 
   .sf-more {
     flex-shrink: 0;
-    font-size: 10px;
+    font-size: var(--text-2xs);
     font-weight: 700;
-    color: rgba(255, 255, 255, 0.45);
-    background: rgba(255, 255, 255, 0.08);
-    border-radius: 5px;
-    padding: 2px 5px;
+    color: var(--text-tertiary);
+    background: color-mix(in oklch, var(--text-primary) 8%, transparent);
+    border-radius: var(--radius-sm);
+    padding: var(--space-0-5) var(--space-1);
   }
 
   .sf-chevron {
     flex-shrink: 0;
-    color: rgba(255, 255, 255, 0.35);
+    color: var(--text-tertiary);
     display: flex;
     align-items: center;
     transition: transform var(--duration-normal) var(--ease-spring);
   }
   .sf-chevron-open { transform: rotate(180deg); }
 
-  /* ── Expanded body ─────────────────────────────────────────────────────── */
+  /* ── Expanded body — quiet paper tiers, tonal separation not hard rules ── */
   .sf-body {
-    border-top: 1px solid color-mix(in oklch, var(--danger-500) 18%, transparent);
+    border-top: 1px solid color-mix(in oklch, var(--danger-500) 20%, transparent);
     display: flex;
     flex-direction: column;
-    gap: 1px;
+    gap: var(--space-px);
     max-height: calc(70vh - 44px);
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -383,20 +376,20 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 14px 8px;
+    padding: var(--space-2-5) var(--space-3-5) var(--space-2);
     background: color-mix(in oklch, var(--danger-500) 8%, transparent);
   }
   .sf-bt-label {
-    font-size: 10px;
+    font-size: var(--text-2xs);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.07em;
-    color: var(--danger-400);
+    color: var(--sf-danger-ink);
   }
   .sf-bt-value {
-    font-size: 26px;
-    font-weight: 900;
-    color: var(--danger-300);
+    font-size: var(--text-3xl);
+    font-weight: 800;
+    color: var(--sf-danger-ink);
     letter-spacing: -0.04em;
     line-height: 1;
     font-variant-numeric: tabular-nums;
@@ -407,38 +400,38 @@
   .sf-med-row {
     display: flex;
     align-items: flex-start;
-    gap: 8px;
-    padding: 8px 14px;
-    background: rgba(255, 255, 255, 0.03);
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3-5);
+    background: var(--surface-2);
   }
   .sf-med-row-alert {
-    background: color-mix(in oklch, var(--danger-500) 7%, transparent);
+    background: color-mix(in oklch, var(--danger-500) 8%, transparent);
   }
   .sf-med-icon {
     flex-shrink: 0;
-    color: var(--danger-400);
-    margin-top: 2px;
+    color: var(--sf-danger-ink);
+    margin-top: var(--space-0-5);
     display: flex;
   }
   .sf-med-content {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--space-0-5);
     min-width: 0;
   }
   .sf-med-label {
-    font-size: 9px;
+    font-size: var(--text-2xs);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.07em;
-    color: rgba(255, 255, 255, 0.35);
+    color: var(--text-tertiary);
   }
-  .sf-med-row-alert .sf-med-label { color: var(--danger-400); }
+  .sf-med-row-alert .sf-med-label { color: var(--sf-danger-ink); }
   .sf-med-value {
-    font-size: 12px;
+    font-size: var(--text-sm);
     font-weight: 500;
-    color: rgba(255, 255, 255, 0.85);
-    line-height: 1.45;
+    color: var(--text-primary);
+    line-height: var(--leading-normal);
     word-break: break-word;
   }
 
@@ -446,59 +439,60 @@
   .sf-contacts {
     display: flex;
     flex-direction: column;
-    gap: 1px;
+    gap: var(--space-px);
     border-top: 1px solid color-mix(in oklch, var(--danger-500) 14%, transparent);
   }
   .sf-contacts-heading {
     display: block;
-    font-size: 9px;
+    font-size: var(--text-2xs);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: rgba(255, 255, 255, 0.30);
-    padding: 8px 14px 4px;
+    color: var(--text-tertiary);
+    padding: var(--space-2) var(--space-3-5) var(--space-1);
   }
   .sf-contact {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
-    padding: 7px 14px;
-    background: rgba(255, 255, 255, 0.03);
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3-5);
+    background: var(--surface-2);
   }
   .sf-contact-meta {
     display: flex;
     flex-direction: column;
-    gap: 1px;
+    gap: var(--space-px);
     min-width: 0;
   }
   .sf-contact-name {
-    font-size: 12px;
+    font-size: var(--text-sm);
     font-weight: 700;
-    color: #fff;
+    color: var(--text-primary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
   .sf-contact-rel {
-    font-size: 10px;
-    color: rgba(255, 255, 255, 0.38);
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
     font-weight: 500;
   }
 
+  /* Sage call action — confirmed-safe register, never vermilion */
   .sf-call-btn {
     flex-shrink: 0;
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 6px 10px;
-    min-height: 44px;
+    gap: var(--space-1);
+    padding: var(--space-1-5) var(--space-2-5);
+    min-height: 44px; /* touch-target floor */
     min-width: 44px;
-    border-radius: 9px;
+    border-radius: var(--radius-md);
     background: var(--success-500-20, color-mix(in oklch, var(--success-500) 18%, transparent));
     border: 1px solid color-mix(in oklch, var(--success-500) 35%, transparent);
-    color: var(--success-400);
-    font-size: 11px;
+    color: var(--sf-success-ink);
+    font-size: var(--text-xs);
     font-weight: 700;
     text-decoration: none;
     white-space: nowrap;
@@ -509,7 +503,7 @@
     -webkit-tap-highlight-color: transparent;
   }
   .sf-call-btn:hover {
-    background: color-mix(in oklch, var(--success-500) 28%, transparent);
+    background: var(--success-500-28, color-mix(in oklch, var(--success-500) 28%, transparent));
     transform: scale(1.04);
   }
   @media (hover: none) {
@@ -520,7 +514,7 @@
   .sf-call-btn:active { transform: scale(0.95); }
 
   .sf-phone-link {
-    color: var(--success-400);
+    color: var(--sf-success-ink);
     text-decoration: none;
     font-weight: 600;
   }
@@ -546,10 +540,10 @@
   }
 
   .sf-more-note {
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.30);
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
     text-align: center;
-    padding: 8px 14px;
+    padding: var(--space-2) var(--space-3-5);
     margin: 0;
   }
 </style>
