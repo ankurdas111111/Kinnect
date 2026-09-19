@@ -21,6 +21,18 @@
   import PulseButton from '../components/hub/PulseButton.svelte';
   import InviteStrip from '../components/hub/InviteStrip.svelte';
   import WeeklyRhythm from '../components/hub/WeeklyRhythm.svelte';
+  import CirclesSection from '../components/hub/CirclesSection.svelte';
+  import { setMobileTab } from '../lib/stores/uiShell.js';
+
+  // Everyone = the verdict view (how is everyone doing); Circles = the rooms
+  // you belong to (which groups, who's in each, anything waiting on you).
+  let view = $state('everyone');
+  function goManageCircles() {
+    // Land on the map with the Connect/sharing surface active — create, join,
+    // leave and admin votes all live there.
+    setMobileTab('share');
+    push('/');
+  }
 
   run(() => {
     if (!$authUser) push('/login');
@@ -152,6 +164,32 @@
       </div>
     </section>
 
+    <!-- Everyone (the verdict view) vs Circles (the rooms you belong to) -->
+    <div class="fc-tabs" role="tablist" aria-label="Dashboard view">
+      <button
+        class="fc-tab" class:fc-tab-active={view === 'everyone'}
+        role="tab" aria-selected={view === 'everyone'}
+        onclick={() => (view = 'everyone')}
+      >Everyone</button>
+      <button
+        class="fc-tab" class:fc-tab-active={view === 'circles'}
+        role="tab" aria-selected={view === 'circles'}
+        onclick={() => (view = 'circles')}
+      >Circles{#if $myRooms.length}<span class="fc-tab-count">{$myRooms.length}</span>{/if}</button>
+    </div>
+
+    {#if view === 'circles'}
+    <section class="fc-section" aria-label="Your circles">
+      <CirclesSection
+        rooms={$myRooms}
+        contacts={$myContacts}
+        {members}
+        meId={$authUser?.userId || ''}
+        meName={$authUser?.displayName || ''}
+        onManage={goManageCircles}
+      />
+    </section>
+    {:else}
     <!-- Circle status: continuous quiet paper rows -->
     <section class="fc-section" aria-label="Your circle">
       <div class="fc-section-head">
@@ -254,6 +292,7 @@
     <section class="fc-section" aria-label="Your week">
       <WeeklyRhythm />
     </section>
+    {/if}
 
     <!-- Slim text nav, not a wall of tiles -->
     <nav class="fc-nav" aria-label="More">
@@ -340,6 +379,46 @@
     padding: var(--space-2) var(--space-4) var(--space-8);
     display: flex; flex-direction: column; gap: var(--space-8);
   }
+  /* ── Everyone | Circles — the paper pill switcher (auth's segment idiom) ── */
+  .fc-tabs {
+    display: flex;
+    align-self: flex-start;
+    background: var(--surface-3);
+    border-radius: var(--radius-full);
+    padding: var(--space-1);
+    gap: var(--space-1);
+  }
+  .fc-tab {
+    min-height: 44px;
+    padding: 0 var(--space-5);
+    border: none; cursor: pointer;
+    background: none;
+    border-radius: var(--radius-full);
+    font-family: var(--font-sans);
+    font-size: var(--text-sm); font-weight: 600;
+    color: var(--text-secondary);
+    display: inline-flex; align-items: center; gap: var(--space-2);
+    transition: background var(--duration-fast) var(--ease-out),
+                color var(--duration-fast) var(--ease-out);
+  }
+  .fc-tab:hover { color: var(--text-primary); }
+  .fc-tab:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 2px; }
+  .fc-tab-active {
+    background: var(--surface-1);
+    color: var(--text-primary);
+    box-shadow: var(--shadow-xs);
+  }
+  .fc-tab-count {
+    font-size: var(--text-xs); font-weight: 600;
+    color: var(--primary-700);
+    background: var(--primary-100);
+    border-radius: var(--radius-full);
+    padding: 1px var(--space-2);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .fc-tab { transition: none; }
+  }
+
   .fc-section { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
 
   /* Gentle entrance — opacity/transform only */
