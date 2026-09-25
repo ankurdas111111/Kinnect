@@ -37,6 +37,7 @@ deploy/oracle/edge/.env
 .agents/
 .claude/
 .codex/
+.slash-cli/
 bencium-claude-code-design-skill/
 claude-agentic-framework/
 web-quality-skills/
