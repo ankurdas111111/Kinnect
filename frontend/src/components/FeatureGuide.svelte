@@ -145,6 +145,20 @@
     if (open) currentPage = 0;
   });
 
+  /** Overlay element — focus lands here on open so Escape reaches the handler. */
+  let overlayEl = $state();
+
+  // Third of the three first-run surfaces that declared aria-modal="true" with
+  // no focus management and no Escape. Same fix as OnboardingOverlay and
+  // HubSpotlight: move focus in on open, listen for Escape at the window.
+  $effect(() => {
+    if (!open) return;
+    overlayEl?.focus();
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
   // Icon SVG paths
   const icons = {
     location: 'M12 20s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11z M12 9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z',
@@ -160,7 +174,7 @@
 </script>
 
 {#if open}
-  <div class="guide-overlay" role="dialog" aria-modal="true" aria-label="Feature Guide">
+  <div class="guide-overlay" bind:this={overlayEl} tabindex="-1" role="dialog" aria-modal="true" aria-label="Feature Guide">
     <div class="guide-card">
       <!-- Header -->
       <div class="guide-header">

@@ -16,6 +16,22 @@
 
   const dispatch = createEventDispatcher();
 
+  /** Backdrop element — focus lands here on open so the dialog is keyboard-reachable. */
+  let backdropEl = $state();
+
+  // The Escape handler used to sit on the backdrop div itself, but focus never
+  // moved into it, so the keydown never arrived and Escape silently did nothing.
+  // Listen at the window instead, and move focus in on open: an aria-modal
+  // dialog that leaves focus on <body> tells assistive tech the rest of the page
+  // is inert while stranding the user outside the dialog.
+  $effect(() => {
+    if (!visible) return;
+    backdropEl?.focus();
+    const onKey = (e) => { if (e.key === 'Escape') dispatch('dismiss'); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
   let step = $state(1);
   let contactCode = $state('');
   let adding = $state(false);
@@ -98,7 +114,7 @@
 </script>
 
 {#if visible}
-  <div class="onboarding-backdrop" onclick={self(() => dispatch('dismiss'))} onkeydown={(e) => { if (e.key === 'Escape') dispatch('dismiss'); }} role="dialog" aria-modal="true" aria-label="Get started" tabindex="-1">
+  <div class="onboarding-backdrop" bind:this={backdropEl} onclick={self(() => dispatch('dismiss'))} role="dialog" aria-modal="true" aria-label="Get started" tabindex="-1">
     <div class="onboarding-card">
       <!-- Step indicators -->
       <div class="step-indicators" aria-label="Step {step} of 3">

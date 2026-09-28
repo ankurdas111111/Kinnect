@@ -7,7 +7,17 @@
 
   const SEEN_KEY = 'kinnect_hub_seen_v2';
 
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [blocked] Another first-run surface owns the screen.
+   */
+
+  /** @type {Props} */
+  let { blocked = false } = $props();
+
   let visible = $state(false);
+  /** Overlay element — focus lands here on open so Escape reaches the handler. */
+  let overlayEl = $state();
   let hole = $state({ x: 0, y: 0, w: 0, h: 0 });
   let tooltipLeft = $state(0);
   let tooltipTop = $state(0);
@@ -24,11 +34,19 @@
     { color: 'var(--member-4)',    label: 'Check-ins',         desc: 'Scheduled safety pings'    },
   ];
 
+  // This coach mark fires at 1400ms; the onboarding overlay fires at 800ms.
+  // Both declare aria-modal="true", so before this guard a new user met two
+  // concurrent modal dialogs — each telling assistive tech the other was inert —
+  // with two competing "Maybe later" buttons. Location permission has to come
+  // first: the product is inert without it. If onboarding is still up when the
+  // timer lands we simply skip, and because SEEN_KEY is left unset the tour
+  // still gets its turn on a later visit.
   onMount(() => {
     if (localStorage.getItem(SEEN_KEY)) return;
     if (window.innerWidth < 768) return; // desktop only — navbar hidden on mobile
 
     setTimeout(() => {
+      if (blocked) return;
       const btn = document.querySelector('.nav-dashboard-btn');
       if (!btn) return;
       const r = btn.getBoundingClientRect();
@@ -42,6 +60,17 @@
       }
       visible = true;
     }, 1400);
+  });
+
+  // Move focus in on open and listen for Escape at the window. This overlay
+  // declared aria-modal="true" but had no focus management and no Escape at all,
+  // so keyboard users could neither reach it nor leave it.
+  $effect(() => {
+    if (!visible) return;
+    overlayEl?.focus();
+    const onKey = (e) => { if (e.key === 'Escape') dismiss(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   });
 
   function dismiss() {
@@ -61,6 +90,8 @@
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
     class="hs-overlay"
+    bind:this={overlayEl}
+    tabindex="-1"
     role="dialog"
     aria-modal="true"
     aria-label="Discover the Hub"

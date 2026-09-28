@@ -1087,8 +1087,10 @@
       <!-- Particle burst confirmation — fires once when user sends their own SOS -->
       <SosParticleBurst active={sosParticleBurstActive} on:done={() => sosParticleBurstActive = false} />
 
-      <!-- First-run Hub discovery coach mark (desktop only, shows once) -->
-      <HubSpotlight />
+      <!-- First-run Hub discovery coach mark (desktop only, shows once).
+           Suppressed while onboarding is up so only one first-run surface can
+           own the screen at a time — permission first, tour second. -->
+      <HubSpotlight blocked={showOnboarding} />
 
       <!-- SOS FAB — always visible bottom-left.
            Fix #2: inline style overrides the CSS @media bottom value on mobile so the FAB
