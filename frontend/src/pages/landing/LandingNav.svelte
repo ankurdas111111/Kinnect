@@ -119,17 +119,22 @@
     gap: var(--space-3);
   }
 
+  /* Sign In is one of two primary entry points, not secondary nav: hiding it
+     below 40rem left returning phone users with no way back in, since there is
+     no hamburger to fall back to. It stays at every width; .nav-links is what
+     collapses. Padding tightens on narrow screens so both CTAs still fit. */
   .lp-signin {
-    display: none;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     min-height: 44px; /* touch floor */
-    padding-inline: var(--space-4);
+    padding-inline: var(--space-2);
     font-size: var(--text-sm);
     font-weight: 500;
     color: var(--text-primary);
     text-decoration: none;
     border-radius: var(--radius-md);
+    white-space: nowrap;
     transition: color var(--duration-normal) var(--ease-out);
   }
 
@@ -167,7 +172,7 @@
 
   @media (min-width: 40rem) {
     .lp-version { display: inline-block; }
-    .lp-signin  { display: inline-flex; }
+    .lp-signin  { padding-inline: var(--space-4); }
   }
 
   @media (min-width: 60rem) {

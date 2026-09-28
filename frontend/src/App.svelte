@@ -89,12 +89,89 @@
 <a href="#main-content" class="skip-nav">Skip to main content</a>
 
 <main id="main-content">
-  <Router {routes} on:conditionsFailed={conditionsFailed} />
+  <!-- Without a boundary, a single thrown render error anywhere in the tree
+       unmounts the whole app and leaves a blank page with no way back. In a
+       product whose job is telling you your family is safe, a white screen is
+       the worst possible failure mode: it is indistinguishable from "everyone
+       is fine". Keep the shell alive and offer a route out. -->
+  <svelte:boundary onerror={(e) => console.error('[route boundary]', e)}>
+    <Router {routes} on:conditionsFailed={conditionsFailed} />
+
+    {#snippet failed(error, reset)}
+      <div class="route-error" role="alert">
+        <h1>Something went wrong on this screen.</h1>
+        <p>The rest of Kinnect is still running. You can retry this screen, or go back to the map.</p>
+        <div class="route-error-actions">
+          <button class="route-error-btn" onclick={reset}>Try again</button>
+          <a class="route-error-link" href="#/" onclick={() => setTimeout(reset, 0)}>Back to the map</a>
+        </div>
+        {#if error?.message}
+          <p class="route-error-detail">{error.message}</p>
+        {/if}
+      </div>
+    {/snippet}
+  </svelte:boundary>
 </main>
 
 <Toast />
 
 <style>
+  /* Route-level error fallback. Uses HEARTH tokens so a failure still looks
+     like Kinnect rather than an unstyled browser error. */
+  .route-error {
+    max-width: 34rem;
+    margin: 0 auto;
+    padding: var(--space-8, 32px) var(--space-5, 20px);
+    text-align: center;
+    color: var(--text-primary, #38332e);
+  }
+  .route-error h1 {
+    font-family: var(--font-serif, Newsreader, serif);
+    font-style: italic;
+    font-weight: 400;
+    font-size: var(--text-2xl, 1.75rem);
+    margin: 0 0 var(--space-3, 12px);
+  }
+  .route-error p {
+    color: var(--text-secondary, #6b625a);
+    margin: 0 0 var(--space-5, 20px);
+  }
+  .route-error-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3, 12px);
+    justify-content: center;
+  }
+  .route-error-btn,
+  .route-error-link {
+    min-height: 44px; /* touch floor */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding-inline: var(--space-5, 20px);
+    border-radius: var(--radius-lg, 12px);
+    font-size: var(--text-base, 1rem);
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .route-error-btn {
+    border: none;
+    background: var(--primary-600, #b0511f);
+    color: var(--text-on-primary, #fff);
+  }
+  .route-error-link {
+    border: 1px solid var(--border-default, #e6dcd2);
+    background: transparent;
+    color: var(--text-primary, #38332e);
+  }
+  .route-error-detail {
+    margin-top: var(--space-5, 20px);
+    font-size: var(--text-xs, 0.75rem);
+    color: var(--text-tertiary, #8a7268);
+    word-break: break-word;
+  }
+
   /* Skip nav: visually hidden until focused, then overlays the top of the page */
   .skip-nav {
     position: fixed;

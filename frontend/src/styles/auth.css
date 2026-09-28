@@ -547,7 +547,12 @@
   padding: var(--space-3) var(--space-5);
   border: none;
   border-radius: var(--radius-lg);
-  background: var(--primary-500);
+  /* primary-600, not -500: the label is 16px, so it needs 4.5:1 rather than the
+     3:1 large-text floor, and ember-500 (#c65d28) measured 4.47:1 against white
+     on the rendered button. This is the app's single most important CTA — it
+     should not be the one control that misses AA. Same reasoning the token file
+     already applies to small ember text via --primary-700. */
+  background: var(--primary-600);
   color: var(--text-on-primary);
   font-family: var(--font-sans);
   font-size: var(--text-base);
