@@ -19,6 +19,20 @@ type gzipResponseWriter struct {
 	http.ResponseWriter
 	gz          *gzip.Writer
 	wroteHeader bool
+	// passthrough is set when the handler below supplied its own
+	// Content-Encoding (serveStaticCompressed shipping a precompressed .br/.gz
+	// sibling). Gzipping those bytes would double-compress them and leave the
+	// stream mislabelled as the inner encoding.
+	passthrough bool
+}
+
+// decide latches whether this response is ours to gzip. It must run before the
+// first byte reaches the client, and only once - the handler may set
+// Content-Encoding any time before that.
+func (g *gzipResponseWriter) decide() {
+	enc := g.Header().Get("Content-Encoding")
+	g.passthrough = enc != "" && !strings.EqualFold(enc, "gzip")
+	g.wroteHeader = true
 }
 
 func (g *gzipResponseWriter) Write(b []byte) (int, error) {
@@ -26,19 +40,30 @@ func (g *gzipResponseWriter) Write(b []byte) (int, error) {
 		if g.Header().Get("Content-Type") == "" {
 			g.Header().Set("Content-Type", http.DetectContentType(b))
 		}
-		g.wroteHeader = true
+		g.decide()
+	}
+	if g.passthrough {
+		return g.ResponseWriter.Write(b)
 	}
 	return g.gz.Write(b)
 }
 
 func (g *gzipResponseWriter) WriteHeader(code int) {
-	g.Header().Del("Content-Length")
-	g.wroteHeader = true
+	if !g.wroteHeader {
+		g.decide()
+	}
+	// Length is only unknown when we recompress; a passed-through body keeps
+	// the Content-Length its handler already computed.
+	if !g.passthrough {
+		g.Header().Del("Content-Length")
+	}
 	g.ResponseWriter.WriteHeader(code)
 }
 
 func (g *gzipResponseWriter) Flush() {
-	g.gz.Flush()
+	if !g.passthrough {
+		g.gz.Flush()
+	}
 	if f, ok := g.ResponseWriter.(http.Flusher); ok {
 		f.Flush()
 	}
@@ -86,7 +111,10 @@ func GzipMiddleware(next http.Handler) http.Handler {
 
 		grw := &gzipResponseWriter{ResponseWriter: w, gz: gz}
 		next.ServeHTTP(grw, r)
-		gz.Close()
+		// Closing would emit a gzip trailer over a body we never compressed.
+		if !grw.passthrough {
+			gz.Close()
+		}
 	})
 }
 
